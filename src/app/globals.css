@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-brand-dark text-white;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Tabular numbers for data tables */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-brand-dark;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-brand-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-brand-muted;
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1e1e2e #0a0a0f;
+  }
+}
+
+@layer components {
+  /* Glassmorphism card */
+  .glass-card {
+    @apply bg-brand-card/80 backdrop-blur-xl border border-brand-border rounded-xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-200 hover:bg-brand-card-hover hover:border-brand-muted/30;
+  }
+
+  /* Gold gradient text */
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-brand-gold to-yellow-400 bg-clip-text text-transparent;
+  }
+
+  /* Purple accent gradient */
+  .text-gradient-purple {
+    @apply bg-gradient-to-r from-brand-accent to-purple-400 bg-clip-text text-transparent;
+  }
+
+  /* Table row hover effect */
+  .table-row-hover {
+    @apply transition-colors duration-150 hover:bg-brand-card-hover/50;
+  }
+
+  /* Positive/Negative value colors */
+  .value-positive {
+    @apply text-brand-green;
+  }
+
+  .value-negative {
+    @apply text-brand-red;
+  }
+
+  /* Tier badges */
+  .badge-elite {
+    @apply bg-brand-gold/10 text-brand-gold border border-brand-gold/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-pro {
+    @apply bg-brand-accent/10 text-brand-accent border border-brand-accent/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-free {
+    @apply bg-brand-muted/10 text-brand-muted border border-brand-muted/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* Direction badges */
+  .badge-bullish {
+    @apply bg-brand-green/10 text-brand-green border border-brand-green/20 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .badge-bearish {
+    @apply bg-brand-red/10 text-brand-red border border-brand-red/20 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .badge-neutral {
+    @apply bg-brand-muted/10 text-brand-muted border border-brand-muted/20 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  /* Glow effect for elite elements */
+  .glow-gold {
+    box-shadow: 0 0 20px rgba(247, 183, 49, 0.15);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+  }
+}
+
+@layer utilities {
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+}

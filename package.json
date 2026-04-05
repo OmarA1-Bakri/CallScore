@@ -1,0 +1,41 @@
+{
+  "name": "crypto-tuber-ranked",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "seed": "tsx src/scripts/seed-creators.ts",
+    "scrape": "tsx src/scripts/scrape-transcripts.ts",
+    "extract": "tsx src/scripts/extract-calls.ts",
+    "match": "tsx src/scripts/match-prices.ts",
+    "score": "tsx src/scripts/compute-scores.ts",
+    "consensus": "tsx src/scripts/detect-consensus.ts",
+    "pipeline": "npm run scrape && npm run extract && npm run match && npm run score && npm run consensus",
+    "db:migrate": "tsx src/scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@neondatabase/serverless": "^0.10.0",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.460.0",
+    "next": "14.2.21",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.21",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
