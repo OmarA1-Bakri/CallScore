@@ -4,7 +4,10 @@ import { query } from "../lib/db";
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
-  const envPath = path.resolve(__dirname, "../../.env");
+  const root = path.resolve(__dirname, "../..");
+  const envPath = fs.existsSync(path.join(root, ".env.local"))
+    ? path.join(root, ".env.local")
+    : path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, "utf-8").split("\n");
   for (const raw of lines) {
@@ -32,26 +35,26 @@ interface CreatorSeed {
 }
 
 const CREATORS: readonly CreatorSeed[] = [
-  { name: "Altcoin Daily", youtube_handle: "@AltcoinDaily", subscribers: "1.66M", focus: "Daily altcoin picks, specific coin calls" },
-  { name: "Discover Crypto", youtube_handle: "@DiscoverCrypto", subscribers: "1.4M", focus: "Solana analysis, altseason picks" },
-  { name: "Alex Becker", youtube_handle: "@AlexBeckersChannel", subscribers: "1.44M", focus: "Bold altcoin calls, AI crypto, metaverse" },
-  { name: "Crypto Banter", youtube_handle: "@CryptoBanter", subscribers: "1.18M", focus: "Live market analysis, daily trade calls" },
-  { name: "EllioTrades", youtube_handle: "@EllioTrades", subscribers: "636K", focus: "DeFi gems, early altcoin calls" },
-  { name: "Benjamin Cowen", youtube_handle: "@BenjaminCowen", subscribers: "972K", focus: "Quantitative analysis, cycle timing" },
-  { name: "Lark Davis", youtube_handle: "@LarkDavis", subscribers: "638K", focus: "Altcoin gem hunting, portfolio updates" },
-  { name: "The Moon (Carl)", youtube_handle: "@TheMoon", subscribers: "657K", focus: "Bold price targets, TA-based calls" },
-  { name: "Crypto Capital Venture", youtube_handle: "@CryptoCapitalVenture", subscribers: "350K", focus: "Price predictions, mid-cap alts" },
+  { name: "Altcoin Daily", youtube_handle: "@AltcoinDaily", subscribers: "1.65M", focus: "Daily altcoin picks, BTC/ETH/ADA/SOL, AI tokens" },
+  { name: "Alex Becker", youtube_handle: "@AlexBeckersChannel", subscribers: "1.6M", focus: "Bold altcoin calls, AI crypto (RENDER, FET, TAO)" },
+  { name: "Discover Crypto", youtube_handle: "@DiscoverCrypto_", subscribers: "1.4M", focus: "SOL ecosystem, broad altcoin analysis" },
+  { name: "Benjamin Cowen", youtube_handle: "@intothecryptoverse", subscribers: "817K", focus: "Quantitative cycle analysis, BTC/ETH/ADA/DOT" },
+  { name: "CryptosRUs", youtube_handle: "@CryptosRUs", subscribers: "810K", focus: "Daily BTC/ETH updates, broad alt coverage" },
+  { name: "Crypto Banter", youtube_handle: "@CryptoBanterGroup", subscribers: "795K", focus: "Live trade calls, daily market analysis" },
+  { name: "Sheldon Evans", youtube_handle: "@SheldonEvansX", subscribers: "700K", focus: "Altcoin picks, sustainable investing approach" },
+  { name: "The Moon Carl", youtube_handle: "@TheMoon", subscribers: "657K", focus: "Bold BTC price targets, TA-based calls" },
+  { name: "Lark Davis", youtube_handle: "@TheCryptoLark", subscribers: "640K", focus: "Altcoin gems, SUI/NEAR, portfolio strategy" },
+  { name: "DataDash", youtube_handle: "@DataDash", subscribers: "511K", focus: "Data-driven macro + crypto, LINK/DOT analysis" },
+  { name: "InvestAnswers", youtube_handle: "@InvestAnswers", subscribers: "450K", focus: "Data-driven buy/sell calls with explicit targets" },
+  { name: "Crypto Capital Venture", youtube_handle: "@CryptoCapitalVenture", subscribers: "402K", focus: "ADA champion, mid-cap alt predictions" },
+  { name: "Austin Hilton", youtube_handle: "@AustinHilton", subscribers: "359K", focus: "Daily altcoin plays, DOGE, meme coins" },
+  { name: "Michael Wrubel", youtube_handle: "@MichaelWrubel", subscribers: "315K", focus: "Undervalued alts, honest quick reviews" },
+  { name: "Satoshi Stacker", youtube_handle: "@StackerSatoshi", subscribers: "300K", focus: "Daily BTC + altcoin picks, AI/gaming crypto" },
   { name: "Crypto Zombie", youtube_handle: "@CryptoZombie", subscribers: "263K", focus: "Daily altcoin alerts, specific entries" },
-  { name: "Coin Bureau", youtube_handle: "@CoinBureau", subscribers: "2.7M", focus: "Deep analysis, project reviews" },
-  { name: "CryptosRUs", youtube_handle: "@CryptosRUs", subscribers: "810K", focus: "Daily updates, BTC analysis" },
-  { name: "DataDash", youtube_handle: "@DataDash", subscribers: "510K", focus: "Macro + crypto crossover" },
-  { name: "Jacob Crypto Bury", youtube_handle: "@JacobCryptoBury", subscribers: "58K", focus: "Early small-cap gems" },
-  { name: "Michael Wrubel", youtube_handle: "@MichaelWrubel", subscribers: "315K", focus: "Quick updates, honest reviews" },
-  { name: "Crypto Jebb", youtube_handle: "@CryptoJebb", subscribers: "247K", focus: "TA, chart patterns, price targets" },
-  { name: "Ivan on Tech", youtube_handle: "@IvanOnTech", subscribers: "534K", focus: "Tech + market calls" },
-  { name: "Crypto ZEUS", youtube_handle: "@CryptoZEUS", subscribers: "77K", focus: "Meme coin analysis, presale picks" },
-  { name: "Crypto Tips", youtube_handle: "@CryptoTips", subscribers: "215K", focus: "Trading guidance, altcoin picks" },
-  { name: "BitBoy Crypto", youtube_handle: "@BitBoyCryptoV2", subscribers: "117K", focus: "Specific predictions, controversial" },
+  { name: "Crypto Jebb", youtube_handle: "@CryptoJebb", subscribers: "248K", focus: "TA chart patterns, price targets" },
+  { name: "Crypto Rover", youtube_handle: "@CryptoRover", subscribers: "210K", focus: "Daily BTC/SOL calls, altcoin analysis" },
+  { name: "Miles Deutscher", youtube_handle: "@milesdeutscher1357", subscribers: "100K", focus: "Specific entries/exits, SUI/INJ/RENDER/FET" },
+  { name: "Jacob Crypto Bury", youtube_handle: "@JacobCryptoBury", subscribers: "58K", focus: "Early small-cap gems, PENDLE/AR" },
 ] as const;
 
 async function main(): Promise<void> {

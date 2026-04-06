@@ -9,11 +9,14 @@ import {
   didHitTarget,
   computeRegimeDifficulty,
 } from "../lib/scoring";
-import type { Call, Direction } from "../lib/types";
+import type { Direction } from "../lib/types";
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
-  const envPath = path.resolve(__dirname, "../../.env");
+  const root = path.resolve(__dirname, "../..");
+  const envPath = fs.existsSync(path.join(root, ".env.local"))
+    ? path.join(root, ".env.local")
+    : path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, "utf-8").split("\n");
   for (const raw of lines) {
@@ -33,61 +36,68 @@ function timestamp(): string {
   return new Date().toISOString();
 }
 
-interface CandleRow {
+// ── In-memory price cache ─────────────────────────────────────────
+// Key: `${symbol}:${roundedMs}` → { close, regime }
+// Rounds timestamps to 5-min intervals to maximize cache hits.
+const ROUND_MS = 5 * 60 * 1000; // 5 min
+const priceCache = new Map<string, { close: number; regime: number | null } | null>();
+
+function roundTime(ms: number): number {
+  return Math.floor(ms / ROUND_MS) * ROUND_MS;
+}
+
+function cacheKey(symbol: string, ms: number): string {
+  return `${symbol}:${roundTime(ms)}`;
+}
+
+interface CandleResult {
   readonly close: number;
+  readonly regime: number | null;
 }
 
-interface RegimeRow {
-  readonly regime: number;
-}
+async function getCandleAt(symbol: string, dateMs: number): Promise<CandleResult | null> {
+  const key = cacheKey(symbol, dateMs);
+  if (priceCache.has(key)) {
+    return priceCache.get(key) ?? null;
+  }
 
-interface HighLowRow {
-  readonly max_high: number | null;
-  readonly min_low: number | null;
-}
-
-/**
- * Look up the closest candle price at or before a given timestamp.
- */
-async function getPriceAt(symbol: string, dateMs: number): Promise<number | null> {
-  const isoDate = new Date(dateMs).toISOString();
-  const rows = await query<CandleRow>(
-    "SELECT close FROM candles WHERE symbol = $1 AND open_time <= $2 ORDER BY open_time DESC LIMIT 1",
-    [symbol, isoDate],
+  const rows = await query<{ close: number; regime: number | null }>(
+    "SELECT close, regime FROM candles WHERE symbol = $1 AND open_time <= $2 ORDER BY open_time DESC LIMIT 1",
+    [symbol, dateMs],
   );
-  return rows.length > 0 ? rows[0].close : null;
+
+  const result = rows.length > 0 ? { close: rows[0].close, regime: rows[0].regime } : null;
+  priceCache.set(key, result);
+  return result;
 }
 
-/**
- * Look up the market regime at a given timestamp.
- */
-async function getRegimeAt(symbol: string, dateMs: number): Promise<number | null> {
-  const isoDate = new Date(dateMs).toISOString();
-  const rows = await query<RegimeRow>(
-    "SELECT regime FROM candles WHERE symbol = $1 AND open_time <= $2 ORDER BY open_time DESC LIMIT 1",
-    [symbol, isoDate],
-  );
-  return rows.length > 0 ? rows[0].regime : null;
-}
+// ── High/Low cache ────────────────────────────────────────────────
+const highLowCache = new Map<string, { maxHigh: number | null; minLow: number | null }>();
 
-/**
- * Get the highest high and lowest low between two timestamps.
- */
 async function getHighLowBetween(
   symbol: string,
   fromMs: number,
   toMs: number,
 ): Promise<{ maxHigh: number | null; minLow: number | null }> {
-  const fromIso = new Date(fromMs).toISOString();
-  const toIso = new Date(toMs).toISOString();
-  const rows = await query<HighLowRow>(
+  const key = `${symbol}:${roundTime(fromMs)}:${roundTime(toMs)}`;
+  if (highLowCache.has(key)) {
+    return highLowCache.get(key)!;
+  }
+
+  const rows = await query<{ max_high: number | null; min_low: number | null }>(
     "SELECT MAX(high) as max_high, MIN(low) as min_low FROM candles WHERE symbol = $1 AND open_time >= $2 AND open_time <= $3",
-    [symbol, fromIso, toIso],
+    [symbol, fromMs, toMs],
   );
-  if (rows.length === 0) return { maxHigh: null, minLow: null };
-  return { maxHigh: rows[0].max_high, minLow: rows[0].min_low };
+
+  const result = rows.length === 0
+    ? { maxHigh: null, minLow: null }
+    : { maxHigh: rows[0].max_high, minLow: rows[0].min_low };
+
+  highLowCache.set(key, result);
+  return result;
 }
 
+// ── Process a single call ─────────────────────────────────────────
 interface UnmatchedCall {
   readonly id: number;
   readonly symbol: string;
@@ -98,26 +108,30 @@ interface UnmatchedCall {
 
 async function processCall(call: UnmatchedCall): Promise<boolean> {
   const callDateMs = new Date(call.call_date).getTime();
-  if (isNaN(callDateMs)) {
-    console.error(`[${timestamp()}]   Invalid call_date for call ${call.id}`);
-    return false;
-  }
+  if (isNaN(callDateMs)) return false;
 
-  // Look up coin prices
-  const priceAtCall = await getPriceAt(call.symbol, callDateMs);
-  if (priceAtCall === null) {
-    return false; // No candle data for this coin at this time
-  }
+  // Fetch all needed prices (coin + BTC at 4 timestamps each) using cache
+  const [coinNow, coin7d, coin30d, coin90d, btcNow, btc7d, btc30d, btc90d] = await Promise.all([
+    getCandleAt(call.symbol, callDateMs),
+    getCandleAt(call.symbol, callDateMs + MS_7D),
+    getCandleAt(call.symbol, callDateMs + MS_30D),
+    getCandleAt(call.symbol, callDateMs + MS_90D),
+    getCandleAt("BTCUSDT", callDateMs),
+    getCandleAt("BTCUSDT", callDateMs + MS_7D),
+    getCandleAt("BTCUSDT", callDateMs + MS_30D),
+    getCandleAt("BTCUSDT", callDateMs + MS_90D),
+  ]);
 
-  const price7d = await getPriceAt(call.symbol, callDateMs + MS_7D);
-  const price30d = await getPriceAt(call.symbol, callDateMs + MS_30D);
-  const price90d = await getPriceAt(call.symbol, callDateMs + MS_90D);
+  if (!coinNow) return false; // No candle data for this symbol
 
-  // Look up BTC prices at same timestamps
-  const btcPriceAtCall = await getPriceAt("BTCUSDT", callDateMs);
-  const btcPrice7d = await getPriceAt("BTCUSDT", callDateMs + MS_7D);
-  const btcPrice30d = await getPriceAt("BTCUSDT", callDateMs + MS_30D);
-  const btcPrice90d = await getPriceAt("BTCUSDT", callDateMs + MS_90D);
+  const priceAtCall = coinNow.close;
+  const price7d = coin7d?.close ?? null;
+  const price30d = coin30d?.close ?? null;
+  const price90d = coin90d?.close ?? null;
+  const btcPriceAtCall = btcNow?.close ?? null;
+  const btcPrice7d = btc7d?.close ?? null;
+  const btcPrice30d = btc30d?.close ?? null;
+  const btcPrice90d = btc90d?.close ?? null;
 
   // Compute returns
   const return7d = price7d !== null ? computeReturn(priceAtCall, price7d) : null;
@@ -159,7 +173,7 @@ async function processCall(call: UnmatchedCall): Promise<boolean> {
   const hitTarget = didHitTarget(direction, call.target_price, maxHigh, minLow);
 
   // Regime at call time
-  const regimeAtCall = await getRegimeAt(call.symbol, callDateMs);
+  const regimeAtCall = coinNow.regime;
   const regimeDifficulty = computeRegimeDifficulty(direction, regimeAtCall);
 
   // Update the call row
@@ -210,31 +224,32 @@ async function processCall(call: UnmatchedCall): Promise<boolean> {
   return true;
 }
 
+// ── Main ──────────────────────────────────────────────────────────
 async function main(): Promise<void> {
   loadEnv();
 
-  console.log(`[${timestamp()}] Starting price matching...`);
+  console.log(`[${timestamp()}] Starting price matching (with cache)...`);
 
-  // Process in batches of 50
-  const BATCH_SIZE = 50;
+  const BATCH_SIZE = 200;
   let totalMatched = 0;
   let totalSkipped = 0;
-  let offset = 0;
+  let lastId = 0;
 
   while (true) {
+    // Use cursor-based pagination (faster than OFFSET for large datasets)
     const batch = await query<UnmatchedCall>(
       `SELECT id, symbol, direction, target_price, call_date
        FROM calls
-       WHERE price_at_call IS NULL
-       ORDER BY call_date DESC
-       LIMIT $1 OFFSET $2`,
-      [BATCH_SIZE, offset],
+       WHERE price_at_call IS NULL AND id > $1
+       ORDER BY id ASC
+       LIMIT $2`,
+      [lastId, BATCH_SIZE],
     );
 
     if (batch.length === 0) break;
 
     console.log(
-      `[${timestamp()}] Processing batch: ${batch.length} calls (offset ${offset})`,
+      `[${timestamp()}] Processing batch of ${batch.length} (from id ${batch[0].id}, cache size: ${priceCache.size})`,
     );
 
     for (const call of batch) {
@@ -250,20 +265,18 @@ async function main(): Promise<void> {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[${timestamp()}]   Error matching call ${call.id}: ${msg}`);
       }
+      lastId = call.id;
     }
 
     console.log(
-      `[${timestamp()}] Batch done: ${totalMatched} matched, ${totalSkipped} skipped so far`,
+      `[${timestamp()}] Batch done: ${totalMatched} matched, ${totalSkipped} skipped (total)`,
     );
-
-    // If we got fewer than BATCH_SIZE, we're done
-    if (batch.length < BATCH_SIZE) break;
-    offset += BATCH_SIZE;
   }
 
   console.log(
     `[${timestamp()}] Price matching complete: ${totalMatched} matched, ${totalSkipped} skipped`,
   );
+  console.log(`[${timestamp()}] Cache stats: ${priceCache.size} price entries, ${highLowCache.size} high/low entries`);
 }
 
 main().catch((err) => {

@@ -12,7 +12,10 @@ import { computeReturn } from "../lib/scoring";
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
-  const envPath = path.resolve(__dirname, "../../.env");
+  const root = path.resolve(__dirname, "../..");
+  const envPath = fs.existsSync(path.join(root, ".env.local"))
+    ? path.join(root, ".env.local")
+    : path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, "utf-8").split("\n");
   for (const raw of lines) {
@@ -53,10 +56,9 @@ interface CandleRow {
 }
 
 async function getPriceAt(symbol: string, dateMs: number): Promise<number | null> {
-  const isoDate = new Date(dateMs).toISOString();
   const rows = await query<CandleRow>(
     "SELECT close FROM candles WHERE symbol = $1 AND open_time <= $2 ORDER BY open_time DESC LIMIT 1",
-    [symbol, isoDate],
+    [symbol, dateMs],
   );
   return rows.length > 0 ? rows[0].close : null;
 }

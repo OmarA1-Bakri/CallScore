@@ -138,6 +138,18 @@ const FAQ_ITEMS: readonly FaqItem[] = [
   },
 ] as const;
 
+function getCheckoutUrl(tierName: string): string {
+  if (tierName === "Elite") {
+    const planId = process.env.WHOP_ELITE_PLAN_ID;
+    return planId ? `https://whop.com/checkout/${planId}` : "#";
+  }
+  if (tierName === "Pro") {
+    const planId = process.env.WHOP_PRO_PLAN_ID;
+    return planId ? `https://whop.com/checkout/${planId}` : "#";
+  }
+  return "/";
+}
+
 export default function PricingPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -202,7 +214,7 @@ export default function PricingPage() {
               <p className="text-gray-400 text-sm mb-6">{tier.tagline}</p>
 
               <Link
-                href="#"
+                href={getCheckoutUrl(tier.name)}
                 className={`block text-center font-semibold text-sm px-4 py-2.5 rounded-lg transition-colors mb-6 ${tier.ctaBg}`}
               >
                 {tier.cta}

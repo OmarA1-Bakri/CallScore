@@ -129,7 +129,7 @@ function LeaderboardTable({
                         {row.creator.name}
                       </p>
                       <p className="text-gray-500 text-xs truncate">
-                        @{row.creator.youtube_handle}
+                        {row.creator.youtube_handle}
                       </p>
                     </div>
                     <ArrowUpRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-brand-gold transition-colors shrink-0 hidden md:block" />

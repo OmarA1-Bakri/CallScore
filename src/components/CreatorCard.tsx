@@ -59,7 +59,7 @@ export default function CreatorCard({ creator, stats, trend }: CreatorCardProps)
             <TrendIcon trend={trend} />
           </div>
           <p className="text-gray-500 text-xs truncate flex items-center gap-1">
-            @{creator.youtube_handle}
+            {creator.youtube_handle}
             <ExternalLink className="w-3 h-3" />
           </p>
         </div>

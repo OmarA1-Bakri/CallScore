@@ -1,12 +1,16 @@
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
+import { YoutubeTranscript } from "youtube-transcript";
 import { query } from "../lib/db";
 import type { Creator } from "../lib/types";
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
-  const envPath = path.resolve(__dirname, "../../.env");
+  const root = path.resolve(__dirname, "../..");
+  const envPath = fs.existsSync(path.join(root, ".env.local"))
+    ? path.join(root, ".env.local")
+    : path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, "utf-8").split("\n");
   for (const raw of lines) {
@@ -26,57 +30,8 @@ function timestamp(): string {
   return new Date().toISOString();
 }
 
-const TEMP_DIR = path.resolve(__dirname, "../../temp");
-
-function ensureTempDir(): void {
-  if (!fs.existsSync(TEMP_DIR)) {
-    fs.mkdirSync(TEMP_DIR, { recursive: true });
-  }
-}
-
-function cleanTempDir(): void {
-  if (!fs.existsSync(TEMP_DIR)) return;
-  const files = fs.readdirSync(TEMP_DIR);
-  for (const file of files) {
-    try {
-      fs.unlinkSync(path.join(TEMP_DIR, file));
-    } catch {
-      // ignore cleanup errors
-    }
-  }
-}
-
-/**
- * Parse VTT subtitle content into clean plaintext.
- * Removes timestamps, metadata headers, deduplicates lines, strips HTML tags.
- */
-function parseVtt(content: string): string {
-  const lines = content.split("\n");
-  const textLines: string[] = [];
-  const seen = new Set<string>();
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (
-      !line ||
-      line.includes("-->") ||
-      line.startsWith("WEBVTT") ||
-      line.startsWith("Kind:") ||
-      line.startsWith("Language:") ||
-      line.startsWith("NOTE")
-    ) {
-      continue;
-    }
-    // Skip numeric-only lines (cue identifiers)
-    if (/^\d+$/.test(line)) continue;
-
-    const clean = line.replace(/<[^>]+>/g, "");
-    if (clean && !seen.has(clean)) {
-      seen.add(clean);
-      textLines.push(clean);
-    }
-  }
-  return textLines.join("\n");
-}
+/** Max videos to scrape per creator per run (most recent first). */
+const MAX_VIDEOS_PER_CREATOR = 60;
 
 /**
  * Compute transcript quality score (0-1) based on:
@@ -117,9 +72,9 @@ function computeTranscriptQuality(text: string): number {
 function fetchVideoList(
   handle: string,
 ): readonly { id: string; title: string; uploadDate: string | null }[] {
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const dateAfter = sixMonthsAgo.toISOString().slice(0, 10).replace(/-/g, "");
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const dateAfter = twelveMonthsAgo.toISOString().slice(0, 10).replace(/-/g, "");
 
   try {
     const output = execSync(
@@ -139,7 +94,8 @@ function fetchVideoList(
         });
       }
     }
-    return results;
+    // Return only the most recent N videos
+    return results.slice(0, MAX_VIDEOS_PER_CREATOR);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[${timestamp()}] Failed to fetch video list for ${handle}: ${msg}`);
@@ -148,33 +104,15 @@ function fetchVideoList(
 }
 
 /**
- * Download auto-generated English subtitles for a single video.
- * Returns the VTT file path or null if unavailable.
+ * Fetch transcript for a single video using the youtube-transcript package.
+ * Returns the joined transcript text or null if unavailable.
  */
-function downloadSubtitles(videoId: string): string | null {
-  const outputTemplate = path.join(TEMP_DIR, videoId);
+async function fetchTranscript(videoId: string): Promise<string | null> {
   try {
-    execSync(
-      `yt-dlp --write-auto-sub --sub-lang en --skip-download --sub-format vtt -o "${outputTemplate}" "https://www.youtube.com/watch?v=${videoId}"`,
-      { encoding: "utf-8", timeout: 60_000, stdio: ["pipe", "pipe", "pipe"] },
-    );
-
-    // yt-dlp may produce .en.vtt or .en-orig.vtt
-    const possiblePaths = [
-      `${outputTemplate}.en.vtt`,
-      `${outputTemplate}.en-orig.vtt`,
-    ];
-
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) return p;
-    }
-
-    // Check for any .vtt file with this video id
-    const tempFiles = fs.readdirSync(TEMP_DIR);
-    const vttFile = tempFiles.find((f) => f.startsWith(videoId) && f.endsWith(".vtt"));
-    if (vttFile) return path.join(TEMP_DIR, vttFile);
-
-    return null;
+    const items = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" });
+    if (!items || items.length === 0) return null;
+    const transcript = items.map((i) => i.text).join(" ");
+    return transcript.trim() || null;
   } catch {
     return null;
   }
@@ -193,7 +131,7 @@ async function processCreator(creator: Creator): Promise<{ scraped: number; skip
   console.log(`[${timestamp()}] Fetching video list for ${creator.name} (${handle})...`);
 
   const videos = fetchVideoList(handle);
-  console.log(`[${timestamp()}]   Found ${videos.length} videos in last 6 months`);
+  console.log(`[${timestamp()}]   Found ${videos.length} videos in last 12 months`);
 
   let scraped = 0;
   let skipped = 0;
@@ -210,17 +148,15 @@ async function processCreator(creator: Creator): Promise<{ scraped: number; skip
       continue;
     }
 
-    // Download subtitles
-    const vttPath = downloadSubtitles(video.id);
-    if (!vttPath) {
+    // Fetch transcript via youtube-transcript package
+    const transcript = await fetchTranscript(video.id);
+    if (!transcript) {
       console.log(`[${timestamp()}]   No subtitles for: ${video.title} (${video.id})`);
       failed++;
       continue;
     }
 
     try {
-      const vttContent = fs.readFileSync(vttPath, "utf-8");
-      const transcript = parseVtt(vttContent);
       const quality = computeTranscriptQuality(transcript);
       const publishedAt = parseUploadDate(video.uploadDate);
 
@@ -233,9 +169,6 @@ async function processCreator(creator: Creator): Promise<{ scraped: number; skip
 
       scraped++;
       console.log(`[${timestamp()}]   Scraped: ${video.title} (quality: ${quality.toFixed(2)})`);
-
-      // Clean up VTT file
-      try { fs.unlinkSync(vttPath); } catch { /* ignore */ }
     } catch (error: unknown) {
       failed++;
       const msg = error instanceof Error ? error.message : String(error);
@@ -254,7 +187,6 @@ async function processCreator(creator: Creator): Promise<{ scraped: number; skip
 
 async function main(): Promise<void> {
   loadEnv();
-  ensureTempDir();
 
   console.log(`[${timestamp()}] Starting transcript scraping...`);
 
@@ -280,7 +212,6 @@ async function main(): Promise<void> {
     }
   }
 
-  cleanTempDir();
   console.log(
     `[${timestamp()}] Scraping complete: ${totalScraped} scraped, ${totalSkipped} skipped, ${totalFailed} failed`,
   );

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import FloatingFeedbackButton from "@/components/FloatingFeedbackButton";
 import "./globals.css";
 
 const inter = Inter({
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
+        <FloatingFeedbackButton />
       </body>
     </html>
   );

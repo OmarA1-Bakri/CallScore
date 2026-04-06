@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Trophy } from "lucide-react";
+import Image from "next/image";
 
 export default function Footer() {
   return (
@@ -10,10 +10,13 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Trophy className="w-5 h-5 text-brand-gold" />
-              <span className="text-gradient-gold font-bold text-sm tracking-tight">
-                CRYPTO-TUBER RANKED
-              </span>
+              <Image
+                src="/logo.png"
+                alt="CryptoTubers Ranked"
+                width={140}
+                height={80}
+                className="h-10 w-auto"
+              />
             </div>
             <p className="text-gray-500 text-sm leading-relaxed">
               We track, rank, and score the top 20 crypto YouTube influencers
@@ -35,10 +38,26 @@ export default function Footer() {
               </li>
               <li>
                 <Link
+                  href="/methodology"
+                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                >
+                  Methodology
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/pricing"
                   className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
                 >
                   Pricing
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/feedback"
+                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                >
+                  Give Feedback
                 </Link>
               </li>
             </ul>

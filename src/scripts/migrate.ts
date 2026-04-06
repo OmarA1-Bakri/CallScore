@@ -4,7 +4,10 @@ import { getDb } from "../lib/db";
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
-  const envPath = path.resolve(__dirname, "../../.env");
+  const root = path.resolve(__dirname, "../..");
+  const envPath = fs.existsSync(path.join(root, ".env.local"))
+    ? path.join(root, ".env.local")
+    : path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, "utf-8").split("\n");
   for (const raw of lines) {
@@ -35,11 +38,16 @@ async function main(): Promise<void> {
 
   const schemaSql = fs.readFileSync(schemaPath, "utf-8");
 
-  // Split on semicolons to get individual statements, filtering empties
-  const statements = schemaSql
+  // Remove standalone comment lines, then split on semicolons
+  const cleaned = schemaSql
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n");
+
+  const statements = cleaned
     .split(";")
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--"));
+    .filter((s) => s.length > 0);
 
   const db = getDb();
 

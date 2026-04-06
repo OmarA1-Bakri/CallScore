@@ -1,12 +1,243 @@
 import { Trophy, BarChart3, Target, Users } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
-import { MOCK_LEADERBOARD_ROWS, MOCK_CONSENSUS_SIGNALS } from "@/lib/mock-data";
 import PeriodFilter from "@/components/PeriodFilter";
+import { query } from "@/lib/db";
+import { getCreatorTier } from "@/lib/whop";
+import { computeTrend } from "@/lib/scoring";
+import type {
+  Creator,
+  CreatorStats,
+  Call,
+  LeaderboardRow,
+  ConsensusSignal,
+  Period,
+  Tier,
+} from "@/lib/types";
 
-export default function HomePage() {
-  const rows = MOCK_LEADERBOARD_ROWS;
-  const signals = MOCK_CONSENSUS_SIGNALS;
+const VALID_PERIODS: readonly Period[] = ["all_time", "90d", "30d"];
+
+interface LeaderboardQueryRow {
+  readonly id: number;
+  readonly creator_id: number;
+  readonly period: Period;
+  readonly total_calls: number;
+  readonly win_rate: number;
+  readonly avg_return_7d: number;
+  readonly avg_return_30d: number;
+  readonly avg_return_90d: number;
+  readonly avg_alpha_30d: number;
+  readonly best_call_id: number | null;
+  readonly worst_call_id: number | null;
+  readonly hit_rate: number;
+  readonly most_called_symbol: string | null;
+  readonly strategy_consistency: number;
+  readonly specificity_avg: number;
+  readonly alpha_score: number;
+  readonly accuracy_rank: number | null;
+  readonly updated_at: string;
+  readonly name: string;
+  readonly youtube_handle: string;
+  readonly youtube_channel_id: string | null;
+  readonly subscribers: string | null;
+  readonly focus: string | null;
+  readonly tier: Tier;
+  readonly creator_alpha_score: number;
+  readonly creator_total_calls: number;
+  readonly creator_win_rate: number;
+  readonly creator_avg_return: number;
+  readonly creator_accuracy_rank: number | null;
+  readonly creator_last_scraped_at: string | null;
+  readonly creator_created_at: string;
+  readonly best_call_symbol: string | null;
+  readonly best_call_return: number | null;
+  readonly best_call_score: number | null;
+  readonly best_call_date: string | null;
+  readonly best_call_direction: string | null;
+  readonly worst_call_symbol: string | null;
+  readonly worst_call_return: number | null;
+  readonly worst_call_score: number | null;
+  readonly worst_call_date: string | null;
+  readonly worst_call_direction: string | null;
+}
+
+interface StatsRow {
+  readonly total_calls: string;
+  readonly avg_accuracy: string;
+  readonly creator_count: string;
+}
+
+function buildCreator(row: LeaderboardQueryRow): Creator {
+  return {
+    id: row.creator_id,
+    name: row.name,
+    youtube_handle: row.youtube_handle,
+    youtube_channel_id: row.youtube_channel_id,
+    subscribers: row.subscribers,
+    focus: row.focus,
+    tier: row.tier,
+    total_calls: row.creator_total_calls,
+    win_rate: row.creator_win_rate,
+    avg_return: row.creator_avg_return,
+    alpha_score: row.creator_alpha_score,
+    accuracy_rank: row.creator_accuracy_rank,
+    last_scraped_at: row.creator_last_scraped_at,
+    created_at: row.creator_created_at,
+  };
+}
+
+function buildStats(row: LeaderboardQueryRow): CreatorStats {
+  return {
+    id: row.id,
+    creator_id: row.creator_id,
+    period: row.period,
+    total_calls: row.total_calls,
+    win_rate: row.win_rate,
+    avg_return_7d: row.avg_return_7d,
+    avg_return_30d: row.avg_return_30d,
+    avg_return_90d: row.avg_return_90d,
+    avg_alpha_30d: row.avg_alpha_30d,
+    best_call_id: row.best_call_id,
+    worst_call_id: row.worst_call_id,
+    hit_rate: row.hit_rate,
+    most_called_symbol: row.most_called_symbol,
+    strategy_consistency: row.strategy_consistency,
+    specificity_avg: row.specificity_avg,
+    alpha_score: row.alpha_score,
+    accuracy_rank: row.accuracy_rank,
+    updated_at: row.updated_at,
+  };
+}
+
+interface PageProps {
+  readonly searchParams: { period?: string };
+}
+
+export default async function HomePage({ searchParams }: PageProps) {
+  const periodParam = searchParams.period ?? "all_time";
+  const period: Period = (VALID_PERIODS as readonly string[]).includes(periodParam)
+    ? (periodParam as Period)
+    : "all_time";
+
+  // Fetch leaderboard from DB
+  let leaderboard: LeaderboardRow[] = [];
+  try {
+    const rows = await query<LeaderboardQueryRow>(
+      `SELECT
+        cs.*,
+        c.name,
+        c.youtube_handle,
+        c.youtube_channel_id,
+        c.subscribers,
+        c.focus,
+        c.tier,
+        c.alpha_score AS creator_alpha_score,
+        c.total_calls AS creator_total_calls,
+        c.win_rate AS creator_win_rate,
+        c.avg_return AS creator_avg_return,
+        c.accuracy_rank AS creator_accuracy_rank,
+        c.last_scraped_at AS creator_last_scraped_at,
+        c.created_at AS creator_created_at,
+        bc.symbol AS best_call_symbol,
+        bc.return_30d AS best_call_return,
+        bc.score AS best_call_score,
+        bc.call_date AS best_call_date,
+        bc.direction AS best_call_direction,
+        wc.symbol AS worst_call_symbol,
+        wc.return_30d AS worst_call_return,
+        wc.score AS worst_call_score,
+        wc.call_date AS worst_call_date,
+        wc.direction AS worst_call_direction
+      FROM creator_stats cs
+      JOIN creators c ON c.id = cs.creator_id
+      LEFT JOIN calls bc ON bc.id = cs.best_call_id
+      LEFT JOIN calls wc ON wc.id = cs.worst_call_id
+      WHERE cs.period = $1
+      ORDER BY cs.accuracy_rank ASC NULLS LAST`,
+      [period],
+    );
+
+    const prevPeriod: Period = period === "30d" ? "90d" : "all_time";
+    const prevScores =
+      period !== "all_time"
+        ? await query<{ creator_id: number; alpha_score: number }>(
+            `SELECT creator_id, alpha_score FROM creator_stats WHERE period = $1`,
+            [prevPeriod],
+          )
+        : [];
+
+    const prevScoreMap = new Map(
+      prevScores.map((r) => [r.creator_id, r.alpha_score]),
+    );
+
+    leaderboard = rows.map((row, index) => {
+      const rank = row.accuracy_rank ?? index + 1;
+      const prev = prevScoreMap.get(row.creator_id);
+      const trend = prev !== undefined ? computeTrend(row.alpha_score, prev) : ("stable" as const);
+
+      return {
+        rank,
+        creator: buildCreator(row),
+        stats: buildStats(row),
+        best_call: row.best_call_symbol
+          ? ({
+              symbol: row.best_call_symbol,
+              return_30d: row.best_call_return,
+              score: row.best_call_score ?? 0,
+              call_date: row.best_call_date ?? "",
+              direction: (row.best_call_direction as Call["direction"]) ?? "neutral",
+            } as Call)
+          : null,
+        worst_call: row.worst_call_symbol
+          ? ({
+              symbol: row.worst_call_symbol,
+              return_30d: row.worst_call_return,
+              score: row.worst_call_score ?? 0,
+              call_date: row.worst_call_date ?? "",
+              direction: (row.worst_call_direction as Call["direction"]) ?? "neutral",
+            } as Call)
+          : null,
+        tier_required: getCreatorTier(rank),
+        trend,
+      };
+    });
+  } catch (err) {
+    // Re-throw in development to surface errors
+    if (process.env.NODE_ENV === "development") {
+      throw err;
+    }
+  }
+
+  // Fetch consensus signals
+  let signals: ConsensusSignal[] = [];
+  try {
+    signals = await query<ConsensusSignal>(
+      `SELECT * FROM consensus_signals ORDER BY signal_date DESC LIMIT 10`,
+    );
+  } catch {
+    // No signals yet
+  }
+
+  // Aggregate stats
+  let totalCalls = "0";
+  let avgAccuracy = "--";
+  let creatorCount = "20";
+  try {
+    const statsRows = await query<StatsRow>(
+      `SELECT
+        COALESCE(SUM(total_calls), 0)::text AS total_calls,
+        CASE WHEN COUNT(*) > 0 THEN ROUND(AVG(win_rate)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
+        COUNT(DISTINCT creator_id)::text AS creator_count
+      FROM creator_stats WHERE period = 'all_time'`,
+    );
+    if (statsRows.length > 0) {
+      totalCalls = Number(statsRows[0].total_calls) > 0 ? statsRows[0].total_calls : "0";
+      avgAccuracy = statsRows[0].avg_accuracy !== "--" ? `${statsRows[0].avg_accuracy}%` : "--";
+      creatorCount = statsRows[0].creator_count;
+    }
+  } catch {
+    // Stats not available
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -15,7 +246,7 @@ export default function HomePage() {
         <div className="inline-flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-4 py-1.5 mb-6">
           <Trophy className="w-4 h-4 text-brand-gold" />
           <span className="text-brand-gold text-xs font-medium">
-            Tracking 20 Crypto YouTubers in Real-Time
+            Tracking {creatorCount} Crypto YouTubers in Real-Time
           </span>
         </div>
 
@@ -35,9 +266,9 @@ export default function HomePage() {
 
         {/* Stats row */}
         <div className="flex flex-wrap justify-center gap-6 mt-8">
-          <StatPill icon={Users} label="Creators Tracked" value="20" />
-          <StatPill icon={BarChart3} label="Total Calls Scored" value="2,400+" />
-          <StatPill icon={Target} label="Avg Accuracy" value="54.2%" />
+          <StatPill icon={Users} label="Creators Tracked" value={creatorCount} />
+          <StatPill icon={BarChart3} label="Total Calls Scored" value={totalCalls} />
+          <StatPill icon={Target} label="Avg Accuracy" value={avgAccuracy} />
         </div>
       </section>
 
@@ -50,10 +281,18 @@ export default function HomePage() {
               Ranked by Alpha Score -- who outperforms Bitcoin the most
             </p>
           </div>
-          <PeriodFilter />
+          <PeriodFilter value={period} />
         </div>
 
-        <Leaderboard rows={rows} />
+        {leaderboard.length > 0 ? (
+          <Leaderboard rows={leaderboard} />
+        ) : (
+          <div className="glass-card p-12 text-center">
+            <p className="text-gray-500">
+              Leaderboard data is being computed. Run the data pipeline to populate scores.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Consensus Signals */}

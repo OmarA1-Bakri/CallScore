@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Trophy, Menu, X } from "lucide-react";
+import Image from "next/image";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 
 export default function Header() {
@@ -10,13 +11,17 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 bg-brand-dark/80 backdrop-blur-xl border-b border-brand-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <Trophy className="w-6 h-6 text-brand-gold group-hover:scale-110 transition-transform" />
-            <span className="text-gradient-gold font-bold text-lg tracking-tight">
-              CRYPTO-TUBER RANKED
-            </span>
+          <Link href="/" className="flex items-center group">
+            <Image
+              src="/logo.png"
+              alt="CryptoTubers Ranked"
+              width={280}
+              height={160}
+              className="h-14 w-auto group-hover:scale-[1.02] transition-transform"
+              priority
+            />
           </Link>
 
           {/* Desktop nav */}
@@ -26,6 +31,12 @@ export default function Header() {
               className="text-gray-400 hover:text-white transition-colors text-sm font-medium"
             >
               Leaderboard
+            </Link>
+            <Link
+              href="/methodology"
+              className="text-gray-400 hover:text-white transition-colors text-sm font-medium"
+            >
+              Methodology
             </Link>
             <Link
               href="/pricing"
@@ -60,6 +71,13 @@ export default function Header() {
               className="block text-gray-400 hover:text-white transition-colors text-sm font-medium py-2"
             >
               Leaderboard
+            </Link>
+            <Link
+              href="/methodology"
+              onClick={() => setMobileOpen(false)}
+              className="block text-gray-400 hover:text-white transition-colors text-sm font-medium py-2"
+            >
+              Methodology
             </Link>
             <Link
               href="/pricing"

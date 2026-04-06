@@ -1,34 +1,53 @@
 import Link from "next/link";
-import {
-  ArrowLeft,
-  ExternalLink,
-  TrendingUp,
-  TrendingDown,
-  Quote,
-} from "lucide-react";
+import { notFound } from "next/navigation";
+import { ArrowLeft, Quote } from "lucide-react";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
-import {
-  MOCK_CALLS_LIST,
-  MOCK_ALL_CREATORS,
-} from "@/lib/mock-data";
+import { query } from "@/lib/db";
 import {
   SYMBOL_NAMES,
   SYMBOL_TICKERS,
   REGIME_LABELS,
   REGIME_COLORS,
 } from "@/lib/constants";
+import type { Call, Creator } from "@/lib/types";
 
 interface PageProps {
   readonly params: { id: string };
 }
 
-export default function CallDetailPage({ params }: PageProps) {
-  // In production: fetch from /api/call/[id]
+export default async function CallDetailPage({ params }: PageProps) {
   const callId = parseInt(params.id, 10);
-  const call = MOCK_CALLS_LIST.find((c) => c.id === callId) ?? MOCK_CALLS_LIST[0];
-  const creator =
-    MOCK_ALL_CREATORS.find((c) => c.id === call.creator_id) ??
-    MOCK_ALL_CREATORS[0];
+  if (isNaN(callId)) {
+    notFound();
+  }
+
+  let call: Call;
+  try {
+    const calls = await query<Call>(
+      `SELECT * FROM calls WHERE id = $1 LIMIT 1`,
+      [callId],
+    );
+    if (calls.length === 0) {
+      notFound();
+    }
+    call = calls[0];
+  } catch {
+    notFound();
+  }
+
+  let creator: Creator | null = null;
+  try {
+    const creators = await query<Creator>(
+      `SELECT * FROM creators WHERE id = $1 LIMIT 1`,
+      [call.creator_id],
+    );
+    creator = creators.length > 0 ? creators[0] : null;
+  } catch {
+    // Creator table may not exist yet
+  }
+
+  const creatorName = creator?.name ?? "Unknown Creator";
+  const creatorHandle = creator?.youtube_handle ?? "unknown";
 
   const ticker = SYMBOL_TICKERS[call.symbol] ?? call.symbol.replace("USDT", "");
   const coinName = SYMBOL_NAMES[call.symbol] ?? call.symbol;
@@ -44,11 +63,11 @@ export default function CallDetailPage({ params }: PageProps) {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back link */}
       <Link
-        href={`/creator/${creator.youtube_handle}`}
+        href={`/creator/${creatorHandle}`}
         className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-6 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
-        Back to {creator.name}
+        Back to {creatorName}
       </Link>
 
       {/* Header */}
@@ -56,7 +75,7 @@ export default function CallDetailPage({ params }: PageProps) {
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
           <div className="flex-1">
             <p className="text-gray-500 text-sm mb-1">
-              {creator.name} &middot;{" "}
+              {creatorName} &middot;{" "}
               {new Date(call.call_date).toLocaleDateString("en-US", {
                 month: "long",
                 day: "numeric",
@@ -114,7 +133,6 @@ export default function CallDetailPage({ params }: PageProps) {
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <PriceCard
           label="7 Days"
-          priceAtCall={call.price_at_call}
           priceAfter={call.price_7d}
           returnPct={call.return_7d}
           alphaPct={call.alpha_7d}
@@ -124,7 +142,6 @@ export default function CallDetailPage({ params }: PageProps) {
         />
         <PriceCard
           label="30 Days"
-          priceAtCall={call.price_at_call}
           priceAfter={call.price_30d}
           returnPct={call.return_30d}
           alphaPct={call.alpha_30d}
@@ -134,7 +151,6 @@ export default function CallDetailPage({ params }: PageProps) {
         />
         <PriceCard
           label="90 Days"
-          priceAtCall={call.price_at_call}
           priceAfter={call.price_90d}
           returnPct={call.return_90d}
           alphaPct={call.alpha_90d}
@@ -165,7 +181,7 @@ export default function CallDetailPage({ params }: PageProps) {
               </p>
               <div className="flex items-center gap-2">
                 <span
-                  className="w-3 h-3 rounded-full"
+                  className="w-3 h-3 rounded-full inline-block"
                   style={{ backgroundColor: regimeColor }}
                 />
                 <span className="text-white font-medium text-sm">
@@ -265,7 +281,6 @@ function MiniStat({ label, value, badge }: MiniStatProps) {
 
 interface PriceCardProps {
   readonly label: string;
-  readonly priceAtCall: number | null;
   readonly priceAfter: number | null;
   readonly returnPct: number | null;
   readonly alphaPct: number | null;
@@ -274,7 +289,6 @@ interface PriceCardProps {
 
 function PriceCard({
   label,
-  priceAtCall,
   priceAfter,
   returnPct,
   alphaPct,

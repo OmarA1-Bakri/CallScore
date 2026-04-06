@@ -48,8 +48,8 @@ async function stepCheckNewVideos(): Promise<StepResult> {
   const staleCreators = creators.filter((c) => {
     if (c.last_scraped_at === null) return true;
     const lastScraped = new Date(c.last_scraped_at).getTime();
-    const oneDayAgo = Date.now() - 86_400_000;
-    return lastScraped < oneDayAgo;
+    const oneWeekAgo = Date.now() - 7 * 86_400_000;
+    return lastScraped < oneWeekAgo;
   });
 
   return {

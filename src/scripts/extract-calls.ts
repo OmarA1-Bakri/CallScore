@@ -1,14 +1,17 @@
 import * as fs from "fs";
 import * as path from "path";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { query } from "../lib/db";
 import { TRACKED_SYMBOLS, SYMBOL_NAMES, SYMBOL_TICKERS } from "../lib/constants";
 import { computeSpecificity } from "../lib/scoring";
 import type { Video, ExtractedCall } from "../lib/types";
 
 function loadEnv(): void {
-  if (process.env.NEON_DATABASE_URL && process.env.ANTHROPIC_API_KEY) return;
-  const envPath = path.resolve(__dirname, "../../.env");
+  if (process.env.NEON_DATABASE_URL) return;
+  const root = path.resolve(__dirname, "../..");
+  const envPath = fs.existsSync(path.join(root, ".env.local"))
+    ? path.join(root, ".env.local")
+    : path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, "utf-8").split("\n");
   for (const raw of lines) {
@@ -85,6 +88,18 @@ const SYMBOL_LIST_STR = TRACKED_SYMBOLS.map(
   (s) => `${SYMBOL_TICKERS[s]} (${SYMBOL_NAMES[s]}, ${s})`,
 ).join(", ");
 
+const GEMINI_MODEL = "gemini-2.0-flash";
+const MAX_RETRIES = 5;
+const INITIAL_BACKOFF_MS = 5_000;
+/** 15 RPM = 4s minimum between requests. Use 4s for safety. */
+const REQUEST_GAP_MS = 4_000;
+/** Max transcript chars to send. Gemini handles 1M tokens but most signal
+ *  is in the first portion, so cap at 30k chars for efficiency. */
+const MAX_TRANSCRIPT_CHARS = 30_000;
+/** Every 50 videos, pause 30s to stay well within daily limits. */
+const BATCH_COOLDOWN_VIDEOS = 50;
+const BATCH_COOLDOWN_MS = 30_000;
+
 interface MentionResult {
   readonly symbol: string;
   readonly context: string;
@@ -96,22 +111,56 @@ interface ExtractionResult extends ExtractedCall {
 }
 
 /**
+ * Call Gemini with retry + exponential backoff on 429 (rate limit).
+ */
+async function geminiGenerate(
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+  prompt: string,
+): Promise<string> {
+  let attempt = 0;
+  let backoff = INITIAL_BACKOFF_MS;
+
+  while (attempt <= MAX_RETRIES) {
+    try {
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      const isRateLimit = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED");
+
+      if (isRateLimit) {
+        attempt++;
+        if (attempt > MAX_RETRIES) {
+          throw new Error(`Gemini rate limit exceeded after ${MAX_RETRIES} retries`);
+        }
+        const waitMs = Math.min(backoff, 120_000);
+        console.warn(
+          `[${timestamp()}] Rate limited (429), retrying in ${waitMs}ms (attempt ${attempt}/${MAX_RETRIES})`,
+        );
+        await sleep(waitMs);
+        backoff *= 2;
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw new Error("Unreachable: exceeded retry loop");
+}
+
+/**
  * Pass 1: Mention detection. Identify all mentions of tracked coins with context.
  */
 async function detectMentions(
-  client: Anthropic,
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   transcript: string,
 ): Promise<readonly MentionResult[]> {
-  // Truncate very long transcripts to avoid token limits
-  const truncated = transcript.length > 30_000 ? transcript.slice(0, 30_000) : transcript;
+  const truncated = transcript.length > MAX_TRANSCRIPT_CHARS
+    ? transcript.slice(0, MAX_TRANSCRIPT_CHARS)
+    : transcript;
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4096,
-    messages: [
-      {
-        role: "user",
-        content: `You are analyzing a crypto YouTube video transcript to find mentions of specific coins.
+  const prompt = `You are analyzing a crypto YouTube video transcript to find mentions of specific coins.
 
 TRACKED COINS: ${SYMBOL_LIST_STR}
 
@@ -128,15 +177,11 @@ Return a JSON array. If no tracked coins mentioned, return [].
 TRANSCRIPT:
 ${truncated}
 
-Respond ONLY with valid JSON array, no markdown fences.`,
-      },
-    ],
-  });
+Respond ONLY with valid JSON array, no markdown fences.`;
 
-  const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+  const text = await geminiGenerate(model, prompt);
 
   try {
-    // Try to extract JSON from the response
     const jsonStr = text.trim().replace(/^```json?\n?/, "").replace(/\n?```$/, "");
     const parsed: unknown = JSON.parse(jsonStr);
     if (!Array.isArray(parsed)) return [];
@@ -166,17 +211,11 @@ Respond ONLY with valid JSON array, no markdown fences.`,
  * Pass 2: Structured extraction for actionable mentions.
  */
 async function extractCall(
-  client: Anthropic,
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   symbol: string,
   context: string,
 ): Promise<ExtractionResult | null> {
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 1024,
-    messages: [
-      {
-        role: "user",
-        content: `You are a crypto analyst extracting specific coin calls from a YouTube video transcript excerpt.
+  const prompt = `You are a crypto analyst extracting specific coin calls from a YouTube video transcript excerpt.
 
 ONLY extract if this is a SPECIFIC ACTIONABLE call - not general commentary or news mention.
 
@@ -204,12 +243,9 @@ If not actionable, return null.
 CONTEXT:
 ${context}
 
-Respond ONLY with valid JSON (object or null), no markdown fences.`,
-      },
-    ],
-  });
+Respond ONLY with valid JSON (object or null), no markdown fences.`;
 
-  const text = response.content[0]?.type === "text" ? response.content[0].text : "";
+  const text = await geminiGenerate(model, prompt);
 
   try {
     const jsonStr = text.trim().replace(/^```json?\n?/, "").replace(/\n?```$/, "");
@@ -245,7 +281,7 @@ Respond ONLY with valid JSON (object or null), no markdown fences.`,
 }
 
 async function processVideo(
-  client: Anthropic,
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   video: Video & { readonly creator_id: number },
 ): Promise<number> {
   if (!video.transcript || video.transcript.trim().length === 0) {
@@ -253,8 +289,8 @@ async function processVideo(
   }
 
   // Pass 1: Detect mentions
-  const mentions = await detectMentions(client, video.transcript);
-  await sleep(600);
+  const mentions = await detectMentions(model, video.transcript);
+  await sleep(REQUEST_GAP_MS);
 
   const actionableMentions = mentions.filter((m) => m.is_actionable_guess);
   if (actionableMentions.length === 0) {
@@ -270,8 +306,8 @@ async function processVideo(
 
   // Pass 2: Extract structured calls for actionable mentions
   for (const mention of actionableMentions) {
-    const result = await extractCall(client, mention.symbol, mention.context);
-    await sleep(600);
+    const result = await extractCall(model, mention.symbol, mention.context);
+    await sleep(REQUEST_GAP_MS);
 
     if (!result || result.extraction_confidence < 0.7) {
       continue;
@@ -336,17 +372,18 @@ async function processVideo(
 async function main(): Promise<void> {
   loadEnv();
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey === "your-anthropic-api-key") {
-    console.error(`[${timestamp()}] ERROR: ANTHROPIC_API_KEY not configured`);
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error(`[${timestamp()}] ERROR: GEMINI_API_KEY not configured`);
     process.exit(1);
   }
 
-  const client = new Anthropic({ apiKey });
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
-  console.log(`[${timestamp()}] Starting call extraction...`);
+  console.log(`[${timestamp()}] Starting call extraction (Gemini / ${GEMINI_MODEL})...`);
 
-  // Fetch unprocessed videos (limit 100 per run for rate limiting)
+  // Fetch unprocessed videos (limit 500 per run)
   const videos = await query<Video & { creator_id: number }>(
     `SELECT v.*, v.creator_id
      FROM videos v
@@ -354,7 +391,7 @@ async function main(): Promise<void> {
        AND v.transcript IS NOT NULL
        AND v.transcript_quality > 0.2
      ORDER BY v.published_at DESC
-     LIMIT 100`,
+     LIMIT 500`,
   );
 
   console.log(`[${timestamp()}] Found ${videos.length} videos to process`);
@@ -364,16 +401,26 @@ async function main(): Promise<void> {
 
   for (const video of videos) {
     try {
-      const calls = await processVideo(client, video);
+      const calls = await processVideo(model, video);
       totalCalls += calls;
       processed++;
       console.log(
         `[${timestamp()}] [${processed}/${videos.length}] ${video.title}: ${calls} calls extracted`,
       );
+
+      // Every 50 videos, pause 30s to stay within daily limits
+      if (processed % BATCH_COOLDOWN_VIDEOS === 0) {
+        console.log(`[${timestamp()}] Batch cooldown (${BATCH_COOLDOWN_MS / 1000}s) after ${processed} videos...`);
+        await sleep(BATCH_COOLDOWN_MS);
+      }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error(`[${timestamp()}] Error processing video ${video.id}: ${msg}`);
-      // Continue with next video
+      // On rate limit errors, add extra cooldown before next video
+      if (msg.includes("rate limit") || msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+        console.log(`[${timestamp()}] Extra cooldown (60s) after rate limit error...`);
+        await sleep(60_000);
+      }
     }
   }
 
