@@ -54,6 +54,7 @@ interface AggregateRow {
   readonly hit_count: string;
   readonly avg_specificity: number | null;
   readonly avg_score: number | null;
+  readonly score_stddev: number | null;
 }
 
 interface ModeRow {
@@ -80,7 +81,8 @@ async function scoreUnscoredCalls(): Promise<number> {
      FROM calls
      WHERE price_at_call IS NOT NULL
        AND score = 0
-       AND return_30d IS NOT NULL`,
+       AND return_30d IS NOT NULL
+       AND extraction_confidence >= 0.5`,
   );
 
   if (calls.length === 0) return 0;
@@ -118,6 +120,10 @@ async function computeCreatorStats(
 ): Promise<void> {
   const periodFilter = getPeriodFilter(period);
 
+  // Clear stale rows for this period — prevents creators with 0 matched
+  // calls from retaining old stats (documented gotcha: gotcha_stale_creator_stats.md)
+  await query("DELETE FROM creator_stats WHERE period = $1", [period]);
+
   console.log(`[${timestamp()}] Computing ${period} stats for ${creators.length} creators...`);
 
   // Collect all stats, then rank
@@ -133,6 +139,7 @@ async function computeCreatorStats(
     mostCalledSymbol: string | null;
     specificityAvg: number;
     alphaScore: number;
+    scoreStddev: number;
     bestCallId: number | null;
     worstCallId: number | null;
   }[] = [];
@@ -150,10 +157,12 @@ async function computeCreatorStats(
         AVG(c.alpha_30d) as avg_alpha_30d,
         COUNT(*) FILTER (WHERE c.hit_target = true)::text as hit_count,
         AVG(c.specificity_score) as avg_specificity,
-        AVG(c.score) as avg_score
+        AVG(c.score) as avg_score,
+        STDDEV_POP(c.score) as score_stddev
       FROM calls c
       WHERE c.creator_id = $1
         AND c.price_at_call IS NOT NULL
+        AND c.extraction_confidence >= 0.5
         ${periodFilter}
       GROUP BY c.creator_id`,
       [creator.id],
@@ -163,6 +172,14 @@ async function computeCreatorStats(
 
     const agg = aggRows[0];
     const totalCalls = parseInt(agg.total_calls, 10);
+
+    // Min-N threshold: creators with fewer than 10 matched calls in this
+    // period are not statistically meaningful. Skip them — their
+    // creator_stats row will be stale or absent, and the leaderboard
+    // query already filters with EXISTS.
+    const MIN_CALLS_FOR_RANKING = 10;
+    if (totalCalls < MIN_CALLS_FOR_RANKING) continue;
+
     const winCount = parseInt(agg.win_count, 10);
     const hitCount = parseInt(agg.hit_count, 10);
 
@@ -200,18 +217,52 @@ async function computeCreatorStats(
       mostCalledSymbol: modeRows.length > 0 ? modeRows[0].most_called : null,
       specificityAvg: agg.avg_specificity ?? 0,
       alphaScore: agg.avg_score ?? 0,
+      scoreStddev: agg.score_stddev ?? 0,
       bestCallId: bwRows.length > 0 ? bwRows[0].best_id : null,
       worstCallId: bwRows.length > 0 ? bwRows[0].worst_id : null,
     });
   }
 
-  // Sort by alphaScore DESC to assign ranks
-  const ranked = [...statsData].sort((a, b) => b.alphaScore - a.alphaScore);
+  // Bayesian shrinkage: pull small-sample creators toward the global mean.
+  // adjusted = (raw_mean * N + global_mean * K) / (N + K)
+  // K=20 means a creator needs ~20 calls before their score is mostly their own.
+  // This kills the "21-call creator at #2" artifact.
+  const SHRINKAGE_K = 20;
+  const globalMeanScore =
+    statsData.length > 0
+      ? statsData.reduce((sum, s) => sum + s.alphaScore * s.totalCalls, 0) /
+        statsData.reduce((sum, s) => sum + s.totalCalls, 0)
+      : 0;
+
+  // Step A: Bayesian shrinkage
+  const shrunk = statsData.map((s) => ({
+    ...s,
+    alphaScore:
+      (s.alphaScore * s.totalCalls + globalMeanScore * SHRINKAGE_K) /
+      (s.totalCalls + SHRINKAGE_K),
+  }));
+
+  // Step B: Consistency adjustment (Sharpe-like).
+  // Penalize creators with high score variance relative to their mean.
+  // consistencyPenalty = 0.1 * (stddev / max(|mean|, 1))
+  // A gambler with scores [80, -20, 80, -20] gets penalized more than
+  // a steady performer with [30, 30, 30, 30] even if their means match.
+  const adjusted = shrunk.map((s) => {
+    if (s.scoreStddev === 0 || s.alphaScore === 0) return s;
+    const cv = s.scoreStddev / Math.max(Math.abs(s.alphaScore), 1);
+    // Cap penalty at 15% — don't over-punish volatile but accurate creators
+    const penalty = Math.min(0.15, cv * 0.1);
+    return { ...s, alphaScore: s.alphaScore * (1 - penalty) };
+  });
+
+  // Sort by adjusted alphaScore DESC to assign ranks
+  const ranked = adjusted.sort((a, b) => b.alphaScore - a.alphaScore);
 
   for (let i = 0; i < ranked.length; i++) {
     const s = ranked[i];
     const rank = i + 1;
 
+    // No ON CONFLICT needed — we DELETE all rows for this period above
     await query(
       `INSERT INTO creator_stats (
         creator_id, period, total_calls, win_rate,
@@ -225,22 +276,7 @@ async function computeCreatorStats(
         $9, $10, $11,
         $12, $13, $14, $15,
         NOW()
-      )
-      ON CONFLICT (creator_id, period) DO UPDATE SET
-        total_calls = EXCLUDED.total_calls,
-        win_rate = EXCLUDED.win_rate,
-        avg_return_7d = EXCLUDED.avg_return_7d,
-        avg_return_30d = EXCLUDED.avg_return_30d,
-        avg_return_90d = EXCLUDED.avg_return_90d,
-        avg_alpha_30d = EXCLUDED.avg_alpha_30d,
-        best_call_id = EXCLUDED.best_call_id,
-        worst_call_id = EXCLUDED.worst_call_id,
-        hit_rate = EXCLUDED.hit_rate,
-        most_called_symbol = EXCLUDED.most_called_symbol,
-        specificity_avg = EXCLUDED.specificity_avg,
-        alpha_score = EXCLUDED.alpha_score,
-        accuracy_rank = EXCLUDED.accuracy_rank,
-        updated_at = NOW()`,
+      )`,
       [
         s.creatorId,
         period,
@@ -286,12 +322,18 @@ async function updateCreatorRankings(): Promise<void> {
      ORDER BY accuracy_rank ASC NULLS LAST`,
   );
 
+  // Percentile-based tiers (scales with creator count):
+  //   Top 20% = elite, next 30% = pro, rest = free
+  const totalRanked = allTimeStats.length;
+  const eliteCutoff = Math.max(1, Math.ceil(totalRanked * 0.2));
+  const proCutoff = Math.max(eliteCutoff + 1, Math.ceil(totalRanked * 0.5));
+
   for (const stats of allTimeStats) {
-    const rank = stats.accuracy_rank ?? 20;
+    const rank = stats.accuracy_rank ?? totalRanked;
     let tier: string;
-    if (rank <= 5) {
+    if (rank <= eliteCutoff) {
       tier = "elite";
-    } else if (rank <= 10) {
+    } else if (rank <= proCutoff) {
       tier = "pro";
     } else {
       tier = "free";

@@ -72,13 +72,16 @@ async function detectNewSignals(): Promise<number> {
 
   for (const symbol of TRACKED_SYMBOLS) {
     for (const direction of ["bullish", "bearish"] as const) {
-      // Get all calls for this symbol+direction, ordered by date
+      // Get all calls for this symbol+direction, ordered by date.
+      // Filter out low-confidence AI extractions to prevent junk from
+      // inflating consensus counts.
       const calls = await query<CallGroup>(
         `SELECT id, creator_id, direction, target_price, call_date
          FROM calls
          WHERE symbol = $1
            AND direction = $2
            AND price_at_call IS NOT NULL
+           AND extraction_confidence >= 0.5
          ORDER BY call_date ASC`,
         [symbol, direction],
       );
@@ -116,7 +119,13 @@ async function detectNewSignals(): Promise<number> {
         if (uniqueCreators.length >= CONSENSUS_MIN_CREATORS) {
           const creatorIds = uniqueCreators.map((c) => c.creator_id);
           const callIds = uniqueCreators.map((c) => c.id);
-          const signalDateMs = anchorDate;
+
+          // Use median call date as signal date (more representative than anchor)
+          const sortedDates = uniqueCreators
+            .map((c) => new Date(c.call_date).getTime())
+            .sort((a, b) => a - b);
+          const medianIdx = Math.floor(sortedDates.length / 2);
+          const signalDateMs = sortedDates[medianIdx];
           const signalDate = new Date(signalDateMs).toISOString();
 
           // Check if this signal already exists (same symbol, direction, overlapping creators, similar date)

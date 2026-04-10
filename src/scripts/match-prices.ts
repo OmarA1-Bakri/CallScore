@@ -55,18 +55,38 @@ interface CandleResult {
   readonly regime: number | null;
 }
 
+// Max staleness: reject candles more than 24h before the target timestamp.
+// Without this, a data gap could silently use a days-old price.
+const MAX_STALENESS_MS = 24 * 60 * 60 * 1000;
+
 async function getCandleAt(symbol: string, dateMs: number): Promise<CandleResult | null> {
   const key = cacheKey(symbol, dateMs);
   if (priceCache.has(key)) {
     return priceCache.get(key) ?? null;
   }
 
-  const rows = await query<{ close: number; regime: number | null }>(
-    "SELECT close, regime FROM candles WHERE symbol = $1 AND open_time <= $2 ORDER BY open_time DESC LIMIT 1",
+  const rows = await query<{ close: number; regime: number | null; open_time: string }>(
+    "SELECT close, regime, open_time FROM candles WHERE symbol = $1 AND open_time <= $2 ORDER BY open_time DESC LIMIT 1",
     [symbol, dateMs],
   );
 
-  const result = rows.length > 0 ? { close: rows[0].close, regime: rows[0].regime } : null;
+  if (rows.length === 0) {
+    priceCache.set(key, null);
+    return null;
+  }
+
+  const candleTime = typeof rows[0].open_time === "string"
+    ? parseInt(rows[0].open_time, 10)
+    : Number(rows[0].open_time);
+  const staleness = dateMs - candleTime;
+
+  if (staleness > MAX_STALENESS_MS) {
+    // Candle is too old — data gap, don't trust this price
+    priceCache.set(key, null);
+    return null;
+  }
+
+  const result: CandleResult = { close: rows[0].close, regime: rows[0].regime };
   priceCache.set(key, result);
   return result;
 }
@@ -103,6 +123,7 @@ interface UnmatchedCall {
   readonly symbol: string;
   readonly direction: string;
   readonly target_price: number | null;
+  readonly stop_loss: number | null;
   readonly call_date: string;
 }
 
@@ -170,7 +191,7 @@ async function processCall(call: UnmatchedCall): Promise<boolean> {
     callDateMs,
     callDateMs + MS_90D,
   );
-  const hitTarget = didHitTarget(direction, call.target_price, maxHigh, minLow);
+  const hitTarget = didHitTarget(direction, call.target_price, call.stop_loss, maxHigh, minLow);
 
   // Regime at call time
   const regimeAtCall = coinNow.regime;
@@ -238,7 +259,7 @@ async function main(): Promise<void> {
   while (true) {
     // Use cursor-based pagination (faster than OFFSET for large datasets)
     const batch = await query<UnmatchedCall>(
-      `SELECT id, symbol, direction, target_price, call_date
+      `SELECT id, symbol, direction, target_price, stop_loss, call_date
        FROM calls
        WHERE price_at_call IS NULL AND id > $1
        ORDER BY id ASC

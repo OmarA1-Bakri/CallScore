@@ -90,5 +90,7 @@ export const MS_30D = 30 * MS_PER_DAY;
 export const MS_90D = 90 * MS_PER_DAY;
 
 // Consensus signal threshold
-export const CONSENSUS_MIN_CREATORS = 3;
-export const CONSENSUS_WINDOW_DAYS = 7;
+// Raised from 3 to 4: with ~19 creators, 3 is too easy to hit by chance.
+// 4 unique creators within 5 days is more meaningful agreement.
+export const CONSENSUS_MIN_CREATORS = 4;
+export const CONSENSUS_WINDOW_DAYS = 5;

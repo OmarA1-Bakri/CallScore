@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { query } from "../lib/db";
+import { wilsonLowerBound } from "../lib/scoring";
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
@@ -25,7 +26,8 @@ interface Row {
   readonly accuracy_rank: number | null;
   readonly alpha_score: number;
   readonly win_rate: number;
-  readonly avg_return: number;
+  readonly avg_alpha_30d: number;
+  readonly avg_return_30d: number;
   readonly total_calls: number;
 }
 
@@ -33,7 +35,7 @@ async function main(): Promise<void> {
   loadEnv();
   const rows = await query<Row>(
     `SELECT cr.name, cr.tier, cs.accuracy_rank, cs.alpha_score, cs.win_rate,
-            cs.avg_return_30d as avg_return, cs.total_calls
+            cs.avg_alpha_30d, cs.avg_return_30d, cs.total_calls
      FROM creators cr
      JOIN creator_stats cs ON cs.creator_id = cr.id AND cs.period = 'all_time'
      WHERE EXISTS (
@@ -44,18 +46,22 @@ async function main(): Promise<void> {
 
   console.log("\n=== CRYPTO-TUBER RANKED LEADERBOARD (all_time) ===\n");
   console.log(
-    "Rank  Tier    Name                       Alpha   Win%    Avg30d%   Calls",
+    "Rank  Tier    Name                       Score   Win%  WinLB%  Alpha%  Return%  Calls",
   );
-  console.log("----  ------  -------------------------  ------  ------  --------  -----");
+  console.log("----  ------  -------------------------  ------  -----  ------  ------  -------  -----");
   for (const r of rows) {
     const rank = r.accuracy_rank?.toString().padStart(4) ?? "  —";
     const tier = r.tier.padEnd(6);
     const name = r.name.substring(0, 25).padEnd(25);
-    const alpha = (r.alpha_score ?? 0).toFixed(1).padStart(6);
+    const score = (r.alpha_score ?? 0).toFixed(1).padStart(6);
     const winRate = ((r.win_rate ?? 0) * 100).toFixed(1).padStart(5);
-    const avgRet = (r.avg_return ?? 0).toFixed(2).padStart(7); // already in percent
+    // Wilson lower bound: honest floor for win rate given sample size
+    const wins = Math.round((r.win_rate ?? 0) * (r.total_calls ?? 0));
+    const wlb = (wilsonLowerBound(wins, r.total_calls ?? 0) * 100).toFixed(1).padStart(6);
+    const alpha30d = (r.avg_alpha_30d ?? 0).toFixed(1).padStart(6);
+    const ret30d = (r.avg_return_30d ?? 0).toFixed(1).padStart(7);
     const calls = (r.total_calls ?? 0).toString().padStart(5);
-    console.log(`${rank}  ${tier}  ${name}  ${alpha}  ${winRate}%  ${avgRet}%  ${calls}`);
+    console.log(`${rank}  ${tier}  ${name}  ${score}  ${winRate}%  ${wlb}%  ${alpha30d}%  ${ret30d}%  ${calls}`);
   }
 
   // Period comparison

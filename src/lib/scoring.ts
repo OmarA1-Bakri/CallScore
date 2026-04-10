@@ -60,28 +60,53 @@ export function computeSpecificity(call: {
 /**
  * Alpha Score: the composite score for a single call.
  *
- * Components (max 100):
+ * Components (range: ~-30 to ~120):
  *   Direction correct at 30d:  0 or 40 points
- *   Alpha over BTC at 30d:    0-25 points (1% alpha = 2.5pts, capped)
- *   Specificity bonus:        0-15 points
- *   Regime difficulty bonus:   0-10 points
+ *   Alpha over BTC at 30d:    -25 to +25 points (two-sided, 1% = 2.5pts)
+ *   Specificity bonus:        0-15 points  (GATED on correct direction)
+ *   Regime difficulty bonus:   0-10 points  (GATED on correct direction)
  *   Target hit:               0 or 10 points
+ *
+ * Confidence multiplier (applied to final score):
+ *   high:   1.15x — bold correct calls rewarded more, bold wrong calls punished more
+ *   medium: 1.00x — baseline
+ *   low:    0.85x — hedged calls dampen both reward and penalty
+ *
+ * Bonuses for specificity and regime difficulty only apply when the
+ * direction call was correct — being specific or contrarian on a
+ * wrong call should not be rewarded.
+ *
+ * Alpha is two-sided: underperforming BTC yields negative points,
+ * outperforming yields positive. This prevents skill-washing where
+ * a correct-direction call that massively trails BTC still scores high.
  */
 export function computeAlphaScore(call: Call): number {
-  const directionPoints = call.correct_direction ? 40 : 0;
+  const isCorrect = call.correct_direction === true;
+
+  const directionPoints = isCorrect ? 40 : 0;
 
   const alpha30d = call.alpha_30d ?? 0;
-  const alphaPoints = Math.min(25, Math.max(0, alpha30d * 2.5));
+  const alphaPoints = Math.min(25, Math.max(-25, alpha30d * 2.5));
 
-  const specificityPoints = (call.specificity_score ?? 0) * 15;
+  const specificityPoints = isCorrect ? (call.specificity_score ?? 0) * 15 : 0;
 
-  const regimePoints = (call.regime_difficulty ?? 0.5) * 10;
+  const regimePoints = isCorrect ? (call.regime_difficulty ?? 0.5) * 10 : 0;
 
   const targetPoints = call.hit_target ? 10 : 0;
 
-  return (
-    directionPoints + alphaPoints + specificityPoints + regimePoints + targetPoints
-  );
+  const raw =
+    directionPoints + alphaPoints + specificityPoints + regimePoints + targetPoints;
+
+  // Confidence multiplier: high-conviction calls have amplified impact.
+  // A creator who loudly says "BUY NOW" and is wrong gets punished harder.
+  const confidenceMultiplier =
+    call.confidence === "high"
+      ? 1.15
+      : call.confidence === "low"
+        ? 0.85
+        : 1.0;
+
+  return raw * confidenceMultiplier;
 }
 
 /**
@@ -108,35 +133,75 @@ export function computeAlpha(
 
 /**
  * Was the direction correct at 30 days?
+ *
+ * Magnitude floor: bullish/bearish must move >2% to count as correct.
+ * A +0.5% move on a bullish call is noise, not signal.
+ *
+ * Neutral threshold widened to ±10% (from ±5%) to reflect crypto
+ * volatility — 30-day ATR is typically 15-25%.
  */
 export function isDirectionCorrect(
   direction: Direction,
   return30d: number,
 ): boolean {
-  if (direction === "neutral") return Math.abs(return30d) < 5;
-  if (direction === "bullish") return return30d > 0;
-  return return30d < 0; // bearish
+  if (direction === "neutral") return Math.abs(return30d) < 10;
+  if (direction === "bullish") return return30d > 2;
+  return return30d < -2; // bearish
 }
 
 /**
  * Did the price hit the stated target between call date and evaluation window?
- * For bullish: did price go above target at any point?
- * For bearish: did price go below target at any point?
+ *
+ * Conservative stop-loss guard: if both target AND stop-loss would have
+ * been triggered within the window, we assume the stop was hit first
+ * (since we only have aggregated high/low, not chronological order).
+ * This is a pessimistic heuristic — better to under-credit than over-credit.
+ *
+ * For a fully accurate check, candles would need to be walked in order.
  */
 export function didHitTarget(
   direction: Direction,
   targetPrice: number | null,
+  stopLoss: number | null,
   highBetween: number | null,
   lowBetween: number | null,
 ): boolean {
   if (targetPrice === null) return false;
+
   if (direction === "bullish" && highBetween !== null) {
-    return highBetween >= targetPrice;
+    const targetHit = highBetween >= targetPrice;
+    const stopHit =
+      stopLoss !== null && lowBetween !== null && lowBetween <= stopLoss;
+    return targetHit && !stopHit;
   }
   if (direction === "bearish" && lowBetween !== null) {
-    return lowBetween <= targetPrice;
+    const targetHit = lowBetween <= targetPrice;
+    const stopHit =
+      stopLoss !== null && highBetween !== null && highBetween >= stopLoss;
+    return targetHit && !stopHit;
   }
   return false;
+}
+
+/**
+ * Wilson score lower bound (95% confidence).
+ *
+ * Returns the lower bound of a binomial proportion confidence interval.
+ * With n=21 and p=0.571 (InvestAnswers), Wilson lower bound ≈ 0.36 —
+ * showing the user that the "57.1% win rate" is not statistically
+ * distinguishable from 36%. Much more honest than raw p.
+ *
+ * z = 1.96 for 95% confidence.
+ */
+export function wilsonLowerBound(wins: number, total: number): number {
+  if (total === 0) return 0;
+  const z = 1.96;
+  const p = wins / total;
+  const denominator = 1 + (z * z) / total;
+  const centre = p + (z * z) / (2 * total);
+  const adjustment =
+    z * Math.sqrt((p * (1 - p) + (z * z) / (4 * total)) / total);
+  return Math.max(0, (centre - adjustment) / denominator);
 }
 
 /**
