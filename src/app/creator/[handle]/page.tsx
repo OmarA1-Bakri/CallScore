@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -8,6 +9,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import AlphaScoreBadge from "@/components/AlphaScoreBadge";
+import RankTierBadge from "@/components/RankTierBadge";
 import PerformanceChart from "@/components/PerformanceChart";
 import CallHistory from "@/components/CallHistory";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
@@ -16,6 +18,30 @@ import type { Creator, CreatorStats, Call } from "@/lib/types";
 
 interface PageProps {
   readonly params: { handle: string };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const handle = decodeURIComponent(params.handle);
+
+  try {
+    const creators = await query<Creator>(
+      `SELECT * FROM creators WHERE youtube_handle = $1 LIMIT 1`,
+      [handle],
+    );
+
+    if (creators.length === 0) {
+      return { title: "Creator Not Found | CryptoTubers Ranked" };
+    }
+
+    const creator = creators[0];
+    return {
+      title: `${creator.name} — Creator Profile | CryptoTubers Ranked`,
+      description: `See ${creator.name}'s crypto call track record, alpha score, win rate, and full call history on CryptoTubers Ranked.`,
+      alternates: { canonical: `/creator/${handle}` },
+    };
+  } catch {
+    return { title: "Creator Not Found | CryptoTubers Ranked" };
+  }
 }
 
 interface PerformancePoint {
@@ -58,13 +84,27 @@ export default async function CreatorPage({ params }: PageProps) {
     // Stats table may not exist yet
   }
 
-  // Fetch calls for this creator
+  // Fetch calls for this creator (limited columns + max 50 for page size)
+  const CALL_LIMIT = 50;
   let calls: Call[] = [];
+  let totalCallCount = 0;
   try {
     calls = await query<Call>(
-      `SELECT * FROM calls WHERE creator_id = $1 ORDER BY call_date DESC`,
+      `SELECT id, creator_id, video_id, symbol, direction, call_type,
+              specificity_score, call_date, return_30d, alpha_30d,
+              hit_target, correct_direction, regime_difficulty, score,
+              extraction_confidence, created_at
+       FROM calls
+       WHERE creator_id = $1
+       ORDER BY call_date DESC
+       LIMIT $2`,
+      [creator.id, CALL_LIMIT],
+    );
+    const countRows = await query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM calls WHERE creator_id = $1`,
       [creator.id],
     );
+    totalCallCount = countRows.length > 0 ? Number(countRows[0].count) : calls.length;
   } catch {
     // Calls table may not exist yet
   }
@@ -141,9 +181,18 @@ export default async function CreatorPage({ params }: PageProps) {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
-              {creator.name}
-            </h1>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                {creator.name}
+              </h1>
+              {stats && (
+                <RankTierBadge
+                  rank={stats.accuracy_rank ?? 99}
+                  totalCalls={stats.total_calls}
+                  wilsonLb={stats.wilson_lb}
+                />
+              )}
+            </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mb-3">
               <span className="flex items-center gap-1">
@@ -178,18 +227,22 @@ export default async function CreatorPage({ params }: PageProps) {
       </section>
 
       {/* Stats row */}
-      <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+      <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <div className="glass-card p-4 flex flex-col items-center">
           <AlphaScoreBadge score={alphaScore} size="lg" />
         </div>
-        <StatCard label="Win Rate" value={`${winRate.toFixed(1)}%`} />
+        <StatCard label="Win Rate" value={`${(winRate * 100).toFixed(1)}%`} />
+        <StatCard
+          label="Win Rate Floor"
+          value={`≥${((stats?.wilson_lb ?? 0) * 100).toFixed(1)}%`}
+        />
         <StatCard
           label="Avg Alpha (30d)"
           value={`${avgAlpha30d >= 0 ? "+" : ""}${avgAlpha30d.toFixed(1)}%`}
           positive={avgAlpha30d >= 0}
         />
         <StatCard label="Total Calls" value={String(totalCalls)} />
-        <StatCard label="Hit Rate" value={`${hitRate.toFixed(1)}%`} />
+        <StatCard label="Hit Rate" value={`${(hitRate * 100).toFixed(1)}%`} />
       </section>
 
       {/* Score breakdown + Chart row */}
@@ -213,7 +266,7 @@ export default async function CreatorPage({ params }: PageProps) {
       {/* Call history */}
       <section>
         {calls.length > 0 ? (
-          <CallHistory calls={calls} />
+          <CallHistory calls={calls} totalCount={totalCallCount} />
         ) : (
           <div className="glass-card p-12 text-center">
             <p className="text-gray-500">No calls tracked yet for this creator.</p>

@@ -16,11 +16,16 @@ export const metadata: Metadata = {
   description:
     "We track, rank, and score the top 20 crypto YouTube influencers by the actual accuracy of their altcoin calls.",
   metadataBase: new URL("https://cryptotuberranked.com"),
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     title: "CRYPTO-TUBER RANKED — Who Actually Beats The Market?",
     description:
       "We track, rank, and score the top 20 crypto YouTube influencers by the actual accuracy of their altcoin calls.",
     type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",

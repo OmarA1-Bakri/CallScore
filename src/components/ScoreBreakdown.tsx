@@ -34,7 +34,7 @@ export default function ScoreBreakdown({
   return (
     <div className="glass-card p-5">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-white font-semibold text-sm">Score Breakdown</h3>
+        <h2 className="text-white font-semibold text-sm">Score Breakdown</h2>
         <span className="text-brand-green font-bold text-lg tabular-nums">
           {total.toFixed(1)}
         </span>

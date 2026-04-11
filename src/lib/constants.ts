@@ -89,8 +89,36 @@ export const MS_7D = 7 * MS_PER_DAY;
 export const MS_30D = 30 * MS_PER_DAY;
 export const MS_90D = 90 * MS_PER_DAY;
 
-// Consensus signal threshold
-// Raised from 3 to 4: with ~19 creators, 3 is too easy to hit by chance.
-// 4 unique creators within 5 days is more meaningful agreement.
-export const CONSENSUS_MIN_CREATORS = 4;
+// Consensus signal thresholds.
+// Tiered by market cap: BTC/ETH are called by everyone, so consensus
+// needs MORE creators to be meaningful. Small caps are more selective.
+export const CONSENSUS_MIN_CREATORS = 5;
 export const CONSENSUS_WINDOW_DAYS = 5;
+
+// High-threshold symbols: every YouTuber talks about these, so
+// consensus with few creators is trivially easy and meaningless.
+// BTC at 10+ has 53.8% accuracy vs 45.2% at 5+. BTC consensus at 58.3%.
+// ETH consensus at 0% (0/2) — terrible signal, needs more data.
+// Creator count is monotonically predictive: ≥12 creators = 57.1% accuracy.
+export const CONSENSUS_HIGH_THRESHOLD_SYMBOLS = new Set([
+  "BTCUSDT",
+  "ETHUSDT",
+]);
+export const CONSENSUS_HIGH_THRESHOLD_MIN = 10;
+
+// Consensus correctness threshold: 2% magnitude floor (same as individual
+// calls). Direction-specific and higher thresholds were tested but performed
+// worse — bearish consensus at 50% accuracy is the key signal, and raising
+// the threshold destroyed that advantage.
+export const CONSENSUS_CORRECT_THRESHOLD = 2;
+
+// Direction base rates: fraction of matched calls where the 30d return
+// falls into each zone. Computed from the full dataset (4224 matched calls).
+// Used to adjust direction scoring — correct bullish calls are harder
+// (only 30.5% of outcomes are positive >2%) and should score higher.
+// These are structural rates; recalibrate if the dataset changes significantly.
+export const DIRECTION_BASE_RATES: Readonly<Record<string, number>> = {
+  bullish: 0.305,
+  bearish: 0.533,
+  neutral: 0.162,
+};

@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { AlphaScoreBar } from "./AlphaScoreBadge";
+import RankTierBadge from "./RankTierBadge";
 import TierGate from "./TierGate";
 import type { LeaderboardRow } from "@/lib/types";
 import { SYMBOL_TICKERS } from "@/lib/constants";
@@ -125,9 +126,16 @@ function LeaderboardTable({
                       {getInitials(row.creator.name)}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white font-medium group-hover:text-brand-gold transition-colors truncate">
-                        {row.creator.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white font-medium group-hover:text-brand-gold transition-colors truncate">
+                          {row.creator.name}
+                        </p>
+                        <RankTierBadge
+                          rank={row.rank}
+                          totalCalls={row.stats.total_calls}
+                          wilsonLb={row.stats.wilson_lb}
+                        />
+                      </div>
                       <p className="text-gray-500 text-xs truncate">
                         {row.creator.youtube_handle}
                       </p>
@@ -139,9 +147,16 @@ function LeaderboardTable({
                   <AlphaScoreBar score={row.stats.alpha_score} />
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums hidden sm:table-cell">
-                  <span className="text-white">
-                    {row.stats.win_rate.toFixed(1)}%
-                  </span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-white">
+                      {(row.stats.win_rate * 100).toFixed(1)}%
+                    </span>
+                    {row.stats.wilson_lb > 0 && (
+                      <span className="text-[10px] text-gray-500" title="Wilson 95% lower bound">
+                        &ge;{(row.stats.wilson_lb * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                   <span
@@ -159,9 +174,10 @@ function LeaderboardTable({
                   {row.stats.total_calls}
                 </td>
                 <td className="px-4 py-3 hidden xl:table-cell">
-                  {bestTicker && row.best_call ? (
+                  {bestTicker && row.best_call?.id ? (
                     <Link
                       href={`/call/${row.best_call.id}`}
+                      aria-label={`View ${row.creator.name} best call: ${bestTicker} +${row.best_call.return_30d?.toFixed(0) ?? "?"}%`}
                       className="text-xs text-gray-400 hover:text-brand-gold transition-colors"
                     >
                       {bestTicker}{" "}

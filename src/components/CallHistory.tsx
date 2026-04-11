@@ -14,6 +14,7 @@ import type { Call } from "@/lib/types";
 
 interface CallHistoryProps {
   readonly calls: readonly Call[];
+  readonly totalCount?: number;
 }
 
 type SortKey = "call_date" | "score" | "return_30d";
@@ -21,7 +22,7 @@ type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 10;
 
-export default function CallHistory({ calls }: CallHistoryProps) {
+export default function CallHistory({ calls, totalCount }: CallHistoryProps) {
   const [sortKey, setSortKey] = useState<SortKey>("call_date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
@@ -67,9 +68,11 @@ export default function CallHistory({ calls }: CallHistoryProps) {
   return (
     <div className="glass-card overflow-hidden">
       <div className="p-4 border-b border-brand-border">
-        <h3 className="text-white font-semibold text-sm">Call History</h3>
+        <h2 className="text-white font-semibold text-sm">Call History</h2>
         <p className="text-gray-500 text-xs mt-1">
-          {calls.length} total calls tracked
+          {totalCount !== undefined && totalCount > calls.length
+            ? `Showing ${calls.length} of ${totalCount} calls`
+            : `${calls.length} total calls tracked`}
         </p>
       </div>
 
@@ -125,6 +128,7 @@ export default function CallHistory({ calls }: CallHistoryProps) {
                   <td className="px-4 py-3">
                     <Link
                       href={`/call/${call.id}`}
+                      aria-label={`View ${ticker} ${call.direction} call details`}
                       className="text-white font-medium hover:text-brand-gold transition-colors"
                     >
                       {ticker}
@@ -204,6 +208,7 @@ export default function CallHistory({ calls }: CallHistoryProps) {
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
+              aria-label="Previous page"
               className="p-1 rounded text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -211,6 +216,7 @@ export default function CallHistory({ calls }: CallHistoryProps) {
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
+              aria-label="Next page"
               className="p-1 rounded text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight className="w-4 h-4" />

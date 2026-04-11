@@ -31,6 +31,12 @@ interface LeaderboardQueryRow {
   readonly specificity_avg: number;
   readonly alpha_score: number;
   readonly accuracy_rank: number | null;
+  readonly effective_n: number;
+  readonly wilson_lb: number;
+  readonly bullish_win_rate: number;
+  readonly bearish_win_rate: number;
+  readonly bullish_pct: number;
+  readonly sharpe_ratio: number;
   readonly updated_at: string;
   readonly name: string;
   readonly youtube_handle: string;
@@ -104,11 +110,18 @@ function buildStats(row: LeaderboardQueryRow): CreatorStats {
     specificity_avg: row.specificity_avg,
     alpha_score: row.alpha_score,
     accuracy_rank: row.accuracy_rank,
+    effective_n: row.effective_n,
+    wilson_lb: row.wilson_lb,
+    bullish_win_rate: row.bullish_win_rate,
+    bearish_win_rate: row.bearish_win_rate,
+    bullish_pct: row.bullish_pct,
+    sharpe_ratio: row.sharpe_ratio,
     updated_at: row.updated_at,
   };
 }
 
 function buildCallSummary(
+  id: number | null,
   symbol: string | null,
   returnVal: number | null,
   score: number | null,
@@ -117,6 +130,7 @@ function buildCallSummary(
 ): Partial<Call> | null {
   if (symbol === null) return null;
   return {
+    id: id ?? undefined,
     symbol,
     return_30d: returnVal,
     score: score ?? 0,
@@ -205,6 +219,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         creator: buildCreator(row),
         stats: buildStats(row),
         best_call: buildCallSummary(
+          row.best_call_id,
           row.best_call_symbol,
           row.best_call_return,
           row.best_call_score,
@@ -212,6 +227,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           row.best_call_direction,
         ) as Call | null,
         worst_call: buildCallSummary(
+          row.worst_call_id,
           row.worst_call_symbol,
           row.worst_call_return,
           row.worst_call_score,

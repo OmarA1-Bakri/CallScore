@@ -11,13 +11,19 @@ export function hasAccess(userTier: Tier, requiredTier: Tier): boolean {
 }
 
 /**
- * Dynamic tier gating based on actual rank.
- * Top 5 = elite, next 5 = pro, rest = free.
- * This is the key differentiator: tiers shift as rankings change.
+ * Leaderboard visibility tier.
+ *
+ * The full leaderboard is FREE — it's the viral hook that drives
+ * organic traffic and social sharing. Paywalling rank numbers kills
+ * virality for zero incremental revenue.
+ *
+ * Paid tiers gate the INTELLIGENCE layer:
+ *   Pro  ($19/mo) — creator deep dives, call history, charts
+ *   Alpha ($49/mo) — bear/bull alerts, contrarian signals, consensus
+ *
+ * All ranks return "free" so nothing is blurred on the homepage.
  */
-export function getCreatorTier(rank: number): Tier {
-  if (rank >= 1 && rank <= 5) return "elite";
-  if (rank >= 6 && rank <= 10) return "pro";
+export function getCreatorTier(_rank: number): Tier {
   return "free";
 }
 
