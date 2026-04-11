@@ -23,7 +23,7 @@ export default function ConsensusSignals({ signals }: ConsensusSignalsProps) {
       <div className="flex items-center gap-2 mb-4">
         <Zap className="w-5 h-5 text-brand-gold" />
         <h3 className="text-white font-semibold text-sm">Consensus Signals</h3>
-        <span className="badge-elite ml-auto">Elite</span>
+        <span className="badge-elite ml-auto">Alpha</span>
       </div>
 
       {/* Signal list */}

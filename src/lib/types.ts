@@ -95,6 +95,12 @@ export interface CreatorStats {
   readonly specificity_avg: number;
   readonly alpha_score: number;
   readonly accuracy_rank: number | null;
+  readonly effective_n: number;
+  readonly wilson_lb: number;
+  readonly bullish_win_rate: number;
+  readonly bearish_win_rate: number;
+  readonly bullish_pct: number;
+  readonly sharpe_ratio: number;
   readonly updated_at: string;
 }
 

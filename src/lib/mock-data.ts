@@ -172,6 +172,12 @@ function makeStat(creator: Creator, rank: number): CreatorStats {
     specificity_avg: 0.6,
     alpha_score: creator.alpha_score,
     accuracy_rank: rank,
+    effective_n: Math.round(creator.total_calls * 0.6),
+    wilson_lb: Math.max(0, creator.win_rate - 0.15),
+    bullish_win_rate: creator.win_rate * 0.8,
+    bearish_win_rate: creator.win_rate * 1.3,
+    bullish_pct: 0.7,
+    sharpe_ratio: 0.25,
     updated_at: "2026-04-05T12:00:00Z",
   };
 }

@@ -5,6 +5,9 @@ import {
   TRACKED_SYMBOLS,
   CONSENSUS_MIN_CREATORS,
   CONSENSUS_WINDOW_DAYS,
+  CONSENSUS_HIGH_THRESHOLD_SYMBOLS,
+  CONSENSUS_HIGH_THRESHOLD_MIN,
+  CONSENSUS_CORRECT_THRESHOLD,
   MS_7D,
   MS_30D,
 } from "../lib/constants";
@@ -41,6 +44,8 @@ interface CallGroup {
   readonly direction: string;
   readonly target_price: number | null;
   readonly call_date: string;
+  readonly creator_alpha_score: number;
+  readonly creator_accuracy_rank: number | null;
 }
 
 interface ExistingSignal {
@@ -70,19 +75,31 @@ async function detectNewSignals(): Promise<number> {
   let newSignals = 0;
   const windowMs = CONSENSUS_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
+  // Hoist ranked count out of loop — same value for every window.
+  const totalRankedRow = await query<{ count: string }>(
+    "SELECT COUNT(*)::text as count FROM creators WHERE accuracy_rank IS NOT NULL",
+  );
+  const rankedCount = parseInt(totalRankedRow[0]?.count ?? "0", 10);
+  const topHalfCutoff = Math.ceil(rankedCount / 2);
+
   for (const symbol of TRACKED_SYMBOLS) {
     for (const direction of ["bullish", "bearish"] as const) {
-      // Get all calls for this symbol+direction, ordered by date.
-      // Filter out low-confidence AI extractions to prevent junk from
-      // inflating consensus counts.
+      // Get all calls for this symbol+direction from ranked creators only.
+      // Filter out low-confidence AI extractions and unranked creators
+      // (those with <10 matched calls) to prevent noise from inflating
+      // consensus counts.
       const calls = await query<CallGroup>(
-        `SELECT id, creator_id, direction, target_price, call_date
-         FROM calls
-         WHERE symbol = $1
-           AND direction = $2
-           AND price_at_call IS NOT NULL
-           AND extraction_confidence >= 0.5
-         ORDER BY call_date ASC`,
+        `SELECT c.id, c.creator_id, c.direction, c.target_price, c.call_date,
+                cr.alpha_score AS creator_alpha_score,
+                cr.accuracy_rank AS creator_accuracy_rank
+         FROM calls c
+         JOIN creators cr ON cr.id = c.creator_id
+         WHERE c.symbol = $1
+           AND c.direction = $2
+           AND c.price_at_call IS NOT NULL
+           AND c.extraction_confidence >= 0.5
+           AND cr.accuracy_rank IS NOT NULL
+         ORDER BY c.call_date ASC`,
         [symbol, direction],
       );
 
@@ -116,7 +133,25 @@ async function detectNewSignals(): Promise<number> {
 
         const uniqueCreators = Array.from(creatorMap.values());
 
-        if (uniqueCreators.length >= CONSENSUS_MIN_CREATORS) {
+        // Tiered threshold: BTC/ETH need more creators for meaningful consensus
+        const minCreators = CONSENSUS_HIGH_THRESHOLD_SYMBOLS.has(symbol)
+          ? CONSENSUS_HIGH_THRESHOLD_MIN
+          : CONSENSUS_MIN_CREATORS;
+
+        if (uniqueCreators.length >= minCreators) {
+          // Quality gate: at least half of participants must be from
+          // the top 50% of ranked creators. This prevents consensus
+          // signals dominated by low-quality creators.
+          const topHalfCount = uniqueCreators.filter(
+            (c) => c.creator_accuracy_rank !== null && c.creator_accuracy_rank <= topHalfCutoff,
+          ).length;
+
+          if (topHalfCount < Math.ceil(uniqueCreators.length / 2)) {
+            // Not enough quality creators — skip this signal
+            windowStart++;
+            continue;
+          }
+
           const creatorIds = uniqueCreators.map((c) => c.creator_id);
           const callIds = uniqueCreators.map((c) => c.id);
 
@@ -164,25 +199,35 @@ async function detectNewSignals(): Promise<number> {
                 ? computeReturn(priceAtSignal, price30d)
                 : null;
 
-            // Determine if signal was correct
+            // Determine if signal was correct.
+            // Direction-aware thresholds: bullish requires 3% (perma-bull bias
+            // makes bullish consensus easy), bearish requires 2% (rare and valuable).
             let correct: boolean | null = null;
             if (return30d !== null) {
               if (direction === "bullish") {
-                correct = return30d > 0;
+                correct = return30d > CONSENSUS_CORRECT_THRESHOLD;
               } else {
-                correct = return30d < 0;
+                correct = return30d < -CONSENSUS_CORRECT_THRESHOLD;
               }
             }
+
+            // Quality score: average alpha_score of participating creators.
+            // Higher = more credible signal. Enables quality-stratified accuracy.
+            const qualityScore = uniqueCreators.reduce(
+              (sum, c) => sum + (c.creator_alpha_score ?? 0), 0,
+            ) / uniqueCreators.length;
 
             await query(
               `INSERT INTO consensus_signals (
                 symbol, direction, creator_count, creator_ids, call_ids,
                 signal_date, avg_target_price, price_at_signal,
-                price_7d, price_30d, return_7d, return_30d, correct
+                price_7d, price_30d, return_7d, return_30d, correct,
+                quality_score
               ) VALUES (
                 $1, $2, $3, $4, $5,
                 $6, $7, $8,
-                $9, $10, $11, $12, $13
+                $9, $10, $11, $12, $13,
+                $14
               )`,
               [
                 symbol,
@@ -198,6 +243,7 @@ async function detectNewSignals(): Promise<number> {
                 return7d,
                 return30d,
                 correct,
+                qualityScore,
               ],
             );
 
@@ -248,9 +294,9 @@ async function updateExistingSignals(): Promise<number> {
     let correct: boolean | null = null;
     if (return30d !== null) {
       if (signal.direction === "bullish") {
-        correct = return30d > 0;
+        correct = return30d > CONSENSUS_CORRECT_THRESHOLD;
       } else {
-        correct = return30d < 0;
+        correct = return30d < -CONSENSUS_CORRECT_THRESHOLD;
       }
     }
 
@@ -281,6 +327,14 @@ async function main(): Promise<void> {
   console.log(
     `[${timestamp()}] Parameters: min_creators=${CONSENSUS_MIN_CREATORS}, window=${CONSENSUS_WINDOW_DAYS}d`,
   );
+
+  // Rebuild from scratch: clear all existing signals since scoring rules changed.
+  // This ensures correctness thresholds and quality filters are applied uniformly.
+  const rebuild = process.argv.includes("--rebuild");
+  if (rebuild) {
+    await query("DELETE FROM consensus_signals");
+    console.log(`[${timestamp()}] Cleared all existing consensus signals for rebuild`);
+  }
 
   // Detect new consensus signals
   const newSignals = await detectNewSignals();

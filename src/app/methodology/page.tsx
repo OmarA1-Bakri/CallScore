@@ -20,9 +20,10 @@ import {
 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Methodology - CRYPTO-TUBER RANKED",
+  title: "Methodology — How We Score Crypto YouTubers | CryptoTubers Ranked",
   description:
-    "Full transparency on how we score crypto YouTube creators. Learn about our Alpha Score formula, data sources, and ranking methodology.",
+    "Our scoring methodology: direction accuracy, alpha vs buy-and-hold, specificity, and statistical rigor across 18.7M candle data points.",
+  alternates: { canonical: "/methodology" },
 };
 
 /* ------------------------------------------------------------------ */
@@ -163,9 +164,9 @@ interface TierInfo {
 }
 
 const TIERS: readonly TierInfo[] = [
-  { name: "Elite", range: "Ranks 1-5", badge: "badge-elite" },
-  { name: "Pro", range: "Ranks 6-10", badge: "badge-pro" },
-  { name: "Free", range: "Ranks 11-20", badge: "badge-free" },
+  { name: "Alpha", range: "Signals & Intelligence", badge: "badge-elite" },
+  { name: "Pro", range: "Deep Analytics", badge: "badge-pro" },
+  { name: "Free", range: "Full Leaderboard", badge: "badge-free" },
 ] as const;
 
 /* ------------------------------------------------------------------ */
@@ -248,6 +249,15 @@ export default function MethodologyPage() {
           subtitle="How individual call scores become creator rankings"
         />
         <CreatorRankingsSection />
+      </section>
+
+      {/* Statistical Rigor */}
+      <section className="mb-16">
+        <SectionHeader
+          title="Statistical Rigor"
+          subtitle="We don't just rank -- we quantify our confidence"
+        />
+        <StatisticalRigorSection />
       </section>
 
       {/* Transparency section */}
@@ -653,8 +663,8 @@ function CreatorRankingsSection() {
             </h3>
           </div>
           <p className="text-gray-400 text-xs leading-relaxed mb-4">
-            The top performers are tiered by rank. Higher tiers are gated behind
-            paid subscriptions to reward serious users.
+            The full leaderboard is free. Paid tiers unlock deeper analytics
+            and actionable intelligence signals.
           </p>
           <div className="space-y-2">
             {TIERS.map((tier) => (
@@ -669,6 +679,73 @@ function CreatorRankingsSection() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Statistical Rigor ---------- */
+
+function StatisticalRigorSection() {
+  const rigorItems: readonly {
+    readonly stat: string;
+    readonly label: string;
+    readonly detail: string;
+  }[] = [
+    {
+      stat: "5,000",
+      label: "Bootstrap Resamples",
+      detail:
+        "We resample the entire dataset 5,000 times to compute 95% confidence intervals for every rank. Top 5 creators overlap -- we tell you that honestly.",
+    },
+    {
+      stat: "0.95+",
+      label: "Spearman Stability",
+      detail:
+        "Every formula weight was perturbed by +/-25%. Rankings remained stable (Spearman > 0.95) across all variations. The formula is robust, not fragile.",
+    },
+    {
+      stat: "1.4%",
+      label: "ICC (Signal Strength)",
+      detail:
+        "Only 1.4% of call-level score variance is between creators. The rest is market noise. This is why we need thousands of calls to separate skill from luck.",
+    },
+    {
+      stat: "3x",
+      label: "Contrarian Edge",
+      detail:
+        "Calls that go against peer consensus score 3x higher on average. This is a statistically significant pattern across 4,600+ scored calls.",
+    },
+    {
+      stat: "18.7M",
+      label: "Candle Data Points",
+      detail:
+        "Every call is matched against Binance OHLCV candle data across 18 coins. No estimates, no approximations -- real prices at call date and evaluation windows.",
+    },
+    {
+      stat: "136+",
+      label: "Analysis Iterations",
+      detail:
+        "The scoring formula has been stress-tested across 136+ statistical analyses: bootstrap, Bayesian estimation, regime splits, decay curves, and more.",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {rigorItems.map((item) => (
+        <div key={item.label} className="glass-card p-5">
+          <div className="mb-3">
+            <span className="text-gradient-gold font-bold text-2xl tabular-nums">
+              {item.stat}
+            </span>
+          </div>
+          <h3 className="text-white font-semibold text-sm mb-1">
+            {item.label}
+          </h3>
+          <p className="text-gray-400 text-xs leading-relaxed">
+            {item.detail}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }

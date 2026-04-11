@@ -9,14 +9,22 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2.5 mb-3">
               <Image
-                src="/logo.png"
+                src="/logo-icon.png"
                 alt="CryptoTubers Ranked"
-                width={140}
-                height={80}
-                className="h-10 w-auto"
+                width={468}
+                height={468}
+                className="h-8 w-auto"
               />
+              <div>
+                <span className="text-white font-extrabold text-sm tracking-tight leading-none">
+                  CryptoTubers
+                </span>
+                <span className="block text-brand-gold font-bold text-[10px] tracking-[0.2em] uppercase leading-none mt-0.5">
+                  Ranked
+                </span>
+              </div>
             </div>
             <p className="text-gray-500 text-sm leading-relaxed">
               We track, rank, and score the top 20 crypto YouTube influencers
@@ -26,7 +34,7 @@ export default function Footer() {
 
           {/* Links */}
           <div>
-            <h4 className="text-white font-semibold text-sm mb-3">Navigate</h4>
+            <h2 className="text-white font-semibold text-sm mb-3">Navigate</h2>
             <ul className="space-y-2">
               <li>
                 <Link
@@ -60,18 +68,36 @@ export default function Footer() {
                   Give Feedback
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/about"
+                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                >
+                  About
+                </Link>
+              </li>
             </ul>
           </div>
 
           {/* Legal */}
           <div>
-            <h4 className="text-white font-semibold text-sm mb-3">Legal</h4>
+            <h2 className="text-white font-semibold text-sm mb-3">Legal</h2>
             <ul className="space-y-2">
               <li>
-                <span className="text-gray-500 text-sm">Terms of Service</span>
+                <Link
+                  href="/terms"
+                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                >
+                  Terms of Service
+                </Link>
               </li>
               <li>
-                <span className="text-gray-500 text-sm">Privacy Policy</span>
+                <Link
+                  href="/privacy"
+                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                >
+                  Privacy Policy
+                </Link>
               </li>
             </ul>
           </div>

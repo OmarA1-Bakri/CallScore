@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Trophy, BarChart3, Target, Users } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
@@ -14,6 +15,13 @@ import type {
   Period,
   Tier,
 } from "@/lib/types";
+
+export const metadata: Metadata = {
+  title: "Crypto YouTuber Leaderboard — Who Actually Beats The Market? | CryptoTubers Ranked",
+  description:
+    "See which crypto YouTubers have the best track record. We verified 4,598 altcoin calls across 19 creators against real market data.",
+  alternates: { canonical: "/" },
+};
 
 const VALID_PERIODS: readonly Period[] = ["all_time", "90d", "30d"];
 
@@ -35,6 +43,12 @@ interface LeaderboardQueryRow {
   readonly specificity_avg: number;
   readonly alpha_score: number;
   readonly accuracy_rank: number | null;
+  readonly effective_n: number;
+  readonly wilson_lb: number;
+  readonly bullish_win_rate: number;
+  readonly bearish_win_rate: number;
+  readonly bullish_pct: number;
+  readonly sharpe_ratio: number;
   readonly updated_at: string;
   readonly name: string;
   readonly youtube_handle: string;
@@ -105,6 +119,12 @@ function buildStats(row: LeaderboardQueryRow): CreatorStats {
     specificity_avg: row.specificity_avg,
     alpha_score: row.alpha_score,
     accuracy_rank: row.accuracy_rank,
+    effective_n: row.effective_n,
+    wilson_lb: row.wilson_lb,
+    bullish_win_rate: row.bullish_win_rate,
+    bearish_win_rate: row.bearish_win_rate,
+    bullish_pct: row.bullish_pct,
+    sharpe_ratio: row.sharpe_ratio,
     updated_at: row.updated_at,
   };
 }
@@ -220,19 +240,17 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   // Aggregate stats
   let totalCalls = "0";
-  let avgAccuracy = "--";
   let creatorCount = "20";
   try {
     const statsRows = await query<StatsRow>(
       `SELECT
         COALESCE(SUM(total_calls), 0)::text AS total_calls,
-        CASE WHEN COUNT(*) > 0 THEN ROUND(AVG(win_rate)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
+        CASE WHEN COUNT(*) > 0 THEN ROUND((AVG(win_rate) * 100)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
         COUNT(DISTINCT creator_id)::text AS creator_count
       FROM creator_stats WHERE period = 'all_time'`,
     );
     if (statsRows.length > 0) {
       totalCalls = Number(statsRows[0].total_calls) > 0 ? statsRows[0].total_calls : "0";
-      avgAccuracy = statsRows[0].avg_accuracy !== "--" ? `${statsRows[0].avg_accuracy}%` : "--";
       creatorCount = statsRows[0].creator_count;
     }
   } catch {
@@ -246,29 +264,30 @@ export default async function HomePage({ searchParams }: PageProps) {
         <div className="inline-flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-4 py-1.5 mb-6">
           <Trophy className="w-4 h-4 text-brand-gold" />
           <span className="text-brand-gold text-xs font-medium">
-            Tracking {creatorCount} Crypto YouTubers in Real-Time
+            {totalCalls} calls scored against real price data
           </span>
         </div>
 
         <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
-          Stop watching 20 YouTube channels.
+          Most crypto YouTubers are noise.
           <br />
           <span className="text-gradient-gold">
-            We tell you who actually beats the market.
+            We found the signal.
           </span>
         </h1>
 
         <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-          We watch them for you and track every altcoin call, match it against
-          real price data, and compute an Alpha Score that shows who genuinely
-          outperforms BTC -- and who is just noise.
+          We scored every altcoin call from {creatorCount} top crypto YouTubers
+          against 18.7M candles of real price data. Who actually beats BTC,
+          who to follow in a bear market, and when to fade the consensus --
+          the answers surprised us.
         </p>
 
         {/* Stats row */}
-        <div className="flex flex-wrap justify-center gap-6 mt-8">
-          <StatPill icon={Users} label="Creators Tracked" value={creatorCount} />
-          <StatPill icon={BarChart3} label="Total Calls Scored" value={totalCalls} />
-          <StatPill icon={Target} label="Avg Accuracy" value={avgAccuracy} />
+        <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-8">
+          <StatPill icon={Users} label="Creators Ranked" value={creatorCount} />
+          <StatPill icon={BarChart3} label="Calls Scored" value={totalCalls} />
+          <StatPill icon={Target} label="Beat Buy & Hold" value="1 of 19" />
         </div>
       </section>
 

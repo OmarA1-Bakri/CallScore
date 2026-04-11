@@ -69,14 +69,14 @@ export default function CreatorCard({ creator, stats, trend }: CreatorCardProps)
 
       {/* Stat grid */}
       <div className="grid grid-cols-2 gap-3">
-        <StatItem label="Win Rate" value={`${stats.win_rate.toFixed(1)}%`} />
+        <StatItem label="Win Rate" value={`${(stats.win_rate * 100).toFixed(1)}%`} />
         <StatItem
           label="Avg Alpha"
           value={`${stats.avg_alpha_30d >= 0 ? "+" : ""}${stats.avg_alpha_30d.toFixed(1)}%`}
           positive={stats.avg_alpha_30d >= 0}
         />
         <StatItem label="Total Calls" value={String(stats.total_calls)} />
-        <StatItem label="Hit Rate" value={`${stats.hit_rate.toFixed(1)}%`} />
+        <StatItem label="Hit Rate" value={`${(stats.hit_rate * 100).toFixed(1)}%`} />
       </div>
     </Link>
   );

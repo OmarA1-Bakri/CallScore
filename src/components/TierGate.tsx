@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Lock, Crown } from "lucide-react";
-import type { Tier } from "@/lib/types";
 
 interface TierGateProps {
   readonly tier: "pro" | "elite";
@@ -10,8 +9,8 @@ interface TierGateProps {
 const TIER_CONFIG = {
   pro: {
     label: "Pro",
-    price: "$50/mo",
-    description: "Unlock the consistent outperformers",
+    price: "$19/mo",
+    description: "Deep analytics on every creator",
     gradient: "from-brand-accent to-purple-400",
     borderColor: "border-brand-accent/30",
     bgColor: "bg-brand-accent/10",
@@ -20,9 +19,9 @@ const TIER_CONFIG = {
     glowClass: "glow-purple",
   },
   elite: {
-    label: "Elite",
-    price: "$99/mo",
-    description: "Full access + consensus signals",
+    label: "Alpha",
+    price: "$49/mo",
+    description: "Actionable signals, not just rankings",
     gradient: "from-brand-gold to-yellow-400",
     borderColor: "border-brand-gold/30",
     bgColor: "bg-brand-gold/10",

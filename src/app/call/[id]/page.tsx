@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Quote } from "lucide-react";
@@ -13,6 +14,36 @@ import type { Call, Creator } from "@/lib/types";
 
 interface PageProps {
   readonly params: { id: string };
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const callId = parseInt(params.id, 10);
+  if (isNaN(callId)) {
+    return { title: "Call Not Found | CryptoTubers Ranked" };
+  }
+
+  try {
+    const calls = await query<Call>(
+      `SELECT * FROM calls WHERE id = $1 LIMIT 1`,
+      [callId],
+    );
+
+    if (calls.length === 0) {
+      return { title: "Call Not Found | CryptoTubers Ranked" };
+    }
+
+    const call = calls[0];
+    const ticker = SYMBOL_TICKERS[call.symbol] ?? call.symbol.replace("USDT", "");
+    const direction = call.direction.charAt(0).toUpperCase() + call.direction.slice(1);
+
+    return {
+      title: `${ticker} ${direction} Call — CryptoTubers Ranked`,
+      description: `Detailed breakdown of this ${ticker} ${call.direction} call: score ${call.score.toFixed(1)}/100, direction ${call.correct_direction ? "correct" : "wrong"}, with full alpha and regime analysis.`,
+      alternates: { canonical: `/call/${params.id}` },
+    };
+  } catch {
+    return { title: "Call Not Found | CryptoTubers Ranked" };
+  }
 }
 
 export default async function CallDetailPage({ params }: PageProps) {
@@ -171,9 +202,9 @@ export default async function CallDetailPage({ params }: PageProps) {
         />
 
         <div className="glass-card p-5">
-          <h3 className="text-white font-semibold text-sm mb-4">
+          <h2 className="text-white font-semibold text-sm mb-4">
             Market Context
-          </h3>
+          </h2>
           <div className="space-y-4">
             <div>
               <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
@@ -239,9 +270,9 @@ export default async function CallDetailPage({ params }: PageProps) {
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-3">
               <Quote className="w-5 h-5 text-brand-gold" />
-              <h3 className="text-white font-semibold text-sm">
+              <h2 className="text-white font-semibold text-sm">
                 From the Transcript
-              </h3>
+              </h2>
             </div>
             <blockquote className="border-l-2 border-brand-gold/40 pl-4 text-gray-300 text-sm leading-relaxed italic">
               &ldquo;{call.raw_quote}&rdquo;

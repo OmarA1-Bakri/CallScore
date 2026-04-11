@@ -105,6 +105,12 @@ CREATE TABLE IF NOT EXISTS creator_stats (
     specificity_avg DOUBLE PRECISION DEFAULT 0,
     alpha_score DOUBLE PRECISION DEFAULT 0,
     accuracy_rank INTEGER,
+    effective_n INTEGER DEFAULT 0,
+    wilson_lb DOUBLE PRECISION DEFAULT 0,
+    bullish_win_rate DOUBLE PRECISION DEFAULT 0,
+    bearish_win_rate DOUBLE PRECISION DEFAULT 0,
+    bullish_pct DOUBLE PRECISION DEFAULT 0,
+    sharpe_ratio DOUBLE PRECISION DEFAULT 0,
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(creator_id, period)
 );
@@ -127,6 +133,7 @@ CREATE TABLE IF NOT EXISTS consensus_signals (
     return_7d DOUBLE PRECISION,
     return_30d DOUBLE PRECISION,
     correct BOOLEAN,
+    quality_score DOUBLE PRECISION,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
