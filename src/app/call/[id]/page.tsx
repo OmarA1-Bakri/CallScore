@@ -10,6 +10,7 @@ import {
   REGIME_LABELS,
   REGIME_COLORS,
 } from "@/lib/constants";
+import { serializeCall } from "@/lib/public-serializer";
 import type { Call, Creator } from "@/lib/types";
 
 interface PageProps {
@@ -32,13 +33,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       return { title: "Call Not Found | CryptoTubers Ranked" };
     }
 
-    const call = calls[0];
+    const call = serializeCall(calls[0]);
     const ticker = SYMBOL_TICKERS[call.symbol] ?? call.symbol.replace("USDT", "");
     const direction = call.direction.charAt(0).toUpperCase() + call.direction.slice(1);
+    const scoreText =
+      call.public_score !== null ? `${call.public_score.toFixed(1)}/100` : call.score_status;
 
     return {
       title: `${ticker} ${direction} Call — CryptoTubers Ranked`,
-      description: `Detailed breakdown of this ${ticker} ${call.direction} call: score ${call.score.toFixed(1)}/100, direction ${call.correct_direction ? "correct" : "wrong"}, with full alpha and regime analysis.`,
+      description: `Detailed breakdown of this ${ticker} ${call.direction} call: ${scoreText}, direction ${call.correct_direction ? "correct" : "wrong"}, with full alpha and regime analysis.`,
       alternates: { canonical: `/call/${params.id}` },
     };
   } catch {
@@ -77,18 +80,34 @@ export default async function CallDetailPage({ params }: PageProps) {
     // Creator table may not exist yet
   }
 
+  const serializedCall = serializeCall(call);
   const creatorName = creator?.name ?? "Unknown Creator";
   const creatorHandle = creator?.youtube_handle ?? "unknown";
 
-  const ticker = SYMBOL_TICKERS[call.symbol] ?? call.symbol.replace("USDT", "");
-  const coinName = SYMBOL_NAMES[call.symbol] ?? call.symbol;
-  const isBullish = call.direction === "bullish";
-  const regimeLabel = call.regime_at_call !== null
-    ? REGIME_LABELS[call.regime_at_call] ?? "Unknown"
+  const ticker = SYMBOL_TICKERS[serializedCall.symbol] ?? serializedCall.symbol.replace("USDT", "");
+  const coinName = SYMBOL_NAMES[serializedCall.symbol] ?? serializedCall.symbol;
+  const isBullish = serializedCall.direction === "bullish";
+  const regimeLabel = serializedCall.regime_at_call !== null
+    ? REGIME_LABELS[serializedCall.regime_at_call] ?? "Unknown"
     : "Unknown";
-  const regimeColor = call.regime_at_call !== null
-    ? REGIME_COLORS[call.regime_at_call] ?? "#6b7280"
+  const regimeColor = serializedCall.regime_at_call !== null
+    ? REGIME_COLORS[serializedCall.regime_at_call] ?? "#6b7280"
     : "#6b7280";
+  const displayScore = serializedCall.public_score;
+  const scoreLabel =
+    serializedCall.score_status === "scored"
+      ? "Alpha Score"
+      : serializedCall.score_status === "pending_horizon"
+        ? "Status"
+        : "Call Status";
+  const scoreValue =
+    serializedCall.score_status === "scored"
+      ? displayScore!.toFixed(1)
+      : serializedCall.score_status === "excluded_confidence"
+        ? "Unscored"
+        : serializedCall.score_status === "invalid_extraction"
+          ? "Invalid"
+          : "Pending";
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -107,7 +126,7 @@ export default async function CallDetailPage({ params }: PageProps) {
           <div className="flex-1">
             <p className="text-gray-500 text-sm mb-1">
               {creatorName} &middot;{" "}
-              {new Date(call.call_date).toLocaleDateString("en-US", {
+              {new Date(serializedCall.call_date).toLocaleDateString("en-US", {
                 month: "long",
                 day: "numeric",
                 year: "numeric",
@@ -116,21 +135,24 @@ export default async function CallDetailPage({ params }: PageProps) {
             <h1 className="text-2xl font-bold text-white">
               {ticker} --{" "}
               <span className={isBullish ? "text-brand-green" : "text-brand-red"}>
-                {call.direction.charAt(0).toUpperCase() + call.direction.slice(1)}
+                {serializedCall.direction.charAt(0).toUpperCase() + serializedCall.direction.slice(1)}
               </span>{" "}
               Call
             </h1>
           </div>
           <div
             className={`text-3xl font-bold tabular-nums ${
-              call.score >= 60
+              serializedCall.score_status !== "scored"
+                ? "text-gray-400"
+                : displayScore! >= 60
                 ? "text-brand-green"
-                : call.score >= 40
+                : displayScore! >= 40
                   ? "text-yellow-400"
                   : "text-brand-red"
             }`}
+            aria-label={scoreLabel}
           >
-            {call.score.toFixed(1)}
+            {scoreValue}
           </div>
         </div>
 
@@ -139,24 +161,27 @@ export default async function CallDetailPage({ params }: PageProps) {
           <MiniStat label="Coin" value={`${coinName} (${ticker})`} />
           <MiniStat
             label="Direction"
-            value={call.direction}
+            value={serializedCall.direction}
             badge={isBullish ? "bullish" : "bearish"}
           />
           <MiniStat
             label="Entry Price"
-            value={call.entry_price !== null ? `$${call.entry_price.toLocaleString()}` : "--"}
+            value={serializedCall.entry_price !== null ? `$${serializedCall.entry_price.toLocaleString()}` : "--"}
           />
           <MiniStat
             label="Target Price"
-            value={call.target_price !== null ? `$${call.target_price.toLocaleString()}` : "--"}
+            value={serializedCall.target_price !== null ? `$${serializedCall.target_price.toLocaleString()}` : "--"}
           />
           <MiniStat
             label="Stop Loss"
-            value={call.stop_loss !== null ? `$${call.stop_loss.toLocaleString()}` : "--"}
+            value={serializedCall.stop_loss !== null ? `$${serializedCall.stop_loss.toLocaleString()}` : "--"}
           />
-          <MiniStat label="Timeframe" value={call.timeframe ?? "--"} />
-          <MiniStat label="Confidence" value={call.confidence ?? "--"} />
-          <MiniStat label="Strategy" value={call.strategy_type?.replace("_", " ") ?? "--"} />
+          <MiniStat label="Timeframe" value={serializedCall.timeframe ?? "--"} />
+          <MiniStat
+            label="Confidence"
+            value={`${(serializedCall.extraction_confidence * 100).toFixed(0)}%`}
+          />
+          <MiniStat label={scoreLabel} value={scoreValue} />
         </div>
       </section>
 
@@ -164,42 +189,63 @@ export default async function CallDetailPage({ params }: PageProps) {
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <PriceCard
           label="7 Days"
-          priceAfter={call.price_7d}
-          returnPct={call.return_7d}
-          alphaPct={call.alpha_7d}
-          btcReturn={call.btc_price_at_call && call.btc_price_7d
-            ? ((call.btc_price_7d - call.btc_price_at_call) / call.btc_price_at_call) * 100
+          status={serializedCall.horizon_status_7d}
+          priceAfter={serializedCall.price_7d}
+          returnPct={serializedCall.return_7d}
+          alphaPct={serializedCall.alpha_7d}
+          btcReturn={serializedCall.btc_price_at_call && serializedCall.btc_price_7d
+            ? ((serializedCall.btc_price_7d - serializedCall.btc_price_at_call) / serializedCall.btc_price_at_call) * 100
             : null}
         />
         <PriceCard
           label="30 Days"
-          priceAfter={call.price_30d}
-          returnPct={call.return_30d}
-          alphaPct={call.alpha_30d}
-          btcReturn={call.btc_price_at_call && call.btc_price_30d
-            ? ((call.btc_price_30d - call.btc_price_at_call) / call.btc_price_at_call) * 100
+          status={serializedCall.horizon_status_30d}
+          priceAfter={serializedCall.price_30d}
+          returnPct={serializedCall.return_30d}
+          alphaPct={serializedCall.alpha_30d}
+          btcReturn={serializedCall.btc_price_at_call && serializedCall.btc_price_30d
+            ? ((serializedCall.btc_price_30d - serializedCall.btc_price_at_call) / serializedCall.btc_price_at_call) * 100
             : null}
         />
         <PriceCard
           label="90 Days"
-          priceAfter={call.price_90d}
-          returnPct={call.return_90d}
-          alphaPct={call.alpha_90d}
-          btcReturn={call.btc_price_at_call && call.btc_price_90d
-            ? ((call.btc_price_90d - call.btc_price_at_call) / call.btc_price_at_call) * 100
+          status={serializedCall.horizon_status_90d}
+          priceAfter={serializedCall.price_90d}
+          returnPct={serializedCall.return_90d}
+          alphaPct={serializedCall.alpha_90d}
+          btcReturn={serializedCall.btc_price_at_call && serializedCall.btc_price_90d
+            ? ((serializedCall.btc_price_90d - serializedCall.btc_price_at_call) / serializedCall.btc_price_at_call) * 100
             : null}
         />
       </section>
 
       {/* Score breakdown + Market regime */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <ScoreBreakdown
-          direction={call.correct_direction ? 40 : 0}
-          alpha={Math.min(25, Math.max(0, (call.alpha_30d ?? 0) * 2.5))}
-          specificity={call.specificity_score * 15}
-          regime={call.regime_difficulty * 10}
-          target={call.hit_target ? 10 : 0}
-        />
+        {serializedCall.public_score_components ? (
+          <ScoreBreakdown
+            direction={serializedCall.public_score_components.direction}
+            alpha={serializedCall.public_score_components.alpha}
+            specificity={serializedCall.public_score_components.specificity}
+            regime={serializedCall.public_score_components.regime}
+            target={serializedCall.public_score_components.target}
+          />
+        ) : (
+          <div className="glass-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-semibold text-sm">Alpha Score</h2>
+              <span className="text-gray-400 font-bold text-lg tabular-nums">
+                {scoreValue}
+              </span>
+            </div>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              {serializedCall.score_status === "excluded_confidence"
+                ? "This call is displayed publicly, but it is not counted because the extraction did not clear the public 70% confidence threshold."
+                : serializedCall.score_status === "invalid_extraction"
+                  ? "This extraction failed the public sanity checks for asset, direction, or target labeling, so it is not scored."
+                  : "This call is still pending because the full scoring window has not elapsed yet."}
+            </p>
+          </div>
+        )}
 
         <div className="glass-card p-5">
           <h2 className="text-white font-semibold text-sm mb-4">
@@ -228,11 +274,11 @@ export default async function CallDetailPage({ params }: PageProps) {
                 <div className="flex-1 h-2 bg-brand-border rounded-full overflow-hidden">
                   <div
                     className="h-full bg-orange-400 rounded-full"
-                    style={{ width: `${call.regime_difficulty * 100}%` }}
+                    style={{ width: `${serializedCall.regime_difficulty * 100}%` }}
                   />
                 </div>
                 <span className="text-gray-300 text-xs tabular-nums">
-                  {(call.regime_difficulty * 100).toFixed(0)}%
+                  {(serializedCall.regime_difficulty * 100).toFixed(0)}%
                 </span>
               </div>
             </div>
@@ -242,10 +288,12 @@ export default async function CallDetailPage({ params }: PageProps) {
               </p>
               <span
                 className={`text-sm font-semibold ${
-                  call.correct_direction ? "text-brand-green" : "text-brand-red"
+                  serializedCall.correct_direction ? "text-brand-green" : "text-brand-red"
                 }`}
               >
-                {call.correct_direction ? "Yes" : "No"}
+                {serializedCall.horizon_status_30d === "pending"
+                  ? "Pending"
+                  : serializedCall.correct_direction ? "Yes" : "No"}
               </span>
             </div>
             <div>
@@ -254,10 +302,14 @@ export default async function CallDetailPage({ params }: PageProps) {
               </p>
               <span
                 className={`text-sm font-semibold ${
-                  call.hit_target ? "text-brand-green" : "text-brand-red"
+                  serializedCall.hit_target ? "text-brand-green" : "text-brand-red"
                 }`}
               >
-                {call.hit_target ? "Yes" : "No"}
+                {serializedCall.target_price === null
+                  ? "No target"
+                  : serializedCall.target_status === "pending"
+                  ? "Pending"
+                  : serializedCall.hit_target ? "Yes" : "No"}
               </span>
             </div>
           </div>
@@ -265,7 +317,7 @@ export default async function CallDetailPage({ params }: PageProps) {
       </section>
 
       {/* Raw quote */}
-      {call.raw_quote && (
+      {serializedCall.raw_quote && (
         <section className="mb-8">
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-3">
@@ -275,11 +327,16 @@ export default async function CallDetailPage({ params }: PageProps) {
               </h2>
             </div>
             <blockquote className="border-l-2 border-brand-gold/40 pl-4 text-gray-300 text-sm leading-relaxed italic">
-              &ldquo;{call.raw_quote}&rdquo;
+              &ldquo;{serializedCall.raw_quote}&rdquo;
             </blockquote>
             <p className="text-gray-600 text-xs mt-3">
-              Extraction confidence: {(call.extraction_confidence * 100).toFixed(0)}%
+              Extraction confidence: {(serializedCall.extraction_confidence * 100).toFixed(0)}%
             </p>
+            {serializedCall.extraction_notes.length > 0 && (
+              <p className="text-gray-600 text-xs mt-2">
+                Validation: {serializedCall.extraction_notes.join("; ")}
+              </p>
+            )}
           </div>
         </section>
       )}
@@ -312,6 +369,7 @@ function MiniStat({ label, value, badge }: MiniStatProps) {
 
 interface PriceCardProps {
   readonly label: string;
+  readonly status: "pending" | "available";
   readonly priceAfter: number | null;
   readonly returnPct: number | null;
   readonly alphaPct: number | null;
@@ -320,12 +378,13 @@ interface PriceCardProps {
 
 function PriceCard({
   label,
+  status,
   priceAfter,
   returnPct,
   alphaPct,
   btcReturn,
 }: PriceCardProps) {
-  const hasData = priceAfter !== null && returnPct !== null;
+  const hasData = status === "available" && priceAfter !== null && returnPct !== null;
 
   return (
     <div className="glass-card p-4">
@@ -375,7 +434,9 @@ function PriceCard({
           )}
         </div>
       ) : (
-        <p className="text-gray-600 text-sm">Not yet available</p>
+        <p className="text-gray-600 text-sm">
+          {status === "pending" ? "Pending until the horizon elapses" : "Not yet available"}
+        </p>
       )}
     </div>
   );

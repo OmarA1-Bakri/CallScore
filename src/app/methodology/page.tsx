@@ -18,11 +18,16 @@ import {
   Layers,
   Activity,
 } from "lucide-react";
+import {
+  EXTRACTION_CONFIDENCE_THRESHOLD,
+  SCORE_WEIGHTS,
+} from "@/lib/public-methodology";
+import { TRACKED_CREATOR_COUNT } from "@/lib/tracked-creators";
 
 export const metadata: Metadata = {
   title: "Methodology — How We Score Crypto YouTubers | CryptoTubers Ranked",
   description:
-    "Our scoring methodology: direction accuracy, alpha vs buy-and-hold, specificity, and statistical rigor across 18.7M candle data points.",
+    "Our scoring methodology: one public Alpha Score formula, confidence-gated extraction, and real market-data verification.",
   alternates: { canonical: "/methodology" },
 };
 
@@ -48,48 +53,48 @@ interface ScoreComponent {
 const SCORE_COMPONENTS: readonly ScoreComponent[] = [
   {
     label: "Direction Correct",
-    maxPoints: 40,
+    maxPoints: SCORE_WEIGHTS.direction,
     color: "text-brand-green",
     bgColor: "bg-brand-green",
     borderColor: "border-brand-green/30",
     description:
-      "Did the price go the direction they called at 30 days? Bullish call + price went up = 40 points. Wrong direction = 0 points.",
+      `Did the price go the direction they called at 30 days? Bullish call + price went up = ${SCORE_WEIGHTS.direction} points. Wrong direction = 0 points.`,
   },
   {
     label: "Alpha Over BTC",
-    maxPoints: 25,
+    maxPoints: SCORE_WEIGHTS.alpha,
     color: "text-blue-400",
     bgColor: "bg-blue-400",
     borderColor: "border-blue-400/30",
     description:
-      "How much did the coin outperform Bitcoin over 30 days? Each 1% of alpha = 2.5 points, capped at 25.",
+      `How much did the coin outperform Bitcoin over 30 days? Each 1% of alpha = ${(SCORE_WEIGHTS.alpha / 10).toFixed(1)} points, capped at ${SCORE_WEIGHTS.alpha}.`,
   },
   {
     label: "Specificity",
-    maxPoints: 15,
+    maxPoints: SCORE_WEIGHTS.specificity,
     color: "text-brand-accent",
     bgColor: "bg-brand-accent",
     borderColor: "border-brand-accent/30",
     description:
-      "How precise was the call? Entry price (3.75 pts), target price (3.75 pts), stop-loss (3.75 pts), timeframe (3.75 pts).",
+      `How precise was the call? Entry price (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), target price (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), stop-loss (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), timeframe (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts).`,
   },
   {
     label: "Regime Difficulty",
-    maxPoints: 10,
+    maxPoints: SCORE_WEIGHTS.regime,
     color: "text-orange-400",
     bgColor: "bg-orange-400",
     borderColor: "border-orange-400/30",
     description:
-      "How hard was this call given market conditions? Bullish call in a bear market = 10 points. Bullish in a bull market = 1 point.",
+      `How hard was this call given market conditions? Bullish call in a bear market = ${SCORE_WEIGHTS.regime} points. Bullish in a bull market = 1 point.`,
   },
   {
     label: "Target Hit",
-    maxPoints: 10,
+    maxPoints: SCORE_WEIGHTS.target,
     color: "text-brand-gold",
     bgColor: "bg-brand-gold",
     borderColor: "border-brand-gold/30",
     description:
-      "Did the price actually hit their stated target within 90 days? Yes = 10 points. No = 0 points.",
+      `Did the price actually hit their stated target within 90 days? Yes = ${SCORE_WEIGHTS.target} points. No = 0 points.`,
   },
 ] as const;
 
@@ -104,7 +109,7 @@ const PIPELINE_STEPS: readonly PipelineStep[] = [
   {
     icon: Video,
     label: "Scrape",
-    detail: "Auto-generated subtitles pulled daily from 20 creators",
+    detail: `Auto-generated subtitles pulled daily from ${TRACKED_CREATOR_COUNT} creators`,
     color: "text-brand-red",
   },
   {
@@ -423,7 +428,7 @@ function DataSourcesGrid() {
         </div>
 
         <div className="space-y-3 mb-5">
-          <DataPoint label="Creators" value="20 Tracked" />
+          <DataPoint label="Creators" value={`${TRACKED_CREATOR_COUNT} Tracked`} />
           <DataPoint label="Source" value="Auto-generated subtitles" />
           <DataPoint label="Frequency" value="Scraped daily" />
           <DataPoint label="Coverage" value="Every new upload" />
@@ -449,14 +454,17 @@ function DataSourcesGrid() {
         <div className="space-y-3 mb-5">
           <DataPoint label="Task" value="Call Identification" />
           <DataPoint label="Filters" value="Actionable predictions only" />
-          <DataPoint label="Confidence" value="> 70% threshold" />
+          <DataPoint
+            label="Confidence"
+            value={`> ${(EXTRACTION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}% threshold`}
+          />
           <DataPoint label="Output" value="Structured call data" />
         </div>
 
         <div className="border-t border-brand-border pt-4">
           <p className="text-gray-500 text-xs leading-relaxed">
             AI parses transcripts to identify specific, actionable predictions --
-            not general commentary. Only calls with confidence above 70% are counted.
+            not general commentary. Only calls with confidence above {(EXTRACTION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}% are counted.
           </p>
         </div>
       </div>
@@ -663,8 +671,9 @@ function CreatorRankingsSection() {
             </h3>
           </div>
           <p className="text-gray-400 text-xs leading-relaxed mb-4">
-            The full leaderboard is free. Paid tiers unlock deeper analytics
-            and actionable intelligence signals.
+            The public research surface is free. Premium delivery workflows are
+            roadmap items and are not required to view creator history or
+            per-call score breakdowns.
           </p>
           <div className="space-y-2">
             {TIERS.map((tier) => (
@@ -763,7 +772,7 @@ function TransparencySection() {
       <TransparencyCard
         icon={Filter}
         title="AI Confidence Filter"
-        description="The extraction AI identifies what qualifies as an actionable call vs. just commentary. Only calls with confidence above 70% are counted."
+        description={`The extraction AI identifies what qualifies as an actionable call vs. just commentary. Only calls with confidence above ${(EXTRACTION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}% are counted.`}
       />
       <TransparencyCard
         icon={Crosshair}

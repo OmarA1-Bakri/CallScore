@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
+import { serializeCalls } from "@/lib/public-serializer";
 import type { Creator, CreatorStats, Call, Tier } from "@/lib/types";
 
 const VALID_SORT_FIELDS = ["date", "score", "return"] as const;
@@ -140,12 +141,13 @@ export async function GET(
 
     const stats = statsRows.length > 0 ? statsRows[0] : null;
     const total = parseInt(countRows[0]?.count ?? "0", 10);
+    const serializedCalls = serializeCalls(callRows);
 
     return NextResponse.json({
       data: {
         creator,
         stats,
-        calls: callRows,
+        calls: serializedCalls,
       },
       meta: {
         pagination: {
@@ -153,6 +155,10 @@ export async function GET(
           limit,
           total,
           has_more: offset + limit < total,
+        },
+        counts: {
+          tracked_calls: total,
+          scored_calls: stats?.total_calls ?? 0,
         },
       },
     });

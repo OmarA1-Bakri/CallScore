@@ -13,15 +13,11 @@ export function hasAccess(userTier: Tier, requiredTier: Tier): boolean {
 /**
  * Leaderboard visibility tier.
  *
- * The full leaderboard is FREE — it's the viral hook that drives
- * organic traffic and social sharing. Paywalling rank numbers kills
- * virality for zero incremental revenue.
+ * The public research surface stays open: leaderboard, creator pages,
+ * call history, and per-call score breakdowns all remain visible.
  *
- * Paid tiers gate the INTELLIGENCE layer:
- *   Pro  ($19/mo) — creator deep dives, call history, charts
- *   Alpha ($49/mo) — bear/bull alerts, contrarian signals, consensus
- *
- * All ranks return "free" so nothing is blurred on the homepage.
+ * Premium tiers are reserved for future delivery workflows, not for
+ * hiding the public methodology or public history.
  */
 export function getCreatorTier(_rank: number): Tier {
   return "free";

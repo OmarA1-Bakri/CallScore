@@ -1,0 +1,21 @@
+# Copy Corrections
+
+- Homepage:
+  - Use dynamic tracked/scored counts instead of hard-coded `19 creators` / `4,598 calls`.
+  - Label leaderboard inputs as scored calls, not total tracked calls.
+- About:
+  - Use dynamic tracked/scored counts.
+  - Keep creator-count language aligned with the tracked creator source of truth.
+- Methodology:
+  - Bind score weights to `40 + 25 + 15 + 10 + 10`.
+  - Bind confidence language to the shared `70%` threshold constant.
+  - Clarify that creator history and per-call breakdowns are public.
+- Pricing:
+  - Remove claims that Pro uniquely unlocks call history or per-call score breakdowns.
+  - Remove the stale `20pts` alpha-over-BTC copy and use `25pts`.
+  - Reframe premium tiers as roadmap/premium-delivery layers until differentiated features ship.
+- Creator pages:
+  - Change `Total Calls` to `Scored Calls` for `creator_stats.total_calls`.
+  - Keep history pagination labeled as tracked calls.
+- Call pages:
+  - Show `Unscored`, `Invalid`, or `Pending` instead of a numeric Alpha Score when the call fails confidence/validation/horizon rules.

@@ -4,6 +4,7 @@ import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
 import { query } from "@/lib/db";
+import { getPublicCounts, PUBLIC_COUNT_LABELS } from "@/lib/public-counts";
 import { getCreatorTier } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import type {
@@ -19,7 +20,7 @@ import type {
 export const metadata: Metadata = {
   title: "Crypto YouTuber Leaderboard — Who Actually Beats The Market? | CryptoTubers Ranked",
   description:
-    "See which crypto YouTubers have the best track record. We verified 4,598 altcoin calls across 19 creators against real market data.",
+    "See which crypto YouTubers have the best track record, with every public Alpha Score tied to the published methodology.",
   alternates: { canonical: "/" },
 };
 
@@ -173,6 +174,7 @@ export default async function HomePage({ searchParams }: PageProps) {
       LEFT JOIN calls bc ON bc.id = cs.best_call_id
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
+        AND cs.total_calls > 0
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );
@@ -238,20 +240,29 @@ export default async function HomePage({ searchParams }: PageProps) {
     // No signals yet
   }
 
+  let publicCounts = await getPublicCounts().catch(() => null);
+  if (!publicCounts) {
+    publicCounts = {
+      trackedCreators: 20,
+      rankedCreators: 0,
+      trackedCalls: 0,
+      scoredCalls: 0,
+      beatBtcCreators: 0,
+    };
+  }
+
   // Aggregate stats
-  let totalCalls = "0";
-  let creatorCount = "20";
+  let totalCalls = String(publicCounts.scoredCalls);
   try {
     const statsRows = await query<StatsRow>(
       `SELECT
         COALESCE(SUM(total_calls), 0)::text AS total_calls,
         CASE WHEN COUNT(*) > 0 THEN ROUND((AVG(win_rate) * 100)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
-        COUNT(DISTINCT creator_id)::text AS creator_count
+        COUNT(DISTINCT creator_id) FILTER (WHERE total_calls > 0)::text AS creator_count
       FROM creator_stats WHERE period = 'all_time'`,
     );
     if (statsRows.length > 0) {
       totalCalls = Number(statsRows[0].total_calls) > 0 ? statsRows[0].total_calls : "0";
-      creatorCount = statsRows[0].creator_count;
     }
   } catch {
     // Stats not available
@@ -277,17 +288,29 @@ export default async function HomePage({ searchParams }: PageProps) {
         </h1>
 
         <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-          We scored every altcoin call from {creatorCount} top crypto YouTubers
-          against 18.7M candles of real price data. Who actually beats BTC,
-          who to follow in a bear market, and when to fade the consensus --
-          the answers surprised us.
+          We track {publicCounts.trackedCreators} crypto YouTubers and score
+          every eligible altcoin call against real market data. The current
+          leaderboard includes {publicCounts.rankedCreators} creators with
+          scored call histories across 18.7M candles of market data.
         </p>
 
         {/* Stats row */}
         <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-8">
-          <StatPill icon={Users} label="Creators Ranked" value={creatorCount} />
-          <StatPill icon={BarChart3} label="Calls Scored" value={totalCalls} />
-          <StatPill icon={Target} label="Beat Buy & Hold" value="1 of 19" />
+          <StatPill
+            icon={Users}
+            label={PUBLIC_COUNT_LABELS.trackedCreators}
+            value={String(publicCounts.trackedCreators)}
+          />
+          <StatPill
+            icon={BarChart3}
+            label={PUBLIC_COUNT_LABELS.scoredCalls}
+            value={totalCalls}
+          />
+          <StatPill
+            icon={Target}
+            label="Creators Beating BTC"
+            value={`${publicCounts.beatBtcCreators} of ${publicCounts.rankedCreators}`}
+          />
         </div>
       </section>
 
@@ -297,7 +320,7 @@ export default async function HomePage({ searchParams }: PageProps) {
           <div>
             <h2 className="text-white font-bold text-xl">Leaderboard</h2>
             <p className="text-gray-500 text-sm mt-1">
-              Ranked by Alpha Score -- who outperforms Bitcoin the most
+              Ranked by average Alpha Score across scored calls
             </p>
           </div>
           <PeriodFilter value={period} />
