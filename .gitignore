@@ -12,3 +12,4 @@ temp/
 CRYPTOTUBER-FIXES.md
 public/logo-variants.png
 squirrel.toml
+output/playwright/
