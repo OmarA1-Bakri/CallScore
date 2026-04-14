@@ -5,3 +5,11 @@ node_modules/
 *.tsbuildinfo
 next-env.d.ts
 out/
+.vercel
+.claude/
+.playwright-mcp/
+temp/
+CRYPTOTUBER-FIXES.md
+public/logo-variants.png
+squirrel.toml
+output/playwright/

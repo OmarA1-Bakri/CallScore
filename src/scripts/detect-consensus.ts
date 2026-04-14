@@ -11,6 +11,7 @@ import {
   MS_7D,
   MS_30D,
 } from "../lib/constants";
+import { EXTRACTION_CONFIDENCE_THRESHOLD } from "../lib/public-methodology";
 import { computeReturn } from "../lib/scoring";
 
 function loadEnv(): void {
@@ -97,10 +98,10 @@ async function detectNewSignals(): Promise<number> {
          WHERE c.symbol = $1
            AND c.direction = $2
            AND c.price_at_call IS NOT NULL
-           AND c.extraction_confidence >= 0.5
+           AND c.extraction_confidence >= $3
            AND cr.accuracy_rank IS NOT NULL
          ORDER BY c.call_date ASC`,
-        [symbol, direction],
+        [symbol, direction, EXTRACTION_CONFIDENCE_THRESHOLD],
       );
 
       if (calls.length < CONSENSUS_MIN_CREATORS) continue;

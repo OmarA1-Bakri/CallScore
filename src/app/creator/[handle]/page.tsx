@@ -14,6 +14,11 @@ import PerformanceChart from "@/components/PerformanceChart";
 import CallHistory from "@/components/CallHistory";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { query } from "@/lib/db";
+import {
+  computeCreatorScoreAverages,
+  getScoredCalls,
+  serializeCalls,
+} from "@/lib/public-serializer";
 import type { Creator, CreatorStats, Call } from "@/lib/types";
 
 interface PageProps {
@@ -49,11 +54,6 @@ interface PerformancePoint {
   readonly score: number;
 }
 
-interface MonthlyScore {
-  readonly month: string;
-  readonly avg_score: number;
-}
-
 export default async function CreatorPage({ params }: PageProps) {
   const handle = decodeURIComponent(params.handle);
 
@@ -84,76 +84,56 @@ export default async function CreatorPage({ params }: PageProps) {
     // Stats table may not exist yet
   }
 
-  // Fetch calls for this creator (limited columns + max 50 for page size)
+  // Fetch all calls so the creator-level aggregates use the same eligibility
+  // rules as the call page and recompute pipeline.
   const CALL_LIMIT = 50;
-  let calls: Call[] = [];
-  let totalCallCount = 0;
+  let allCalls: Call[] = [];
   try {
-    calls = await query<Call>(
-      `SELECT id, creator_id, video_id, symbol, direction, call_type,
-              specificity_score, call_date, return_30d, alpha_30d,
-              hit_target, correct_direction, regime_difficulty, score,
-              extraction_confidence, created_at
+    allCalls = await query<Call>(
+      `SELECT *
        FROM calls
        WHERE creator_id = $1
-       ORDER BY call_date DESC
-       LIMIT $2`,
-      [creator.id, CALL_LIMIT],
-    );
-    const countRows = await query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM calls WHERE creator_id = $1`,
+       ORDER BY call_date DESC`,
       [creator.id],
     );
-    totalCallCount = countRows.length > 0 ? Number(countRows[0].count) : calls.length;
   } catch {
     // Calls table may not exist yet
   }
 
-  // Compute monthly performance for chart
-  let performance: PerformancePoint[] = [];
-  if (calls.length > 0) {
-    try {
-      const monthlyRows = await query<MonthlyScore>(
-        `SELECT
-          TO_CHAR(call_date, 'Mon YYYY') AS month,
-          ROUND(AVG(score)::numeric, 1) AS avg_score
-        FROM calls
-        WHERE creator_id = $1 AND score > 0
-        GROUP BY TO_CHAR(call_date, 'Mon YYYY'), DATE_TRUNC('month', call_date)
-        ORDER BY DATE_TRUNC('month', call_date) ASC`,
-        [creator.id],
-      );
-      performance = monthlyRows.map((r) => ({
-        date: r.month,
-        score: Number(r.avg_score),
-      }));
-    } catch {
-      // Performance data not available
-    }
+  const serializedCalls = serializeCalls(allCalls);
+  const displayCalls = serializedCalls.slice(0, CALL_LIMIT);
+  const trackedCallCount = allCalls.length;
+  const scoreAverages = computeCreatorScoreAverages(allCalls);
+  const scoredCalls = getScoredCalls(allCalls);
+
+  const monthlyMap = new Map<string, { label: string; total: number; count: number; ts: number }>();
+  for (const call of scoredCalls) {
+    const callDate = new Date(call.call_date);
+    const monthKey = `${callDate.getUTCFullYear()}-${String(callDate.getUTCMonth() + 1).padStart(2, "0")}`;
+    const existing = monthlyMap.get(monthKey) ?? {
+      label: callDate.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }),
+      total: 0,
+      count: 0,
+      ts: Date.UTC(callDate.getUTCFullYear(), callDate.getUTCMonth(), 1),
+    };
+    monthlyMap.set(monthKey, {
+      ...existing,
+      total: existing.total + (call.public_score ?? 0),
+      count: existing.count + 1,
+    });
   }
 
-  // Compute average score breakdown from calls
-  const scoredCalls = calls.filter((c) => c.score > 0);
-  const avgDirection = scoredCalls.length > 0
-    ? (scoredCalls.filter((c) => c.correct_direction).length / scoredCalls.length) * 40
-    : 0;
-  const avgAlpha = scoredCalls.length > 0
-    ? Math.min(25, Math.max(0, scoredCalls.reduce((s, c) => s + (c.alpha_30d ?? 0), 0) / scoredCalls.length * 2.5))
-    : 0;
-  const avgSpecificity = scoredCalls.length > 0
-    ? (scoredCalls.reduce((s, c) => s + c.specificity_score, 0) / scoredCalls.length) * 15
-    : 0;
-  const avgRegime = scoredCalls.length > 0
-    ? (scoredCalls.reduce((s, c) => s + c.regime_difficulty, 0) / scoredCalls.length) * 10
-    : 0;
-  const avgTarget = scoredCalls.length > 0
-    ? (scoredCalls.filter((c) => c.hit_target).length / scoredCalls.length) * 10
-    : 0;
+  const performance: PerformancePoint[] = Array.from(monthlyMap.values())
+    .sort((a, b) => a.ts - b.ts)
+    .map((row) => ({
+      date: row.label,
+      score: Number((row.total / row.count).toFixed(1)),
+    }));
 
   const alphaScore = stats?.alpha_score ?? creator.alpha_score;
   const winRate = stats?.win_rate ?? creator.win_rate;
   const avgAlpha30d = stats?.avg_alpha_30d ?? 0;
-  const totalCalls = stats?.total_calls ?? creator.total_calls;
+  const scoredCallCount = stats?.total_calls ?? scoredCalls.length;
   const hitRate = stats?.hit_rate ?? 0;
 
   return (
@@ -241,18 +221,18 @@ export default async function CreatorPage({ params }: PageProps) {
           value={`${avgAlpha30d >= 0 ? "+" : ""}${avgAlpha30d.toFixed(1)}%`}
           positive={avgAlpha30d >= 0}
         />
-        <StatCard label="Total Calls" value={String(totalCalls)} />
+        <StatCard label="Scored Calls" value={String(scoredCallCount)} />
         <StatCard label="Hit Rate" value={`${(hitRate * 100).toFixed(1)}%`} />
       </section>
 
       {/* Score breakdown + Chart row */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <ScoreBreakdown
-          direction={Number(avgDirection.toFixed(1))}
-          alpha={Number(avgAlpha.toFixed(1))}
-          specificity={Number(avgSpecificity.toFixed(1))}
-          regime={Number(avgRegime.toFixed(1))}
-          target={Number(avgTarget.toFixed(1))}
+          direction={Number(scoreAverages.direction.toFixed(1))}
+          alpha={Number(scoreAverages.alpha.toFixed(1))}
+          specificity={Number(scoreAverages.specificity.toFixed(1))}
+          regime={Number(scoreAverages.regime.toFixed(1))}
+          target={Number(scoreAverages.target.toFixed(1))}
         />
         {performance.length > 0 ? (
           <PerformanceChart data={performance} />
@@ -265,8 +245,12 @@ export default async function CreatorPage({ params }: PageProps) {
 
       {/* Call history */}
       <section>
-        {calls.length > 0 ? (
-          <CallHistory calls={calls} totalCount={totalCallCount} />
+        {displayCalls.length > 0 ? (
+          <CallHistory
+            calls={displayCalls}
+            totalCount={trackedCallCount}
+            scoredCount={scoredCallCount}
+          />
         ) : (
           <div className="glass-card p-12 text-center">
             <p className="text-gray-500">No calls tracked yet for this creator.</p>

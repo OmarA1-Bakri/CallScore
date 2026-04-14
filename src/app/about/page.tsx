@@ -10,11 +10,12 @@ import {
   ArrowRight,
   Shield,
 } from "lucide-react";
+import { getPublicCounts } from "@/lib/public-counts";
 
 export const metadata: Metadata = {
   title: "About - CryptoTubers Ranked",
   description:
-    "We independently track and verify the accuracy of crypto YouTube influencers' altcoin predictions against real market data. Learn about our mission and methodology.",
+    "We independently track and verify crypto YouTube calls against real market data using the published Alpha Score methodology.",
 };
 
 /* ------------------------------------------------------------------ */
@@ -27,33 +28,6 @@ interface KeyFact {
   readonly label: string;
   readonly color: string;
 }
-
-const KEY_FACTS: readonly KeyFact[] = [
-  {
-    icon: Video,
-    value: "19",
-    label: "Creators Tracked",
-    color: "text-brand-red",
-  },
-  {
-    icon: Target,
-    value: "4,598+",
-    label: "Calls Scored",
-    color: "text-brand-green",
-  },
-  {
-    icon: Database,
-    value: "18.7M",
-    label: "Candle Data Points",
-    color: "text-blue-400",
-  },
-  {
-    icon: BarChart3,
-    value: "Daily",
-    label: "Ranking Updates",
-    color: "text-brand-gold",
-  },
-] as const;
 
 interface HowStep {
   readonly icon: React.ComponentType<{ className?: string }>;
@@ -97,7 +71,41 @@ const HOW_STEPS: readonly HowStep[] = [
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const counts = await getPublicCounts().catch(() => ({
+    trackedCreators: 20,
+    rankedCreators: 0,
+    trackedCalls: 0,
+    scoredCalls: 0,
+    beatBtcCreators: 0,
+  }));
+  const keyFacts: readonly KeyFact[] = [
+    {
+      icon: Video,
+      value: String(counts.trackedCreators),
+      label: "Creators Tracked",
+      color: "text-brand-red",
+    },
+    {
+      icon: Target,
+      value: counts.scoredCalls.toLocaleString(),
+      label: "Calls Scored",
+      color: "text-brand-green",
+    },
+    {
+      icon: Database,
+      value: "18.7M",
+      label: "Candle Data Points",
+      color: "text-blue-400",
+    },
+    {
+      icon: BarChart3,
+      value: "Daily",
+      label: "Ranking Updates",
+      color: "text-brand-gold",
+    },
+  ];
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back link */}
@@ -133,7 +141,7 @@ export default function AboutPage() {
       {/* Key facts */}
       <section className="mb-16">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {KEY_FACTS.map((fact) => {
+          {keyFacts.map((fact) => {
             const Icon = fact.icon;
             return (
               <div key={fact.label} className="glass-card p-5 text-center">

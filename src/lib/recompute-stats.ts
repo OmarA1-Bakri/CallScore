@@ -1,0 +1,255 @@
+import { query } from "./db";
+import { computePublicScore, getCallEligibilitySql } from "./public-methodology";
+import type { Call, Period } from "./types";
+
+interface ScoreRow {
+  readonly id: number;
+  readonly extraction_confidence: number;
+  readonly call_date: string;
+  readonly target_price: number | null;
+  readonly price_at_call: number | null;
+  readonly price_30d: number | null;
+  readonly price_90d: number | null;
+  readonly return_30d: number | null;
+  readonly correct_direction: boolean | null;
+  readonly alpha_30d: number | null;
+  readonly specificity_score: number;
+  readonly regime_difficulty: number;
+  readonly hit_target: boolean | null;
+}
+
+const PERIOD_FILTERS: Record<Period, string> = {
+  all_time: "",
+  "90d": "AND c.call_date >= NOW() - INTERVAL '90 days'",
+  "30d": "AND c.call_date >= NOW() - INTERVAL '30 days'",
+};
+
+function toScoreInput(row: ScoreRow): Call {
+  return {
+    ...({} as Call),
+    id: row.id,
+    creator_id: 0,
+    video_id: 0,
+    symbol: "",
+    direction: "neutral",
+    call_type: null,
+    entry_price: null,
+    target_price: row.target_price,
+    stop_loss: null,
+    timeframe: null,
+    confidence: null,
+    strategy_type: null,
+    raw_quote: null,
+    extraction_confidence: row.extraction_confidence,
+    specificity_score: row.specificity_score,
+    call_date: row.call_date,
+    price_at_call: row.price_at_call,
+    btc_price_at_call: null,
+    price_7d: null,
+    price_30d: row.price_30d,
+    price_90d: row.price_90d,
+    btc_price_7d: null,
+    btc_price_30d: null,
+    btc_price_90d: null,
+    return_7d: null,
+    return_30d: row.return_30d,
+    return_90d: null,
+    alpha_7d: null,
+    alpha_30d: row.alpha_30d,
+    alpha_90d: null,
+    hit_target: row.hit_target,
+    correct_direction: row.correct_direction,
+    regime_at_call: null,
+    regime_difficulty: row.regime_difficulty,
+    score: 0,
+    created_at: row.call_date,
+  };
+}
+
+export async function recomputeCallScores(): Promise<number> {
+  const rows = await query<ScoreRow>(
+    `SELECT
+      id,
+      extraction_confidence,
+      call_date::text AS call_date,
+      target_price,
+      price_at_call,
+      price_30d,
+      price_90d,
+      return_30d,
+      correct_direction,
+      alpha_30d,
+      specificity_score,
+      regime_difficulty,
+      hit_target
+     FROM calls`,
+  );
+
+  const scoredUpdates = rows.map((row) => {
+    const eligible =
+      row.price_at_call !== null &&
+      row.price_30d !== null &&
+      row.return_30d !== null &&
+      row.extraction_confidence >= 0.7 &&
+      new Date(row.call_date).getTime() <= Date.now() - 30 * 86_400_000 &&
+      (
+        row.target_price === null ||
+        (
+          row.price_90d !== null &&
+          row.hit_target !== null &&
+          new Date(row.call_date).getTime() <= Date.now() - 90 * 86_400_000
+        )
+      );
+
+    return {
+      id: row.id,
+      score: eligible ? computePublicScore(toScoreInput(row)) : 0,
+    };
+  });
+
+  const batchSize = 500;
+  for (let index = 0; index < scoredUpdates.length; index += batchSize) {
+    const batch = scoredUpdates.slice(index, index + batchSize);
+    await query(
+      `UPDATE calls SET score = bulk.score
+       FROM unnest($1::int[], $2::float8[]) AS bulk(id, score)
+       WHERE calls.id = bulk.id`,
+      [batch.map((row) => row.id), batch.map((row) => row.score)],
+    );
+  }
+
+  return scoredUpdates.filter((row) => row.score > 0).length;
+}
+
+export async function recomputeCreatorStats(period: Period): Promise<void> {
+  const periodFilter = PERIOD_FILTERS[period];
+  const eligibleSql = getCallEligibilitySql("c");
+
+  await query(
+    `DELETE FROM creator_stats WHERE period = $1`,
+    [period],
+  );
+
+  await query(
+    `INSERT INTO creator_stats (
+      creator_id, period, total_calls, win_rate,
+      avg_return_7d, avg_return_30d, avg_return_90d, avg_alpha_30d,
+      best_call_id, worst_call_id, hit_rate, most_called_symbol,
+      strategy_consistency, specificity_avg, alpha_score,
+      accuracy_rank, effective_n, wilson_lb, bullish_win_rate,
+      bearish_win_rate, bullish_pct, sharpe_ratio, updated_at
+    )
+    SELECT
+      cr.id AS creator_id,
+      $1 AS period,
+      COUNT(c.id) FILTER (WHERE ${eligibleSql} ${periodFilter}) AS total_calls,
+      COALESCE(AVG(CASE WHEN ${eligibleSql} ${periodFilter} THEN CASE WHEN c.correct_direction THEN 1.0 ELSE 0.0 END END), 0) AS win_rate,
+      COALESCE(AVG(c.return_7d) FILTER (WHERE ${eligibleSql} ${periodFilter}), 0) AS avg_return_7d,
+      COALESCE(AVG(c.return_30d) FILTER (WHERE ${eligibleSql} ${periodFilter}), 0) AS avg_return_30d,
+      COALESCE(AVG(c.return_90d) FILTER (WHERE ${eligibleSql} ${periodFilter}), 0) AS avg_return_90d,
+      COALESCE(AVG(c.alpha_30d) FILTER (WHERE ${eligibleSql} ${periodFilter}), 0) AS avg_alpha_30d,
+      (
+        SELECT cl.id
+        FROM calls cl
+        WHERE cl.creator_id = cr.id
+          AND ${getCallEligibilitySql("cl")}
+          ${period === "all_time" ? "" : `AND cl.call_date >= NOW() - INTERVAL '${period.slice(0, 2)} days'`}
+        ORDER BY cl.score DESC, cl.id ASC
+        LIMIT 1
+      ) AS best_call_id,
+      (
+        SELECT cl.id
+        FROM calls cl
+        WHERE cl.creator_id = cr.id
+          AND ${getCallEligibilitySql("cl")}
+          ${period === "all_time" ? "" : `AND cl.call_date >= NOW() - INTERVAL '${period.slice(0, 2)} days'`}
+        ORDER BY cl.score ASC, cl.id ASC
+        LIMIT 1
+      ) AS worst_call_id,
+      COALESCE(AVG(CASE WHEN ${eligibleSql} ${periodFilter} THEN CASE WHEN c.hit_target THEN 1.0 ELSE 0.0 END END), 0) AS hit_rate,
+      (
+        SELECT cl.symbol
+        FROM calls cl
+        WHERE cl.creator_id = cr.id
+          AND ${getCallEligibilitySql("cl")}
+          ${period === "all_time" ? "" : `AND cl.call_date >= NOW() - INTERVAL '${period.slice(0, 2)} days'`}
+        GROUP BY cl.symbol
+        ORDER BY COUNT(*) DESC, cl.symbol ASC
+        LIMIT 1
+      ) AS most_called_symbol,
+      COALESCE(
+        1.0 - (
+          STDDEV_POP(c.score) FILTER (WHERE ${eligibleSql} ${periodFilter}) /
+          NULLIF(AVG(c.score) FILTER (WHERE ${eligibleSql} ${periodFilter}), 0)
+        ),
+        0
+      ) AS strategy_consistency,
+      COALESCE(AVG(c.specificity_score) FILTER (WHERE ${eligibleSql} ${periodFilter}), 0) AS specificity_avg,
+      COALESCE(AVG(c.score) FILTER (WHERE ${eligibleSql} ${periodFilter}), 0) AS alpha_score,
+      NULL::int AS accuracy_rank,
+      COUNT(DISTINCT (c.symbol || ':' || c.direction || ':' || TO_CHAR(c.call_date, 'YYYY-MM'))) FILTER (WHERE ${eligibleSql} ${periodFilter}) AS effective_n,
+      0 AS wilson_lb,
+      COALESCE(
+        AVG(CASE WHEN c.direction = 'bullish' AND ${eligibleSql} ${periodFilter} THEN CASE WHEN c.correct_direction THEN 1.0 ELSE 0.0 END END),
+        0
+      ) AS bullish_win_rate,
+      COALESCE(
+        AVG(CASE WHEN c.direction = 'bearish' AND ${eligibleSql} ${periodFilter} THEN CASE WHEN c.correct_direction THEN 1.0 ELSE 0.0 END END),
+        0
+      ) AS bearish_win_rate,
+      COALESCE(
+        AVG(CASE WHEN ${eligibleSql} ${periodFilter} THEN CASE WHEN c.direction = 'bullish' THEN 1.0 ELSE 0.0 END END),
+        0
+      ) AS bullish_pct,
+      COALESCE(
+        AVG(c.score) FILTER (WHERE ${eligibleSql} ${periodFilter}) /
+        NULLIF(STDDEV_POP(c.score) FILTER (WHERE ${eligibleSql} ${periodFilter}), 0),
+        0
+      ) AS sharpe_ratio,
+      NOW() AS updated_at
+    FROM creators cr
+    LEFT JOIN calls c ON c.creator_id = cr.id
+    GROUP BY cr.id`,
+    [period],
+  );
+
+  await query(
+    `UPDATE creator_stats cs
+     SET accuracy_rank = ranked.rank
+     FROM (
+       SELECT
+         id,
+         ROW_NUMBER() OVER (
+           PARTITION BY period
+           ORDER BY alpha_score DESC, win_rate DESC, total_calls DESC, creator_id ASC
+         ) AS rank
+       FROM creator_stats
+       WHERE period = $1 AND total_calls > 0
+     ) ranked
+     WHERE cs.id = ranked.id`,
+    [period],
+  );
+}
+
+export async function syncCreatorSnapshots(): Promise<void> {
+  await query(
+    `UPDATE creators c
+     SET
+       alpha_score = cs.alpha_score,
+       win_rate = cs.win_rate,
+       avg_return = cs.avg_return_30d,
+       total_calls = cs.total_calls,
+       accuracy_rank = cs.accuracy_rank
+     FROM creator_stats cs
+     WHERE cs.creator_id = c.id
+       AND cs.period = 'all_time'`,
+  );
+}
+
+export async function recomputeAllStats(): Promise<void> {
+  await recomputeCallScores();
+  await recomputeCreatorStats("all_time");
+  await recomputeCreatorStats("90d");
+  await recomputeCreatorStats("30d");
+  await syncCreatorSnapshots();
+}

@@ -75,7 +75,7 @@ export default function CreatorCard({ creator, stats, trend }: CreatorCardProps)
           value={`${stats.avg_alpha_30d >= 0 ? "+" : ""}${stats.avg_alpha_30d.toFixed(1)}%`}
           positive={stats.avg_alpha_30d >= 0}
         />
-        <StatItem label="Total Calls" value={String(stats.total_calls)} />
+        <StatItem label="Scored Calls" value={String(stats.total_calls)} />
         <StatItem label="Hit Rate" value={`${(stats.hit_rate * 100).toFixed(1)}%`} />
       </div>
     </Link>

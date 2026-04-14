@@ -186,6 +186,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       LEFT JOIN calls bc ON bc.id = cs.best_call_id
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
+        AND cs.total_calls > 0
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );

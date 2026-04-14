@@ -10,11 +10,12 @@ import {
   X,
 } from "lucide-react";
 import { SYMBOL_TICKERS } from "@/lib/constants";
-import type { Call } from "@/lib/types";
+import type { SerializedCall } from "@/lib/public-serializer";
 
 interface CallHistoryProps {
-  readonly calls: readonly Call[];
+  readonly calls: readonly SerializedCall[];
   readonly totalCount?: number;
+  readonly scoredCount?: number;
 }
 
 type SortKey = "call_date" | "score" | "return_30d";
@@ -22,7 +23,20 @@ type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 10;
 
-export default function CallHistory({ calls, totalCount }: CallHistoryProps) {
+function getScoreLabel(call: SerializedCall): string {
+  if (call.score_status === "scored") {
+    return (call.public_score ?? 0).toFixed(1);
+  }
+  if (call.score_status === "excluded_confidence") return "Unscored";
+  if (call.score_status === "invalid_extraction") return "Invalid";
+  return "Pending";
+}
+
+export default function CallHistory({
+  calls,
+  totalCount,
+  scoredCount,
+}: CallHistoryProps) {
   const [sortKey, setSortKey] = useState<SortKey>("call_date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
@@ -30,8 +44,14 @@ export default function CallHistory({ calls, totalCount }: CallHistoryProps) {
   const sorted = useMemo(() => {
     const arr = [...calls];
     arr.sort((a, b) => {
-      const aVal = a[sortKey] ?? 0;
-      const bVal = b[sortKey] ?? 0;
+      const aVal =
+        sortKey === "score"
+          ? (a.public_score ?? -1)
+          : (a[sortKey] ?? 0);
+      const bVal =
+        sortKey === "score"
+          ? (b.public_score ?? -1)
+          : (b[sortKey] ?? 0);
       if (typeof aVal === "string" && typeof bVal === "string") {
         return sortDir === "asc"
           ? aVal.localeCompare(bVal)
@@ -71,8 +91,9 @@ export default function CallHistory({ calls, totalCount }: CallHistoryProps) {
         <h2 className="text-white font-semibold text-sm">Call History</h2>
         <p className="text-gray-500 text-xs mt-1">
           {totalCount !== undefined && totalCount > calls.length
-            ? `Showing ${calls.length} of ${totalCount} calls`
-            : `${calls.length} total calls tracked`}
+            ? `Showing ${calls.length} of ${totalCount} tracked calls`
+            : `${calls.length} tracked calls`}
+          {scoredCount !== undefined ? ` · ${scoredCount} scored` : ""}
         </p>
       </div>
 
@@ -148,10 +169,22 @@ export default function CallHistory({ calls, totalCount }: CallHistoryProps) {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-white font-medium tabular-nums">
-                    {call.score.toFixed(1)}
+                    <span
+                      className={
+                        call.score_status === "scored"
+                          ? "text-white"
+                          : "text-gray-500 text-xs uppercase tracking-wider"
+                      }
+                    >
+                      {getScoreLabel(call)}
+                    </span>
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {call.return_30d !== null ? (
+                    {call.horizon_status_30d === "pending" ? (
+                      <span className="text-gray-600 text-xs uppercase tracking-wider">
+                        Pending
+                      </span>
+                    ) : call.return_30d !== null ? (
                       <span
                         className={
                           call.return_30d >= 0
@@ -167,7 +200,11 @@ export default function CallHistory({ calls, totalCount }: CallHistoryProps) {
                     )}
                   </td>
                   <td className="px-4 py-3 tabular-nums hidden lg:table-cell">
-                    {call.alpha_30d !== null ? (
+                    {call.horizon_status_30d === "pending" ? (
+                      <span className="text-gray-600 text-xs uppercase tracking-wider">
+                        Pending
+                      </span>
+                    ) : call.alpha_30d !== null ? (
                       <span
                         className={
                           call.alpha_30d >= 0
@@ -183,7 +220,11 @@ export default function CallHistory({ calls, totalCount }: CallHistoryProps) {
                     )}
                   </td>
                   <td className="px-4 py-3 text-center hidden md:table-cell">
-                    {call.hit_target === true ? (
+                    {call.target_status === "pending" ? (
+                      <span className="text-gray-600 text-xs uppercase tracking-wider">
+                        Pending
+                      </span>
+                    ) : call.hit_target === true ? (
                       <Target className="w-4 h-4 text-brand-green mx-auto" />
                     ) : call.hit_target === false ? (
                       <X className="w-4 h-4 text-brand-red mx-auto" />

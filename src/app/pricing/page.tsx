@@ -16,7 +16,7 @@ import {
 export const metadata: Metadata = {
   title: "Pricing — CryptoTubers Ranked",
   description:
-    "Free leaderboard for everyone. Pro analytics at $19/mo. Alpha signals at $49/mo. Find the crypto YouTubers who actually beat the market.",
+    "Public beta pricing and roadmap for CryptoTubers Ranked.",
   alternates: { canonical: "/pricing" },
 };
 
@@ -39,12 +39,12 @@ const TIERS: readonly TierConfig[] = [
     name: "Free",
     price: "$0",
     period: "forever",
-    tagline: "Full leaderboard, see every rank",
+    tagline: "All public research surfaces stay open",
     features: [
       "Complete leaderboard (all ranks)",
-      "Creator profiles with basic stats",
-      "Win rate, alpha score, total calls",
-      "7-day delayed data",
+      "Creator profiles and call history",
+      "Per-call Alpha Score breakdowns",
+      "Win rate, Alpha Score, and scored-call totals",
     ],
     cta: "Get Started",
     highlighted: false,
@@ -57,16 +57,15 @@ const TIERS: readonly TierConfig[] = [
     name: "Pro",
     price: "$19",
     period: "/mo",
-    tagline: "Deep analytics on every creator",
+    tagline: "Reserved for upcoming premium workflows",
     features: [
       "Everything in Free",
-      "Full call-by-call history",
-      "Score breakdown per call",
-      "Performance charts over time",
-      "Bull vs bear win rates",
-      "Real-time data updates",
+      "Premium workflows are being rebuilt",
+      "Future account-linked exports",
+      "Future saved screens and notifications",
+      "Priority feedback access while premium is in beta",
     ],
-    cta: "Upgrade to Pro",
+    cta: "Join Pro Waitlist",
     highlighted: false,
     gradient: "from-brand-accent to-purple-400",
     borderColor: "border-brand-accent/30",
@@ -77,17 +76,15 @@ const TIERS: readonly TierConfig[] = [
     name: "Alpha",
     price: "$49",
     period: "/mo",
-    tagline: "Actionable signals, not just rankings",
+    tagline: "Future delivery layer for alerts and API access",
     features: [
       "Everything in Pro",
-      "Bear & bull specialist rankings",
-      "Contrarian signal alerts",
-      "Consensus strength warnings",
-      "Direction-specific leaderboards",
-      "First-mover detection",
-      "API access (coming soon)",
+      "Future signal delivery products",
+      "Future API and webhook access",
+      "Future premium alerting surfaces",
+      "Early access to private-alpha experiments",
     ],
-    cta: "Get Alpha",
+    cta: "Join Alpha Waitlist",
     highlighted: true,
     gradient: "from-brand-gold to-yellow-400",
     borderColor: "border-brand-gold/30",
@@ -105,18 +102,13 @@ interface FeatureRow {
 
 const COMPARISON_FEATURES: readonly FeatureRow[] = [
   { feature: "Full Leaderboard (All Ranks)", free: true, pro: true, alpha: true },
-  { feature: "Creator Profiles", free: "Basic", pro: "Full", alpha: "Full" },
-  { feature: "Call History", free: false, pro: "Full", alpha: "Full" },
-  { feature: "Score Breakdown per Call", free: false, pro: true, alpha: true },
-  { feature: "Performance Charts", free: false, pro: true, alpha: true },
-  { feature: "Data Freshness", free: "7-day delay", pro: "Real-time", alpha: "Real-time" },
-  { feature: "Bull vs Bear Win Rates", free: false, pro: true, alpha: true },
-  { feature: "Direction-Specific Rankings", free: false, pro: false, alpha: true },
-  { feature: "Contrarian Signal Alerts", free: false, pro: false, alpha: true },
-  { feature: "Consensus Strength Warnings", free: false, pro: false, alpha: true },
-  { feature: "Bear/Bull Specialist Alerts", free: false, pro: false, alpha: true },
-  { feature: "First-Mover Detection", free: false, pro: false, alpha: true },
-  { feature: "API Access", free: false, pro: false, alpha: "Coming soon" },
+  { feature: "Creator Profiles", free: "Full", pro: "Full", alpha: "Full" },
+  { feature: "Call History", free: true, pro: true, alpha: true },
+  { feature: "Score Breakdown per Call", free: true, pro: true, alpha: true },
+  { feature: "Performance Charts", free: true, pro: true, alpha: true },
+  { feature: "Data Freshness", free: "After each public recompute", pro: "Premium roadmap", alpha: "Premium roadmap" },
+  { feature: "Premium Workflows", free: "Public beta only", pro: "Planned", alpha: "Planned" },
+  { feature: "Alerts and API", free: false, pro: "Planned", alpha: "Planned" },
 ] as const;
 
 interface FaqItem {
@@ -128,27 +120,27 @@ const FAQ_ITEMS: readonly FaqItem[] = [
   {
     question: "Why is the leaderboard free?",
     answer:
-      "The leaderboard is the hook, not the product. Rankings tell you WHO is good -- but the real value is understanding WHEN to listen, in WHAT market conditions, and which signals to fade. That intelligence is what Pro and Alpha unlock.",
+      "Because the public research surface is the product right now. The leaderboard, creator pages, call history, and score breakdowns stay open while we rebuild the premium delivery layer.",
   },
   {
     question: "How do you calculate the Alpha Score?",
     answer:
-      "Each call is scored on five components: direction correctness at 30 days (40pts), alpha over BTC returns (20pts), call specificity (15pts), market regime difficulty (10pts), and target hit accuracy (10pts). Scores are base-rate adjusted so bearish calls in bull markets earn more than easy consensus calls. Full details on our Methodology page.",
+      "Each call is scored on five public components: direction correctness at 30 days (40pts), alpha over BTC at 30 days (25pts), specificity (15pts), market regime difficulty (10pts), and target hit within 90 days (10pts). There is no hidden normalization or confidence multiplier on the public Alpha Score.",
   },
   {
     question: "What are contrarian signals?",
     answer:
-      "When a top-ranked creator calls the opposite direction of the crowd, we flag it. Our data shows contrarian calls score 3x higher than herd calls. Miles Deutscher, for example, has a 70% win rate when going against consensus. Alpha subscribers get alerts when these signals fire.",
+      "They are situations where a creator calls the opposite direction of the crowd. We study those cases publicly today; delivery-oriented premium tooling for them is still on the roadmap.",
   },
   {
     question: "What are consensus strength warnings?",
     answer:
-      "When 3+ creators independently call the same coin in the same direction within a week, we analyze the signal strength. Counter-intuitively, unanimous agreement among creators is historically the weakest signal -- mixed opinions correlate with much higher accuracy. We surface this so you know when to be cautious.",
+      "When multiple creators independently call the same coin in the same direction within a short window, we analyze that cluster. The public site already shows the raw research; premium warning surfaces are planned, not shipped.",
   },
   {
     question: "How often is the data updated?",
     answer:
-      "We scrape new videos daily and run the full scoring pipeline every 24 hours. Free users see data with a 7-day delay. Pro and Alpha users get real-time updates as soon as new scores are computed.",
+      "We scrape new videos daily and rerun the scoring pipeline after new extraction and market-data backfills complete. Public pages reflect the latest completed recompute.",
   },
   {
     question: "Can I cancel anytime?",
@@ -156,21 +148,14 @@ const FAQ_ITEMS: readonly FaqItem[] = [
       "Yes, you can cancel your subscription at any time. Your access will continue through the end of your current billing period.",
   },
   {
-    question: "Only 1 of 19 beats buy-and-hold -- why should I subscribe?",
+    question: "If the public site is free, what are Pro and Alpha for?",
     answer:
-      "That stat is the point. Most people follow 5-10 crypto YouTubers blindly. We show you which one actually generates alpha, who has an 85% win rate in bear markets, and when the crowd is about to be wrong. The value is not that everyone is great -- it is knowing who is and when.",
+      "For now, they are roadmap tiers rather than unique public-site unlocks. We will only market premium workflows once the delivery surfaces are live and materially different from the public dataset.",
   },
 ] as const;
 
 function getCheckoutUrl(tierName: string): string {
-  if (tierName === "Alpha") {
-    const planId = process.env.WHOP_ELITE_PLAN_ID;
-    return planId ? `https://whop.com/checkout/${planId}` : "#";
-  }
-  if (tierName === "Pro") {
-    const planId = process.env.WHOP_PRO_PLAN_ID;
-    return planId ? `https://whop.com/checkout/${planId}` : "#";
-  }
+  if (tierName === "Alpha" || tierName === "Pro") return "/feedback";
   return "/";
 }
 
@@ -209,12 +194,12 @@ export default function PricingPage() {
         <ValueProp
           icon={Radar}
           title="Contrarian Signals"
-          description="When a top creator goes against the crowd, they win 3x more often. We alert you the moment it happens."
+          description="When a top creator goes against the crowd, those calls often matter more. Public data shows the pattern; premium delivery tooling is still in roadmap mode."
         />
         <ValueProp
           icon={Shield}
           title="Consensus Warnings"
-          description="When all creators agree, accuracy drops. Unanimous bullish consensus historically hits just 54%. We warn you."
+          description="When all creators agree, accuracy can drop. The public site shows the underlying consensus research; warning-specific premium UX is still planned."
         />
       </section>
 

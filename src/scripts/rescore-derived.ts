@@ -1,24 +1,27 @@
-/**
- * rescore-derived.ts
- *
- * Recomputes derived scoring fields for all matched calls using the
- * updated rubric logic:
- *   - correct_direction: now requires >2% magnitude (bullish/bearish)
- *   - hit_target: conservative — assumes stop hit first if both triggered
- *   - score: reset to 0 so compute-scores will rescore with new formula
- *
- * OPTIMIZED: Uses batch SQL instead of per-call candle queries.
- * Previous version: 4224 individual queries against 18.7M-row candles table.
- * New version: 2 batch queries (correct_direction has no candle dependency).
- *
- * Run this BEFORE compute-scores.ts after rubric changes.
- */
 import * as fs from "fs";
 import * as path from "path";
-import { query } from "../lib/db";
-import { MS_90D } from "../lib/constants";
+import { fileURLToPath } from "url";
 import { didHitTarget } from "../lib/scoring";
+import { query } from "../lib/db";
+import { hasHorizonElapsed } from "../lib/public-methodology";
 import type { Direction } from "../lib/types";
+
+interface DerivedRow {
+  readonly id: number;
+  readonly symbol: string;
+  readonly direction: string;
+  readonly target_price: number | null;
+  readonly stop_loss: number | null;
+  readonly call_date: string;
+  readonly return_30d: number | null;
+  readonly hit_target: boolean | null;
+}
+
+interface CandlePoint {
+  readonly id: number;
+  readonly max_high: number | null;
+  readonly min_low: number | null;
+}
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
@@ -27,72 +30,47 @@ function loadEnv(): void {
     ? path.join(root, ".env.local")
     : path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
-  const lines = fs.readFileSync(envPath, "utf-8").split("\n");
-  for (const raw of lines) {
+  for (const raw of fs.readFileSync(envPath, "utf-8").split("\n")) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
     const eqIdx = line.indexOf("=");
     if (eqIdx < 0) continue;
     const key = line.slice(0, eqIdx).trim();
     const value = line.slice(eqIdx + 1).trim();
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
+    if (!process.env[key]) process.env[key] = value;
   }
 }
 
-function timestamp(): string {
-  return new Date().toISOString();
-}
+export async function recomputeDerivedFields(
+  callIds?: readonly number[],
+): Promise<void> {
+  const filters = callIds && callIds.length > 0
+    ? "AND id = ANY($1::int[])"
+    : "";
+  const params = callIds && callIds.length > 0 ? [callIds] : [];
 
-interface TargetCall {
-  readonly id: number;
-  readonly symbol: string;
-  readonly direction: string;
-  readonly target_price: number;
-  readonly stop_loss: number | null;
-  readonly call_date: string;
-}
-
-interface CandlePoint {
-  readonly open_time: string;
-  readonly high: number;
-  readonly low: number;
-}
-
-/**
- * Binary search: find the leftmost index where candles[i].open_time >= target.
- */
-function lowerBound(candles: readonly CandlePoint[], targetMs: number): number {
-  let lo = 0;
-  let hi = candles.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (Number(candles[mid].open_time) < targetMs) {
-      lo = mid + 1;
-    } else {
-      hi = mid;
-    }
-  }
-  return lo;
-}
-
-async function main(): Promise<void> {
-  loadEnv();
-
-  console.log(`[${timestamp()}] Starting derived field recomputation (batch mode)...`);
-
-  // Count matched calls
-  const countResult = await query<{ count: string }>(
-    "SELECT COUNT(*)::text as count FROM calls WHERE price_at_call IS NOT NULL",
+  const rows = await query<DerivedRow>(
+    `SELECT id, symbol, direction, target_price, stop_loss,
+            call_date::text AS call_date, return_30d, hit_target
+     FROM calls
+     WHERE price_at_call IS NOT NULL
+       ${filters}
+     ORDER BY symbol, call_date`,
+    params,
   );
-  const totalCalls = parseInt(countResult[0]?.count ?? "0", 10);
-  console.log(`[${timestamp()}] Total matched calls: ${totalCalls}`);
 
-  // ── Step 1: Batch correct_direction (no candle lookups needed) ────────
-  // This replaces 4224 individual evaluations with one SQL statement.
-  // The magnitude floor (>2% for bullish/bearish) is embedded in the CASE.
-  console.log(`[${timestamp()}] Step 1: Batch-updating correct_direction...`);
+  if (rows.length === 0) return;
+
+  await query(
+    `UPDATE calls SET
+      correct_direction = NULL,
+      hit_target = NULL,
+      score = 0
+     WHERE price_at_call IS NOT NULL
+       ${filters}`,
+    params,
+  );
+
   await query(
     `UPDATE calls SET
       correct_direction = CASE
@@ -101,119 +79,88 @@ async function main(): Promise<void> {
         WHEN direction = 'bullish' THEN return_30d > 2
         ELSE return_30d < -2
       END
-    WHERE price_at_call IS NOT NULL`,
-  );
-  console.log(`[${timestamp()}] Step 1 complete: correct_direction updated for all matched calls`);
-
-  // ── Step 2: Batch hit_target per symbol ────────
-  // Only calls with target_price need candle data. Group by symbol to
-  // minimize candle table scans (one scan per symbol instead of per call).
-  const callsWithTarget = await query<TargetCall>(
-    `SELECT id, symbol, direction, target_price, stop_loss, call_date
-     FROM calls
-     WHERE price_at_call IS NOT NULL AND target_price IS NOT NULL
-     ORDER BY symbol, call_date`,
+     WHERE price_at_call IS NOT NULL
+       AND call_date <= NOW() - INTERVAL '30 days'
+       ${filters}`,
+    params,
   );
 
-  console.log(
-    `[${timestamp()}] Step 2: Computing hit_target for ${callsWithTarget.length} calls with targets...`,
-  );
-
-  // Set hit_target = false for calls without target_price (bulk)
   await query(
     `UPDATE calls SET hit_target = false
-     WHERE price_at_call IS NOT NULL AND target_price IS NULL`,
+     WHERE price_at_call IS NOT NULL
+       AND target_price IS NULL
+       AND call_date <= NOW() - INTERVAL '90 days'
+       ${filters}`,
+    params,
   );
 
-  if (callsWithTarget.length > 0) {
-    // Group calls by symbol
-    const bySymbol = new Map<string, TargetCall[]>();
-    for (const c of callsWithTarget) {
-      const group = bySymbol.get(c.symbol) ?? [];
-      group.push(c);
-      bySymbol.set(c.symbol, group);
-    }
-
-    const hitUpdates: { id: number; hit: boolean }[] = [];
-    let symbolsProcessed = 0;
-
-    for (const [symbol, symbolCalls] of Array.from(bySymbol.entries())) {
-      // Find the overall date range needed for this symbol
-      const dateMs = symbolCalls.map((c) => new Date(c.call_date).getTime());
-      const minDate = Math.min(...dateMs);
-      const maxDate = Math.max(...dateMs) + MS_90D;
-
-      // One query per symbol: fetch all candles in the needed range
-      const candles = await query<CandlePoint>(
-        `SELECT open_time::text as open_time, high, low
-         FROM candles
-         WHERE symbol = $1 AND open_time >= $2 AND open_time <= $3
-         ORDER BY open_time ASC`,
-        [symbol, minDate, maxDate],
+  const hitUpdates: { id: number; hit: boolean | null }[] = [];
+  const eligibleTargetRows = rows.filter(
+    (row) =>
+      row.target_price !== null &&
+      row.hit_target === null &&
+      hasHorizonElapsed(row.call_date, "90d", new Date()),
+  );
+  if (eligibleTargetRows.length > 0) {
+    console.log(`Recomputing hit_target for ${eligibleTargetRows.length} calls...`);
+    const chunkSize = 10;
+    for (let index = 0; index < eligibleTargetRows.length; index += chunkSize) {
+      const chunkRows = eligibleTargetRows.slice(index, index + chunkSize);
+      const chunkIds = chunkRows.map((row) => row.id);
+      const candleRows = await query<CandlePoint>(
+        `SELECT
+          c.id,
+          MAX(cd.high) AS max_high,
+          MIN(cd.low) AS min_low
+         FROM calls c
+         LEFT JOIN candles cd
+           ON cd.symbol = c.symbol
+          AND cd.open_time >= EXTRACT(EPOCH FROM c.call_date) * 1000
+          AND cd.open_time <= EXTRACT(EPOCH FROM c.call_date + INTERVAL '90 days') * 1000
+         WHERE c.id = ANY($1::int[])
+         GROUP BY c.id`,
+        [chunkIds],
       );
-
-      // For each call, binary search for the relevant window and compute max/min
-      for (const call of symbolCalls) {
-        const callMs = new Date(call.call_date).getTime();
-        const endMs = callMs + MS_90D;
-
-        const startIdx = lowerBound(candles, callMs);
-        let maxHigh = -Infinity;
-        let minLow = Infinity;
-
-        for (let i = startIdx; i < candles.length; i++) {
-          const t = Number(candles[i].open_time);
-          if (t > endMs) break;
-          if (candles[i].high > maxHigh) maxHigh = candles[i].high;
-          if (candles[i].low < minLow) minLow = candles[i].low;
-        }
-
-        const hit = didHitTarget(
-          call.direction as Direction,
-          call.target_price,
-          call.stop_loss,
-          maxHigh === -Infinity ? null : maxHigh,
-          minLow === Infinity ? null : minLow,
-        );
-
-        hitUpdates.push({ id: call.id, hit });
-      }
-
-      symbolsProcessed++;
-      if (symbolsProcessed % 10 === 0 || symbolsProcessed === bySymbol.size) {
-        console.log(
-          `[${timestamp()}]   ${symbolsProcessed}/${bySymbol.size} symbols processed`,
-        );
-      }
-    }
-
-    // Batch UPDATE hit_target using unnest
-    const BATCH_SIZE = 500;
-    for (let i = 0; i < hitUpdates.length; i += BATCH_SIZE) {
-      const batch = hitUpdates.slice(i, i + BATCH_SIZE);
+      const candleMap = new Map(candleRows.map((row) => [row.id, row]));
+      const chunkUpdates = chunkRows.map((row) => {
+        const candle = candleMap.get(row.id);
+        return {
+          id: row.id,
+          hit: didHitTarget(
+            row.direction as Direction,
+            row.target_price,
+            row.stop_loss,
+            candle?.max_high ?? null,
+            candle?.min_low ?? null,
+          ),
+        };
+      });
+      hitUpdates.push(...chunkUpdates);
       await query(
         `UPDATE calls SET hit_target = bulk.hit
          FROM unnest($1::int[], $2::bool[]) AS bulk(id, hit)
          WHERE calls.id = bulk.id`,
-        [batch.map((u) => u.id), batch.map((u) => u.hit)],
+        [chunkUpdates.map((row) => row.id), chunkUpdates.map((row) => row.hit)],
+      );
+      console.log(
+        `  loaded target candle batch ${Math.floor(index / chunkSize) + 1}/${Math.ceil(eligibleTargetRows.length / chunkSize)}`,
       );
     }
-
-    const hitCount = hitUpdates.filter((u) => u.hit).length;
-    console.log(
-      `[${timestamp()}] Step 2 complete: ${hitUpdates.length} target calls evaluated, ${hitCount} hit target`,
-    );
   }
-
-  // ── Step 3: Reset all scores to 0 ────────
-  await query(
-    `UPDATE calls SET score = 0 WHERE price_at_call IS NOT NULL`,
-  );
-
-  console.log(`[${timestamp()}] All scores reset to 0 — run compute-scores.ts next`);
 }
 
-main().catch((err) => {
-  console.error(`[${new Date().toISOString()}] Fatal error:`, err);
-  process.exit(1);
-});
+async function main(): Promise<void> {
+  loadEnv();
+  await recomputeDerivedFields();
+}
+
+const isEntryPoint =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isEntryPoint) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

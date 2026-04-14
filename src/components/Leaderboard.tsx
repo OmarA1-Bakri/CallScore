@@ -90,7 +90,7 @@ function LeaderboardTable({
               Avg Alpha
             </th>
             <th className="text-right text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden lg:table-cell">
-              Total Calls
+              Scored Calls
             </th>
             <th className="text-left text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden xl:table-cell">
               Best Call

@@ -1,5 +1,5 @@
 import type { Call, Direction } from "./types";
-import { DIRECTION_BASE_RATES } from "./constants";
+import { computePublicScore } from "./public-methodology";
 
 /**
  * Regime difficulty: how hard was this call given market conditions?
@@ -366,37 +366,7 @@ export function computeSpecificity(call: {
  *   individual positions are ephemeral.
  */
 export function computeAlphaScore(call: Call): number {
-  const isCorrect = call.correct_direction === true;
-
-  // Base-rate-adjusted direction reward: harder correct predictions
-  // earn more points. sqrt dampening prevents excessive swing.
-  const baseRate = DIRECTION_BASE_RATES[call.direction] ?? 0.5;
-  const rarityMultiplier = Math.sqrt(0.5 / Math.max(baseRate, 0.05));
-  const directionPoints = isCorrect ? 40 * rarityMultiplier : -10;
-
-  const alpha30d = call.alpha_30d ?? 0;
-  const alphaPoints = Math.min(20, Math.max(-20, alpha30d * 2.0));
-
-  const specificityPoints = isCorrect ? (call.specificity_score ?? 0) * 15 : 0;
-
-  const regimePoints = isCorrect ? (call.regime_difficulty ?? 0.5) * 10 : 0;
-
-  const targetPoints = call.hit_target ? 10 : 0;
-
-  const raw =
-    directionPoints + alphaPoints + specificityPoints + regimePoints + targetPoints;
-
-  // Confidence multiplier: high-conviction calls have amplified impact.
-  // A creator who loudly says "BUY NOW" and is wrong gets punished harder
-  // (the -10 direction penalty gets amplified to -11.5).
-  const confidenceMultiplier =
-    call.confidence === "high"
-      ? 1.15
-      : call.confidence === "low"
-        ? 0.85
-        : 1.0;
-
-  return raw * confidenceMultiplier;
+  return computePublicScore(call);
 }
 
 /**

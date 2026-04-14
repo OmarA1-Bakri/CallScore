@@ -9,6 +9,7 @@ import {
   didHitTarget,
   computeRegimeDifficulty,
 } from "../lib/scoring";
+import { hasHorizonElapsed } from "../lib/public-methodology";
 import type { Direction } from "../lib/types";
 
 function loadEnv(): void {
@@ -130,17 +131,22 @@ interface UnmatchedCall {
 async function processCall(call: UnmatchedCall): Promise<boolean> {
   const callDateMs = new Date(call.call_date).getTime();
   if (isNaN(callDateMs)) return false;
+  const now = new Date();
+
+  const has7d = hasHorizonElapsed(call.call_date, "7d", now);
+  const has30d = hasHorizonElapsed(call.call_date, "30d", now);
+  const has90d = hasHorizonElapsed(call.call_date, "90d", now);
 
   // Fetch all needed prices (coin + BTC at 4 timestamps each) using cache
   const [coinNow, coin7d, coin30d, coin90d, btcNow, btc7d, btc30d, btc90d] = await Promise.all([
     getCandleAt(call.symbol, callDateMs),
-    getCandleAt(call.symbol, callDateMs + MS_7D),
-    getCandleAt(call.symbol, callDateMs + MS_30D),
-    getCandleAt(call.symbol, callDateMs + MS_90D),
+    has7d ? getCandleAt(call.symbol, callDateMs + MS_7D) : Promise.resolve(null),
+    has30d ? getCandleAt(call.symbol, callDateMs + MS_30D) : Promise.resolve(null),
+    has90d ? getCandleAt(call.symbol, callDateMs + MS_90D) : Promise.resolve(null),
     getCandleAt("BTCUSDT", callDateMs),
-    getCandleAt("BTCUSDT", callDateMs + MS_7D),
-    getCandleAt("BTCUSDT", callDateMs + MS_30D),
-    getCandleAt("BTCUSDT", callDateMs + MS_90D),
+    has7d ? getCandleAt("BTCUSDT", callDateMs + MS_7D) : Promise.resolve(null),
+    has30d ? getCandleAt("BTCUSDT", callDateMs + MS_30D) : Promise.resolve(null),
+    has90d ? getCandleAt("BTCUSDT", callDateMs + MS_90D) : Promise.resolve(null),
   ]);
 
   if (!coinNow) return false; // No candle data for this symbol
@@ -186,12 +192,15 @@ async function processCall(call: UnmatchedCall): Promise<boolean> {
   const correctDirection = return30d !== null ? isDirectionCorrect(direction, return30d) : null;
 
   // Target hit detection (check within 90d window)
-  const { maxHigh, minLow } = await getHighLowBetween(
-    call.symbol,
-    callDateMs,
-    callDateMs + MS_90D,
-  );
-  const hitTarget = didHitTarget(direction, call.target_price, call.stop_loss, maxHigh, minLow);
+  let hitTarget: boolean | null = null;
+  if (has90d) {
+    const { maxHigh, minLow } = await getHighLowBetween(
+      call.symbol,
+      callDateMs,
+      callDateMs + MS_90D,
+    );
+    hitTarget = didHitTarget(direction, call.target_price, call.stop_loss, maxHigh, minLow);
+  }
 
   // Regime at call time
   const regimeAtCall = coinNow.regime;
