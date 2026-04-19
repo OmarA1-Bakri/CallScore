@@ -11,31 +11,9 @@
  *
  * Run: npm exec -- node --import tsx src/scripts/scan-new-calls.ts [--hours=6]
  */
-import * as fs from "fs";
-import * as path from "path";
 import { query } from "../lib/db";
 import { enqueueNewCallAlert } from "../lib/alerts";
-
-function loadEnv(): void {
-  if (process.env.NEON_DATABASE_URL) return;
-  const root = path.resolve(__dirname, "../..");
-  const envPath = fs.existsSync(path.join(root, ".env.local"))
-    ? path.join(root, ".env.local")
-    : path.join(root, ".env");
-  if (!fs.existsSync(envPath)) return;
-  for (const raw of fs.readFileSync(envPath, "utf-8").split("\n")) {
-    const t = raw.trim();
-    if (!t || t.startsWith("#")) continue;
-    const i = t.indexOf("=");
-    if (i < 0) continue;
-    const k = t.slice(0, i).trim();
-    if (!process.env[k]) process.env[k] = t.slice(i + 1).trim();
-  }
-}
-
-function timestamp(): string {
-  return new Date().toISOString();
-}
+import { loadEnv, timestamp } from "./_shared";
 
 function parseHoursArg(argv: readonly string[]): number {
   const match = argv.find((a) => a.startsWith("--hours="));
@@ -76,22 +54,30 @@ async function main(): Promise<void> {
     `[${timestamp()}] scan-new-calls: found ${pairs.length} (watcher x call) pairs`,
   );
 
+  // Each (user, call) enqueue is independent, so run them in parallel.
+  // Promise.allSettled keeps us going when individual rows fail — we
+  // still want to enqueue the rest rather than short-circuit on the
+  // first error.
+  const results = await Promise.allSettled(
+    pairs.map((row) =>
+      enqueueNewCallAlert(row.user_id, row.creator_id, row.call_id),
+    ),
+  );
+
   let enqueued = 0;
   let duplicates = 0;
   let enqueueFailures = 0;
 
-  for (const row of pairs) {
-    try {
-      const inserted = await enqueueNewCallAlert(
-        row.user_id,
-        row.creator_id,
-        row.call_id,
-      );
-      if (inserted) enqueued++;
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === "fulfilled") {
+      if (result.value) enqueued++;
       else duplicates++;
-    } catch (error: unknown) {
+    } else {
       enqueueFailures++;
-      const msg = error instanceof Error ? error.message : String(error);
+      const row = pairs[i];
+      const reason = result.reason;
+      const msg = reason instanceof Error ? reason.message : String(reason);
       console.error(
         `[${timestamp()}] enqueue failed user=${row.user_id} call=${row.call_id}: ${msg}`,
       );
