@@ -30,6 +30,24 @@ function parseIsoDate(raw: string | null): Date | null {
   return value;
 }
 
+// Date-only inputs like "2025-12-31" parse as 2025-12-31T00:00:00Z, which
+// would silently exclude calls timestamped later that same day from an
+// inclusive call_date <= end filter. Normalize explicitly so the UX
+// matches the user's intent: start = start-of-day, end = end-of-day UTC.
+function parseIsoDateAsStartOfDay(raw: string | null): Date | null {
+  const d = parseIsoDate(raw);
+  if (d === null) return null;
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+function parseIsoDateAsEndOfDay(raw: string | null): Date | null {
+  const d = parseIsoDate(raw);
+  if (d === null) return null;
+  d.setUTCHours(23, 59, 59, 999);
+  return d;
+}
+
 function parseCapital(raw: string | null): number | null {
   if (raw === null || raw.length === 0) return null;
   const value = Number(raw);
@@ -46,8 +64,10 @@ function parseStrategy(raw: string | null): BacktestStrategy | null {
 
 function defaultRange(now: Date): { readonly start: Date; readonly end: Date } {
   const end = new Date(now);
+  end.setUTCHours(23, 59, 59, 999);
   const start = new Date(now);
   start.setUTCDate(start.getUTCDate() - 365);
+  start.setUTCHours(0, 0, 0, 0);
   return { start, end };
 }
 
@@ -58,11 +78,13 @@ function parseQuery(
   const { start: defaultStart, end: defaultEnd } = defaultRange(now);
 
   const startRaw = searchParams.get("start");
-  const startDate = startRaw === null ? defaultStart : parseIsoDate(startRaw);
+  const startDate =
+    startRaw === null ? defaultStart : parseIsoDateAsStartOfDay(startRaw);
   if (startDate === null) return { error: "invalid_start" };
 
   const endRaw = searchParams.get("end");
-  const endDate = endRaw === null ? defaultEnd : parseIsoDate(endRaw);
+  const endDate =
+    endRaw === null ? defaultEnd : parseIsoDateAsEndOfDay(endRaw);
   if (endDate === null) return { error: "invalid_end" };
 
   if (endDate.getTime() <= startDate.getTime()) {

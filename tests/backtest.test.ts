@@ -493,3 +493,32 @@ test("unknown creator throws invalid_creator", async () => {
       err instanceof BacktestValidationError && err.message === "invalid_creator",
   );
 });
+
+test("H1: call at 18:00Z on the endDate day is included when end=YYYY-MM-DD", async () => {
+  // Simulates what the API/page does after normalizing: an end-of-day
+  // endDate at 23:59:59.999Z. The call fires later the same calendar day.
+  const calls: Call[] = [
+    buildCall({
+      id: 42,
+      return_30d: 10,
+      call_date: "2025-12-31T18:00:00.000Z",
+    }),
+  ];
+  const endOfDay = new Date("2025-12-31T00:00:00.000Z");
+  endOfDay.setUTCHours(23, 59, 59, 999);
+
+  const result = await runBacktest(
+    {
+      creatorId: 1,
+      startDate: new Date("2025-01-01T00:00:00.000Z"),
+      endDate: endOfDay,
+      initialCapital: 1000,
+      strategy: "equal_weight",
+    },
+    { provider: makeProvider({ calls }), now: NOW },
+  );
+
+  assert.equal(result.callCount, 1);
+  assert.equal(result.pnlByCall[0].callId, 42);
+  assert.ok(Math.abs(result.finalCapital - 1100) < 1e-6);
+});
