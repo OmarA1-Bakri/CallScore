@@ -189,7 +189,10 @@ interface NodeModuleCtor {
   new (filename: string, parent: NodeJS.Module | null): PrimedModule;
 }
 
-/* eslint-disable @typescript-eslint/no-require-imports */
+// Priming the CommonJS require.cache is the only way to intercept `@/lib/db`
+// before `@/lib/self-correction` imports it (tsx compiles TypeScript to CJS
+// at runtime). We have to use `require()` here; dynamic ESM `import()` runs
+// too late because the import graph is already resolved by then.
 const NodeModule = require("node:module") as NodeModuleCtor;
 
 function primeCache(
@@ -215,7 +218,6 @@ primeCache(DB_PATH, {
 const selfCorrection = require(
   path.join(PROJECT_ROOT, "src", "lib", "self-correction.ts"),
 ) as typeof import("../src/lib/self-correction");
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 const { detectRevisions, computeSelfCorrectionScore, tierForScore } =
   selfCorrection;
