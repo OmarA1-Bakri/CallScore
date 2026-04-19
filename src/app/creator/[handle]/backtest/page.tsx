@@ -337,7 +337,7 @@ export default async function BacktestPage({
         className="border-b pb-3 mb-6 text-xs"
         style={{ borderColor: COLOR_DIM, color: COLOR_MID }}
       >
-        {`// creator/${handle}/backtest :: v1 :: cache 15m swr 1h`}
+        {`// creator/${handle}/backtest :: v1 :: cache 5m swr 1m`}
       </div>
 
       <div className="mb-4">

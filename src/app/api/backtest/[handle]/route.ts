@@ -120,11 +120,11 @@ export async function GET(
 
     return NextResponse.json(result, {
       headers: {
-        // 15 min fresh on the CDN, serve stale for up to 1h while
-        // revalidating. Short enough that a backfill/rescore of
-        // return_30d / alpha_30d / hit_target / score_status flushes
-        // within a reasonable window.
-        "Cache-Control": "public, s-maxage=900, stale-while-revalidate=3600",
+        // 5 min fresh on the CDN with a 1 min stale-serve grace period
+        // while the edge revalidates. Short enough that a rescore or
+        // backfill of return_30d / alpha_30d / hit_target / score_status
+        // flushes publicly within ~6 minutes worst case.
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=60",
       },
     });
   } catch (error: unknown) {
