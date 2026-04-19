@@ -47,17 +47,19 @@ async function persistRevision(revision: Revision): Promise<boolean> {
   const rows = await query<InsertCountRow>(
     `INSERT INTO call_revisions (
        original_call_id,
+       revised_call_id,
        creator_id,
        revised_at,
        revision_type,
        source_video_id,
        notes
      )
-     VALUES ($1, $2, $3, $4, $5, $6)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (original_call_id, revision_type) DO NOTHING
      RETURNING '1'::text AS inserted`,
     [
       revision.originalCallId,
+      revision.revisedCallId,
       revision.creatorId,
       revision.revisedAt.toISOString(),
       revision.revisionType,

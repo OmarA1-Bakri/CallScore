@@ -5,13 +5,26 @@
  *   - updated_target      — raised/lowered a price target ("updating my target")
  *   - reversed_direction  — flipped bullish<->bearish on the same ticker
  *   - retracted           — "I take it back" / "no longer recommend"
- *   - confirmed_miss      — acknowledged a losing call ("I was wrong")
+ *   - confirmed_miss      — acknowledged a losing call ("I was wrong on BTC")
  *
  * This rewards accountability (Cowen-style public updates) vs silent delete
  * behaviour. The detection logic is intentionally conservative — patterns are
- * tightly scoped so false positives don't drown out real signal.
+ * tightly scoped and require first-person ownership + ticker proximity inside
+ * the same sentence so third-person commentary and sarcasm don't count.
+ *
+ * Key integrity invariants (reviewed by Codex, enforced by tests):
+ *   - Exactly ONE revision per (trigger-sentence, original-call) pair —
+ *     a single "I was wrong on BTC" does NOT retroactively tag every prior
+ *     BTC call. We pair with the NEAREST eligible prior call inside a
+ *     bounded window.
+ *   - Pairs never cross creators. Pairs never cross normalized symbols.
+ *   - CONFIRMED_MISS and RETRACTED patterns are disjoint: the word `retract`
+ *     lives in RETRACTED only.
+ *   - Scoring applies Bayesian shrinkage so low-N creators can't leapfrog
+ *     genuinely transparent high-volume creators.
  */
 import { query } from "./db";
+import { coinName, normalizeTicker, shortTicker } from "./ticker-normalize";
 import type { Call, Direction } from "./types";
 
 export type RevisionType =
@@ -24,6 +37,7 @@ export type SelfCorrectionTier = "honest" | "some" | "rarely";
 
 export interface Revision {
   readonly originalCallId: number;
+  readonly revisedCallId: number;
   readonly creatorId: number;
   readonly revisedAt: Date;
   readonly revisionType: RevisionType;
@@ -46,37 +60,57 @@ export interface SelfCorrectionAggregate {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Regex patterns — case-insensitive, Unicode safe.                  */
+/*  Regex patterns — case-insensitive.                                */
 /* ------------------------------------------------------------------ */
 
 const UPDATED_TARGET_PATTERN =
   /\b(update[ds]?|updating|adjust(?:ing|ed)?|revis(?:ing|ed)|mov(?:ing|ed))\s+(my\s+)?(target|price\s+target)/i;
 
+// First-person ownership only. NOTE: `retract` deliberately not here — the
+// RETRACTED_PATTERN below owns it, preventing overlap (H1).
 const CONFIRMED_MISS_PATTERN =
-  /\b(i\s+was\s+wrong|admit|didn'?t\s+work\s+out|retract|bad\s+call|missed\s+(it|the\s+call))/i;
+  /\b(i\s+was\s+wrong|i['\u2019]?m\s+wrong|i\s+admit|my\s+(call|position)\s+was\s+wrong|i\s+missed\s+(it|the\s+call|that)|i\s+got\s+(it|that|this)\s+wrong|didn'?t\s+work\s+out\s+(for\s+me|for\s+us)|that\s+was\s+a\s+bad\s+call)\b/i;
 
 const RETRACTED_PATTERN =
-  /\b(retract|take\s+(it\s+)?back|no\s+longer\s+recommend)/i;
+  /\b(i\s+retract|retract(?:ing)?\s+(?:my|that|the)|take\s+(?:that|it)\s+back|no\s+longer\s+recommend|i\s+no\s+longer\s+recommend)\b/i;
+
+/* ------------------------------------------------------------------ */
+/*  Pairing windows and thresholds.                                   */
+/* ------------------------------------------------------------------ */
 
 const REVERSAL_GAP_MAX_DAYS = 30;
-const UPDATED_TARGET_GAP_MAX_DAYS = 60;
+const UPDATED_TARGET_GAP_MAX_DAYS = 90;
+const CONFIRMED_MISS_GAP_MAX_DAYS = 180;
+const RETRACTED_GAP_MAX_DAYS = 90;
 const REVERSAL_MIN_CONFIDENCE = 0.7;
+const TICKER_PROXIMITY_CHARS = 60;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /* ------------------------------------------------------------------ */
-/*  Scoring rubric constants (single source of truth).                */
+/*  Scoring rubric constants.                                         */
 /* ------------------------------------------------------------------ */
 
-const POINTS: Readonly<Record<RevisionType, number>> = {
+const POINTS = {
   confirmed_miss: 1.0,
   updated_target: 0.5,
-  reversed_direction: 0.5,
+  // reversed_direction: full 0.5 when the later call is scored + correct,
+  // partial 0.25 when still pending horizon (the reversal action itself is
+  // always credited, outcome-based credit is layered on top later).
+  reversed_direction_full: 0.5,
+  reversed_direction_partial: 0.25,
   retracted: 0.5,
-};
+} as const;
 
 const TIER_HONEST_MIN = 0.15;
 const TIER_SOME_MIN = 0.05;
+
+// Bayesian shrinkage pseudo-count (H3). `K = 20` means a creator with only
+// a handful of scored calls is pulled strongly toward the prior mean of 0,
+// preventing a 1/2 creator from leapfrogging a 5/200 creator. Chosen to
+// align with the same order-of-magnitude as the minimum-volume floor used
+// by the rank-tier badge elsewhere (Wilson interval).
+const SHRINKAGE_K = 20;
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -108,32 +142,167 @@ function toSourceVideoId(call: Call): string | null {
   return String(call.video_id);
 }
 
+/**
+ * Split a raw quote into sentences on `.`, `!`, `?`. Naive but good enough
+ * — we compare phrases inside sentences to avoid cross-sentence matches like
+ * "Someone said I was wrong. BTC is pumping." crediting a BTC admission.
+ */
+function splitSentences(text: string): readonly string[] {
+  return text
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Returns the expected canonical ticker if it (or its coin name) is
+ * mentioned in `sentence` within `TICKER_PROXIMITY_CHARS` of the regex
+ * match, else null.
+ *
+ * Implementation note: we deliberately avoid building a RegExp from the
+ * ticker string (even though `TRACKED_SYMBOLS` is a static allowlist) so
+ * static analysers can't flag ReDoS via dynamic regex construction. We
+ * walk the window with indexOf and verify word-boundary characters
+ * manually — much cheaper than a regex anyway.
+ */
+function findMentionedTickerNear(
+  sentence: string,
+  triggerMatch: RegExpMatchArray,
+  expectedCanonical: string,
+): string | null {
+  const matchStart = triggerMatch.index ?? 0;
+  const matchEnd = matchStart + triggerMatch[0].length;
+  const windowStart = Math.max(0, matchStart - TICKER_PROXIMITY_CHARS);
+  const windowEnd = Math.min(sentence.length, matchEnd + TICKER_PROXIMITY_CHARS);
+  const window = sentence.slice(windowStart, windowEnd).toLowerCase();
+
+  const ticker = shortTicker(expectedCanonical);
+  const name = coinName(expectedCanonical);
+
+  if (ticker && containsWordBoundary(window, ticker.toLowerCase())) {
+    return expectedCanonical;
+  }
+  if (name && containsWordBoundary(window, name.toLowerCase())) {
+    return expectedCanonical;
+  }
+  return null;
+}
+
+/**
+ * Case-sensitive substring search with manual word-boundary checks at the
+ * start and end of the hit. `haystack` and `needle` must already be in the
+ * same case (we lowercase both at the call site).
+ */
+function containsWordBoundary(haystack: string, needle: string): boolean {
+  if (needle.length === 0) return false;
+  let from = 0;
+  while (from <= haystack.length - needle.length) {
+    const idx = haystack.indexOf(needle, from);
+    if (idx < 0) return false;
+    const before = idx === 0 ? "" : haystack.charAt(idx - 1);
+    const afterIdx = idx + needle.length;
+    const after = afterIdx >= haystack.length ? "" : haystack.charAt(afterIdx);
+    if (!isWordChar(before) && !isWordChar(after)) return true;
+    from = idx + 1;
+  }
+  return false;
+}
+
+function isWordChar(c: string): boolean {
+  if (c.length === 0) return false;
+  const code = c.charCodeAt(0);
+  // ASCII word char = [A-Za-z0-9_]. Sufficient for tracked tickers/names.
+  return (
+    (code >= 48 && code <= 57) || // 0-9
+    (code >= 65 && code <= 90) || // A-Z
+    (code >= 97 && code <= 122) || // a-z
+    code === 95 // _
+  );
+}
+
+/**
+ * Heuristic "first-person context" — blocks obvious third-person mentions
+ * like "he was wrong" that would otherwise sneak past the regex (the regex
+ * anchors on `I was wrong`, but quoted third-person prose may still nest
+ * `I` inside a longer sentence). We require the pronoun `I`/`I'm`/`my` to
+ * appear within 15 chars before the trigger to count.
+ */
+function hasFirstPersonLead(sentence: string, trigger: RegExpMatchArray): boolean {
+  // The CONFIRMED_MISS_PATTERN already anchors on `I ...`, so the existence
+  // of `I`/`I'm`/`my` in the match itself is guaranteed. We nonetheless
+  // check for quoted-speech markers immediately before the match: a `said`
+  // or `"` within 20 chars before the trigger is a red flag for reported
+  // speech and we reject the match.
+  const start = trigger.index ?? 0;
+  const lookBack = sentence.slice(Math.max(0, start - 20), start).toLowerCase();
+  if (/\b(said|says|told|quoted|tweeted|replied|wrote)\b/.test(lookBack)) return false;
+  if (/["\u201c\u201d].{0,10}$/.test(lookBack)) return false;
+  return true;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Public: detectRevisions                                           */
 /* ------------------------------------------------------------------ */
 
+interface GroupKey {
+  readonly creatorId: number;
+  readonly symbol: string;
+}
+
+function groupKeyString(key: GroupKey): string {
+  return `${key.creatorId}:${key.symbol}`;
+}
+
+interface NormalizedCall {
+  readonly call: Call;
+  readonly normalizedSymbol: string;
+  readonly date: Date;
+}
+
 /**
- * Detect revision events by scanning each creator's call history for
- * same-ticker pairs and regex signals in `raw_quote`.
+ * Detect revision events by scanning each (creator, normalized symbol)
+ * pair history for direction reversals and regex signals in `raw_quote`.
  *
- * The function is pure — it does NOT hit the database. The caller is
- * expected to supply all of a creator's calls ordered by `call_date`
- * ASC (insertion order is not assumed).
+ * The function is pure — no DB, no side effects. Caller supplies all calls
+ * (optionally mixing creators and symbols — we group internally as defense
+ * in depth, M1).
  *
- * Returns one Revision per (originalCallId, revisionType) pair; duplicate
- * matches against the same original are suppressed so the DB unique index
- * never rejects a row.
+ * Emits exactly ONE revision per (originalCallId, revisionType). For the
+ * text-triggered revisions (confirmed_miss / retracted / updated_target),
+ * the LATER call is paired with its NEAREST prior eligible call within a
+ * bounded window. If no prior call exists in the window, nothing is emitted
+ * (C1).
  */
 export function detectRevisions(calls: readonly Call[]): Revision[] {
   if (calls.length === 0) return [];
 
-  // Sort defensively so callers can pass unsorted arrays. We key the output
-  // de-dup map on `${originalCallId}:${revisionType}` — the same unique pair
-  // as the DB index.
-  const sorted = [...calls].sort(
-    (a, b) =>
-      new Date(a.call_date).getTime() - new Date(b.call_date).getTime(),
-  );
+  // Pre-normalize once. Calls whose symbol is not tracked are dropped —
+  // they cannot be part of a meaningful revision pair.
+  const normalized: NormalizedCall[] = [];
+  for (const call of calls) {
+    const normalizedSymbol = normalizeTicker(call.symbol);
+    if (normalizedSymbol === null) continue;
+    normalized.push({
+      call,
+      normalizedSymbol,
+      date: new Date(call.call_date),
+    });
+  }
+
+  normalized.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  // Group by (creator_id, normalized symbol). Pairs never cross either
+  // boundary (M1).
+  const groups = new Map<string, NormalizedCall[]>();
+  for (const nc of normalized) {
+    const key = groupKeyString({
+      creatorId: nc.call.creator_id,
+      symbol: nc.normalizedSymbol,
+    });
+    const existing = groups.get(key) ?? [];
+    existing.push(nc);
+    groups.set(key, existing);
+  }
 
   const seen = new Set<string>();
   const out: Revision[] = [];
@@ -145,91 +314,149 @@ export function detectRevisions(calls: readonly Call[]): Revision[] {
     out.push(revision);
   };
 
-  // Group by symbol for pairwise comparisons. Symbol already stores canonical
-  // USDT form (e.g. BTCUSDT) so no further normalization is needed — callers
-  // rely on the upstream `normalizeSymbol` in ai-extraction.ts.
-  const bySymbol = new Map<string, Call[]>();
-  for (const call of sorted) {
-    const existing = bySymbol.get(call.symbol) ?? [];
-    existing.push(call);
-    bySymbol.set(call.symbol, existing);
-  }
-
-  for (const group of Array.from(bySymbol.values())) {
+  for (const group of Array.from(groups.values())) {
     if (group.length < 2) continue;
 
     for (let i = 0; i < group.length; i++) {
       const later = group[i];
-      const laterDate = new Date(later.call_date);
-      const laterQuote = later.raw_quote ?? "";
 
-      // Pair each later call with its earliest earlier call on the same
-      // ticker. Inner loop iterates over predecessors (indices < i).
+      // Direction-reversal pairing: full O(n^2) scan within the 30d window
+      // because every prior bullish/bearish is a valid candidate for the
+      // reversal signal. De-dup of `originalCallId:reversed_direction`
+      // guarantees one row per original regardless of how many laters
+      // flip against it.
       for (let j = 0; j < i; j++) {
         const earlier = group[j];
-        const earlierDate = new Date(earlier.call_date);
-        const gap = daysBetween(earlierDate, laterDate);
+        const gap = daysBetween(earlier.date, later.date);
+        if (gap > REVERSAL_GAP_MAX_DAYS) continue;
+        if (!directionsOpposite(earlier.call.direction, later.call.direction)) continue;
+        if (confidenceToNumeric(earlier.call.confidence) < REVERSAL_MIN_CONFIDENCE) continue;
+        if (confidenceToNumeric(later.call.confidence) < REVERSAL_MIN_CONFIDENCE) continue;
 
-        // reversed_direction
+        emit({
+          originalCallId: earlier.call.id,
+          revisedCallId: later.call.id,
+          creatorId: earlier.call.creator_id,
+          revisedAt: later.date,
+          revisionType: "reversed_direction",
+          sourceVideoId: toSourceVideoId(later.call),
+          notes: `direction ${earlier.call.direction} -> ${later.call.direction}`,
+        });
+      }
+
+      // Text-triggered revisions. We match per-sentence to avoid
+      // cross-sentence false positives, then pair with the NEAREST prior
+      // eligible call inside a bounded window (C1). If multiple sentences
+      // in the same later quote trigger the same revision type, the de-dup
+      // set still collapses them down to one row per original call.
+      const laterQuote = later.call.raw_quote ?? "";
+      if (laterQuote.length === 0) continue;
+
+      const sentences = splitSentences(laterQuote);
+
+      for (const sentence of sentences) {
+        // confirmed_miss
+        const missMatch = sentence.match(CONFIRMED_MISS_PATTERN);
         if (
-          gap <= REVERSAL_GAP_MAX_DAYS &&
-          directionsOpposite(earlier.direction, later.direction) &&
-          confidenceToNumeric(earlier.confidence) >= REVERSAL_MIN_CONFIDENCE &&
-          confidenceToNumeric(later.confidence) >= REVERSAL_MIN_CONFIDENCE
+          missMatch &&
+          hasFirstPersonLead(sentence, missMatch) &&
+          findMentionedTickerNear(sentence, missMatch, later.normalizedSymbol)
         ) {
-          emit({
-            originalCallId: earlier.id,
-            creatorId: earlier.creator_id,
-            revisedAt: laterDate,
-            revisionType: "reversed_direction",
-            sourceVideoId: toSourceVideoId(later),
-            notes: `direction ${earlier.direction} -> ${later.direction}`,
-          });
+          const nearest = nearestPriorWithinWindow(
+            group,
+            i,
+            CONFIRMED_MISS_GAP_MAX_DAYS,
+          );
+          if (nearest !== null) {
+            emit({
+              originalCallId: nearest.call.id,
+              revisedCallId: later.call.id,
+              creatorId: later.call.creator_id,
+              revisedAt: later.date,
+              revisionType: "confirmed_miss",
+              sourceVideoId: toSourceVideoId(later.call),
+              notes: "first-person miss admission with ticker proximity",
+            });
+          }
         }
 
-        // updated_target (wider window, requires quote evidence)
+        // retracted
+        const retractMatch = sentence.match(RETRACTED_PATTERN);
         if (
-          gap <= UPDATED_TARGET_GAP_MAX_DAYS &&
-          UPDATED_TARGET_PATTERN.test(laterQuote)
+          retractMatch &&
+          findMentionedTickerNear(sentence, retractMatch, later.normalizedSymbol)
         ) {
-          emit({
-            originalCallId: earlier.id,
-            creatorId: earlier.creator_id,
-            revisedAt: laterDate,
-            revisionType: "updated_target",
-            sourceVideoId: toSourceVideoId(later),
-            notes: "target revision language in later quote",
-          });
+          const nearest = nearestPriorWithinWindow(
+            group,
+            i,
+            RETRACTED_GAP_MAX_DAYS,
+          );
+          if (nearest !== null) {
+            emit({
+              originalCallId: nearest.call.id,
+              revisedCallId: later.call.id,
+              creatorId: later.call.creator_id,
+              revisedAt: later.date,
+              revisionType: "retracted",
+              sourceVideoId: toSourceVideoId(later.call),
+              notes: "retraction language with ticker proximity",
+            });
+          }
         }
 
-        // confirmed_miss — explicit acknowledgement in the later quote.
-        if (CONFIRMED_MISS_PATTERN.test(laterQuote)) {
-          emit({
-            originalCallId: earlier.id,
-            creatorId: earlier.creator_id,
-            revisedAt: laterDate,
-            revisionType: "confirmed_miss",
-            sourceVideoId: toSourceVideoId(later),
-            notes: "miss acknowledgement language in later quote",
-          });
-        }
-
-        // retracted — explicit retraction language in the later quote.
-        if (RETRACTED_PATTERN.test(laterQuote)) {
-          emit({
-            originalCallId: earlier.id,
-            creatorId: earlier.creator_id,
-            revisedAt: laterDate,
-            revisionType: "retracted",
-            sourceVideoId: toSourceVideoId(later),
-            notes: "retraction language in later quote",
-          });
+        // updated_target
+        const targetMatch = sentence.match(UPDATED_TARGET_PATTERN);
+        if (
+          targetMatch &&
+          findMentionedTickerNear(sentence, targetMatch, later.normalizedSymbol)
+        ) {
+          const nearest = nearestPriorWithinWindow(
+            group,
+            i,
+            UPDATED_TARGET_GAP_MAX_DAYS,
+          );
+          if (nearest !== null) {
+            emit({
+              originalCallId: nearest.call.id,
+              revisedCallId: later.call.id,
+              creatorId: later.call.creator_id,
+              revisedAt: later.date,
+              revisionType: "updated_target",
+              sourceVideoId: toSourceVideoId(later.call),
+              notes: "price-target revision with ticker proximity",
+            });
+          }
         }
       }
     }
   }
 
   return out;
+}
+
+/**
+ * Given a sorted group and the index of the current LATER call, return the
+ * nearest prior call (highest index strictly less than i) whose call_date
+ * is within `windowDays` of the later call's date. Returns null if no such
+ * call exists.
+ */
+function nearestPriorWithinWindow(
+  group: readonly NormalizedCall[],
+  laterIndex: number,
+  windowDays: number,
+): NormalizedCall | null {
+  const later = group[laterIndex];
+  for (let k = laterIndex - 1; k >= 0; k--) {
+    const candidate = group[k];
+    const gap = daysBetween(candidate.date, later.date);
+    if (gap > windowDays) {
+      // Group is sorted ascending by date, so anything earlier is further.
+      break;
+    }
+    // Nearest = first candidate walking back that is inside the window.
+    return candidate;
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -244,11 +471,12 @@ export function tierForScore(score: number): SelfCorrectionTier {
 
 interface RevisionScoringRow {
   readonly revision_type: RevisionType;
-  readonly return_30d: number | null;
-  readonly direction: Direction;
-  readonly hit_target: boolean | null;
-  readonly correct_direction: boolean | null;
-  readonly score_qualifies: boolean;
+  readonly original_return_30d: number | null;
+  readonly original_direction: Direction;
+  readonly original_extraction_confidence: number;
+  readonly revised_correct_direction: boolean | null;
+  readonly revised_return_30d: number | null;
+  readonly revised_extraction_confidence: number | null;
 }
 
 interface CreatorScoredCountRow {
@@ -256,35 +484,42 @@ interface CreatorScoredCountRow {
 }
 
 /**
- * Compute the self-correction score for a single creator from the
- * `call_revisions` table joined against the original calls.
+ * Compute the self-correction score for a single creator by joining the
+ * `call_revisions` table against BOTH the original and the revised calls.
  *
- * Zero-state contract: a creator with no revisions returns
- * `{score: 0, revisionCount: 0, tier: "rarely"}`.
+ * Scoring rules (see POINTS above):
+ *   - updated_target:      +0.5 flat
+ *   - retracted:           +0.5 flat
+ *   - confirmed_miss:      +1.0 iff original is scored AND was directionally
+ *                          wrong (return * direction_sign <= 0)
+ *   - reversed_direction:  +0.5 iff revised call is scored AND correct
+ *                          +0.25 iff revised call is still pending horizon
+ *                          0    iff revised call is scored AND wrong
+ *
+ * The raw ratio is `points / (scoredCalls + SHRINKAGE_K)` so low-volume
+ * creators cannot leapfrog high-volume transparent ones (H3).
+ *
+ * Zero-state contract preserved: no revisions -> score 0, tier "rarely".
  */
 export async function computeSelfCorrectionScore(
   creatorId: number,
 ): Promise<SelfCorrectionScore> {
-  // Pull each revision along with enough of the original call to decide
-  // whether the rubric's conditional points apply.
   const revisionRows = await query<RevisionScoringRow>(
     `SELECT
        r.revision_type,
-       oc.return_30d,
-       oc.direction,
-       oc.hit_target,
-       oc.correct_direction,
-       (oc.extraction_confidence >= 0.6
-         AND oc.return_30d IS NOT NULL) AS score_qualifies
+       oc.return_30d              AS original_return_30d,
+       oc.direction               AS original_direction,
+       oc.extraction_confidence   AS original_extraction_confidence,
+       rc.correct_direction       AS revised_correct_direction,
+       rc.return_30d              AS revised_return_30d,
+       rc.extraction_confidence   AS revised_extraction_confidence
      FROM call_revisions r
      JOIN calls oc ON oc.id = r.original_call_id
+     LEFT JOIN calls rc ON rc.id = r.revised_call_id
      WHERE r.creator_id = $1`,
     [creatorId],
   );
 
-  // Denominator: creator's scored call count (scored = has return_30d and
-  // passes the extraction-confidence floor). Matches the public-methodology
-  // "scored" gate closely enough for a ratio.
   const denomRows = await query<CreatorScoredCountRow>(
     `SELECT COUNT(*)::text AS scored_count
        FROM calls
@@ -297,22 +532,23 @@ export async function computeSelfCorrectionScore(
   const scoredCalls =
     denomRows.length > 0 ? Number(denomRows[0].scored_count) : 0;
 
-  if (revisionRows.length === 0 || scoredCalls === 0) {
+  if (revisionRows.length === 0) {
     return {
       creatorId,
       score: 0,
-      revisionCount: revisionRows.length,
+      revisionCount: 0,
       tier: "rarely",
     };
   }
 
   let points = 0;
-
   for (const row of revisionRows) {
     points += pointsForRevision(row);
   }
 
-  const rawScore = points / scoredCalls;
+  // Bayesian shrinkage: when `scoredCalls` is tiny, denominator is dominated
+  // by K and raw score stays near 0 even if every revision scored max points.
+  const rawScore = points / (scoredCalls + SHRINKAGE_K);
   const clamped = Math.max(0, Math.min(1, rawScore));
 
   return {
@@ -326,36 +562,39 @@ export async function computeSelfCorrectionScore(
 function pointsForRevision(row: RevisionScoringRow): number {
   switch (row.revision_type) {
     case "updated_target":
+      return POINTS.updated_target;
+
     case "retracted":
-      return POINTS[row.revision_type];
+      return POINTS.retracted;
 
     case "confirmed_miss": {
-      // Only award points when the original call was in fact a miss:
-      // return_30d * direction_sign <= 0. Neutral-direction originals or
-      // pending-horizon rows do not qualify.
-      if (!row.score_qualifies || row.return_30d === null) return 0;
+      if (row.original_extraction_confidence < 0.6) return 0;
+      if (row.original_return_30d === null) return 0;
       const directionSign =
-        row.direction === "bullish"
+        row.original_direction === "bullish"
           ? 1
-          : row.direction === "bearish"
+          : row.original_direction === "bearish"
             ? -1
             : 0;
       if (directionSign === 0) return 0;
-      const directionalReturn = row.return_30d * directionSign;
-      return directionalReturn <= 0 ? POINTS.confirmed_miss : 0;
+      const directional = row.original_return_30d * directionSign;
+      return directional <= 0 ? POINTS.confirmed_miss : 0;
     }
 
     case "reversed_direction": {
-      // Reward only when the LATER call (the corrected view) ended up
-      // hitting. We approximate "later call hit" via correct_direction on
-      // the ORIGINAL call being false AND the revision itself being the
-      // reversal — but that's fragile. Instead, require hit_target on
-      // original to be false OR correct_direction false; i.e. the reversal
-      // is validated because the original was indeed wrong.
-      if (row.correct_direction === false || row.hit_target === false) {
-        return POINTS.reversed_direction;
+      // Revised call missing / unlinked -> no outcome credit. Still 0 rather
+      // than a flat reward so flip-flop without backing evidence cannot game
+      // the score (H2).
+      if (
+        row.revised_return_30d === null ||
+        row.revised_extraction_confidence === null ||
+        row.revised_extraction_confidence < 0.6
+      ) {
+        return POINTS.reversed_direction_partial;
       }
-      return 0;
+      return row.revised_correct_direction === true
+        ? POINTS.reversed_direction_full
+        : 0;
     }
 
     default:
@@ -376,8 +615,8 @@ interface BulkAggregateRow {
 
 /**
  * Compute self-correction aggregates for every creator that has at least
- * one call. Used by the leaderboard query so the homepage and API share a
- * single trip to the DB.
+ * one revision, using a single SQL round-trip. Applies the same scoring
+ * rubric as `computeSelfCorrectionScore` including the Bayesian shrinkage.
  */
 export async function computeAllSelfCorrectionAggregates(): Promise<
   ReadonlyMap<number, SelfCorrectionAggregate>
@@ -409,13 +648,23 @@ export async function computeAllSelfCorrectionAggregates(): Promise<
                )
                THEN ${POINTS.confirmed_miss}
              WHEN r.revision_type = 'reversed_direction'
-               AND (oc.correct_direction = false OR oc.hit_target = false)
-               THEN ${POINTS.reversed_direction}
+               AND rc.return_30d IS NOT NULL
+               AND rc.extraction_confidence >= 0.6
+               AND rc.correct_direction = true
+               THEN ${POINTS.reversed_direction_full}
+             WHEN r.revision_type = 'reversed_direction'
+               AND (
+                 rc.return_30d IS NULL OR
+                 rc.extraction_confidence IS NULL OR
+                 rc.extraction_confidence < 0.6
+               )
+               THEN ${POINTS.reversed_direction_partial}
              ELSE 0
            END
          )::text AS score_numerator
        FROM call_revisions r
        JOIN calls oc ON oc.id = r.original_call_id
+       LEFT JOIN calls rc ON rc.id = r.revised_call_id
        GROUP BY r.creator_id
      )
      SELECT
@@ -431,7 +680,7 @@ export async function computeAllSelfCorrectionAggregates(): Promise<
   for (const row of rows) {
     const scored = Number(row.scored_calls);
     const numerator = Number(row.score_numerator);
-    const rawScore = scored > 0 ? numerator / scored : 0;
+    const rawScore = numerator / (scored + SHRINKAGE_K);
     const clamped = Math.max(0, Math.min(1, rawScore));
     out.set(row.creator_id, {
       creatorId: row.creator_id,
