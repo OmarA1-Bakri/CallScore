@@ -466,7 +466,11 @@ function nearestPriorWithinWindow(
     const candidate = group[k];
     const gap = daysBetween(candidate.date, later.date);
     if (gap > windowDays) {
-      // Group is sorted ascending by date, so anything earlier is further.
+      // INVARIANT: `group` is sorted ASC by call_date (built from `normalized`
+      // which is sorted earlier in detectRevisions). Once a candidate's gap
+      // exceeds windowDays, every earlier candidate has an even larger gap
+      // and cannot be inside the window either. If the sort order ever
+      // changes, DELETE this break and continue iterating.
       break;
     }
     // Nearest = first candidate walking back that is inside the window.
