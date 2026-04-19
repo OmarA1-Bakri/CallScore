@@ -267,8 +267,6 @@ const AUTH_PATH = path.join(PROJECT_ROOT, "src", "lib", "auth.ts");
 // Pre-populate require.cache with fake modules BEFORE anything else
 // pulls in `@/lib/db` or `@/lib/auth`. tsx compiles TypeScript to CJS,
 // so cache entries are keyed by absolute .ts file path.
-/* eslint-disable @typescript-eslint/no-require-imports */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const NodeModule = require("node:module") as any;
 
 function primeCache(
@@ -295,20 +293,16 @@ primeCache(AUTH_PATH, {
   destroySession: async () => undefined,
   getCurrentTier: async () => stubbedSession?.tier ?? "free",
 });
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 /* ----------------------------------------------------------------- */
 /*  Now import modules under test                                     */
 /* ----------------------------------------------------------------- */
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const alerts = require(path.join(PROJECT_ROOT, "src", "lib", "alerts.ts")) as
   typeof import("../src/lib/alerts");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const watchHelpers = require(
   path.join(PROJECT_ROOT, "src", "app", "api", "alerts", "watch", "helpers.ts"),
 ) as typeof import("../src/app/api/alerts/watch/helpers");
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const watchRoute = require(
   path.join(PROJECT_ROOT, "src", "app", "api", "alerts", "watch", "route.ts"),
 ) as typeof import("../src/app/api/alerts/watch/route");
@@ -633,7 +627,6 @@ test("claimPendingAlerts respects the batch limit", async () => {
 /*  Unsubscribe token (reviewer H1)                                   */
 /* ----------------------------------------------------------------- */
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const unsub = require(
   path.join(PROJECT_ROOT, "src", "lib", "unsubscribe-token.ts"),
 ) as typeof import("../src/lib/unsubscribe-token");
