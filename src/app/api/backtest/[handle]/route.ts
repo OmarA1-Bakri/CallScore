@@ -149,7 +149,11 @@ export async function GET(
 
     return NextResponse.json(result, {
       headers: {
-        "Cache-Control": "public, max-age=3600",
+        // 15 min fresh on the CDN, serve stale for up to 1h while
+        // revalidating. Short enough that a backfill/rescore of
+        // return_30d / alpha_30d / hit_target / score_status flushes
+        // within a reasonable window.
+        "Cache-Control": "public, s-maxage=900, stale-while-revalidate=3600",
       },
     });
   } catch (error: unknown) {
