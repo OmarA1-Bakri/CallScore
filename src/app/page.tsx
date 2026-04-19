@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactElement } from "react";
 import { Trophy, BarChart3, Target, Users } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
@@ -135,7 +136,9 @@ interface PageProps {
   readonly searchParams: { period?: string };
 }
 
-export default async function HomePage({ searchParams }: PageProps) {
+export default async function HomePage({
+  searchParams,
+}: PageProps): Promise<ReactElement> {
   const periodParam = searchParams.period ?? "all_time";
   const period: Period = (VALID_PERIODS as readonly string[]).includes(periodParam)
     ? (periodParam as Period)
@@ -403,7 +406,7 @@ interface PremiseRowProps {
   readonly source: string;
 }
 
-function PremiseRow({ claim, source }: PremiseRowProps) {
+function PremiseRow({ claim, source }: PremiseRowProps): ReactElement {
   return (
     <li className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 px-4 py-3">
       <span className="text-[#C8D3CA] text-sm leading-snug">{claim}</span>
@@ -414,7 +417,7 @@ function PremiseRow({ claim, source }: PremiseRowProps) {
   );
 }
 
-function StatPill({ icon: Icon, label, value }: StatPillProps) {
+function StatPill({ icon: Icon, label, value }: StatPillProps): ReactElement {
   return (
     <div className="flex items-center gap-2 bg-brand-card border border-brand-border rounded-lg px-4 py-2.5">
       <Icon className="w-4 h-4 text-brand-gold" />

@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import type { SelfCorrectionTier } from "@/lib/self-correction";
 
 interface SelfCorrectionBadgeProps {
@@ -26,7 +27,7 @@ export default function SelfCorrectionBadge({
   revisionCount,
   tier,
   showLabel = false,
-}: SelfCorrectionBadgeProps) {
+}: SelfCorrectionBadgeProps): ReactElement {
   const color = TIER_COLORS[tier];
   const formatted = formatScore(score);
   const title = `Self-correction index ${formatted} (${revisionCount} revision${revisionCount === 1 ? "" : "s"}) — tier: ${tierLabel(tier)}. Rewards creators who publicly update or admit losing calls.`;
