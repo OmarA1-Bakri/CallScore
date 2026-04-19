@@ -23,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "CRYPTO-TUBER RANKED — Who Actually Beats The Market?",
   description:
-    "We track, rank, and score the top 20 crypto YouTube influencers by the actual accuracy of their altcoin calls.",
+    "Every altcoin call from 20 crypto YouTubers, scored against 18.7M Binance candles. Public methodology, auditable data, no sponsorships.",
   metadataBase: new URL("https://cryptotuberranked.com"),
   icons: {
     icon: "/favicon.ico",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "CRYPTO-TUBER RANKED — Who Actually Beats The Market?",
     description:
-      "We track, rank, and score the top 20 crypto YouTube influencers by the actual accuracy of their altcoin calls.",
+      "Every altcoin call from 20 crypto YouTubers, scored against 18.7M Binance candles. Public methodology, auditable data, no sponsorships.",
     type: "website",
     images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "CRYPTO-TUBER RANKED",
     description:
-      "We track, rank, and score the top 20 crypto YouTube influencers by the actual accuracy of their altcoin calls.",
+      "Altcoin calls from 20 crypto YouTubers, scored against 18.7M Binance candles. Public methodology, no sponsorships.",
   },
 };
 
