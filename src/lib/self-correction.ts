@@ -66,10 +66,14 @@ export interface SelfCorrectionAggregate {
 const UPDATED_TARGET_PATTERN =
   /\b(update[ds]?|updating|adjust(?:ing|ed)?|revis(?:ing|ed)|mov(?:ing|ed))\s+(my\s+)?(target|price\s+target)/i;
 
-// First-person ownership only. NOTE: `retract` deliberately not here — the
-// RETRACTED_PATTERN below owns it, preventing overlap (H1).
+// First-person ownership of a FAILURE only. NOTE: `retract` deliberately not
+// here — the RETRACTED_PATTERN below owns it, preventing overlap (H1).
+//
+// The pattern deliberately avoids bare `I admit`: that matches positive
+// statements like "I admit I'm a fan of BTC". When `admit` is used, the
+// admission must be explicitly about a wrong/bad/miss/losing call.
 const CONFIRMED_MISS_PATTERN =
-  /\b(i\s+was\s+wrong|i['\u2019]?m\s+wrong|i\s+admit|my\s+(call|position)\s+was\s+wrong|i\s+missed\s+(it|the\s+call|that)|i\s+got\s+(it|that|this)\s+wrong|didn'?t\s+work\s+out\s+(for\s+me|for\s+us)|that\s+was\s+a\s+bad\s+call)\b/i;
+  /\b(i\s+was\s+wrong|i['\u2019]?m\s+wrong|my\s+(call|position|prediction|thesis)\s+was\s+wrong|i\s+missed\s+(it|the\s+call|that)|i\s+got\s+(it|that|this)\s+wrong|didn'?t\s+work\s+out\s+(for\s+me|for\s+us)|that\s+was\s+a\s+bad\s+call|i\s+admit\s+(i\s+(was\s+)?wrong|that\s+was\s+a\s+(bad|wrong)\s+call|i\s+missed))\b/i;
 
 const RETRACTED_PATTERN =
   /\b(i\s+retract|retract(?:ing)?\s+(?:my|that|the)|take\s+(?:that|it)\s+back|no\s+longer\s+recommend|i\s+no\s+longer\s+recommend)\b/i;

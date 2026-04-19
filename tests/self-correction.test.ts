@@ -659,7 +659,10 @@ test("H1: 'I was wrong about the Grateful Dead' (no ticker) does NOT match", () 
   );
 });
 
-test("H1: bare 'admit' without 'I admit' does NOT match", () => {
+test("H1: positive 'I admit I'm a fan of BTC' does NOT match confirmed_miss", () => {
+  // Regression: the round-1 CONFIRMED_MISS_PATTERN contained bare `i admit`
+  // which matched this positive statement as a miss. Round-2 tightened the
+  // pattern so `admit` must be followed by failure language.
   const earlier = buildCall({
     id: 1,
     symbol: "BTCUSDT",
@@ -671,13 +674,50 @@ test("H1: bare 'admit' without 'I admit' does NOT match", () => {
     raw_quote: "I admit I'm a fan of BTC and always will be.",
     call_date: "2025-01-30T00:00:00.000Z",
   });
-  // This one DOES match the "I admit" pattern because we intentionally allow
-  // it. But it's a narrow pattern, not a bare `admit`. Verify the narrower
-  // version fires correctly.
+  const revisions = detectRevisions([earlier, later]);
+  assert.equal(
+    revisions.filter((r) => r.revisionType === "confirmed_miss").length,
+    0,
+    "positive 'I admit I'm a fan' must not be treated as a miss",
+  );
+});
+
+test("H1: 'I admit I was wrong on BTC' DOES match confirmed_miss", () => {
+  // Counter-test for the above: the admission must still fire when it's
+  // explicitly about a wrong/missed call.
+  const earlier = buildCall({
+    id: 1,
+    symbol: "BTCUSDT",
+    call_date: "2025-01-01T00:00:00.000Z",
+  });
+  const later = buildCall({
+    id: 2,
+    symbol: "BTCUSDT",
+    raw_quote: "I admit I was wrong on BTC.",
+    call_date: "2025-01-30T00:00:00.000Z",
+  });
   const revisions = detectRevisions([earlier, later]);
   assert.ok(
     revisions.some((r) => r.revisionType === "confirmed_miss"),
-    "'I admit' near BTC should still be caught",
+    "'I admit I was wrong on BTC' must be caught as a miss",
+  );
+});
+
+test("H1: 'I admit that was a bad call on ETH' DOES match confirmed_miss", () => {
+  const earlier = buildCall({
+    id: 1,
+    symbol: "ETHUSDT",
+    call_date: "2025-01-01T00:00:00.000Z",
+  });
+  const later = buildCall({
+    id: 2,
+    symbol: "ETHUSDT",
+    raw_quote: "I admit that was a bad call on ETH.",
+    call_date: "2025-01-30T00:00:00.000Z",
+  });
+  const revisions = detectRevisions([earlier, later]);
+  assert.ok(
+    revisions.some((r) => r.revisionType === "confirmed_miss"),
   );
 });
 
