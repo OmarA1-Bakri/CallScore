@@ -78,9 +78,10 @@ export class BacktestValidationError extends Error {
   }
 }
 
-// Internal fetchers — isolated so tests can inject fakes via Object.defineProperty
-// on the exported module, matching the pattern used elsewhere.
-export interface BacktestDataProvider {
+// Injectable dependencies for the backtest engine. Tests substitute
+// fakes for all three loaders; production wiring goes through
+// `liveBacktestDeps` which queries Neon directly.
+export interface BacktestDeps {
   readonly loadCreator: (creatorId: number) => Promise<Creator | null>;
   readonly loadCalls: (
     creatorId: number,
@@ -90,7 +91,7 @@ export interface BacktestDataProvider {
   readonly loadBtcPriceAt: (date: Date) => Promise<number | null>;
 }
 
-export const liveDataProvider: BacktestDataProvider = {
+export const liveBacktestDeps: BacktestDeps = {
   async loadCreator(creatorId) {
     const rows = await query<Creator>(
       `SELECT * FROM creators WHERE id = $1 LIMIT 1`,
@@ -306,7 +307,7 @@ function buildMonthlySeries(
 
 export interface RunBacktestOptions {
   readonly now?: Date;
-  readonly provider?: BacktestDataProvider;
+  readonly deps?: BacktestDeps;
 }
 
 export async function runBacktest(
@@ -314,15 +315,15 @@ export async function runBacktest(
   options: RunBacktestOptions = {},
 ): Promise<BacktestResult> {
   validateInput(input);
-  const provider = options.provider ?? liveDataProvider;
+  const deps = options.deps ?? liveBacktestDeps;
   const now = options.now ?? new Date();
 
-  const creator = await provider.loadCreator(input.creatorId);
+  const creator = await deps.loadCreator(input.creatorId);
   if (creator === null) {
     throw new BacktestValidationError("creator");
   }
 
-  const rawCalls = await provider.loadCalls(
+  const rawCalls = await deps.loadCalls(
     input.creatorId,
     input.startDate.toISOString(),
     input.endDate.toISOString(),
@@ -391,8 +392,8 @@ export async function runBacktest(
   }
 
   const [btcStart, btcEnd] = await Promise.all([
-    provider.loadBtcPriceAt(input.startDate),
-    provider.loadBtcPriceAt(input.endDate),
+    deps.loadBtcPriceAt(input.startDate),
+    deps.loadBtcPriceAt(input.endDate),
   ]);
 
   let totalReturnVsBtcPct = 0;

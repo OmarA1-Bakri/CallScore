@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   BacktestValidationError,
   runBacktest,
-  type BacktestDataProvider,
+  type BacktestDeps,
   type BacktestInput,
 } from "../src/lib/backtest";
 import type { Call, Creator } from "../src/lib/types";
@@ -75,14 +75,14 @@ function buildCall(overrides: Partial<Call> = {}): Call {
   };
 }
 
-interface FakeProviderOptions {
+interface FakeDepsOptions {
   readonly creator?: Creator | null;
   readonly calls?: readonly Call[];
   readonly btcStart?: number | null;
   readonly btcEnd?: number | null;
 }
 
-function makeProvider(opts: FakeProviderOptions = {}): BacktestDataProvider {
+function makeDeps(opts: FakeDepsOptions = {}): BacktestDeps {
   const startDefault = 50_000;
   const endDefault = 60_000;
   const providedStart = opts.btcStart;
@@ -118,7 +118,7 @@ test("equal_weight — two known calls compute expected PnL and final capital", 
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
 
   // allocation = 500 per call. PnL = 500*0.20 + 500*(-0.10) = 100 - 50 = 50.
@@ -145,7 +145,7 @@ test("equal_weight — mixed hits and misses compute totalReturnPct correctly", 
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
 
   // allocation = 250. Total = 250*(0.50-0.20+0.10-0.05) = 250*0.35 = 87.5
@@ -199,7 +199,7 @@ test("direction_only — 3 hits + 2 misses produces net +1 allocation", async ()
       initialCapital: 1000,
       strategy: "direction_only",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
 
   // allocation = 200. 3 hits * 200 - 2 misses * 200 = 200. final = 1200.
@@ -216,7 +216,7 @@ test("empty range returns zero-state result without throwing", async () => {
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls: [] }), now: NOW },
+    { deps: makeDeps({ calls: [] }), now: NOW },
   );
   assert.equal(result.callCount, 0);
   assert.equal(result.finalCapital, 1000);
@@ -239,7 +239,7 @@ test("return_30d is treated as percent — no double multiplication", async () =
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
   assert.ok(Math.abs(result.finalCapital - 1100) < 1e-6);
   assert.ok(Math.abs(result.pnlByCall[0].pnlDollars - 100) < 1e-6);
@@ -260,7 +260,7 @@ test("monthly series buckets PnL by YYYY-MM month", async () => {
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
 
   const feb = result.monthlySeries.find((p) => p.month === "2025-02");
@@ -294,7 +294,7 @@ test("BTC benchmark — known prices produce expected vs-BTC delta", async () =>
       strategy: "equal_weight",
     },
     {
-      provider: makeProvider({
+      deps: makeDeps({
         calls,
         btcStart: 40_000,
         btcEnd: 60_000,
@@ -325,7 +325,7 @@ test("BTC benchmark missing — totalReturnVsBtcPct falls back to zero", async (
       strategy: "equal_weight",
     },
     {
-      provider: makeProvider({
+      deps: makeDeps({
         calls,
         btcStart: null,
         btcEnd: null,
@@ -359,7 +359,7 @@ test("neutral-direction calls are excluded from the backtest", async () => {
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
   assert.equal(result.callCount, 1);
   // 100% allocation on the one bullish call at +20%.
@@ -397,7 +397,7 @@ test("pending_horizon and low-confidence calls are excluded", async () => {
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
   assert.equal(result.callCount, 1);
   assert.equal(result.pnlByCall[0].callId, 3);
@@ -414,7 +414,7 @@ test("strict input validation — negative capital throws invalid_capital", asyn
           initialCapital: -100,
           strategy: "equal_weight",
         },
-        { provider: makeProvider(), now: NOW },
+        { deps: makeDeps(), now: NOW },
       ),
     (err: unknown) =>
       err instanceof BacktestValidationError && err.message === "invalid_capital",
@@ -432,7 +432,7 @@ test("strict input validation — end before start throws invalid_range", async 
           initialCapital: 1000,
           strategy: "equal_weight",
         },
-        { provider: makeProvider(), now: NOW },
+        { deps: makeDeps(), now: NOW },
       ),
     (err: unknown) =>
       err instanceof BacktestValidationError && err.message === "invalid_range",
@@ -450,7 +450,7 @@ test("strict input validation — unknown strategy throws invalid_strategy", asy
           initialCapital: 1000,
           strategy: "leveraged_futures" as unknown as BacktestInput["strategy"],
         },
-        { provider: makeProvider(), now: NOW },
+        { deps: makeDeps(), now: NOW },
       ),
     (err: unknown) =>
       err instanceof BacktestValidationError &&
@@ -469,7 +469,7 @@ test("capital above MAX_BACKTEST_CAPITAL throws invalid_capital", async () => {
           initialCapital: 100_000_000,
           strategy: "equal_weight",
         },
-        { provider: makeProvider(), now: NOW },
+        { deps: makeDeps(), now: NOW },
       ),
     (err: unknown) =>
       err instanceof BacktestValidationError && err.message === "invalid_capital",
@@ -487,7 +487,7 @@ test("unknown creator throws invalid_creator", async () => {
           initialCapital: 1000,
           strategy: "equal_weight",
         },
-        { provider: makeProvider({ creator: null }), now: NOW },
+        { deps: makeDeps({ creator: null }), now: NOW },
       ),
     (err: unknown) =>
       err instanceof BacktestValidationError && err.message === "invalid_creator",
@@ -515,7 +515,7 @@ test("H1: call at 18:00Z on the endDate day is included when end=YYYY-MM-DD", as
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
 
   assert.equal(result.callCount, 1);
@@ -540,7 +540,7 @@ test("H2: correct short (return_30d = -10) counts as a HIT, not a MISS", async (
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
 
   assert.equal(result.hitCount, 1);
@@ -588,7 +588,7 @@ test("H2: mixed long/short hit and miss accounting agrees with direction_only Pn
       initialCapital: 1000,
       strategy: "equal_weight",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
   assert.equal(eq.hitCount, 2);
   assert.equal(eq.missCount, 2);
@@ -608,7 +608,7 @@ test("H2: mixed long/short hit and miss accounting agrees with direction_only Pn
       initialCapital: 1000,
       strategy: "direction_only",
     },
-    { provider: makeProvider({ calls }), now: NOW },
+    { deps: makeDeps({ calls }), now: NOW },
   );
   assert.equal(dir.hitCount, 2);
   assert.equal(dir.missCount, 2);
