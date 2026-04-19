@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingFeedbackButton from "@/components/FloatingFeedbackButton";
@@ -9,6 +9,14 @@ const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-inter",
+});
+
+/* added by W4 for /about terminal aesthetic — exposes font-mono via CSS var */
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "700"],
+  variable: "--font-jetbrains-mono",
 });
 
 export const metadata: Metadata = {
@@ -45,7 +53,10 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en" className={`${inter.variable} dark`}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${jetbrainsMono.variable} dark`}
+    >
       <body className={`${inter.className} min-h-screen flex flex-col`}>
         <Header />
         <main className="flex-1">{children}</main>
