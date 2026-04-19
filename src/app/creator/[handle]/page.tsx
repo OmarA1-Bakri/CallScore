@@ -196,15 +196,24 @@ export default async function CreatorPage({ params }: PageProps) {
               )}
             </div>
 
-            <a
-              href={`https://youtube.com/${creator.youtube_handle}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-brand-gold hover:text-brand-gold-dim text-sm transition-colors"
-            >
-              View on YouTube
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+            <div className="flex flex-wrap items-center gap-4">
+              <a
+                href={`https://youtube.com/${creator.youtube_handle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-brand-gold hover:text-brand-gold-dim text-sm transition-colors"
+              >
+                View on YouTube
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+              <Link
+                href={`/creator/${encodeURIComponent(creator.youtube_handle)}/backtest`}
+                className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm transition-colors"
+                prefetch={false}
+              >
+                simulate returns →
+              </Link>
+            </div>
           </div>
         </div>
       </section>
