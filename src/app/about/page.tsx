@@ -219,12 +219,12 @@ export default function AboutPage(): ReactElement {
               />
               <span
                 aria-label="live"
+                className="bb-live-dot"
                 style={{
                   width: "10px",
                   height: "10px",
                   borderRadius: "50%",
                   background: TERMINAL_ACCENT,
-                  boxShadow: "0 0 6px rgba(63,214,122,0.5)",
                 }}
               />
             </span>
@@ -637,7 +637,7 @@ export default function AboutPage(): ReactElement {
         </div>
       </div>
 
-      {/* Scoped CSS for the blinking caret + reduced-motion override */}
+      {/* Scoped CSS for the blinking caret + live-dot pulse + reduced-motion */}
       <style>{`
         @keyframes bb-blink {
           0%, 50% { opacity: 1; }
@@ -646,8 +646,16 @@ export default function AboutPage(): ReactElement {
         .bb-caret {
           animation: bb-blink 1.05s steps(1, end) infinite;
         }
+        @keyframes bb-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.55; }
+        }
+        .bb-live-dot {
+          animation: bb-pulse 2.2s ease-in-out infinite;
+        }
         @media (prefers-reduced-motion: reduce) {
           .bb-caret { animation: none; opacity: 1; }
+          .bb-live-dot { animation: none; opacity: 1; }
         }
       `}</style>
     </div>
