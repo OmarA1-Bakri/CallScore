@@ -15,7 +15,12 @@ export interface WatchRow {
   readonly created_at: string;
 }
 
-export interface PendingAlertRow {
+/**
+ * Raw row shape from `alerts_queue`. `sent_at` is null for rows that
+ * have not been delivered (or have been reverted by `revertClaim`);
+ * non-null once a claim marks them shipped.
+ */
+export interface AlertQueueRow {
   readonly id: number;
   readonly user_id: string;
   readonly creator_id: number | null;
@@ -91,8 +96,8 @@ export async function enqueueNewCallAlert(
 
 export async function getPendingAlertsForUser(
   userId: string,
-): Promise<PendingAlertRow[]> {
-  return query<PendingAlertRow>(
+): Promise<AlertQueueRow[]> {
+  return query<AlertQueueRow>(
     `SELECT id, user_id, creator_id, call_id, event_type, created_at, sent_at
      FROM alerts_queue
      WHERE user_id = $1 AND sent_at IS NULL
@@ -218,8 +223,8 @@ export async function revertClaim(
 export async function listRecentAlertsForUser(
   userId: string,
   limit: number = 20,
-): Promise<PendingAlertRow[]> {
-  return query<PendingAlertRow>(
+): Promise<AlertQueueRow[]> {
+  return query<AlertQueueRow>(
     `SELECT id, user_id, creator_id, call_id, event_type, created_at, sent_at
      FROM alerts_queue
      WHERE user_id = $1

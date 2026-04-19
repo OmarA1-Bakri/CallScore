@@ -33,27 +33,19 @@ export class ResendTimeoutError extends Error {
   }
 }
 
-function readApiKey(): string {
-  const key = process.env.RESEND_API_KEY;
-  if (!key || key.trim().length === 0) {
-    throw new Error("RESEND_API_KEY is required to send alerts email");
+function requireEnv(key: string): string {
+  const value = process.env[key];
+  if (!value || value.trim().length === 0) {
+    throw new Error(`${key} not configured`);
   }
-  return key;
-}
-
-function readFromAddress(): string {
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!from || from.trim().length === 0) {
-    throw new Error("RESEND_FROM_EMAIL is required to send alerts email");
-  }
-  return from;
+  return value;
 }
 
 export async function sendEmail(
   input: SendEmailInput,
 ): Promise<SendEmailResult> {
-  const apiKey = readApiKey();
-  const from = readFromAddress();
+  const apiKey = requireEnv("RESEND_API_KEY");
+  const from = requireEnv("RESEND_FROM_EMAIL");
 
   const body = {
     from,

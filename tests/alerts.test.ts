@@ -37,15 +37,43 @@ interface AlertRow {
   sent_at: string | null;
 }
 
+interface CallRow {
+  id: number;
+  symbol: string;
+  direction: string;
+  call_date: string;
+}
+
+interface CreatorRow {
+  id: number;
+  name: string;
+}
+
+interface UserRow {
+  id: string;
+  email: string;
+}
+
 interface DbState {
   watches: WatchRow[];
   alerts: AlertRow[];
+  calls: CallRow[];
+  creators: CreatorRow[];
+  users: UserRow[];
   nextWatchId: number;
   nextAlertId: number;
 }
 
 function freshState(): DbState {
-  return { watches: [], alerts: [], nextWatchId: 1, nextAlertId: 1 };
+  return {
+    watches: [],
+    alerts: [],
+    calls: [],
+    creators: [],
+    users: [],
+    nextWatchId: 1,
+    nextAlertId: 1,
+  };
 }
 
 let db: DbState = freshState();
@@ -59,6 +87,12 @@ async function fakeQuery<T>(
   params: unknown[] = [],
 ): Promise<T[]> {
   const sql = text.replace(/\s+/g, " ").trim();
+
+  // information_schema existence probe (userEmailsTableExists helper).
+  if (/SELECT EXISTS .*information_schema\.tables/i.test(sql)) {
+    const exists = db.users.length > 0;
+    return [{ exists }] as unknown as T[];
+  }
 
   if (/^INSERT INTO watchlists/i.test(sql)) {
     const userId = String(params[0]);
@@ -143,16 +177,71 @@ async function fakeQuery<T>(
       .slice(0, limit) as unknown as T[];
   }
 
+  // CTE-based atomic claim: FOR UPDATE SKIP LOCKED + UPDATE ... RETURNING
+  // with joined call + creator payload. Matches claimPendingAlerts().
+  if (/^WITH claimed AS/i.test(sql)) {
+    const limit = Number(params[0]);
+    const eligible = db.alerts
+      .filter((a) => a.sent_at === null && a.event_type === "new_call")
+      .slice()
+      .sort((a, b) => {
+        if (a.user_id !== b.user_id) return a.user_id.localeCompare(b.user_id);
+        return a.created_at.localeCompare(b.created_at);
+      })
+      .slice(0, limit);
+
+    const nowIso = new Date().toISOString();
+    const claimed: Record<string, unknown>[] = [];
+    for (const a of eligible) {
+      a.sent_at = nowIso;
+      const call = db.calls.find((c) => c.id === a.call_id);
+      const creator = db.creators.find((c) => c.id === a.creator_id);
+      const user = db.users.find((u) => u.id === a.user_id);
+      if (!call || !creator) continue;
+      claimed.push({
+        alert_id: a.id,
+        user_id: a.user_id,
+        user_email: user?.email ?? null,
+        call_id: a.call_id,
+        creator_id: a.creator_id,
+        creator_name: creator.name,
+        symbol: call.symbol,
+        direction: call.direction,
+        call_date: call.call_date,
+      });
+    }
+    return claimed as unknown as T[];
+  }
+
+  // Two distinct UPDATE paths now: revert (SET sent_at = NULL) and
+  // markAlertsSent (SET sent_at = NOW()). Route based on SQL text so the
+  // fake honours the revert semantics that the HIGH fix relies on.
   if (/^UPDATE alerts_queue/i.test(sql)) {
     const ids = (params[0] as number[]) ?? [];
-    const updated: { id: number }[] = [];
-    for (const a of db.alerts) {
-      if (ids.includes(a.id) && a.sent_at === null) {
-        a.sent_at = new Date().toISOString();
-        updated.push({ id: a.id });
+
+    if (/SET\s+sent_at\s*=\s*NULL/i.test(sql)) {
+      const reverted: { id: number }[] = [];
+      for (const a of db.alerts) {
+        if (ids.includes(a.id) && a.sent_at !== null) {
+          a.sent_at = null;
+          reverted.push({ id: a.id });
+        }
       }
+      return reverted as unknown as T[];
     }
-    return updated as unknown as T[];
+
+    if (/SET\s+sent_at\s*=\s*NOW\(\)/i.test(sql)) {
+      const updated: { id: number }[] = [];
+      for (const a of db.alerts) {
+        if (ids.includes(a.id) && a.sent_at === null) {
+          a.sent_at = new Date().toISOString();
+          updated.push({ id: a.id });
+        }
+      }
+      return updated as unknown as T[];
+    }
+
+    throw new Error(`fakeQuery: unrecognized UPDATE alerts_queue: ${sql}`);
   }
 
   throw new Error(`fakeQuery: unrecognized SQL: ${sql}`);
@@ -447,4 +536,138 @@ test("parseCreatorId rejects non-integer numbers and non-string types", () => {
   assert.equal(parseCreatorId(undefined), null);
   assert.equal(parseCreatorId({}), null);
   assert.equal(parseCreatorId([]), null);
+});
+
+/* ----------------------------------------------------------------- */
+/*  Atomic claim + revertClaim coverage (reviewer M8)                 */
+/* ----------------------------------------------------------------- */
+
+function seedClaimFixture(): void {
+  db.creators.push({ id: 10, name: "Creator Alpha" });
+  db.calls.push({
+    id: 1001,
+    symbol: "BTCUSDT",
+    direction: "bullish",
+    call_date: "2026-04-19T00:00:00.000Z",
+  });
+  db.users.push({ id: "user_a", email: "user_a@example.com" });
+}
+
+test("claimPendingAlerts atomically flips sent_at and returns payload", async () => {
+  resetDb();
+  seedClaimFixture();
+  await alerts.enqueueNewCallAlert("user_a", 10, 1001);
+
+  const rows = await alerts.claimPendingAlerts(10, true);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].user_id, "user_a");
+  assert.equal(rows[0].user_email, "user_a@example.com");
+  assert.equal(rows[0].creator_id, 10);
+  assert.equal(rows[0].call_id, 1001);
+  assert.equal(rows[0].symbol, "BTCUSDT");
+
+  // A second claim must now find nothing — the first call flipped sent_at.
+  const second = await alerts.claimPendingAlerts(10, true);
+  assert.equal(second.length, 0);
+});
+
+test("revertClaim pushes sent_at back to NULL for the given ids", async () => {
+  resetDb();
+  seedClaimFixture();
+  await alerts.enqueueNewCallAlert("user_a", 10, 1001);
+  const claimed = await alerts.claimPendingAlerts(10, true);
+  assert.equal(claimed.length, 1);
+
+  const reverted = await alerts.revertClaim([claimed[0].alert_id]);
+  assert.equal(reverted, 1);
+
+  // Row is eligible to be claimed again after revert.
+  const reclaimed = await alerts.claimPendingAlerts(10, true);
+  assert.equal(reclaimed.length, 1);
+  assert.equal(reclaimed[0].call_id, 1001);
+});
+
+test("revertClaim is a no-op for ids that are already unsent", async () => {
+  resetDb();
+  seedClaimFixture();
+  await alerts.enqueueNewCallAlert("user_a", 10, 1001);
+
+  // No claim yet — sent_at is still NULL, so revert matches nothing.
+  const row = db.alerts[0];
+  const reverted = await alerts.revertClaim([row.id]);
+  assert.equal(reverted, 0);
+});
+
+test("revertClaim returns 0 for an empty id list without hitting the DB", async () => {
+  const reverted = await alerts.revertClaim([]);
+  assert.equal(reverted, 0);
+});
+
+test("claimPendingAlerts respects the batch limit", async () => {
+  resetDb();
+  seedClaimFixture();
+  db.calls.push({
+    id: 1002,
+    symbol: "ETHUSDT",
+    direction: "bullish",
+    call_date: "2026-04-19T01:00:00.000Z",
+  });
+  db.calls.push({
+    id: 1003,
+    symbol: "SOLUSDT",
+    direction: "bearish",
+    call_date: "2026-04-19T02:00:00.000Z",
+  });
+  await alerts.enqueueNewCallAlert("user_a", 10, 1001);
+  await alerts.enqueueNewCallAlert("user_a", 10, 1002);
+  await alerts.enqueueNewCallAlert("user_a", 10, 1003);
+
+  const firstBatch = await alerts.claimPendingAlerts(2, true);
+  assert.equal(firstBatch.length, 2);
+
+  const secondBatch = await alerts.claimPendingAlerts(10, true);
+  assert.equal(secondBatch.length, 1);
+});
+
+/* ----------------------------------------------------------------- */
+/*  Unsubscribe token (reviewer H1)                                   */
+/* ----------------------------------------------------------------- */
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const unsub = require(
+  path.join(PROJECT_ROOT, "src", "lib", "unsubscribe-token.ts"),
+) as typeof import("../src/lib/unsubscribe-token");
+
+test("buildUnsubscribeToken round-trips through verifyUnsubscribeToken", () => {
+  const token = unsub.buildUnsubscribeToken("user_abc");
+  const payload = unsub.verifyUnsubscribeToken(token);
+  assert.ok(payload);
+  assert.equal(payload.userId, "user_abc");
+  assert.equal(payload.scope, "alerts-unsubscribe");
+});
+
+test("verifyUnsubscribeToken rejects tampered tokens", () => {
+  const token = unsub.buildUnsubscribeToken("user_abc");
+  const tampered = token.slice(0, -4) + "AAAA";
+  assert.equal(unsub.verifyUnsubscribeToken(tampered), null);
+});
+
+test("verifyUnsubscribeToken rejects malformed input", () => {
+  assert.equal(unsub.verifyUnsubscribeToken(""), null);
+  assert.equal(unsub.verifyUnsubscribeToken("no-dot"), null);
+  assert.equal(unsub.verifyUnsubscribeToken("."), null);
+  assert.equal(unsub.verifyUnsubscribeToken(".sig"), null);
+  assert.equal(unsub.verifyUnsubscribeToken("payload."), null);
+});
+
+test("buildUnsubscribeUrl produces a URL containing a verifiable token", () => {
+  const url = unsub.buildUnsubscribeUrl(
+    "https://cryptotubersranked.com",
+    "user_xyz",
+  );
+  assert.ok(url.startsWith("https://cryptotubersranked.com/api/alerts/unsubscribe?token="));
+  const extracted = decodeURIComponent(url.split("token=")[1]);
+  const payload = unsub.verifyUnsubscribeToken(extracted);
+  assert.ok(payload);
+  assert.equal(payload.userId, "user_xyz");
 });

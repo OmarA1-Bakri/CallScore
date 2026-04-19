@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { hasAccess } from "@/lib/whop";
 import { addWatch, removeWatch } from "@/lib/alerts";
+import { parseCreatorId, isForeignKeyViolation } from "./helpers";
 
 interface WatchPayload {
   readonly creatorId?: unknown;
 }
-
-import { parseCreatorId, isForeignKeyViolation } from "./helpers";
 
 function unauthorized(): NextResponse {
   return NextResponse.json(
