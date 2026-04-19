@@ -97,28 +97,14 @@ function toIsoDateInput(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function buildSparkline(series: readonly BacktestMonthlyPoint[]): string {
-  if (series.length === 0) return "";
-  const values = series.map((p) => p.portfolioValue);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min;
-  if (span === 0) return SPARK_BLOCKS[3].repeat(series.length);
-  return values
-    .map((v) => {
-      const normalized = (v - min) / span;
-      const bucket = Math.min(
-        SPARK_BLOCKS.length - 1,
-        Math.max(0, Math.round(normalized * (SPARK_BLOCKS.length - 1))),
-      );
-      return SPARK_BLOCKS[bucket];
-    })
-    .join("");
-}
+type SparklineSeriesKey = "portfolioValue" | "btcValue";
 
-function buildBtcSparkline(series: readonly BacktestMonthlyPoint[]): string {
+function buildSparkline(
+  series: readonly BacktestMonthlyPoint[],
+  key: SparklineSeriesKey,
+): string {
   if (series.length === 0) return "";
-  const values = series.map((p) => p.btcValue);
+  const values = series.map((p) => p[key]);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min;
@@ -328,8 +314,12 @@ export default async function BacktestPage({
   const profitable = result ? result.finalCapital >= result.initialCapital : true;
   const heroColor = profitable ? COLOR_PHOSPHOR : COLOR_TERMINAL_RED;
 
-  const sparkline = result ? buildSparkline(result.monthlySeries) : "";
-  const btcSparkline = result ? buildBtcSparkline(result.monthlySeries) : "";
+  const sparkline = result
+    ? buildSparkline(result.monthlySeries, "portfolioValue")
+    : "";
+  const btcSparkline = result
+    ? buildSparkline(result.monthlySeries, "btcValue")
+    : "";
 
   const hitRate =
     result && result.callCount > 0
