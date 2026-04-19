@@ -78,6 +78,7 @@ async function main(): Promise<void> {
 
   let enqueued = 0;
   let duplicates = 0;
+  let enqueueFailures = 0;
 
   for (const row of pairs) {
     try {
@@ -89,6 +90,7 @@ async function main(): Promise<void> {
       if (inserted) enqueued++;
       else duplicates++;
     } catch (error: unknown) {
+      enqueueFailures++;
       const msg = error instanceof Error ? error.message : String(error);
       console.error(
         `[${timestamp()}] enqueue failed user=${row.user_id} call=${row.call_id}: ${msg}`,
@@ -97,9 +99,12 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `[${timestamp()}] scan-new-calls done: enqueued=${enqueued} skipped_duplicates=${duplicates}`,
+    `[${timestamp()}] scan-new-calls done: enqueued=${enqueued} skipped_duplicates=${duplicates} failures=${enqueueFailures}`,
   );
-  process.exit(0);
+  // Duplicates are expected (idempotency ON CONFLICT) and do not count as
+  // failure. Real enqueue failures must surface a non-zero exit so cron
+  // treats the run as failed and alerts aren't silently dropped.
+  process.exit(enqueueFailures > 0 ? 1 : 0);
 }
 
 main().catch((err: unknown) => {
