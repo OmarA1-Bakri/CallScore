@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import type { ReactElement } from "react";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -51,7 +52,9 @@ interface RootLayoutProps {
   readonly children: React.ReactNode;
 }
 
-export default function RootLayout({ children }: RootLayoutProps) {
+export default function RootLayout({
+  children,
+}: RootLayoutProps): ReactElement {
   return (
     <html
       lang="en"
