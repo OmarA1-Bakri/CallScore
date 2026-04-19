@@ -19,6 +19,19 @@ export interface SendEmailResult {
 }
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
+const RESEND_TIMEOUT_MS = 10_000;
+
+/**
+ * Thrown when the Resend HTTP call exceeds RESEND_TIMEOUT_MS. Callers
+ * (cron jobs) can catch this specifically to distinguish transient
+ * network timeouts from permanent failures (non-2xx responses).
+ */
+export class ResendTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Resend request timed out after ${timeoutMs}ms`);
+    this.name = "ResendTimeoutError";
+  }
+}
 
 function readApiKey(): string {
   const key = process.env.RESEND_API_KEY;
@@ -50,14 +63,29 @@ export async function sendEmail(
     text: input.text,
   };
 
-  const response = await fetch(RESEND_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(RESEND_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
+    });
+  } catch (error: unknown) {
+    // AbortError from AbortSignal.timeout() — surface as a distinct
+    // typed error so cron can log + retry without conflating with
+    // non-2xx application errors.
+    if (
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
+    ) {
+      throw new ResendTimeoutError(RESEND_TIMEOUT_MS);
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
