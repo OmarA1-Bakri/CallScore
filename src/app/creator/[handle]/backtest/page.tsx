@@ -12,6 +12,11 @@ import {
   type BacktestResult,
   type BacktestStrategy,
 } from "@/lib/backtest";
+import {
+  defaultBacktestRange,
+  parseIsoDateAsEndOfDay,
+  parseIsoDateAsStartOfDay,
+} from "@/lib/backtest-params";
 import type { Creator } from "@/lib/types";
 
 interface PageProps {
@@ -57,31 +62,6 @@ export async function generateMetadata({
   } catch {
     return { title: "Backtest | CryptoTubers Ranked" };
   }
-}
-
-function parseIsoDate(value: string | undefined): Date | null {
-  if (value === undefined || value.length === 0) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
-}
-
-// Date-only inputs like "2025-12-31" parse as 2025-12-31T00:00:00Z. Snap
-// start to start-of-day and end to end-of-day UTC so the engine's
-// inclusive `call_date <= endDate` filter doesn't silently drop calls
-// timestamped later on the boundary day.
-function parseIsoDateAsStartOfDay(value: string | undefined): Date | null {
-  const d = parseIsoDate(value);
-  if (d === null) return null;
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
-function parseIsoDateAsEndOfDay(value: string | undefined): Date | null {
-  const d = parseIsoDate(value);
-  if (d === null) return null;
-  d.setUTCHours(23, 59, 59, 999);
-  return d;
 }
 
 function parseCapitalParam(value: string | undefined): number {
@@ -312,11 +292,7 @@ export default async function BacktestPage({
   }
 
   const now = new Date();
-  const defaultEnd = new Date(now);
-  defaultEnd.setUTCHours(23, 59, 59, 999);
-  const defaultStart = new Date(now);
-  defaultStart.setUTCDate(defaultStart.getUTCDate() - 365);
-  defaultStart.setUTCHours(0, 0, 0, 0);
+  const { start: defaultStart, end: defaultEnd } = defaultBacktestRange(now);
 
   const startDate =
     parseIsoDateAsStartOfDay(searchParams.start) ?? defaultStart;

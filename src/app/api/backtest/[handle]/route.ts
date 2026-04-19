@@ -8,6 +8,11 @@ import {
   runBacktest,
   type BacktestStrategy,
 } from "@/lib/backtest";
+import {
+  defaultBacktestRange,
+  parseIsoDateAsEndOfDay,
+  parseIsoDateAsStartOfDay,
+} from "@/lib/backtest-params";
 import type { Creator } from "@/lib/types";
 
 // TODO: gate behind Pro+ when premium launches. Current release is public
@@ -21,31 +26,6 @@ interface ParsedParams {
   readonly endDate: Date;
   readonly capital: number;
   readonly strategy: BacktestStrategy;
-}
-
-function parseIsoDate(raw: string | null): Date | null {
-  if (raw === null || raw.length === 0) return null;
-  const value = new Date(raw);
-  if (Number.isNaN(value.getTime())) return null;
-  return value;
-}
-
-// Date-only inputs like "2025-12-31" parse as 2025-12-31T00:00:00Z, which
-// would silently exclude calls timestamped later that same day from an
-// inclusive call_date <= end filter. Normalize explicitly so the UX
-// matches the user's intent: start = start-of-day, end = end-of-day UTC.
-function parseIsoDateAsStartOfDay(raw: string | null): Date | null {
-  const d = parseIsoDate(raw);
-  if (d === null) return null;
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
-}
-
-function parseIsoDateAsEndOfDay(raw: string | null): Date | null {
-  const d = parseIsoDate(raw);
-  if (d === null) return null;
-  d.setUTCHours(23, 59, 59, 999);
-  return d;
 }
 
 function parseCapital(raw: string | null): number | null {
@@ -62,20 +42,11 @@ function parseStrategy(raw: string | null): BacktestStrategy | null {
     : null;
 }
 
-function defaultRange(now: Date): { readonly start: Date; readonly end: Date } {
-  const end = new Date(now);
-  end.setUTCHours(23, 59, 59, 999);
-  const start = new Date(now);
-  start.setUTCDate(start.getUTCDate() - 365);
-  start.setUTCHours(0, 0, 0, 0);
-  return { start, end };
-}
-
 function parseQuery(
   searchParams: URLSearchParams,
   now: Date,
 ): ParsedParams | { readonly error: string } {
-  const { start: defaultStart, end: defaultEnd } = defaultRange(now);
+  const { start: defaultStart, end: defaultEnd } = defaultBacktestRange(now);
 
   const startRaw = searchParams.get("start");
   const startDate =
