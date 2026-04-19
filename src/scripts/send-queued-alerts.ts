@@ -12,7 +12,8 @@
  * Required env:
  *   - RESEND_API_KEY
  *   - RESEND_FROM_EMAIL
- *   - ALERTS_BASE_URL (optional, default https://cryptotuberranked.com)
+ *   - SESSION_SECRET      (used to HMAC-sign unsubscribe tokens)
+ *   - ALERTS_BASE_URL     (optional, default https://cryptotuberranked.com)
  *   - ALERTS_CLAIM_BATCH  (optional, default 500)
  *
  * A (user_id -> email) resolver is wired through the `users` table if
@@ -21,48 +22,37 @@
  *
  * Run: node --import tsx src/scripts/send-queued-alerts.ts
  */
-import * as fs from "fs";
-import * as path from "path";
 import { query } from "../lib/db";
-import { claimPendingAlerts, revertClaim } from "../lib/alerts";
+import {
+  claimPendingAlerts,
+  revertClaim,
+  type ClaimedAlertRow,
+} from "../lib/alerts";
 import { sendEmail } from "../lib/resend";
+import { buildUnsubscribeUrl } from "../lib/unsubscribe-token";
+import { loadEnv, timestamp } from "./_shared";
 
-function loadEnv(): void {
-  if (process.env.NEON_DATABASE_URL) return;
-  const root = path.resolve(__dirname, "../..");
-  const envPath = fs.existsSync(path.join(root, ".env.local"))
-    ? path.join(root, ".env.local")
-    : path.join(root, ".env");
-  if (!fs.existsSync(envPath)) return;
-  for (const raw of fs.readFileSync(envPath, "utf-8").split("\n")) {
-    const t = raw.trim();
-    if (!t || t.startsWith("#")) continue;
-    const i = t.indexOf("=");
-    if (i < 0) continue;
-    const k = t.slice(0, i).trim();
-    if (!process.env[k]) process.env[k] = t.slice(i + 1).trim();
-  }
-}
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
-function timestamp(): string {
-  return new Date().toISOString();
-}
-
-import type { ClaimedAlertRow } from "../lib/alerts";
-
-interface CreatorBucket {
+type CreatorBucket = {
   readonly creatorId: number;
   readonly creatorName: string;
-  readonly rows: ClaimedAlertRow[];
-}
+  readonly rows: readonly ClaimedAlertRow[];
+};
 
-interface DigestGroup {
+type DigestGroup = {
   readonly userId: string;
   readonly email: string;
-  readonly alertIds: number[];
+  readonly alertIds: readonly number[];
   /** Keyed by creator_id so same-display-name creators don't merge. */
-  readonly creatorBuckets: Map<number, CreatorBucket>;
-}
+  readonly creatorBuckets: ReadonlyMap<number, CreatorBucket>;
+};
+
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
 
 function baseUrl(): string {
   return (
@@ -81,6 +71,10 @@ function escapeHtml(input: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/* ------------------------------------------------------------------ */
+/*  Digest builders                                                    */
+/* ------------------------------------------------------------------ */
+
 function buildSubject(group: DigestGroup): string {
   const buckets = Array.from(group.creatorBuckets.values());
   const creatorCount = buckets.length;
@@ -91,7 +85,11 @@ function buildSubject(group: DigestGroup): string {
   return `${label} made ${callCount} new ${plural} — CryptoTubers Ranked`;
 }
 
-function buildTextBody(group: DigestGroup, base: string): string {
+function buildTextBody(
+  group: DigestGroup,
+  base: string,
+  unsubscribeUrl: string,
+): string {
   const lines: string[] = [];
   lines.push("CryptoTubers Ranked — new calls from creators you watch");
   lines.push("");
@@ -105,11 +103,15 @@ function buildTextBody(group: DigestGroup, base: string): string {
     }
     lines.push("");
   }
-  lines.push("Unsubscribe: " + base + "/unsubscribe?token=TODO");
+  lines.push(`Unsubscribe: ${unsubscribeUrl}`);
   return lines.join("\n");
 }
 
-function buildHtmlBody(group: DigestGroup, base: string): string {
+function buildHtmlBody(
+  group: DigestGroup,
+  base: string,
+  unsubscribeUrl: string,
+): string {
   const parts: string[] = [];
   parts.push(
     `<div style="font-family:JetBrains Mono,ui-monospace,monospace;background:#0B0F0E;color:#C8D3CA;padding:24px;">`,
@@ -137,12 +139,16 @@ function buildHtmlBody(group: DigestGroup, base: string): string {
   }
   parts.push(
     `<p style="color:#5B6B63;font-size:12px;margin-top:24px;">` +
-      `<a href="${escapeHtml(base)}/unsubscribe?token=TODO" style="color:#5B6B63;">unsubscribe</a>` +
+      `<a href="${escapeHtml(unsubscribeUrl)}" style="color:#5B6B63;">unsubscribe</a>` +
       `</p>`,
   );
   parts.push(`</div>`);
   return parts.join("");
 }
+
+/* ------------------------------------------------------------------ */
+/*  DB helpers                                                         */
+/* ------------------------------------------------------------------ */
 
 async function userEmailsTableExists(): Promise<boolean> {
   const rows = await query<{ exists: boolean }>(
@@ -154,8 +160,33 @@ async function userEmailsTableExists(): Promise<boolean> {
   return rows[0]?.exists === true;
 }
 
-function groupByUser(rows: readonly ClaimedAlertRow[]): DigestGroup[] {
-  const byUser = new Map<string, DigestGroup>();
+/* ------------------------------------------------------------------ */
+/*  Grouping — immutable reducer                                       */
+/* ------------------------------------------------------------------ */
+
+type MutableCreatorBucket = {
+  readonly creatorId: number;
+  readonly creatorName: string;
+  rows: ClaimedAlertRow[];
+};
+
+type MutableDigestGroup = {
+  readonly userId: string;
+  readonly email: string;
+  alertIds: number[];
+  creatorBuckets: Map<number, MutableCreatorBucket>;
+};
+
+/**
+ * Group claimed rows into per-user digests. Builds mutable scaffolding
+ * internally (for allocation efficiency) and freezes each group into
+ * a fully immutable `DigestGroup` before returning. Rows without a
+ * resolved `user_email` are dropped — the caller is responsible for
+ * reverting those claims.
+ */
+function groupByUser(rows: readonly ClaimedAlertRow[]): readonly DigestGroup[] {
+  const byUser = new Map<string, MutableDigestGroup>();
+
   for (const row of rows) {
     if (!row.user_email) continue;
     let group = byUser.get(row.user_id);
@@ -164,22 +195,43 @@ function groupByUser(rows: readonly ClaimedAlertRow[]): DigestGroup[] {
         userId: row.user_id,
         email: row.user_email,
         alertIds: [],
-        creatorBuckets: new Map(),
+        creatorBuckets: new Map<number, MutableCreatorBucket>(),
       };
       byUser.set(row.user_id, group);
     }
     group.alertIds.push(row.alert_id);
-    const bucket =
-      group.creatorBuckets.get(row.creator_id) ??
-      ({
+    let bucket = group.creatorBuckets.get(row.creator_id);
+    if (!bucket) {
+      bucket = {
         creatorId: row.creator_id,
         creatorName: row.creator_name,
         rows: [],
-      } satisfies CreatorBucket);
+      };
+      group.creatorBuckets.set(row.creator_id, bucket);
+    }
     bucket.rows.push(row);
-    group.creatorBuckets.set(row.creator_id, bucket);
   }
-  return Array.from(byUser.values());
+
+  // Freeze into readonly-typed shape.
+  return Array.from(byUser.values()).map(
+    (g): DigestGroup => ({
+      userId: g.userId,
+      email: g.email,
+      alertIds: Object.freeze([...g.alertIds]),
+      creatorBuckets: Object.freeze(
+        new Map(
+          Array.from(g.creatorBuckets.entries()).map(([id, b]) => [
+            id,
+            Object.freeze({
+              creatorId: b.creatorId,
+              creatorName: b.creatorName,
+              rows: Object.freeze([...b.rows]),
+            }) as CreatorBucket,
+          ]),
+        ),
+      ),
+    }),
+  );
 }
 
 function parseClaimBatch(): number {
@@ -189,6 +241,10 @@ function parseClaimBatch(): number {
   if (!Number.isFinite(n) || n <= 0) return 500;
   return Math.min(n, 10_000);
 }
+
+/* ------------------------------------------------------------------ */
+/*  Main                                                               */
+/* ------------------------------------------------------------------ */
 
 async function main(): Promise<void> {
   loadEnv();
@@ -245,12 +301,13 @@ async function main(): Promise<void> {
   const base = baseUrl();
 
   for (const group of groups) {
+    const unsubscribeUrl = buildUnsubscribeUrl(base, group.userId);
     try {
       await sendEmail({
         to: group.email,
         subject: buildSubject(group),
-        html: buildHtmlBody(group, base),
-        text: buildTextBody(group, base),
+        html: buildHtmlBody(group, base, unsubscribeUrl),
+        text: buildTextBody(group, base, unsubscribeUrl),
       });
       sent += group.alertIds.length;
     } catch (error: unknown) {
