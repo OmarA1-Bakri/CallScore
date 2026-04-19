@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { AlphaScoreBar } from "./AlphaScoreBadge";
 import RankTierBadge from "./RankTierBadge";
+import SelfCorrectionBadge from "./SelfCorrectionBadge";
 import TierGate from "./TierGate";
 import type { LeaderboardRow } from "@/lib/types";
 import { SYMBOL_TICKERS } from "@/lib/constants";
@@ -86,6 +87,9 @@ function LeaderboardTable({
             <th className="text-right text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden sm:table-cell">
               Win Rate
             </th>
+            <th className="text-right text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden sm:table-cell">
+              Self-Correction
+            </th>
             <th className="text-right text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden md:table-cell">
               Avg Alpha
             </th>
@@ -157,6 +161,13 @@ function LeaderboardTable({
                       </span>
                     )}
                   </div>
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums hidden sm:table-cell">
+                  <SelfCorrectionBadge
+                    score={row.selfCorrectionScore ?? 0}
+                    revisionCount={row.revisionCount ?? 0}
+                    tier={row.selfCorrectionTier ?? "rarely"}
+                  />
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums hidden md:table-cell">
                   <span
