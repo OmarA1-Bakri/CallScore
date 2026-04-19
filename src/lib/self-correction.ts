@@ -24,7 +24,12 @@
  *     genuinely transparent high-volume creators.
  */
 import { query } from "./db";
-import { coinName, normalizeTicker, shortTicker } from "./ticker-normalize";
+import {
+  coinName,
+  extraAliases,
+  normalizeTicker,
+  shortTicker,
+} from "./ticker-normalize";
 import type { Call, Direction } from "./types";
 
 export type RevisionType =
@@ -188,6 +193,13 @@ function findMentionedTickerNear(
   }
   if (name && containsWordBoundary(window, name.toLowerCase())) {
     return expectedCanonical;
+  }
+  // Manual aliases (e.g. XBT for BTC). Extra aliases are stored in
+  // lowercase already so no further normalization required.
+  for (const alias of extraAliases(expectedCanonical)) {
+    if (containsWordBoundary(window, alias)) {
+      return expectedCanonical;
+    }
   }
   return null;
 }

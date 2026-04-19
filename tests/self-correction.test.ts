@@ -219,8 +219,13 @@ const selfCorrection = require(
   path.join(PROJECT_ROOT, "src", "lib", "self-correction.ts"),
 ) as typeof import("../src/lib/self-correction");
 
+const tickerNormalize = require(
+  path.join(PROJECT_ROOT, "src", "lib", "ticker-normalize.ts"),
+) as typeof import("../src/lib/ticker-normalize");
+
 const { detectRevisions, computeSelfCorrectionScore, tierForScore } =
   selfCorrection;
+const { normalizeTicker } = tickerNormalize;
 
 /* ----------------------------------------------------------------- */
 /*  Fixture helpers                                                   */
@@ -808,6 +813,40 @@ test("M1: untracked symbol is dropped (no revisions)", () => {
   });
   const revisions = detectRevisions([a, b]);
   assert.equal(revisions.length, 0);
+});
+
+/* ================================================================= */
+/*  M-xbt — XBT (BitMEX/Kraken) alias for BTC                         */
+/* ================================================================= */
+
+test("M-xbt: normalizeTicker('XBT') resolves to BTCUSDT", () => {
+  assert.equal(normalizeTicker("XBT"), "BTCUSDT");
+});
+
+test("M-xbt: normalizeTicker lowercase/mixed-case XBT variants", () => {
+  assert.equal(normalizeTicker("xbt"), "BTCUSDT");
+  assert.equal(normalizeTicker("Xbt"), "BTCUSDT");
+  assert.equal(normalizeTicker("XBTUSD"), "BTCUSDT");
+  assert.equal(normalizeTicker("XBTUSDT"), "BTCUSDT");
+});
+
+test("M-xbt: 'I was wrong about XBT' triggers confirmed_miss for BTC", () => {
+  const earlier = buildCall({
+    id: 1,
+    symbol: "BTCUSDT",
+    call_date: "2025-01-01T00:00:00.000Z",
+  });
+  const later = buildCall({
+    id: 2,
+    symbol: "BTCUSDT",
+    raw_quote: "Honestly I was wrong about XBT here.",
+    call_date: "2025-01-30T00:00:00.000Z",
+  });
+  const revisions = detectRevisions([earlier, later]);
+  assert.ok(
+    revisions.some((r) => r.revisionType === "confirmed_miss"),
+    "XBT should resolve to BTC for proximity matching",
+  );
 });
 
 /* ================================================================= */

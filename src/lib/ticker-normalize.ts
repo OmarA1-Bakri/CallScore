@@ -14,8 +14,25 @@ import { SYMBOL_NAMES, SYMBOL_TICKERS, TRACKED_SYMBOLS } from "./constants";
 
 const TRACKED_SET: ReadonlySet<string> = new Set<string>(TRACKED_SYMBOLS);
 
+/**
+ * Manual alias table for venue-specific or community tickers that don't
+ * appear in the canonical ticker/name lookup.
+ *
+ * - `XBT` is the ISO-style "non-national-currency" prefix used by BitMEX,
+ *   Kraken, and referenced in many transcripts. Maps to BTCUSDT.
+ *
+ * Keep this list tight — every entry widens the match surface for the
+ *`findMentionedTickerNear` proximity check and can create false positives
+ * on common English words if we aren't careful.
+ */
+const MANUAL_ALIASES: Readonly<Record<string, string>> = {
+  xbt: "BTCUSDT",
+  xbtusd: "BTCUSDT",
+  xbtusdt: "BTCUSDT",
+};
+
 // One-time reverse lookup: every alias (short ticker, name, USDT pair,
-// USD pair) maps back to the canonical USDT symbol. Keys are lowercase.
+// USD pair, manual) maps back to the canonical USDT symbol. Keys lowercase.
 const ALIAS_LOOKUP: ReadonlyMap<string, string> = (() => {
   const out = new Map<string, string>();
   for (const canonical of TRACKED_SYMBOLS) {
@@ -32,8 +49,29 @@ const ALIAS_LOOKUP: ReadonlyMap<string, string> = (() => {
     // USD pair variant: "BTCUSD"
     if (ticker) out.set(`${ticker.toLowerCase()}usd`, canonical);
   }
+  for (const [alias, canonical] of Object.entries(MANUAL_ALIASES)) {
+    out.set(alias, canonical);
+  }
   return out;
 })();
+
+// Reverse index: canonical symbol -> list of extra aliases (manual + name
+// variants) we should search for when doing ticker-proximity matching.
+const EXTRA_ALIASES_BY_CANONICAL: ReadonlyMap<string, readonly string[]> =
+  (() => {
+    const out = new Map<string, string[]>();
+    for (const [alias, canonical] of Object.entries(MANUAL_ALIASES)) {
+      const list = out.get(canonical) ?? [];
+      list.push(alias);
+      out.set(canonical, list);
+    }
+    // Freeze: callers read-only.
+    const frozen = new Map<string, readonly string[]>();
+    for (const entry of Array.from(out.entries())) {
+      frozen.set(entry[0], entry[1]);
+    }
+    return frozen;
+  })();
 
 /**
  * Normalize any ticker-shaped input to its canonical USDT symbol.
@@ -67,4 +105,13 @@ export function shortTicker(canonical: string): string | null {
  */
 export function coinName(canonical: string): string | null {
   return SYMBOL_NAMES[canonical] ?? null;
+}
+
+/**
+ * Any extra aliases (besides the short ticker and coin name) that the
+ * proximity check should match on. Currently populated from
+ * `MANUAL_ALIASES`; empty list for symbols without manual aliases.
+ */
+export function extraAliases(canonical: string): readonly string[] {
+  return EXTRA_ALIASES_BY_CANONICAL.get(canonical) ?? [];
 }
