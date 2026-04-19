@@ -175,7 +175,9 @@ export default function AboutPage(): ReactElement {
   return (
     <div style={pageStyle}>
       {/* ============== TOP STATUS STRIP ============== */}
-      <header style={topbarStyle} role="banner">
+      {/* Uses a plain <div>, not <header>/role="banner", because the
+          single authoritative banner landmark lives in layout.tsx. */}
+      <div style={topbarStyle}>
         <div style={{ ...shellStyle, ...topbarInnerStyle }}>
           <div
             style={{
@@ -234,9 +236,11 @@ export default function AboutPage(): ReactElement {
             <b style={{ color: TERMINAL_TEXT, fontWeight: 500 }}>2026-04-19</b>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main id="main">
+      {/* Page content wrapper — NOT a <main>; the layout owns the single
+          <main> landmark. Using <div> avoids nested-landmark a11y issues. */}
+      <div>
         <div style={shellStyle}>
           {/* ============== HERO ============== */}
           <section
@@ -620,7 +624,7 @@ export default function AboutPage(): ReactElement {
             </div>
           </section>
         </div>
-      </main>
+      </div>
 
       {/* Scoped CSS for the blinking caret + reduced-motion override */}
       <style>{`
