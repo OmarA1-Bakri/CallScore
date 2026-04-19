@@ -1,374 +1,453 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  Check,
-  X,
-  Crown,
-  Zap,
-  BarChart3,
-  ArrowLeft,
-  ChevronDown,
-  Radar,
-  TrendingDown,
-  Shield,
-} from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Pricing — CryptoTubers Ranked",
   description:
-    "Public beta pricing and roadmap for CryptoTubers Ranked.",
+    "Three tiers: free, pro ($19/mo), alpha ($49/mo). Full research free. Alerts, exports, and API on paid.",
   alternates: { canonical: "/pricing" },
 };
 
-interface TierConfig {
-  readonly name: string;
-  readonly price: string;
-  readonly period: string;
-  readonly tagline: string;
-  readonly features: readonly string[];
-  readonly cta: string;
-  readonly highlighted: boolean;
-  readonly gradient: string;
-  readonly borderColor: string;
-  readonly ctaBg: string;
-  readonly icon: React.ComponentType<{ className?: string }>;
-}
+/* ------------------------------------------------------------------ */
+/*  Terminal-aesthetic pricing page                                    */
+/*  Locked tokens: #0B0F0E / #121815 / #C8D3CA / #5B6B63 / #3FD67A     */
+/* ------------------------------------------------------------------ */
 
-const TIERS: readonly TierConfig[] = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    tagline: "All public research surfaces stay open",
-    features: [
-      "Complete leaderboard (all ranks)",
-      "Creator profiles and call history",
-      "Per-call Alpha Score breakdowns",
-      "Win rate, Alpha Score, and scored-call totals",
-    ],
-    cta: "Get Started",
-    highlighted: false,
-    gradient: "from-gray-400 to-gray-500",
-    borderColor: "border-brand-border",
-    ctaBg: "bg-brand-card hover:bg-brand-card-hover text-white border border-brand-border",
-    icon: BarChart3,
-  },
-  {
-    name: "Pro",
-    price: "$19",
-    period: "/mo",
-    tagline: "Reserved for upcoming premium workflows",
-    features: [
-      "Everything in Free",
-      "Premium workflows are being rebuilt",
-      "Future account-linked exports",
-      "Future saved screens and notifications",
-      "Priority feedback access while premium is in beta",
-    ],
-    cta: "Join Pro Waitlist",
-    highlighted: false,
-    gradient: "from-brand-accent to-purple-400",
-    borderColor: "border-brand-accent/30",
-    ctaBg: "bg-brand-accent hover:bg-brand-accent/80 text-white",
-    icon: Zap,
-  },
-  {
-    name: "Alpha",
-    price: "$49",
-    period: "/mo",
-    tagline: "Future delivery layer for alerts and API access",
-    features: [
-      "Everything in Pro",
-      "Future signal delivery products",
-      "Future API and webhook access",
-      "Future premium alerting surfaces",
-      "Early access to private-alpha experiments",
-    ],
-    cta: "Join Alpha Waitlist",
-    highlighted: true,
-    gradient: "from-brand-gold to-yellow-400",
-    borderColor: "border-brand-gold/30",
-    ctaBg: "bg-brand-gold hover:bg-brand-gold-dim text-brand-dark",
-    icon: Crown,
-  },
-] as const;
+type Glyph = "yes" | "no" | "soon";
 
 interface FeatureRow {
-  readonly feature: string;
-  readonly free: boolean | string;
-  readonly pro: boolean | string;
-  readonly alpha: boolean | string;
+  readonly label: string;
+  readonly free: Glyph;
+  readonly pro: Glyph;
+  readonly alpha: Glyph;
 }
 
-const COMPARISON_FEATURES: readonly FeatureRow[] = [
-  { feature: "Full Leaderboard (All Ranks)", free: true, pro: true, alpha: true },
-  { feature: "Creator Profiles", free: "Full", pro: "Full", alpha: "Full" },
-  { feature: "Call History", free: true, pro: true, alpha: true },
-  { feature: "Score Breakdown per Call", free: true, pro: true, alpha: true },
-  { feature: "Performance Charts", free: true, pro: true, alpha: true },
-  { feature: "Data Freshness", free: "After each public recompute", pro: "Premium roadmap", alpha: "Premium roadmap" },
-  { feature: "Premium Workflows", free: "Public beta only", pro: "Planned", alpha: "Planned" },
-  { feature: "Alerts and API", free: false, pro: "Planned", alpha: "Planned" },
+const FEATURES: readonly FeatureRow[] = [
+  { label: "Full leaderboard (all ranks)", free: "yes", pro: "yes", alpha: "yes" },
+  { label: "Creator profiles + full call history", free: "yes", pro: "yes", alpha: "yes" },
+  { label: "Per-call Alpha Score breakdowns", free: "yes", pro: "yes", alpha: "yes" },
+  { label: "Methodology transparency", free: "yes", pro: "yes", alpha: "yes" },
+  { label: "Per-creator email alerts", free: "no", pro: "yes", alpha: "yes" },
+  { label: "Watchlists (unlimited)", free: "no", pro: "yes", alpha: "yes" },
+  { label: "Recent-performance filter (30/90d)", free: "no", pro: "yes", alpha: "yes" },
+  { label: "CSV export of call history", free: "no", pro: "yes", alpha: "yes" },
+  { label: "Historical backtest simulator", free: "no", pro: "no", alpha: "yes" },
+  { label: "Anti-consensus / convergence alerts", free: "no", pro: "no", alpha: "yes" },
+  { label: "API access (read-only)", free: "no", pro: "no", alpha: "yes" },
+  { label: "Webhook notifications", free: "no", pro: "no", alpha: "yes" },
 ] as const;
 
-interface FaqItem {
-  readonly question: string;
-  readonly answer: string;
+function glyphChar(g: Glyph): string {
+  if (g === "yes") return "\u2713";
+  if (g === "soon") return "\u2192";
+  return "\u00b7";
 }
 
-const FAQ_ITEMS: readonly FaqItem[] = [
-  {
-    question: "Why is the leaderboard free?",
-    answer:
-      "Because the public research surface is the product right now. The leaderboard, creator pages, call history, and score breakdowns stay open while we rebuild the premium delivery layer.",
-  },
-  {
-    question: "How do you calculate the Alpha Score?",
-    answer:
-      "Each call is scored on five public components: direction correctness at 30 days (40pts), alpha over BTC at 30 days (25pts), specificity (15pts), market regime difficulty (10pts), and target hit within 90 days (10pts). There is no hidden normalization or confidence multiplier on the public Alpha Score.",
-  },
-  {
-    question: "What are contrarian signals?",
-    answer:
-      "They are situations where a creator calls the opposite direction of the crowd. We study those cases publicly today; delivery-oriented premium tooling for them is still on the roadmap.",
-  },
-  {
-    question: "What are consensus strength warnings?",
-    answer:
-      "When multiple creators independently call the same coin in the same direction within a short window, we analyze that cluster. The public site already shows the raw research; premium warning surfaces are planned, not shipped.",
-  },
-  {
-    question: "How often is the data updated?",
-    answer:
-      "We scrape new videos daily and rerun the scoring pipeline after new extraction and market-data backfills complete. Public pages reflect the latest completed recompute.",
-  },
-  {
-    question: "Can I cancel anytime?",
-    answer:
-      "Yes, you can cancel your subscription at any time. Your access will continue through the end of your current billing period.",
-  },
-  {
-    question: "If the public site is free, what are Pro and Alpha for?",
-    answer:
-      "For now, they are roadmap tiers rather than unique public-site unlocks. We will only market premium workflows once the delivery surfaces are live and materially different from the public dataset.",
-  },
-] as const;
+function glyphClass(g: Glyph): string {
+  if (g === "yes") return "text-[#3FD67A] font-bold";
+  if (g === "soon") return "text-[#5B6B63] font-medium";
+  return "text-[#5B6B63]";
+}
 
-function getCheckoutUrl(tierName: string): string {
-  if (tierName === "Alpha" || tierName === "Pro") return "/feedback";
-  return "/";
+function glyphAriaLabel(g: Glyph): string {
+  if (g === "yes") return "included";
+  if (g === "soon") return "coming soon";
+  return "not in this tier";
 }
 
 export default function PricingPage() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back link */}
-      <Link
-        href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-8 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Leaderboard
-      </Link>
+    <main className="bg-[#0B0F0E] text-[#C8D3CA] font-mono min-h-screen">
+      <div className="max-w-[980px] mx-auto px-6 py-16">
+        {/* =============== HERO =============== */}
+        <section className="mb-16" aria-labelledby="pricing-title">
+          <p className="text-[#5B6B63] text-xs tracking-wider mb-2">
+            <span className="text-[#3FD67A]">&gt;</span> cat /docs/pricing.md
+          </p>
+          <h1
+            id="pricing-title"
+            className="font-mono font-bold text-4xl sm:text-5xl leading-none tracking-tight mb-4"
+          >
+            <span className="text-[#3FD67A] mr-3">#</span>PRICING
+          </h1>
+          <p className="text-[#C8D3CA] text-lg font-medium mb-3">
+            Pay once alerts earn their keep. Free research, forever.
+          </p>
+          <p className="text-[#5B6B63] text-sm max-w-prose leading-relaxed">
+            The leaderboard, creator histories, score breakdowns, and methodology
+            stay free — always. Paid tiers buy delivery: alerts, exports, simulators, API.
+          </p>
+        </section>
 
-      {/* Header */}
-      <section className="text-center mb-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
-          The Leaderboard Is Free.
-          <br />
-          <span className="text-gradient-gold">The Intelligence Is Not.</span>
-        </h1>
-        <p className="text-gray-400 max-w-xl mx-auto text-sm sm:text-base">
-          Rankings show you who is good. Alpha signals show you who to listen to
-          today, in this market, for this trade.
-        </p>
-      </section>
+        {/* =============== TIERS (dot-leader rows) =============== */}
+        <section className="mb-16" aria-labelledby="tiers-title">
+          <p className="text-[#5B6B63] text-xs uppercase tracking-[0.08em] mb-2">01 / tiers</p>
+          <h2
+            id="tiers-title"
+            className="font-mono font-bold text-xl mb-6"
+          >
+            <span className="text-[#5B6B63] mr-2">{"//"}</span>select one
+          </h2>
 
-      {/* Value props */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-        <ValueProp
-          icon={TrendingDown}
-          title="Bear Market Specialists"
-          description="Miles Deutscher: #19 overall, but #1 in bear markets with 85% win rate. Know who to follow when it matters most."
-        />
-        <ValueProp
-          icon={Radar}
-          title="Contrarian Signals"
-          description="When a top creator goes against the crowd, those calls often matter more. Public data shows the pattern; premium delivery tooling is still in roadmap mode."
-        />
-        <ValueProp
-          icon={Shield}
-          title="Consensus Warnings"
-          description="When all creators agree, accuracy can drop. The public site shows the underlying consensus research; warning-specific premium UX is still planned."
-        />
-      </section>
+          <ul className="font-mono text-sm" aria-label="subscription tiers">
+            <TierRow
+              marker=" "
+              name="TIER_FREE"
+              price="$0"
+              status="ACTIVE"
+              statusTone="active"
+              ctaText="start here"
+              ctaHref="/"
+              note="full leaderboard + creator profiles + call history + score breakdowns"
+            />
+            <TierRow
+              marker=">"
+              name="TIER_PRO"
+              price="$19/mo"
+              status="LIVE"
+              statusTone="active"
+              recommended
+              ctaText={"14-day free trial \u2192"}
+              ctaHref="/api/checkout/pro?interval=monthly"
+              note={"alerts + watchlists + 30/90d filter + CSV export ($190/yr \u00b7 2 months free)"}
+              annualHref="/api/checkout/pro?interval=annual"
+            />
+            <TierRow
+              marker=" "
+              name="TIER_ALPHA"
+              price="$49/mo"
+              status="LIVE"
+              statusTone="active"
+              ctaText={"14-day free trial \u2192"}
+              ctaHref="/api/checkout/alpha?interval=monthly"
+              note={"everything in pro + backtest simulator + anti-consensus alerts + API ($490/yr \u00b7 2 months free)"}
+              annualHref="/api/checkout/alpha?interval=annual"
+            />
+          </ul>
 
-      {/* Pricing cards */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-        {TIERS.map((tier) => {
-          const Icon = tier.icon;
+          <p className="mt-6 text-[#5B6B63] text-sm">
+            <span className="text-[#3FD67A] mr-2">#</span>
+            <span className="text-[#3FD67A] font-bold">TIER_PRO</span>
+            <span className="text-[#5B6B63]">
+              : daily-driver recommended. 14-day free trial, no card required.
+            </span>
+          </p>
+        </section>
 
-          return (
+        {/* =============== FEATURE MATRIX =============== */}
+        <section className="mb-16" aria-labelledby="compare-title">
+          <p className="text-[#5B6B63] text-xs uppercase tracking-[0.08em] mb-2">02 / comparison</p>
+          <h2
+            id="compare-title"
+            className="font-mono font-bold text-xl mb-6"
+          >
+            <span className="text-[#5B6B63] mr-2">{"//"}</span>features {"\u2014"} per tier
+          </h2>
+
+          <div className="border border-[rgba(200,211,202,0.14)] bg-[#121815] overflow-x-auto">
             <div
-              key={tier.name}
-              className={`relative rounded-xl border p-6 ${tier.borderColor} ${
-                tier.highlighted
-                  ? "bg-brand-card glow-gold"
-                  : "bg-brand-card/50"
-              }`}
+              aria-hidden="true"
+              className="text-[#5B6B63] text-xs font-mono whitespace-nowrap overflow-hidden px-4 py-2 border-b border-dashed border-[rgba(200,211,202,0.08)]"
             >
-              {tier.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="badge-elite text-xs px-3 py-1">
-                    Best Value
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 mb-4">
-                <Icon className="w-5 h-5 text-gray-400" />
-                <span
-                  className={`font-bold bg-gradient-to-r ${tier.gradient} bg-clip-text text-transparent`}
-                >
-                  {tier.name}
-                </span>
-              </div>
-
-              <div className="mb-2">
-                <span className="text-4xl font-bold text-white">
-                  {tier.price}
-                </span>
-                <span className="text-gray-500 text-sm">{tier.period}</span>
-              </div>
-
-              <p className="text-gray-400 text-sm mb-6">{tier.tagline}</p>
-
-              <Link
-                href={getCheckoutUrl(tier.name)}
-                className={`block text-center font-semibold text-sm px-4 py-2.5 rounded-lg transition-colors mb-6 ${tier.ctaBg}`}
-              >
-                {tier.cta}
-              </Link>
-
-              <ul className="space-y-2.5">
-                {tier.features.map((feature) => (
-                  <li
-                    key={feature}
-                    className="flex items-start gap-2 text-gray-300 text-sm"
-                  >
-                    <Check className="w-4 h-4 text-brand-green shrink-0 mt-0.5" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
+              {"\u250C\u2500 capability \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252C\u2500\u2500free\u2500\u2500\u252C\u2500\u2500pro\u2500\u2500\u252C\u2500alpha\u2500\u2510"}
             </div>
-          );
-        })}
-      </section>
-
-      {/* Feature comparison */}
-      <section className="mb-16">
-        <h2 className="text-white font-bold text-xl text-center mb-8">
-          Feature Comparison
-        </h2>
-        <div className="glass-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full font-mono text-sm text-[#C8D3CA]">
+              <caption className="sr-only">Feature availability by tier</caption>
               <thead>
-                <tr className="border-b border-brand-border">
-                  <th className="text-left text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3">
-                    Feature
+                <tr className="text-[#5B6B63] text-xs uppercase tracking-[0.06em]">
+                  <th scope="col" className="text-left font-medium px-4 py-3">
+                    capability
                   </th>
-                  <th className="text-center text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3">
-                    Free
+                  <th scope="col" className="text-center font-medium px-4 py-3">
+                    free
                   </th>
-                  <th className="text-center text-xs font-medium uppercase tracking-wider px-4 py-3 text-brand-accent">
-                    Pro
+                  <th scope="col" className="text-center font-medium px-4 py-3">
+                    pro
                   </th>
-                  <th className="text-center text-xs font-medium uppercase tracking-wider px-4 py-3 text-brand-gold">
-                    Alpha
+                  <th scope="col" className="text-center font-medium px-4 py-3">
+                    alpha
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {COMPARISON_FEATURES.map((row) => (
+                {FEATURES.map((row) => (
                   <tr
-                    key={row.feature}
-                    className="border-b border-brand-border/50 table-row-hover"
+                    key={row.label}
+                    className="border-t border-[rgba(200,211,202,0.06)] hover:bg-[rgba(63,214,122,0.03)]"
                   >
-                    <td className="px-4 py-3 text-gray-300">{row.feature}</td>
-                    <td className="px-4 py-3 text-center">
-                      <FeatureValue value={row.free} />
+                    <td className="px-4 py-2.5 text-[#C8D3CA] whitespace-nowrap">
+                      {row.label}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <FeatureValue value={row.pro} />
+                    <td className={`px-4 py-2.5 text-center ${glyphClass(row.free)}`}>
+                      <span aria-label={glyphAriaLabel(row.free)}>{glyphChar(row.free)}</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <FeatureValue value={row.alpha} />
+                    <td className={`px-4 py-2.5 text-center ${glyphClass(row.pro)}`}>
+                      <span aria-label={glyphAriaLabel(row.pro)}>{glyphChar(row.pro)}</span>
+                    </td>
+                    <td className={`px-4 py-2.5 text-center ${glyphClass(row.alpha)}`}>
+                      <span aria-label={glyphAriaLabel(row.alpha)}>{glyphChar(row.alpha)}</span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <div
+              aria-hidden="true"
+              className="text-[#5B6B63] text-xs font-mono whitespace-nowrap overflow-hidden px-4 py-2 border-t border-dashed border-[rgba(200,211,202,0.08)]"
+            >
+              {"\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518"}
+            </div>
           </div>
-        </div>
-      </section>
 
-      {/* FAQ */}
-      <section className="max-w-2xl mx-auto mb-16">
-        <h2 className="text-white font-bold text-xl text-center mb-8">
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-4">
-          {FAQ_ITEMS.map((item) => (
-            <FaqCard key={item.question} item={item} />
-          ))}
-        </div>
-      </section>
+          <p className="mt-4 text-[#5B6B63] text-xs flex flex-wrap gap-5">
+            <span>glyphs:</span>
+            <span>
+              <span className="text-[#3FD67A] font-bold">{"\u2713"}</span> included
+            </span>
+            <span>
+              <span className="text-[#5B6B63]">{"\u00b7"}</span> not in this tier
+            </span>
+            <span>
+              <span className="text-[#5B6B63]">{"\u2192"}</span> coming soon
+            </span>
+          </p>
+        </section>
+
+        {/* =============== STATUS DISCLOSURE =============== */}
+        <section className="mb-16" aria-labelledby="status-title">
+          <p className="text-[#5B6B63] text-xs uppercase tracking-[0.08em] mb-2">03 / status</p>
+          <h2
+            id="status-title"
+            className="font-mono font-bold text-xl mb-6"
+          >
+            <span className="text-[#5B6B63] mr-2">{"//"}</span>right now
+          </h2>
+
+          <div className="bg-[#121815] border border-[rgba(200,211,202,0.14)] font-mono text-sm">
+            <div className="px-4 py-3 border-b border-dashed border-[rgba(200,211,202,0.08)] text-[#3FD67A]">
+              <span className="mr-2">$</span>cat PRICING_STATUS.md
+            </div>
+            <ol className="px-4 py-3 text-[#C8D3CA] leading-7">
+              <li>
+                <span className="text-[#5B6B63]">{"// free:"}</span>{" "}
+                <span className="text-[#C8D3CA]">live. no account required.</span>
+              </li>
+              <li>
+                <span className="text-[#5B6B63]">{"// pro:"}</span>{" "}
+                <span className="text-[#C8D3CA]">
+                  live. 14-day free trial, no card required.
+                </span>
+              </li>
+              <li>
+                <span className="text-[#5B6B63]">{"// alpha:"}</span>{" "}
+                <span className="text-[#C8D3CA]">
+                  live. 14-day free trial, no card required.
+                </span>
+              </li>
+              <li>
+                <span className="text-[#5B6B63]">{"// refunds:"}</span>{" "}
+                <span className="text-[#C8D3CA]">14 days after first payment, no questions.</span>
+              </li>
+              <li className="text-[#5B6B63]">
+                {"// we do not take creator money. we do not sell data."}
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        {/* =============== CTA PROMPT =============== */}
+        <section className="mb-16" aria-labelledby="select-title">
+          <p className="text-[#5B6B63] text-xs uppercase tracking-[0.08em] mb-2">04 / select</p>
+          <h2 id="select-title" className="sr-only">
+            Choose a tier
+          </h2>
+          <p className="font-mono text-lg flex items-baseline gap-2 flex-wrap">
+            <span className="text-[#3FD67A]">&gt;</span>
+            <span className="text-[#3FD67A] font-bold">select_tier</span>
+            <span className="text-[#5B6B63]">
+              [<span className="text-[#C8D3CA]">free</span>|
+              <span className="text-[#C8D3CA]">pro</span>|
+              <span className="text-[#C8D3CA]">alpha</span>]
+            </span>
+            <BlinkCaret />
+          </p>
+          <nav
+            aria-label="tier quick-select"
+            className="mt-3 pl-6 flex flex-wrap gap-5 text-base"
+          >
+            <Link
+              href="/"
+              prefetch={false}
+              className="text-[#C8D3CA] underline underline-offset-4 decoration-[rgba(200,211,202,0.25)] hover:text-[#3FD67A] hover:decoration-[#3FD67A]"
+            >
+              free
+            </Link>
+            <span aria-hidden="true" className="text-[#5B6B63]">
+              |
+            </span>
+            <Link
+              href="/api/checkout/pro?interval=monthly"
+              prefetch={false}
+              className="text-[#C8D3CA] underline underline-offset-4 decoration-[rgba(200,211,202,0.25)] hover:text-[#3FD67A] hover:decoration-[#3FD67A]"
+            >
+              pro
+            </Link>
+            <span aria-hidden="true" className="text-[#5B6B63]">
+              |
+            </span>
+            <Link
+              href="/api/checkout/alpha?interval=monthly"
+              prefetch={false}
+              className="text-[#C8D3CA] underline underline-offset-4 decoration-[rgba(200,211,202,0.25)] hover:text-[#3FD67A] hover:decoration-[#3FD67A]"
+            >
+              alpha
+            </Link>
+          </nav>
+        </section>
+
+        {/* =============== FAQ =============== */}
+        <section aria-labelledby="faq-title">
+          <p className="text-[#5B6B63] text-xs uppercase tracking-[0.08em] mb-2">05 / faq</p>
+          <h2
+            id="faq-title"
+            className="font-mono font-bold text-xl mb-6"
+          >
+            <span className="text-[#5B6B63] mr-2">{"//"}</span>faq
+          </h2>
+          <div className="grid gap-7 font-mono">
+            <FaqItem
+              question="why a free tier?"
+              answer="because the research surface is the product. paying for bespoke delivery (alerts, exports, api) is the real upgrade."
+            />
+            <FaqItem
+              question="what happens after the 14-day trial?"
+              answer="you downgrade to the free tier. your watchlists and history stay. alerts stop."
+            />
+            <FaqItem
+              question="do you take sponsorships from tracked creators?"
+              answer="no. never. this is the whole point."
+            />
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Local subcomponents                                                */
+/* ------------------------------------------------------------------ */
+
+interface TierRowProps {
+  readonly marker: string;
+  readonly name: string;
+  readonly price: string;
+  readonly status: string;
+  readonly statusTone: "active" | "muted";
+  readonly recommended?: boolean;
+  readonly ctaText: string;
+  readonly ctaHref: string;
+  readonly note: string;
+  readonly annualHref?: string;
+}
+
+function TierRow({
+  marker,
+  name,
+  price,
+  status,
+  statusTone,
+  recommended = false,
+  ctaText,
+  ctaHref,
+  note,
+  annualHref,
+}: TierRowProps) {
+  const statusColor =
+    statusTone === "active" ? "text-[#3FD67A]" : "text-[#5B6B63]";
+
+  return (
+    <li className="grid grid-cols-[2ch_11ch_minmax(40px,1fr)_9ch_minmax(40px,1fr)_7ch_1fr] items-baseline gap-x-3 pt-2.5 pb-0.5 sm:gap-x-2.5">
+      <span
+        aria-hidden="true"
+        className={marker.trim() === ">" ? "text-[#3FD67A] font-bold" : "text-transparent"}
+      >
+        {marker}
+      </span>
+      <span className="text-[#C8D3CA] font-bold tracking-wide whitespace-nowrap">
+        {name}
+      </span>
+      <span
+        aria-hidden="true"
+        className="text-[#5B6B63] tracking-widest overflow-hidden whitespace-nowrap -translate-y-[3px] select-none"
+      >
+        ..........................
+      </span>
+      <span className="text-white font-bold tabular-nums whitespace-nowrap">
+        {price}
+      </span>
+      <span
+        aria-hidden="true"
+        className="text-[#5B6B63] tracking-widest overflow-hidden whitespace-nowrap -translate-y-[3px] select-none"
+      >
+        ...........
+      </span>
+      <span className={`${statusColor} font-bold tracking-wide whitespace-nowrap`}>
+        [{status}]
+      </span>
+      <span className="text-[#5B6B63] whitespace-nowrap">
+        {recommended && (
+          <span className="text-[#3FD67A] font-bold tracking-wide mr-2">
+            [RECOMMENDED]
+          </span>
+        )}
+        <Link
+          href={ctaHref}
+          prefetch={false}
+          className="text-[#3FD67A] underline underline-offset-[3px] decoration-[rgba(63,214,122,0.6)] hover:decoration-[#3FD67A]"
+        >
+          {ctaText}
+        </Link>
+        {annualHref && (
+          <>
+            <span className="text-[#5B6B63] mx-2">{"\u00b7"}</span>
+            <Link
+              href={annualHref}
+              prefetch={false}
+              className="text-[#5B6B63] underline underline-offset-[3px] decoration-[rgba(200,211,202,0.2)] hover:text-[#3FD67A]"
+            >
+              annual
+            </Link>
+          </>
+        )}
+      </span>
+      <span className="col-span-7 text-[#5B6B63] text-xs pb-2.5 pl-0">
+        <span className="text-[#5B6B63] mr-1.5">{"//"}</span>
+        {note}
+      </span>
+    </li>
+  );
+}
+
+function FaqItem({ question, answer }: { readonly question: string; readonly answer: string }) {
+  return (
+    <div>
+      <p className="text-[#C8D3CA] font-medium text-sm mb-2 flex gap-2.5">
+        <span aria-hidden="true" className="text-[#3FD67A]">
+          &gt;
+        </span>
+        <span>{question}</span>
+      </p>
+      <p className="text-[#5B6B63] text-sm leading-7 pl-6">{answer}</p>
     </div>
   );
 }
 
-function FeatureValue({ value }: { readonly value: boolean | string }) {
-  if (value === true) {
-    return <Check className="w-4 h-4 text-brand-green mx-auto" />;
-  }
-  if (value === false) {
-    return <X className="w-4 h-4 text-gray-600 mx-auto" />;
-  }
-  return <span className="text-gray-300 text-xs">{value}</span>;
-}
-
-function FaqCard({ item }: { readonly item: FaqItem }) {
+function BlinkCaret() {
   return (
-    <details className="glass-card group" open={false}>
-      <summary className="flex items-center justify-between cursor-pointer p-4 text-white font-medium text-sm list-none">
-        {item.question}
-        <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="px-4 pb-4 text-gray-400 text-sm leading-relaxed">
-        {item.answer}
-      </div>
-    </details>
-  );
-}
-
-function ValueProp({
-  icon: Icon,
-  title,
-  description,
-}: {
-  readonly icon: React.ComponentType<{ className?: string }>;
-  readonly title: string;
-  readonly description: string;
-}) {
-  return (
-    <div className="glass-card p-5">
-      <div className="flex items-center gap-3 mb-2">
-        <Icon className="w-5 h-5 text-brand-gold" />
-        <h2 className="text-white font-semibold text-sm">{title}</h2>
-      </div>
-      <p className="text-gray-400 text-xs leading-relaxed">{description}</p>
-    </div>
+    <span
+      aria-hidden="true"
+      className="inline-block w-2.5 h-5 bg-[#3FD67A] align-text-bottom animate-pulse motion-reduce:animate-none"
+    />
   );
 }
