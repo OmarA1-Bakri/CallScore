@@ -138,6 +138,11 @@ async function fakeQuery<T>(text: string, params: unknown[] = []): Promise<T[]> 
       ) {
         existing.numerator += 1.0;
       } else if (r.revision_type === "reversed_direction") {
+        // Mirror the round-2 M-partial-scoring SQL:
+        //   scored + correct + confident -> 0.5
+        //   pending (return_30d null) with linked rc -> 0.25
+        //   everything else (including scored-wrong / low-confidence /
+        //   missing link) -> 0
         if (
           rc &&
           rc.return_30d !== null &&
@@ -145,11 +150,7 @@ async function fakeQuery<T>(text: string, params: unknown[] = []): Promise<T[]> 
           rc.correct_direction === true
         ) {
           existing.numerator += 0.5;
-        } else if (
-          !rc ||
-          rc.return_30d === null ||
-          rc.extraction_confidence < 0.6
-        ) {
+        } else if (rc && rc.return_30d === null) {
           existing.numerator += 0.25;
         }
       }
@@ -1029,6 +1030,75 @@ test("H2: reversed_direction with pending revised call awards partial 0.25", asy
   // numerator 0.25 / (49 + 20) = 0.00362... (note: id 2 drops out of scored
   // denominator because return_30d is null).
   assert.ok(result.score > 0 && result.score < 0.01);
+});
+
+/* ================================================================= */
+/*  M-partial-scoring — partial credit is PENDING-only (round 2)      */
+/* ================================================================= */
+
+test("M-partial: confident-but-wrong scored reversal awards 0, not 0.25", async () => {
+  resetFakeDb();
+  // 50 scored + correct bullish calls to give a realistic denominator.
+  for (let i = 1; i <= 50; i++) {
+    fakeDb.calls.push({
+      id: i,
+      creator_id: 21,
+      return_30d: 5,
+      direction: "bullish",
+      hit_target: true,
+      correct_direction: true,
+      extraction_confidence: 0.8,
+    });
+  }
+  // Revised call id 2: SCORED, WRONG direction, HIGH confidence. Under the
+  // round-1 logic this would have earned partial 0.25 because the partial
+  // branch only checked the confidence floor. Round-2 collapses scored-wrong
+  // to 0 regardless of confidence.
+  fakeDb.calls[1].correct_direction = false;
+  fakeDb.calls[1].return_30d = -8;
+  fakeDb.calls[1].extraction_confidence = 0.9;
+  fakeDb.revisions.push({
+    creator_id: 21,
+    original_call_id: 1,
+    revised_call_id: 2,
+    revision_type: "reversed_direction",
+  });
+  const result = await computeSelfCorrectionScore(21);
+  assert.equal(result.score, 0, "confident-but-wrong reversal must score 0");
+  assert.equal(result.tier, "rarely");
+});
+
+test("M-partial: low-confidence scored reversal awards 0, not 0.25", async () => {
+  resetFakeDb();
+  for (let i = 1; i <= 50; i++) {
+    fakeDb.calls.push({
+      id: i,
+      creator_id: 22,
+      return_30d: 5,
+      direction: "bullish",
+      hit_target: true,
+      correct_direction: true,
+      extraction_confidence: 0.8,
+    });
+  }
+  // Revised call id 2: SCORED with correct direction but confidence 0.55
+  // (below the 0.6 floor used across the scoring pipeline). Should be
+  // treated as not-trusted -> 0.
+  fakeDb.calls[1].correct_direction = true;
+  fakeDb.calls[1].return_30d = 10;
+  fakeDb.calls[1].extraction_confidence = 0.55;
+  fakeDb.revisions.push({
+    creator_id: 22,
+    original_call_id: 1,
+    revised_call_id: 2,
+    revision_type: "reversed_direction",
+  });
+  const result = await computeSelfCorrectionScore(22);
+  assert.equal(
+    result.score,
+    0,
+    "low-confidence scored reversal must score 0 (align with 0.6 floor)",
+  );
 });
 
 test("tierForScore: boundary values map to the documented tiers", () => {

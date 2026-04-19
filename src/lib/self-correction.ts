@@ -598,15 +598,30 @@ function pointsForRevision(row: RevisionScoringRow): number {
     }
 
     case "reversed_direction": {
-      // Revised call missing / unlinked -> no outcome credit. Still 0 rather
-      // than a flat reward so flip-flop without backing evidence cannot game
-      // the score (H2).
+      // Partial credit (0.25) is reserved for PENDING revisions — the later
+      // call hasn't resolved yet so we can't judge the reversal's outcome,
+      // but the act of reversing publicly still deserves some credit.
+      // Rules (Codex round-2 M-partial-scoring):
+      //   - Revised call is PENDING (return_30d == null) -> 0.25
+      //   - Revised call is SCORED + correct_direction=true -> 0.5
+      //   - Revised call is SCORED + correct_direction=false -> 0 (whipsaw)
+      //   - Revised call low-confidence (<0.6) scored -> 0 (align with
+      //     extraction-confidence floor used for the rest of scoring)
+      //   - Revised call missing entirely (null join) -> 0 (no evidence)
+      if (row.revised_return_30d === null) {
+        // Distinguish "pending with link" (partial credit) from "no link at
+        // all" (no credit). Extraction confidence is null only when the
+        // LEFT JOIN missed, which means no revised call was recorded.
+        if (row.revised_extraction_confidence === null) return 0;
+        return POINTS.reversed_direction_partial;
+      }
+      // Scored revision — require the confidence floor before we trust the
+      // direction flag.
       if (
-        row.revised_return_30d === null ||
         row.revised_extraction_confidence === null ||
         row.revised_extraction_confidence < 0.6
       ) {
-        return POINTS.reversed_direction_partial;
+        return 0;
       }
       return row.revised_correct_direction === true
         ? POINTS.reversed_direction_full
@@ -663,17 +678,19 @@ export async function computeAllSelfCorrectionAggregates(): Promise<
                  (oc.direction = 'bearish' AND oc.return_30d >= 0)
                )
                THEN ${POINTS.confirmed_miss}
+             -- Reversed direction (Codex round-2 M-partial-scoring):
+             -- partial credit ONLY for pending-horizon revisions where we
+             -- have a linked revised call. Scored-but-wrong or low-confidence
+             -- reversals collapse to 0.
              WHEN r.revision_type = 'reversed_direction'
                AND rc.return_30d IS NOT NULL
+               AND rc.extraction_confidence IS NOT NULL
                AND rc.extraction_confidence >= 0.6
                AND rc.correct_direction = true
                THEN ${POINTS.reversed_direction_full}
              WHEN r.revision_type = 'reversed_direction'
-               AND (
-                 rc.return_30d IS NULL OR
-                 rc.extraction_confidence IS NULL OR
-                 rc.extraction_confidence < 0.6
-               )
+               AND rc.return_30d IS NULL
+               AND rc.extraction_confidence IS NOT NULL
                THEN ${POINTS.reversed_direction_partial}
              ELSE 0
            END
