@@ -7,6 +7,7 @@ import { query } from "@/lib/db";
 import { getPublicCounts, PUBLIC_COUNT_LABELS } from "@/lib/public-counts";
 import { getCreatorTier } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
+import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
 import type {
   Creator,
   CreatorStats,
@@ -192,10 +193,17 @@ export default async function HomePage({ searchParams }: PageProps) {
       prevScores.map((r) => [r.creator_id, r.alpha_score]),
     );
 
+    // Self-correction aggregates are optional: tolerate a missing
+    // call_revisions table so the home page still renders pre-migration.
+    const selfCorrectionMap = await computeAllSelfCorrectionAggregates().catch(
+      () => new Map<number, never>(),
+    );
+
     leaderboard = rows.map((row, index) => {
       const rank = row.accuracy_rank ?? index + 1;
       const prev = prevScoreMap.get(row.creator_id);
       const trend = prev !== undefined ? computeTrend(row.alpha_score, prev) : ("stable" as const);
+      const selfCorrection = selfCorrectionMap.get(row.creator_id);
 
       return {
         rank,
@@ -221,6 +229,9 @@ export default async function HomePage({ searchParams }: PageProps) {
           : null,
         tier_required: getCreatorTier(rank),
         trend,
+        selfCorrectionScore: selfCorrection?.score ?? 0,
+        revisionCount: selfCorrection?.revisionCount ?? 0,
+        selfCorrectionTier: selfCorrection?.tier ?? "rarely",
       };
     });
   } catch (err) {
@@ -339,6 +350,14 @@ export default async function HomePage({ searchParams }: PageProps) {
             claim={"Influencer-tweeted tokens returned \u221219% over 3 months."}
             source="HBS · Pacelli"
           />
+          <li className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 px-4 py-3">
+            <span className="text-[#5B6B63] text-sm leading-snug">
+              We also score who admits when they&apos;re wrong. No other tracker does.
+            </span>
+            <span className="text-[#5B6B63] text-[11px] tracking-wide whitespace-nowrap">
+              [self-correction index]
+            </span>
+          </li>
         </ul>
       </section>
 

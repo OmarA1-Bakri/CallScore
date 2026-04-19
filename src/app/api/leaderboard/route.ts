@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCreatorTier } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
+import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
 import type {
   Creator,
   CreatorStats,
@@ -207,6 +208,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       prevScores.map((row) => [row.creator_id, row.alpha_score]),
     );
 
+    // Self-correction aggregates are optional: a brand-new deploy where the
+    // `call_revisions` table does not yet exist should not break the main
+    // leaderboard. Fall back to an empty map on any error.
+    const selfCorrectionMap = await computeAllSelfCorrectionAggregates().catch(
+      () => new Map<number, never>(),
+    );
+
     const leaderboard: LeaderboardRow[] = rows.map((row, index) => {
       const rank = row.accuracy_rank ?? index + 1;
       const previousScore = prevScoreMap.get(row.creator_id);
@@ -214,6 +222,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         previousScore !== undefined
           ? computeTrend(row.alpha_score, previousScore)
           : ("stable" as const);
+
+      const selfCorrection = selfCorrectionMap.get(row.creator_id);
 
       return {
         rank,
@@ -237,6 +247,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         ) as Call | null,
         tier_required: getCreatorTier(rank),
         trend,
+        selfCorrectionScore: selfCorrection?.score ?? 0,
+        revisionCount: selfCorrection?.revisionCount ?? 0,
+        selfCorrectionTier: selfCorrection?.tier ?? "rarely",
       };
     });
 
