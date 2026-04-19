@@ -7,16 +7,7 @@ interface WatchPayload {
   readonly creatorId?: unknown;
 }
 
-function parseCreatorId(value: unknown): number | null {
-  const n =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? parseInt(value, 10)
-        : NaN;
-  if (!Number.isFinite(n) || Number.isNaN(n) || n < 1) return null;
-  return Math.floor(n);
-}
+import { parseCreatorId, isForeignKeyViolation } from "./helpers";
 
 function unauthorized(): NextResponse {
   return NextResponse.json(
@@ -65,6 +56,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 200, headers: { "cache-control": "no-store" } },
     );
   } catch (error: unknown) {
+    if (isForeignKeyViolation(error)) {
+      return NextResponse.json(
+        { error: "creator_not_found" },
+        { status: 400, headers: { "cache-control": "no-store" } },
+      );
+    }
     const message =
       error instanceof Error ? error.message : "internal_error";
     console.error("[alerts.watch.POST]", message);

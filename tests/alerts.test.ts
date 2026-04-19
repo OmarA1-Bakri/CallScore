@@ -216,6 +216,10 @@ primeCache(AUTH_PATH, {
 const alerts = require(path.join(PROJECT_ROOT, "src", "lib", "alerts.ts")) as
   typeof import("../src/lib/alerts");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
+const watchHelpers = require(
+  path.join(PROJECT_ROOT, "src", "app", "api", "alerts", "watch", "helpers.ts"),
+) as typeof import("../src/app/api/alerts/watch/helpers");
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const watchRoute = require(
   path.join(PROJECT_ROOT, "src", "app", "api", "alerts", "watch", "route.ts"),
 ) as typeof import("../src/app/api/alerts/watch/route");
@@ -394,4 +398,53 @@ test("DELETE /api/alerts/watch removes the watchlist row", async () => {
   assert.equal(res.status, 200);
   const list = await alerts.listWatches("user_pro");
   assert.equal(list.length, 0);
+});
+
+/* ----------------------------------------------------------------- */
+/*  parseCreatorId strict-parse unit tests (Codex M3)                 */
+/* ----------------------------------------------------------------- */
+
+test("parseCreatorId rejects '7abc' and other non-numeric suffixes", () => {
+  const { parseCreatorId } = watchHelpers;
+  assert.equal(parseCreatorId("7abc"), null);
+  assert.equal(parseCreatorId("abc7"), null);
+  assert.equal(parseCreatorId("7 "), null);
+  assert.equal(parseCreatorId(" 7"), null);
+});
+
+test("parseCreatorId rejects exponential and decimal strings", () => {
+  const { parseCreatorId } = watchHelpers;
+  assert.equal(parseCreatorId("1e3"), null);
+  assert.equal(parseCreatorId("7.5"), null);
+  assert.equal(parseCreatorId("7.0"), null);
+  assert.equal(parseCreatorId("0x7"), null);
+});
+
+test("parseCreatorId rejects leading zeros and zero", () => {
+  const { parseCreatorId } = watchHelpers;
+  assert.equal(parseCreatorId("07"), null);
+  assert.equal(parseCreatorId("0"), null);
+  assert.equal(parseCreatorId("-1"), null);
+  assert.equal(parseCreatorId(""), null);
+});
+
+test("parseCreatorId accepts positive integers as number or string", () => {
+  const { parseCreatorId } = watchHelpers;
+  assert.equal(parseCreatorId(1), 1);
+  assert.equal(parseCreatorId(42), 42);
+  assert.equal(parseCreatorId("1"), 1);
+  assert.equal(parseCreatorId("42"), 42);
+});
+
+test("parseCreatorId rejects non-integer numbers and non-string types", () => {
+  const { parseCreatorId } = watchHelpers;
+  assert.equal(parseCreatorId(0), null);
+  assert.equal(parseCreatorId(-1), null);
+  assert.equal(parseCreatorId(1.5), null);
+  assert.equal(parseCreatorId(NaN), null);
+  assert.equal(parseCreatorId(Infinity), null);
+  assert.equal(parseCreatorId(null), null);
+  assert.equal(parseCreatorId(undefined), null);
+  assert.equal(parseCreatorId({}), null);
+  assert.equal(parseCreatorId([]), null);
 });
