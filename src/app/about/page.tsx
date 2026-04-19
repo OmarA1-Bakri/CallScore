@@ -7,22 +7,33 @@ import BrandWordmark from "./BrandWordmark";
 /*  Metadata                                                           */
 /* ------------------------------------------------------------------ */
 
+const ABOUT_TITLE = "about — binary baron · crypto-tubers ranked";
+const ABOUT_DESCRIPTION =
+  "Why I track every crypto YouTuber's call against real prices. No opinions, no sponsorships, no deletion. Public methodology, auditable data, founder-accountable.";
+
+// Social share image is inherited from the layout's global metadata.
+// Keep this array in sync with `src/app/layout.tsx` metadata.openGraph.images.
+const SHARED_OG_IMAGES: ReadonlyArray<{
+  readonly url: string;
+  readonly width: number;
+  readonly height: number;
+}> = [{ url: "/og-image.png", width: 1200, height: 630 }];
+
 export const metadata: Metadata = {
-  title: "about — binary baron · crypto-tubers ranked",
-  description:
-    "Why I track every crypto YouTuber's call against real prices. No opinions, no sponsorships, no deletion. Public methodology, auditable data, founder-accountable.",
+  title: ABOUT_TITLE,
+  description: ABOUT_DESCRIPTION,
   alternates: { canonical: "/about" },
   openGraph: {
-    title: "about — binary baron · crypto-tubers ranked",
-    description:
-      "Why I track every crypto YouTuber's call against real prices. No opinions, no sponsorships, no deletion. Public methodology, auditable data, founder-accountable.",
+    title: ABOUT_TITLE,
+    description: ABOUT_DESCRIPTION,
     type: "website",
+    images: [...SHARED_OG_IMAGES],
   },
   twitter: {
     card: "summary_large_image",
-    title: "about — binary baron · crypto-tubers ranked",
-    description:
-      "Why I track every crypto YouTuber's call against real prices. No opinions, no sponsorships, no deletion. Public methodology, auditable data, founder-accountable.",
+    title: ABOUT_TITLE,
+    description: ABOUT_DESCRIPTION,
+    images: [...SHARED_OG_IMAGES.map((img) => img.url)],
   },
 };
 
