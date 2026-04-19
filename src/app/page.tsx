@@ -314,6 +314,34 @@ export default async function HomePage({ searchParams }: PageProps) {
         </div>
       </section>
 
+      {/* Sourced premise strip — terminal aesthetic, muted dividers */}
+      <section
+        aria-labelledby="premise-title"
+        className="mb-10 font-mono"
+      >
+        <h2
+          id="premise-title"
+          className="text-[#5B6B63] text-xs uppercase tracking-[0.08em] mb-3"
+        >
+          <span className="text-[#5B6B63] mr-1.5">{"//"}</span>
+          the premise — sourced
+        </h2>
+        <ul className="divide-y divide-[rgba(200,211,202,0.08)] border-y border-[rgba(200,211,202,0.08)] bg-[#121815]">
+          <PremiseRow
+            claim="76% of influencer-endorsed tokens fail to deliver."
+            source="Arkham · Mar 2025"
+          />
+          <PremiseRow
+            claim="Top crypto YouTubers are directionally correct ~22% of the time."
+            source="Finance Research Letters · 2024"
+          />
+          <PremiseRow
+            claim={"Influencer-tweeted tokens returned \u221219% over 3 months."}
+            source="HBS · Pacelli"
+          />
+        </ul>
+      </section>
+
       {/* Period filter + Leaderboard */}
       <section className="mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -349,6 +377,22 @@ interface StatPillProps {
   readonly icon: React.ComponentType<{ className?: string }>;
   readonly label: string;
   readonly value: string;
+}
+
+interface PremiseRowProps {
+  readonly claim: string;
+  readonly source: string;
+}
+
+function PremiseRow({ claim, source }: PremiseRowProps) {
+  return (
+    <li className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 px-4 py-3">
+      <span className="text-[#C8D3CA] text-sm leading-snug">{claim}</span>
+      <span className="text-[#5B6B63] text-[11px] tracking-wide whitespace-nowrap">
+        [{source}]
+      </span>
+    </li>
+  );
 }
 
 function StatPill({ icon: Icon, label, value }: StatPillProps) {
