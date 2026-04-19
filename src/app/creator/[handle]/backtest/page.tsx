@@ -332,7 +332,7 @@ export default async function BacktestPage({
     endDate.getTime() > safeStart.getTime() ? endDate : defaultEnd;
 
   let result: BacktestResult | null = null;
-  let errorMessage: string | null = null;
+  let hasError = false;
   try {
     result = await runBacktest({
       creatorId: creator.id,
@@ -342,7 +342,11 @@ export default async function BacktestPage({
       strategy,
     });
   } catch (error: unknown) {
-    errorMessage = error instanceof Error ? error.message : "backtest_failed";
+    // Never surface the underlying error text publicly — it may contain
+    // DB connection fragments or internal detail. Log for operators.
+    // eslint-disable-next-line no-console
+    console.error("[backtest:page] unhandled error:", error);
+    hasError = true;
   }
 
   const profitable = result ? result.finalCapital >= result.initialCapital : true;
@@ -393,7 +397,9 @@ export default async function BacktestPage({
           </h1>
         ) : (
           <h1 className="text-2xl" style={{ color: COLOR_TERMINAL_RED }}>
-            {errorMessage ?? "backtest unavailable"}
+            {hasError
+              ? "Backtest unavailable right now"
+              : "Backtest unavailable"}
           </h1>
         )}
       </section>

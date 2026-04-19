@@ -156,8 +156,17 @@ export async function GET(
     if (error instanceof BacktestValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    const message =
-      error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Do NOT surface internal error messages publicly — DB errors can
+    // leak connection-string fragments, table names, or stack frames.
+    // Log full detail server-side, return a generic envelope to clients.
+    // eslint-disable-next-line no-console
+    console.error("[backtest] unhandled error:", error);
+    return NextResponse.json(
+      {
+        error: "internal_error",
+        message: "Backtest unavailable. Please try again.",
+      },
+      { status: 500 },
+    );
   }
 }
