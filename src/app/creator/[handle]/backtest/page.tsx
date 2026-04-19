@@ -177,7 +177,9 @@ interface LedgerRowProps {
 }
 
 function LedgerRow({ call }: LedgerRowProps) {
-  const hit = call.returnPct !== null && call.returnPct > 0;
+  // Direction-aware hit flag supplied by the engine — a correct short
+  // (return_30d < 0) renders HIT, matching how direction_only pays out.
+  const hit = call.isHit;
   const color = hit ? COLOR_PHOSPHOR : COLOR_TERMINAL_RED;
   const date = call.callDate.slice(0, 10);
   const ticker = padRight(call.ticker, 10);

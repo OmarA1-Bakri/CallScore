@@ -522,3 +522,95 @@ test("H1: call at 18:00Z on the endDate day is included when end=YYYY-MM-DD", as
   assert.equal(result.pnlByCall[0].callId, 42);
   assert.ok(Math.abs(result.finalCapital - 1100) < 1e-6);
 });
+
+test("H2: correct short (return_30d = -10) counts as a HIT, not a MISS", async () => {
+  const calls: Call[] = [
+    buildCall({
+      id: 7,
+      direction: "bearish",
+      return_30d: -10,
+      call_date: "2025-02-01T00:00:00.000Z",
+    }),
+  ];
+  const result = await runBacktest(
+    {
+      creatorId: 1,
+      startDate: new Date("2025-01-01T00:00:00.000Z"),
+      endDate: new Date("2025-12-31T23:59:59.999Z"),
+      initialCapital: 1000,
+      strategy: "equal_weight",
+    },
+    { provider: makeProvider({ calls }), now: NOW },
+  );
+
+  assert.equal(result.hitCount, 1);
+  assert.equal(result.missCount, 0);
+  assert.equal(result.pnlByCall[0].isHit, true);
+});
+
+test("H2: mixed long/short hit and miss accounting agrees with direction_only PnL", async () => {
+  const calls: Call[] = [
+    // long + positive: HIT
+    buildCall({
+      id: 1,
+      direction: "bullish",
+      return_30d: 15,
+      call_date: "2025-02-01T00:00:00.000Z",
+    }),
+    // short + negative: HIT
+    buildCall({
+      id: 2,
+      direction: "bearish",
+      return_30d: -20,
+      call_date: "2025-03-01T00:00:00.000Z",
+    }),
+    // long + negative: MISS
+    buildCall({
+      id: 3,
+      direction: "bullish",
+      return_30d: -5,
+      call_date: "2025-04-01T00:00:00.000Z",
+    }),
+    // short + positive: MISS
+    buildCall({
+      id: 4,
+      direction: "bearish",
+      return_30d: 8,
+      call_date: "2025-05-01T00:00:00.000Z",
+    }),
+  ];
+
+  const eq = await runBacktest(
+    {
+      creatorId: 1,
+      startDate: new Date("2025-01-01T00:00:00.000Z"),
+      endDate: new Date("2025-12-31T23:59:59.999Z"),
+      initialCapital: 1000,
+      strategy: "equal_weight",
+    },
+    { provider: makeProvider({ calls }), now: NOW },
+  );
+  assert.equal(eq.hitCount, 2);
+  assert.equal(eq.missCount, 2);
+  // Per-call isHit must be independent of strategy.
+  assert.deepEqual(
+    eq.pnlByCall.map((c) => c.isHit),
+    [true, true, false, false],
+  );
+
+  // direction_only with the same calls: 2 hits - 2 misses = net 0,
+  // allocation = 250, final capital == initial.
+  const dir = await runBacktest(
+    {
+      creatorId: 1,
+      startDate: new Date("2025-01-01T00:00:00.000Z"),
+      endDate: new Date("2025-12-31T23:59:59.999Z"),
+      initialCapital: 1000,
+      strategy: "direction_only",
+    },
+    { provider: makeProvider({ calls }), now: NOW },
+  );
+  assert.equal(dir.hitCount, 2);
+  assert.equal(dir.missCount, 2);
+  assert.ok(Math.abs(dir.finalCapital - 1000) < 1e-6);
+});

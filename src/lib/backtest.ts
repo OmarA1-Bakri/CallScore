@@ -38,6 +38,12 @@ export interface BacktestCall {
   readonly returnPct: number | null;
   readonly alphaOverBtc: number | null;
   readonly pnlDollars: number;
+  // Direction-aware outcome flag: true iff the creator's directional
+  // prediction was correct (long with +return or short with -return).
+  // Strategy-independent — drives hitCount/missCount and the UI ledger
+  // verdict regardless of whether the strategy is equal_weight or
+  // direction_only. A correct short with return_30d = -15 is a HIT.
+  readonly isHit: boolean;
 }
 
 export interface BacktestMonthlyPoint {
@@ -165,18 +171,26 @@ function equalWeightPnl(returnPct: number, allocation: number): number {
   return allocation * (returnPct / 100);
 }
 
-// direction_only PnL: +allocation when direction matches outcome sign,
-// -allocation otherwise. Neutral/zero returns count as a miss for the
-// long/short call (magnitude floor is enforced upstream in scoring).
+// Direction-aware hit test. Shared by direction_only's PnL calc and by
+// the hitCount/missCount/ledger-verdict accounting so that short calls
+// are credited correctly when return_30d is negative.
+function isDirectionalHit(
+  direction: BacktestDirection,
+  returnPct: number,
+): boolean {
+  if (direction === "long") return returnPct > 0;
+  return returnPct < 0;
+}
+
+// direction_only PnL: +allocation on a directional hit, -allocation
+// otherwise. Zero returns count as a miss (magnitude floor is enforced
+// upstream in scoring).
 function directionOnlyPnl(
   direction: BacktestDirection,
   returnPct: number,
   allocation: number,
 ): number {
-  const correct =
-    (direction === "long" && returnPct > 0) ||
-    (direction === "short" && returnPct < 0);
-  return correct ? allocation : -allocation;
+  return isDirectionalHit(direction, returnPct) ? allocation : -allocation;
 }
 
 function monthKey(date: Date): string {
@@ -360,6 +374,7 @@ export async function runBacktest(
         returnPct,
         alphaOverBtc: call.alpha_30d,
         pnlDollars: pnl,
+        isHit: isDirectionalHit(direction, returnPct),
       };
     },
   );
@@ -370,8 +385,8 @@ export async function runBacktest(
 
   let hitCount = 0;
   let missCount = 0;
-  for (const row of eligible) {
-    if (row.returnPct > 0) hitCount += 1;
+  for (const row of pnlByCall) {
+    if (row.isHit) hitCount += 1;
     else missCount += 1;
   }
 
