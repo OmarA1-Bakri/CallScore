@@ -87,6 +87,7 @@ export default function Header() {
               <div className="flex items-center gap-3">
                 <Link
                   href="/api/auth/whop"
+                  prefetch={false}
                   className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1.5"
                 >
                   <LogIn className="w-4 h-4" />
@@ -158,6 +159,7 @@ export default function Header() {
               <>
                 <Link
                   href="/api/auth/whop"
+                  prefetch={false}
                   onClick={() => setMobileOpen(false)}
                   className="block text-gray-300 hover:text-white transition-colors text-sm font-medium py-2"
                 >

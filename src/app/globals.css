@@ -14,6 +14,14 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Focus ring — visible keyboard focus on all interactive elements.
+     Terminal-green per design lock. Offset so it never hugs glyphs. */
+  *:focus-visible {
+    outline: 2px solid #3FD67A;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
   /* Tabular numbers for data tables */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
@@ -41,6 +49,23 @@
   * {
     scrollbar-width: thin;
     scrollbar-color: #1e1e2e #0a0a0f;
+  }
+}
+
+/* Respect prefers-reduced-motion — override smooth scroll + transitions
+   for users who've opted out of motion. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

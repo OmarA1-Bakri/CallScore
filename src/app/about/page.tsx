@@ -72,13 +72,16 @@ const HOW_STEPS: readonly HowStep[] = [
 /* ------------------------------------------------------------------ */
 
 export default async function AboutPage() {
-  const counts = await getPublicCounts().catch(() => ({
-    trackedCreators: 20,
-    rankedCreators: 0,
-    trackedCalls: 0,
-    scoredCalls: 0,
-    beatBtcCreators: 0,
-  }));
+  const counts = await getPublicCounts().catch((error: unknown) => {
+    console.error("[/about] getPublicCounts failed, using fallback defaults:", error);
+    return {
+      trackedCreators: 20,
+      rankedCreators: 0,
+      trackedCalls: 0,
+      scoredCalls: 0,
+      beatBtcCreators: 0,
+    };
+  });
   const keyFacts: readonly KeyFact[] = [
     {
       icon: Video,

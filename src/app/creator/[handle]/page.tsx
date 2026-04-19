@@ -15,7 +15,10 @@ import CallHistory from "@/components/CallHistory";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { query } from "@/lib/db";
 import {
+  computeCreatorAvgAlpha30d,
+  computeCreatorHitRate,
   computeCreatorScoreAverages,
+  computeCreatorWinRate,
   getScoredCalls,
   serializeCalls,
 } from "@/lib/public-serializer";
@@ -130,11 +133,11 @@ export default async function CreatorPage({ params }: PageProps) {
       score: Number((row.total / row.count).toFixed(1)),
     }));
 
-  const alphaScore = stats?.alpha_score ?? creator.alpha_score;
-  const winRate = stats?.win_rate ?? creator.win_rate;
-  const avgAlpha30d = stats?.avg_alpha_30d ?? 0;
-  const scoredCallCount = stats?.total_calls ?? scoredCalls.length;
-  const hitRate = stats?.hit_rate ?? 0;
+  const alphaScore = Number(scoreAverages.total.toFixed(1));
+  const winRate = computeCreatorWinRate(allCalls);
+  const avgAlpha30d = computeCreatorAvgAlpha30d(allCalls);
+  const scoredCallCount = scoredCalls.length;
+  const hitRate = computeCreatorHitRate(allCalls);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -214,6 +217,7 @@ export default async function CreatorPage({ params }: PageProps) {
         <StatCard label="Win Rate" value={`${(winRate * 100).toFixed(1)}%`} />
         <StatCard
           label="Win Rate Floor"
+          // TODO: wilson_lb from stats — may be stale; consider live compute when creator_stats refresh job is fixed
           value={`≥${((stats?.wilson_lb ?? 0) * 100).toFixed(1)}%`}
         />
         <StatCard
