@@ -57,9 +57,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.info("[FEEDBACK]", {
       timestamp: new Date().toISOString(),
       category: feedback.category,
-      name: feedback.name ?? "(anonymous)",
-      email: feedback.email ?? "(not provided)",
-      message: feedback.message,
+      name_provided: Boolean(feedback.name?.trim()),
+      email_provided: Boolean(feedback.email?.trim()),
+      message_chars: feedback.message.trim().length,
     });
 
     return NextResponse.json({ success: true });

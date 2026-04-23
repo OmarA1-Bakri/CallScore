@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { destroySession } from "@/lib/auth";
 
 /**
- * GET /api/auth/logout
+ * POST /api/auth/logout
  * Destroys the session cookie and redirects to home.
  */
-export async function GET(): Promise<NextResponse> {
+export async function POST(): Promise<NextResponse> {
   await destroySession();
 
   const baseUrl =
@@ -15,4 +15,14 @@ export async function GET(): Promise<NextResponse> {
       : "http://localhost:3000");
 
   return NextResponse.redirect(`${baseUrl}/`);
+}
+
+export async function GET(): Promise<NextResponse> {
+  return NextResponse.json(
+    { error: "Method not allowed" },
+    {
+      status: 405,
+      headers: { Allow: "POST" },
+    },
+  );
 }

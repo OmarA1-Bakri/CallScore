@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getUserTier } from "@/lib/whop";
+import { getRequestAuthContext } from "@/lib/auth";
 import type { ConsensusSignal } from "@/lib/types";
 
 const MAX_LIMIT = 50;
@@ -8,15 +9,6 @@ const DEFAULT_LIMIT = 10;
 
 interface ConsensusQueryRow extends ConsensusSignal {
   readonly creator_names: readonly string[];
-}
-
-function extractAccessToken(request: NextRequest): string | null {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.slice(7);
-  }
-
-  return request.cookies.get("whop_access_token")?.value ?? null;
 }
 
 function parsePositiveInt(
@@ -33,8 +25,8 @@ function parsePositiveInt(
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     // Elite-only endpoint
-    const accessToken = extractAccessToken(request);
-    const userTier = await getUserTier(accessToken);
+    const auth = getRequestAuthContext(request);
+    const userTier = auth.session?.tier ?? await getUserTier(auth.accessToken);
 
     if (userTier !== "elite") {
       return NextResponse.json(

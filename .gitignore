@@ -7,11 +7,18 @@ next-env.d.ts
 out/
 .vercel
 .claude/
+.agents/
+.codex
+.omx/
+.vscode/
+.worktrees/
 .playwright-mcp/
 temp/
+audit-output/
 CRYPTOTUBER-FIXES.md
 public/logo-variants.png
 squirrel.toml
+skills-lock.json
 output/playwright/
 .omx/
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
 import { serializeCalls } from "@/lib/public-serializer";
+import { getRequestAuthContext } from "@/lib/auth";
 import type { Creator, CreatorStats, Call, Tier } from "@/lib/types";
 
 const VALID_SORT_FIELDS = ["date", "score", "return"] as const;
@@ -19,15 +20,6 @@ const DEFAULT_PAGE = 1;
 
 function isValidSort(value: string): value is SortField {
   return (VALID_SORT_FIELDS as readonly string[]).includes(value);
-}
-
-function extractAccessToken(request: NextRequest): string | null {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.slice(7);
-  }
-
-  return request.cookies.get("whop_access_token")?.value ?? null;
 }
 
 function parsePositiveInt(
@@ -80,8 +72,8 @@ export async function GET(
     const requiredTier: Tier = getCreatorTier(rank);
 
     // Check user access
-    const accessToken = extractAccessToken(request);
-    const userTier = await getUserTier(accessToken);
+    const auth = getRequestAuthContext(request);
+    const userTier = auth.session?.tier ?? await getUserTier(auth.accessToken);
 
     if (!hasAccess(userTier, requiredTier)) {
       return NextResponse.json(

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth";
 import { getUserTier } from "@/lib/whop";
 
+const OAUTH_STATE_COOKIE_NAME = "ctr_oauth_state";
+
 /**
  * GET /api/auth/whop/callback
  * Handles the OAuth callback from Whop.
@@ -12,6 +14,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const state = searchParams.get("state");
+  const storedState = request.cookies.get(OAUTH_STATE_COOKIE_NAME)?.value;
 
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ??
@@ -19,14 +23,30 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       ? "https://cryptotuberranked.com"
       : "http://localhost:3000");
 
+  const redirectWithStateClear = (path: string): NextResponse => {
+    const response = NextResponse.redirect(`${baseUrl}${path}`);
+    response.cookies.set(OAUTH_STATE_COOKIE_NAME, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    return response;
+  };
+
   // Handle OAuth errors
   if (error) {
     console.error("Whop OAuth error:", error);
-    return NextResponse.redirect(`${baseUrl}/?auth_error=${error}`);
+    return redirectWithStateClear(`/?auth_error=${error}`);
   }
 
   if (!code) {
-    return NextResponse.redirect(`${baseUrl}/?auth_error=no_code`);
+    return redirectWithStateClear("/?auth_error=no_code");
+  }
+
+  if (!state || !storedState || state !== storedState) {
+    return redirectWithStateClear("/?auth_error=invalid_state");
   }
 
   try {
@@ -35,7 +55,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     if (!tokenData.access_token) {
       console.error("No access token in response:", tokenData);
-      return NextResponse.redirect(`${baseUrl}/?auth_error=no_token`);
+      return redirectWithStateClear("/?auth_error=no_token");
     }
 
     // Get user info from Whop
@@ -53,10 +73,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Redirect to home (or pricing if free tier to encourage upgrade)
     const redirectTo = tier === "free" ? "/pricing" : "/";
-    return NextResponse.redirect(`${baseUrl}${redirectTo}`);
+    return redirectWithStateClear(redirectTo);
   } catch (err) {
     console.error("OAuth callback error:", err);
-    return NextResponse.redirect(`${baseUrl}/?auth_error=callback_failed`);
+    return redirectWithStateClear("/?auth_error=callback_failed");
   }
 }
 

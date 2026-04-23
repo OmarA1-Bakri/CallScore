@@ -13,8 +13,25 @@ export interface Session {
   readonly exp: number;
 }
 
-const COOKIE_NAME = "ctr_session";
+export const SESSION_COOKIE_NAME = "ctr_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+interface HeaderStoreLike {
+  get(name: string): string | null;
+}
+
+interface CookieValueLike {
+  readonly value: string;
+}
+
+interface CookieStoreLike {
+  get(name: string): CookieValueLike | undefined;
+}
+
+export interface RequestAuthContext {
+  readonly accessToken: string | null;
+  readonly session: Session | null;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Signing helpers (HMAC-SHA256)                                      */
@@ -72,6 +89,39 @@ function decode(token: string): Session | null {
   }
 }
 
+export function createSessionToken(session: Session): string {
+  return encode(session);
+}
+
+export function getSessionFromToken(
+  token: string | null | undefined,
+): Session | null {
+  if (!token) return null;
+  return decode(token);
+}
+
+export function getRequestAuthContext(request: {
+  readonly headers: HeaderStoreLike;
+  readonly cookies: CookieStoreLike;
+}): RequestAuthContext {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    return {
+      accessToken: authHeader.slice(7),
+      session: null,
+    };
+  }
+
+  const session = getSessionFromToken(
+    request.cookies.get(SESSION_COOKIE_NAME)?.value,
+  );
+
+  return {
+    accessToken: session?.accessToken ?? null,
+    session,
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
@@ -88,10 +138,10 @@ export async function createSession(
     exp: Date.now() + SESSION_TTL_MS,
   };
 
-  const token = encode(session);
+  const token = createSessionToken(session);
   const cookieStore = await cookies();
 
-  cookieStore.set(COOKIE_NAME, token, {
+  cookieStore.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -103,9 +153,9 @@ export async function createSession(
 export async function getSession(): Promise<Session | null> {
   try {
     const cookieStore = await cookies();
-    const cookie = cookieStore.get(COOKIE_NAME);
-    if (!cookie?.value) return null;
-    return decode(cookie.value);
+    return getSessionFromToken(
+      cookieStore.get(SESSION_COOKIE_NAME)?.value,
+    );
   } catch {
     return null;
   }
@@ -113,7 +163,7 @@ export async function getSession(): Promise<Session | null> {
 
 export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_NAME);
+  cookieStore.delete(SESSION_COOKIE_NAME);
 }
 
 /**
