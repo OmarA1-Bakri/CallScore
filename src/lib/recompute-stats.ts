@@ -1,5 +1,9 @@
 import { query } from "./db";
-import { computePublicScore, getCallEligibilitySql } from "./public-methodology";
+import {
+  computePublicScore,
+  getCallEligibilitySql,
+  getCallScoreStatus,
+} from "./public-methodology";
 import type { Call, Period } from "./types";
 
 interface ScoreRow {
@@ -86,20 +90,16 @@ export async function recomputeCallScores(): Promise<number> {
   );
 
   const scoredUpdates = rows.map((row) => {
-    const eligible =
-      row.price_at_call !== null &&
-      row.price_30d !== null &&
-      row.return_30d !== null &&
-      row.extraction_confidence >= 0.7 &&
-      new Date(row.call_date).getTime() <= Date.now() - 30 * 86_400_000 &&
-      (
-        row.target_price === null ||
-        (
-          row.price_90d !== null &&
-          row.hit_target !== null &&
-          new Date(row.call_date).getTime() <= Date.now() - 90 * 86_400_000
-        )
-      );
+    const eligible = getCallScoreStatus({
+      extraction_confidence: row.extraction_confidence,
+      call_date: row.call_date,
+      price_at_call: row.price_at_call,
+      target_price: row.target_price,
+      price_30d: row.price_30d,
+      price_90d: row.price_90d,
+      return_30d: row.return_30d,
+      hit_target: row.hit_target,
+    }) === "scored";
 
     return {
       id: row.id,

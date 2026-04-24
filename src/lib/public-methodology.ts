@@ -48,6 +48,7 @@ type ScoreInput = Pick<
 interface ScoreStatusInput {
   readonly extraction_confidence: number;
   readonly call_date: string;
+  readonly price_at_call?: number | null;
   readonly target_price: number | null;
   readonly price_30d: number | null;
   readonly price_90d: number | null;
@@ -122,6 +123,7 @@ export function getCallScoreStatus(
   if (call.extraction_confidence < EXTRACTION_CONFIDENCE_THRESHOLD) {
     return "excluded_confidence";
   }
+  if (call.price_at_call === null) return "pending_horizon";
   if (
     !hasHorizonElapsed(call.call_date, "30d", now) ||
     call.price_30d === null ||

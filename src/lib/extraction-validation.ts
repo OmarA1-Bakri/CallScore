@@ -5,8 +5,15 @@ const BULLISH_PATTERNS = [
   /\b(buy|buying|long|accumulate|accumulating|bullish|best buy|strong buy|great buy)\b/i,
   /\b(go(?:ing)? up|push up|move up|rip higher|heading higher|upside)\b/i,
   /\b(target|targets|hit|reach|go to|get to|towards)\b/i,
-  /\b(undervalued|breakout|rally|pump|moon|higher high)\b/i,
+  /\b(undervalued|break(?:ing)? out|rally|pump|moon|higher high)\b/i,
 ];
+
+const AMBIGUOUS_SYMBOL_SUPPORT: Partial<Record<string, RegExp>> = {
+  LINKUSDT: /(?:\bchain\s?link\b|\$LINK\b)/i,
+  NEARUSDT: /(?:\bNEAR\s+Protocol\b|\$NEAR\b)/i,
+  DOTUSDT: /(?:\bPolkadot\b|\$DOT\b)/i,
+  ARUSDT: /(?:\bArweave\b|\$AR\b)/i,
+};
 
 const BEARISH_PATTERNS = [
   /\b(sell|selling|short|shorting|bearish|avoid|stay away)\b/i,
@@ -48,10 +55,10 @@ function buildSymbolAliases(symbol: string): readonly string[] {
   const aliases = new Set<string>();
   const ticker = SYMBOL_TICKERS[symbol];
   const name = SYMBOL_NAMES[symbol];
-  const ambiguousTickerSymbols = new Set(["NEARUSDT", "ARUSDT", "LINKUSDT", "DOTUSDT"]);
-  if (ticker && !ambiguousTickerSymbols.has(symbol)) aliases.add(ticker.toLowerCase());
+  const isAmbiguousTicker = symbol in AMBIGUOUS_SYMBOL_SUPPORT;
+  if (ticker && !isAmbiguousTicker) aliases.add(ticker.toLowerCase());
   if (name) aliases.add(name.toLowerCase());
-  aliases.add(symbol.replace("USDT", "").toLowerCase());
+  if (!isAmbiguousTicker) aliases.add(symbol.replace("USDT", "").toLowerCase());
 
   if (symbol === "BTCUSDT") aliases.add("bitcoin");
   if (symbol === "ETHUSDT") aliases.add("ethereum");
@@ -136,21 +143,17 @@ function hasSymbolSupport(
   aliases: readonly string[],
   symbol: string,
 ): boolean {
-  if (symbol === "NEARUSDT") {
-    return /\bNEAR\b/.test(text) || text.toLowerCase().includes("near protocol");
-  }
-  if (symbol === "ARUSDT") {
-    return /\bAR\b/.test(text) || text.toLowerCase().includes("arweave");
-  }
-  if (symbol === "LINKUSDT") {
-    return /\bLINK\b/.test(text) || text.toLowerCase().includes("chainlink") || text.toLowerCase().includes("chain link");
-  }
-  if (symbol === "DOTUSDT") {
-    return /\bDOT\b/.test(text) || text.toLowerCase().includes("polkadot");
+  const ambiguousSymbolSupport = AMBIGUOUS_SYMBOL_SUPPORT[symbol];
+  if (ambiguousSymbolSupport) {
+    return ambiguousSymbolSupport.test(text);
   }
 
   const haystack = text.toLowerCase();
   return aliases.some((alias) => haystack.includes(alias.toLowerCase()));
+}
+
+export function hasExplicitSymbolSupport(symbol: string, text: string): boolean {
+  return hasSymbolSupport(text, buildSymbolAliases(symbol), symbol);
 }
 
 function normalizeTargetPrice(text: string, targetPrice: number | null): number | null {
