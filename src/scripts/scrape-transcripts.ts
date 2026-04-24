@@ -1,7 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
-import { YoutubeTranscript } from "youtube-transcript";
 import { query } from "../lib/db";
 import type { Creator } from "../lib/types";
 
@@ -32,6 +31,55 @@ function timestamp(): string {
 
 /** Max videos to scrape per creator per run (most recent first). */
 const MAX_VIDEOS_PER_CREATOR = 60;
+
+interface ComposioResult<T> {
+  readonly successful: boolean;
+  readonly data?: T;
+  readonly error?: string | { message?: string };
+  readonly storedInFile?: boolean;
+  readonly outputFilePath?: string;
+}
+
+interface SupadataChannelVideos {
+  readonly video_ids?: readonly string[];
+}
+
+interface SupadataVideoMeta {
+  readonly id: string;
+  readonly title: string;
+  readonly uploadDate?: string | null;
+}
+
+interface SupadataTranscriptChunk {
+  readonly text: string;
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+function composioExecute<T>(slug: string, payload: object): ComposioResult<T> {
+  const json = JSON.stringify(payload);
+  const output = execSync(
+    `composio execute ${slug} -d ${shellQuote(json)}`,
+    { encoding: "utf-8", timeout: 120_000, stdio: ["pipe", "pipe", "pipe"] },
+  );
+  const trimmed = output.trim();
+  const start = trimmed.indexOf("{");
+  if (start < 0) {
+    throw new Error(`Could not parse composio response for ${slug}`);
+  }
+  return JSON.parse(trimmed.slice(start)) as ComposioResult<T>;
+}
+
+function extractComposioError(result: { error?: unknown }): string {
+  if (typeof result.error === "string") return result.error;
+  if (result.error && typeof result.error === "object") {
+    const maybeMessage = (result.error as { message?: unknown }).message;
+    if (typeof maybeMessage === "string") return maybeMessage;
+  }
+  return "Unknown Composio error";
+}
 
 /**
  * Compute transcript quality score (0-1) based on:
@@ -66,36 +114,43 @@ function computeTranscriptQuality(text: string): number {
 }
 
 /**
- * Fetch video list from a YouTube channel using yt-dlp.
+ * Fetch video list from a YouTube channel using Supadata via Composio.
  * Returns array of { id, title, uploadDate }.
  */
 function fetchVideoList(
   handle: string,
 ): readonly { id: string; title: string; uploadDate: string | null }[] {
-  const twelveMonthsAgo = new Date();
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-  const dateAfter = twelveMonthsAgo.toISOString().slice(0, 10).replace(/-/g, "");
-
   try {
-    const output = execSync(
-      `yt-dlp --flat-playlist --print "%(id)s|||%(title)s|||%(upload_date)s" --dateafter ${dateAfter} "https://www.youtube.com/${handle}/videos"`,
-      { encoding: "utf-8", timeout: 120_000, stdio: ["pipe", "pipe", "pipe"] },
+    const videos = composioExecute<SupadataChannelVideos>(
+      "SUPADATA_GET_YOUTUBE_CHANNEL_VIDEOS",
+      { channel_id: handle, type: "video", limit: MAX_VIDEOS_PER_CREATOR },
     );
-    const results: { id: string; title: string; uploadDate: string | null }[] = [];
-    for (const raw of output.split("\n")) {
-      const line = raw.trim();
-      if (!line) continue;
-      const [id, title, uploadDate] = line.split("|||");
-      if (id && title) {
-        results.push({
-          id: id.trim(),
-          title: title.trim(),
-          uploadDate: uploadDate?.trim() || null,
-        });
-      }
+    if (!videos.successful || !videos.data?.video_ids) {
+      throw new Error(extractComposioError(videos));
     }
-    // Return only the most recent N videos
-    return results.slice(0, MAX_VIDEOS_PER_CREATOR);
+
+    const results: { id: string; title: string; uploadDate: string | null }[] = [];
+    for (const videoId of videos.data.video_ids) {
+      const meta = composioExecute<SupadataVideoMeta>(
+        "SUPADATA_GET_YOUTUBE_VIDEO",
+        { video_id: videoId },
+      );
+      if (!meta.successful || !meta.data) {
+        console.error(`[${timestamp()}] Failed to fetch metadata for ${videoId}: ${extractComposioError(meta)}`);
+        continue;
+      }
+      results.push({
+        id: meta.data.id,
+        title: meta.data.title,
+        uploadDate: meta.data.uploadDate ?? null,
+      });
+    }
+
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    return results
+      .filter((video) => !video.uploadDate || new Date(video.uploadDate) >= twelveMonthsAgo)
+      .slice(0, MAX_VIDEOS_PER_CREATOR);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[${timestamp()}] Failed to fetch video list for ${handle}: ${msg}`);
@@ -104,14 +159,28 @@ function fetchVideoList(
 }
 
 /**
- * Fetch transcript for a single video using the youtube-transcript package.
+ * Fetch transcript for a single video using Supadata via Composio.
  * Returns the joined transcript text or null if unavailable.
  */
 async function fetchTranscript(videoId: string): Promise<string | null> {
   try {
-    const items = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" });
-    if (!items || items.length === 0) return null;
-    const transcript = items.map((i) => i.text).join(" ");
+    const result = composioExecute<{ content?: readonly SupadataTranscriptChunk[] | string }>(
+      "SUPADATA_GET_TRANSCRIPT",
+      { url: `https://youtu.be/${videoId}`, text: false, lang: "en" },
+    );
+    if (!result.successful) return null;
+
+    let payload: { content?: readonly SupadataTranscriptChunk[] | string } | undefined = result.data;
+    if (result.storedInFile && result.outputFilePath) {
+      payload = JSON.parse(fs.readFileSync(result.outputFilePath, "utf-8"))?.data;
+    }
+    if (!payload) return null;
+
+    if (typeof payload.content === "string") {
+      return payload.content.trim() || null;
+    }
+    if (!Array.isArray(payload.content) || payload.content.length === 0) return null;
+    const transcript = payload.content.map((i) => i.text).join(" ");
     return transcript.trim() || null;
   } catch {
     return null;
@@ -148,7 +217,7 @@ async function processCreator(creator: Creator): Promise<{ scraped: number; skip
       continue;
     }
 
-    // Fetch transcript via youtube-transcript package
+    // Fetch transcript via Supadata/Composio
     const transcript = await fetchTranscript(video.id);
     if (!transcript) {
       console.log(`[${timestamp()}]   No subtitles for: ${video.title} (${video.id})`);

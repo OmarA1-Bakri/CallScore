@@ -57,8 +57,8 @@ function buildCall(overrides: Partial<Call> = {}): Call {
   };
 }
 
-test("tracked creator source of truth stays at 20", () => {
-  assert.equal(TRACKED_CREATOR_COUNT, 20);
+test("tracked creator source of truth supports the expanded index universe", () => {
+  assert.equal(TRACKED_CREATOR_COUNT, 53);
 });
 
 test("public Alpha Score equals the documented component sum", () => {
