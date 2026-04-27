@@ -1077,3 +1077,23 @@ body::before {
   @media (max-width: 1080px) { .signals-metrics, .signals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .signal-ledger-head { display: none; } .signal-ledger-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 760px) { .signals-hero, .signals-metrics, .signals-grid, .signal-ledger-row { grid-template-columns: 1fr; } }
 }
+
+@layer components {
+  .compare-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 26px; align-items: end; padding: 18px 0 30px; border-bottom: var(--hair-strong); }
+  .compare-hero h1 { max-width: 940px; color: var(--ink-900); font-family: var(--font-serif); font-size: clamp(40px, 6.5vw, 84px); font-weight: 400; letter-spacing: -.04em; line-height: .94; }
+  .compare-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+  .compare-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 24px; align-items: stretch; }
+  .compare-card { display: grid; gap: 16px; align-content: start; border: var(--hair-strong); background: var(--ink-050); padding: 18px; }
+  .compare-card-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .compare-card h2 { color: var(--ink-900); font-family: var(--font-serif); font-size: 32px; font-weight: 400; line-height: 1; }
+  .compare-card p { min-height: 68px; color: var(--ink-600); line-height: 1.5; }
+  .compare-axis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: var(--hair-soft); }
+  .compare-axis-grid div { padding: 12px; border-right: var(--hair-soft); border-bottom: var(--hair-soft); }
+  .compare-axis-grid div:nth-child(2n) { border-right: 0; }
+  .compare-axis-grid div:nth-last-child(-n+2) { border-bottom: 0; }
+  .compare-axis-grid dt { color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+  .compare-axis-grid dd { margin-top: 8px; color: var(--ink-900); font-family: var(--font-serif); font-size: 24px; }
+  .compare-notes { display: flex; gap: 12px; align-items: center; margin-top: 24px; border-top: var(--hair-soft); padding-top: 18px; color: var(--ink-600); }
+  @media (max-width: 1080px) { .compare-summary, .compare-board { grid-template-columns: 1fr; } .compare-card p { min-height: 0; } }
+  @media (max-width: 760px) { .compare-hero { grid-template-columns: 1fr; } .compare-axis-grid { grid-template-columns: 1fr; } .compare-axis-grid div { border-right: 0; } }
+}
