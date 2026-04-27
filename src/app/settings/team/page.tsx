@@ -1,15 +1,19 @@
+import type { Metadata } from "next";
 import { PageShell } from "@/components/layout";
+import { SettingsCard, SettingsHero } from "../_components";
 
-export default function Page() {
+export const metadata: Metadata = { title: "Team Settings | CryptoTubers Ranked" };
+
+export default function TeamSettingsPage() {
   return (
-    <PageShell className="shell-placeholder">
-      <p className="shell-kicker">Team settings</p>
-      <h1>Manage seats, SSO, and roles.</h1>
-      <p className="shell-lede">Phase 1 establishes route chrome and navigation; full data composition lands in later route phases.</p>
-      <div className="shell-panel">
-        <span className="shell-square" aria-hidden="true" />
-        <p>Team admin/member behavior is backend gated by OQ-32.</p>
-      </div>
+    <PageShell>
+      <SettingsHero kicker="Team settings" title="Manage seats, SSO, and research roles." lede="Team settings are a roadmap surface for funds, research desks, and creator-monitoring teams that need shared alert routing." gate="team roadmap">
+        <section className="settings-grid">
+          <SettingsCard title="Seat management" copy="Invite analysts and assign read-only, alert-manager, or owner-style roles once team accounts land." action="Request seats" />
+          <SettingsCard title="Shared watchlists" copy="Create team-level creator and asset lists so signal feeds are consistent across researchers." action="Request shared lists" />
+          <SettingsCard title="Audit trail" copy="Track who changed alert routing and which creator/signal decisions were exported." action="Request audit trail" />
+        </section>
+      </SettingsHero>
     </PageShell>
   );
 }
