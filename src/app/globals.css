@@ -1015,3 +1015,40 @@ body::before {
   @media (max-width: 1120px) { .calls-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .calls-ledger-head { display: none; } .calls-ledger-row { grid-template-columns: 1fr 1fr; align-items: start; } }
   @media (max-width: 760px) { .calls-hero, .calls-ledger-row, .calls-metrics { grid-template-columns: 1fr; } }
 }
+
+@layer components {
+  .call-backlink { display: inline-flex; margin-bottom: 20px; color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .call-backlink:hover { color: var(--accent); }
+  .call-hero { display: grid; grid-template-columns: 160px minmax(0, 1fr) 280px; gap: 26px; align-items: end; padding: 18px 0 30px; border-bottom: var(--hair-strong); }
+  .call-asset-lockup { display: grid; gap: 10px; align-content: start; justify-items: start; }
+  .call-hero h1 { max-width: 880px; color: var(--ink-900); font-family: var(--font-serif); font-size: clamp(38px, 6vw, 78px); font-weight: 400; letter-spacing: -.04em; line-height: .94; text-transform: capitalize; }
+  .call-hero h1 em { color: var(--accent); font-style: italic; }
+  .call-score-card { display: grid; gap: 12px; border: var(--hair-strong); background: var(--ink-050); padding: 18px; color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+  .call-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+  .call-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; margin-top: 24px; }
+  .call-body-secondary { align-items: start; }
+  .call-panel { border: var(--hair-strong); background: var(--ink-050); padding: 18px; }
+  .call-section-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 14px; }
+  .call-horizons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: var(--hair-soft); }
+  .call-horizon-card { min-height: 150px; padding: 16px; border-right: var(--hair-soft); color: var(--ink-600); }
+  .call-horizon-card:last-child { border-right: 0; }
+  .call-horizon-card span, .call-quote span { display: block; color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .call-horizon-card strong { display: block; margin: 14px 0 8px; color: var(--ink-900); font-family: var(--font-serif); font-size: 28px; font-weight: 400; }
+  .call-rail { display: grid; gap: 14px; align-content: start; }
+  .call-rail dl, .call-component-grid { display: grid; gap: 0; border: var(--hair-soft); }
+  .call-rail dl div, .call-component-grid div { display: flex; justify-content: space-between; gap: 12px; padding: 12px; border-bottom: var(--hair-soft); }
+  .call-rail dl div:last-child, .call-component-grid div:last-child { border-bottom: 0; }
+  .call-rail dt, .call-component-grid dt { color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+  .call-rail dd, .call-component-grid dd { color: var(--ink-900); text-align: right; }
+  .call-component-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: 14px; }
+  .call-component-grid div { display: grid; border-bottom: 0; border-right: var(--hair-soft); }
+  .call-component-grid div:last-child { border-right: 0; }
+  .call-component-grid dd { margin-top: 8px; font-family: var(--font-serif); font-size: 28px; text-align: left; }
+  .call-muted { color: var(--ink-600); }
+  .call-quote { display: block; border: var(--hair-strong); background: var(--ink-900); color: var(--ink-150); padding: 22px; font-family: var(--font-serif); font-size: 21px; line-height: 1.45; }
+  .call-quote span { color: var(--accent); margin-bottom: 12px; }
+  .call-quote small { display: block; margin-top: 14px; color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; line-height: 1.5; }
+  .call-quote-empty { color: var(--ink-500); }
+  @media (max-width: 1120px) { .call-hero, .call-body { grid-template-columns: 1fr; } .call-metrics, .call-horizons { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) { .call-metrics, .call-horizons, .call-component-grid { grid-template-columns: 1fr; } .call-horizon-card, .call-component-grid div { border-right: 0; border-bottom: var(--hair-soft); } }
+}
