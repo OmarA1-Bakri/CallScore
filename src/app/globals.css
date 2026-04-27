@@ -1052,3 +1052,28 @@ body::before {
   @media (max-width: 1120px) { .call-hero, .call-body { grid-template-columns: 1fr; } .call-metrics, .call-horizons { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 760px) { .call-metrics, .call-horizons, .call-component-grid { grid-template-columns: 1fr; } .call-horizon-card, .call-component-grid div { border-right: 0; border-bottom: var(--hair-soft); } }
 }
+
+@layer components {
+  .signals-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 26px; align-items: end; padding: 18px 0 30px; border-bottom: var(--hair-strong); }
+  .signals-hero h1 { max-width: 980px; color: var(--ink-900); font-family: var(--font-serif); font-size: clamp(40px, 6.4vw, 82px); font-weight: 400; letter-spacing: -.04em; line-height: .94; }
+  .signals-metrics, .signals-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 24px; }
+  .signal-card { display: grid; gap: 16px; border: var(--hair-strong); background: var(--ink-050); padding: 18px; min-height: 260px; }
+  .signal-card-top, .signal-card-actions, .signal-asset, .asset-cluster-strip a { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .signal-card h2 { color: var(--ink-900); font-family: var(--font-serif); font-size: 30px; font-weight: 400; line-height: 1; }
+  .signal-card p { color: var(--ink-600); line-height: 1.55; }
+  .signal-card-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: var(--hair-soft); margin-top: auto; }
+  .signal-card-stats div { padding: 12px; border-right: var(--hair-soft); }
+  .signal-card-stats div:last-child { border-right: 0; }
+  .signal-card-stats span, .signal-ledger-head { color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }
+  .signal-card-stats strong { display: block; margin-top: 6px; color: var(--ink-900); font-family: var(--font-serif); font-size: 24px; font-weight: 400; }
+  .signal-card-actions { justify-content: space-between; border-top: var(--hair-soft); padding-top: 12px; }
+  .signal-card-actions a { color: var(--accent); font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+  .signal-ledger { margin-top: 24px; border-top: var(--hair-strong); }
+  .signal-ledger-head, .signal-ledger-row { display: grid; grid-template-columns: 170px 110px 1fr 90px 90px 110px; gap: 12px; align-items: center; }
+  .signal-ledger-head { padding: 10px 0; }
+  .signal-ledger-row { min-height: 70px; padding: 12px 0; border-top: var(--hair-soft); color: var(--ink-700); }
+  .asset-cluster-strip { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+  .asset-cluster-strip a { border: var(--hair-soft); background: var(--ink-050); padding: 10px 12px; }
+  @media (max-width: 1080px) { .signals-metrics, .signals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .signal-ledger-head { display: none; } .signal-ledger-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px) { .signals-hero, .signals-metrics, .signals-grid, .signal-ledger-row { grid-template-columns: 1fr; } }
+}
