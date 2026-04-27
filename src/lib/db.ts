@@ -11,7 +11,7 @@ export const DATABASE_URL_ENV_KEYS = [
 ] as const;
 
 export function resolveDatabaseUrl(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Record<string, string | undefined> = process.env,
 ): string {
   for (const key of DATABASE_URL_ENV_KEYS) {
     const value = env[key];
