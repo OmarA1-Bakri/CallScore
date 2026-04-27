@@ -64,7 +64,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} dark`}>
       <body className="font-sans bg-ink-0 text-ink-700 min-h-screen flex flex-col">
         <Masthead />
-        <main className="relative z-content flex-1">{children}</main>
+        <div className="relative z-content flex-1">{children}</div>
         <Footer />
         <FloatingFeedbackButton />
       </body>
