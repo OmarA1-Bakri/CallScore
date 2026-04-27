@@ -1,14 +1,30 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter_Tight, JetBrains_Mono, Source_Serif_4 } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingFeedbackButton from "@/components/FloatingFeedbackButton";
 import "./globals.css";
 
-const inter = Inter({
+const serif = Source_Serif_4({
   subsets: ["latin"],
+  weight: ["400", "500"],
+  style: ["normal", "italic"],
+  variable: "--font-serif",
   display: "swap",
-  variable: "--font-inter",
+});
+
+const sans = Inter_Tight({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
+  variable: "--font-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -36,7 +52,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0f",
+  themeColor: "#0A0A0B",
 };
 
 interface RootLayoutProps {
@@ -45,8 +61,8 @@ interface RootLayoutProps {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en" className={`${inter.variable} dark`}>
-      <body className={`${inter.className} min-h-screen flex flex-col`}>
+    <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} dark`}>
+      <body className="font-sans bg-ink-0 text-ink-700 min-h-screen flex flex-col">
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
