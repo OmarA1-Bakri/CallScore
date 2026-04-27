@@ -1174,3 +1174,35 @@ body::before {
   @media (max-width: 980px) { .settings-grid, .settings-grid-two { grid-template-columns: 1fr; } }
   @media (max-width: 760px) { .settings-hero { grid-template-columns: 1fr; } }
 }
+
+@layer components {
+  @media (max-width: 640px) {
+    .mast { position: sticky; }
+    .mast-in { grid-template-columns: 1fr; gap: 10px; padding: 10px 16px 12px; align-items: start; }
+    .brand-wordmark { width: fit-content; }
+    .brand-main { font-size: 18px; }
+    .app-nav { width: calc(100vw - 32px); gap: 16px; padding: 8px 0 2px; scroll-snap-type: x proximity; }
+    .app-nav a { min-height: 32px; display: inline-flex; align-items: center; scroll-snap-align: start; }
+    .mast-actions { width: 100%; justify-content: space-between; }
+    .cmd-k { display: none; }
+    .mast-user { min-height: 34px; }
+    .mast-cta, .mast-auth-link, .ui-button { min-height: 40px; justify-content: center; }
+    .page-shell { padding: 28px 16px 80px; overflow-x: clip; }
+    .shell-lede { font-size: 16px; line-height: 1.55; }
+    .controls-row { grid-template-columns: 1fr; gap: 12px; }
+    .controls-filters { overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+    .controls-filters::-webkit-scrollbar { display: none; }
+    .search-field { width: 100%; }
+    .segmented { width: 100%; overflow-x: auto; }
+    .segmented button { flex: 1 0 auto; min-height: 40px; }
+    .leaderboard-layout, .profile-body, .call-body, .dashboard-grid { gap: 14px; }
+    .leaderboard-table, .calls-ledger, .signal-ledger, .pricing-table { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; overflow-x: auto; scrollbar-width: thin; }
+    .leaderboard-table table { min-width: 760px; }
+    .profile-actions, .call-asset-lockup, .signal-card-actions { align-items: stretch; }
+    .profile-actions > *, .signal-card-actions > *, .compare-card .ui-button, .pricing-card .ui-button, .settings-card .ui-button { width: 100%; }
+    .profile-avatar { width: 68px; height: 68px; font-size: 23px; }
+    .profile-id h1, .calls-hero h1, .call-hero h1, .signals-hero h1, .compare-hero h1, .dashboard-hero h1, .pricing-hero h1, .method-hero h1, .settings-hero h1 { font-size: clamp(36px, 14vw, 54px); line-height: .96; }
+    .signal-card, .compare-card, .pricing-card, .settings-card, .dashboard-panel, .call-panel, .profile-panel { padding: 16px; }
+    .premium-lock-veil { min-height: 44px; }
+  }
+}
