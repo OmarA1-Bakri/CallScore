@@ -944,3 +944,24 @@ body::before {
   .snapshot-rail article { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; border-top: var(--hair-soft); padding-top: 12px; color: var(--ink-600); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
   @media (max-width: 900px) { .thesis-block { grid-template-columns: 1fr; gap: 24px; } }
 }
+
+@layer components {
+  .leaderboard-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0; border: var(--hair-strong); }
+  .leaderboard-table-wrap { overflow-x: auto; background: var(--ink-050); }
+  .leaderboard-table { width: 100%; min-width: 860px; border-collapse: collapse; }
+  .leaderboard-table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .leaderboard-table th { height: 34px; padding: 0 14px; border-bottom: var(--hair-strong); color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; font-weight: 400; letter-spacing: .1em; text-align: left; text-transform: uppercase; }
+  .leaderboard-table td { height: var(--row); padding: 10px 14px; border-bottom: var(--hair-soft); color: var(--ink-700); vertical-align: middle; }
+  .leaderboard-table tbody tr:hover { background: var(--ink-100); }
+  .creator-cell { display: grid; gap: 5px; min-width: 210px; }
+  .creator-cell a { color: var(--ink-900); font-family: var(--font-serif); font-size: 17px; font-style: italic; line-height: 1.1; }
+  .creator-cell > span { color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em; }
+  .creator-cell > div, .source-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .tabular-cell { color: var(--ink-900); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .leaderboard-empty { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; min-height: 220px; padding: 28px; background: var(--ink-050); color: var(--ink-600); }
+  @media (max-width: 1000px) { .leaderboard-layout { grid-template-columns: 1fr; } }
+}
+
+@layer components {
+  .leaderboard-proof-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding-top: 18px; border-top: var(--hair-soft); }
+}

@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
-import { Trophy, BarChart3, Target, Users } from "lucide-react";
-import Leaderboard from "@/components/Leaderboard";
-import ConsensusSignals from "@/components/ConsensusSignals";
-import PeriodFilter from "@/components/PeriodFilter";
+import { PageShell } from "@/components/layout";
+import {
+  ConsensusSnapshotRail,
+  ControlsRow,
+  LeaderboardTable,
+  ThesisBlock,
+} from "@/components/composites";
+import { Badge } from "@/components/primitives";
 import { query } from "@/lib/db";
-import { getPublicCounts, PUBLIC_COUNT_LABELS } from "@/lib/public-counts";
+import { getPublicCounts } from "@/lib/public-counts";
 import { getCreatorTier } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import type {
@@ -12,17 +16,9 @@ import type {
   CreatorStats,
   Call,
   LeaderboardRow,
-  ConsensusSignal,
   Period,
   Tier,
 } from "@/lib/types";
-
-export const metadata: Metadata = {
-  title: "Crypto YouTuber Leaderboard — Who Actually Beats The Market? | CryptoTubers Ranked",
-  description:
-    "See which crypto YouTubers have the best track record, with every public Alpha Score tied to the published methodology.",
-  alternates: { canonical: "/" },
-};
 
 const VALID_PERIODS: readonly Period[] = ["all_time", "90d", "30d"];
 
@@ -230,16 +226,6 @@ export default async function HomePage({ searchParams }: PageProps) {
     }
   }
 
-  // Fetch consensus signals
-  let signals: ConsensusSignal[] = [];
-  try {
-    signals = await query<ConsensusSignal>(
-      `SELECT * FROM consensus_signals ORDER BY signal_date DESC LIMIT 10`,
-    );
-  } catch {
-    // No signals yet
-  }
-
   let publicCounts = await getPublicCounts().catch(() => null);
   if (!publicCounts) {
     publicCounts = {
@@ -268,99 +254,32 @@ export default async function HomePage({ searchParams }: PageProps) {
     // Stats not available
   }
 
+  const periodLabel = period === "all_time" ? "all" : period;
+  const liveSubtitle = `Calls scored against the chain · N≥10 · ranked by α (log-return excess vs benchmark) · ${periodLabel} window.`;
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Hero */}
-      <section className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-4 py-1.5 mb-6">
-          <Trophy className="w-4 h-4 text-brand-gold" />
-          <span className="text-brand-gold text-xs font-medium">
-            {totalCalls} calls scored against real price data
-          </span>
-        </div>
+    <PageShell>
+      <ThesisBlock
+        title="Who's actually worth listening to."
+        subtitle={liveSubtitle}
+        creators={publicCounts.rankedCreators || publicCounts.trackedCreators}
+        calls={Number(totalCalls)}
+        lastUpdated="public ledger"
+      />
 
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
-          Most crypto YouTubers are noise.
-          <br />
-          <span className="text-gradient-gold">
-            We found the signal.
-          </span>
-        </h1>
+      <ControlsRow />
 
-        <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-          We track {publicCounts.trackedCreators} crypto YouTubers and score
-          every eligible altcoin call against real market data. The current
-          leaderboard includes {publicCounts.rankedCreators} creators with
-          scored call histories across 18.7M candles of market data.
-        </p>
-
-        {/* Stats row */}
-        <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-8">
-          <StatPill
-            icon={Users}
-            label={PUBLIC_COUNT_LABELS.trackedCreators}
-            value={String(publicCounts.trackedCreators)}
-          />
-          <StatPill
-            icon={BarChart3}
-            label={PUBLIC_COUNT_LABELS.scoredCalls}
-            value={totalCalls}
-          />
-          <StatPill
-            icon={Target}
-            label="Creators Beating BTC"
-            value={`${publicCounts.beatBtcCreators} of ${publicCounts.rankedCreators}`}
-          />
-        </div>
+      <section className="leaderboard-layout" aria-label="Leaderboard and consensus snapshot">
+        <LeaderboardTable rows={leaderboard} />
+        <ConsensusSnapshotRail />
       </section>
 
-      {/* Period filter + Leaderboard */}
-      <section className="mb-12">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-white font-bold text-xl">Leaderboard</h2>
-            <p className="text-gray-500 text-sm mt-1">
-              Ranked by average Alpha Score across scored calls
-            </p>
-          </div>
-          <PeriodFilter value={period} />
-        </div>
-
-        {leaderboard.length > 0 ? (
-          <Leaderboard rows={leaderboard} />
-        ) : (
-          <div className="glass-card p-12 text-center">
-            <p className="text-gray-500">
-              Leaderboard data is being computed. Run the data pipeline to populate scores.
-            </p>
-          </div>
-        )}
+      <section className="leaderboard-proof-strip" aria-label="Public data coverage">
+        <Badge tone="accent">{publicCounts.trackedCreators} tracked creators</Badge>
+        <Badge tone="neutral">{publicCounts.scoredCalls} scored calls</Badge>
+        <Badge tone="pos">{publicCounts.beatBtcCreators} beating BTC</Badge>
+        <Badge tone="lock">Pro filters pending</Badge>
       </section>
-
-      {/* Consensus Signals */}
-      <section className="mb-12 max-w-lg">
-        <ConsensusSignals signals={signals} />
-      </section>
-    </div>
-  );
-}
-
-interface StatPillProps {
-  readonly icon: React.ComponentType<{ className?: string }>;
-  readonly label: string;
-  readonly value: string;
-}
-
-function StatPill({ icon: Icon, label, value }: StatPillProps) {
-  return (
-    <div className="flex items-center gap-2 bg-brand-card border border-brand-border rounded-lg px-4 py-2.5">
-      <Icon className="w-4 h-4 text-brand-gold" />
-      <div className="text-left">
-        <p className="text-white font-bold text-sm tabular-nums">{value}</p>
-        <p className="text-gray-500 text-[10px] uppercase tracking-wider">
-          {label}
-        </p>
-      </div>
-    </div>
+    </PageShell>
   );
 }
