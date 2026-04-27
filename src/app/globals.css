@@ -920,3 +920,27 @@ body::before {
     color: var(--ink-700);
   }
 }
+
+@layer components {
+  .thesis-block { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 56px; padding-bottom: 28px; border-bottom: var(--hair-strong); }
+  .thesis-block h1 { color: var(--ink-900); font-family: var(--font-serif); font-size: clamp(36px,5vw,64px); font-style: italic; font-weight: 400; letter-spacing: -0.025em; line-height: 1.02; max-width: 820px; }
+  .thesis-block p { color: var(--ink-600); max-width: 72ch; margin-top: 14px; }
+  .thesis-stat-panel, .metric-card, .snapshot-rail { border: var(--hair-strong); background: var(--ink-050); padding: 18px; }
+  .thesis-stat-panel { display: grid; gap: 16px; align-content: start; }
+  .thesis-stat-panel dl { display: grid; gap: 10px; margin: 0; }
+  .thesis-stat-panel div { display: flex; justify-content: space-between; border-top: var(--hair-soft); padding-top: 10px; }
+  .thesis-stat-panel dt { color: var(--ink-500); font-family: var(--font-mono); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+  .thesis-stat-panel dd { color: var(--ink-900); font-family: var(--font-mono); margin: 0; }
+  .controls-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 18px 0; }
+  .controls-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+  .composite-demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-top: 24px; }
+  .metric-card { display: grid; gap: 12px; align-content: start; }
+  .metric-kicker { color: var(--accent); font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .metric-main { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; }
+  .metric-main h3 { color: var(--ink-900); font-family: var(--font-serif); font-size: 22px; font-weight: 400; }
+  .metric-main strong { color: var(--ink-900); font-family: var(--font-mono); font-size: 18px; font-weight: 500; }
+  .metric-card > p:not(.metric-kicker) { color: var(--ink-600); }
+  .snapshot-rail { display: grid; gap: 12px; align-content: start; }
+  .snapshot-rail article { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; border-top: var(--hair-soft); padding-top: 12px; color: var(--ink-600); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
+  @media (max-width: 900px) { .thesis-block { grid-template-columns: 1fr; gap: 24px; } }
+}
