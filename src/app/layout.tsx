@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter_Tight, JetBrains_Mono, Source_Serif_4 } from "next/font/google";
-import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingFeedbackButton from "@/components/FloatingFeedbackButton";
+import { Masthead } from "@/components/layout";
 import "./globals.css";
 
 const serif = Source_Serif_4({
@@ -63,8 +63,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} dark`}>
       <body className="font-sans bg-ink-0 text-ink-700 min-h-screen flex flex-col">
-        <Header />
-        <main className="flex-1">{children}</main>
+        <Masthead />
+        <main className="relative z-content flex-1">{children}</main>
         <Footer />
         <FloatingFeedbackButton />
       </body>

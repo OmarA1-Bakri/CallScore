@@ -1,124 +1,51 @@
 import Link from "next/link";
-import Image from "next/image";
+
+const NAV_LINKS = [
+  { href: "/", label: "Leaderboard" },
+  { href: "/signals", label: "Signals" },
+  { href: "/calls", label: "Calls" },
+  { href: "/compare", label: "Compare" },
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/methodology", label: "Methodology" },
+  { href: "/pricing", label: "Pricing" },
+] as const;
+
+const LEGAL_LINKS = [
+  { href: "/terms", label: "Terms" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/feedback", label: "Feedback" },
+] as const;
 
 export default function Footer() {
   return (
-    <footer className="border-t border-brand-border bg-brand-dark">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Top section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          {/* Brand */}
-          <div>
-            <div className="flex items-center gap-2.5 mb-3">
-              <Image
-                src="/logo-icon.png"
-                alt="CryptoTubers Ranked"
-                width={468}
-                height={468}
-                className="h-8 w-auto"
-              />
-              <div>
-                <span className="text-white font-extrabold text-sm tracking-tight leading-none">
-                  CryptoTubers
-                </span>
-                <span className="block text-brand-gold font-bold text-[10px] tracking-[0.2em] uppercase leading-none mt-0.5">
-                  Ranked
-                </span>
-              </div>
-            </div>
-            <p className="text-gray-500 text-sm leading-relaxed">
-              We track, rank, and score the top 20 crypto YouTube influencers
-              by the actual accuracy of their altcoin calls.
-            </p>
-          </div>
-
-          {/* Links */}
-          <div>
-            <h2 className="text-white font-semibold text-sm mb-3">Navigate</h2>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
-                >
-                  Leaderboard
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/methodology"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
-                >
-                  Methodology
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/pricing"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
-                >
-                  Pricing
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/feedback"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
-                >
-                  Give Feedback
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/about"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
-                >
-                  About
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <h2 className="text-white font-semibold text-sm mb-3">Legal</h2>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  href="/terms"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
-                >
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/privacy"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
-                >
-                  Privacy Policy
-                </Link>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Disclaimer */}
-        <div className="border-t border-brand-border pt-6">
-          <p className="text-gray-600 text-xs leading-relaxed mb-4">
-            <strong className="text-gray-500">Financial Disclaimer:</strong>{" "}
-            CRYPTO-TUBER RANKED is an informational analytics platform only. Nothing
-            on this site constitutes financial advice, investment recommendations,
-            or endorsements. Cryptocurrency investments are highly volatile and
-            carry substantial risk of loss. Past performance of any creator does not
-            guarantee future results. Always do your own research (DYOR) and consult
-            a licensed financial advisor before making any investment decisions.
-          </p>
-          <p className="text-gray-600 text-xs">
-            &copy; {new Date().getFullYear()} CRYPTO-TUBER RANKED. All rights
-            reserved.
+    <footer className="site-footer">
+      <div className="site-footer-in">
+        <div className="footer-brand">
+          <Link href="/" className="brand-wordmark" aria-label="CryptoTubers Ranked home">
+            <span className="brand-main">CryptoTubers</span>
+            <span className="brand-accent">Ranked</span>
+          </Link>
+          <p>
+            Public performance analytics for crypto creator calls. Scores are informational,
+            evidence-linked, and not financial advice.
           </p>
         </div>
+
+        <nav aria-label="Footer navigation" className="footer-links">
+          {NAV_LINKS.map((link) => (
+            <Link key={link.href} href={link.href}>{link.label}</Link>
+          ))}
+        </nav>
+
+        <nav aria-label="Legal navigation" className="footer-legal">
+          {LEGAL_LINKS.map((link) => (
+            <Link key={link.href} href={link.href}>{link.label}</Link>
+          ))}
+        </nav>
+      </div>
+      <div className="site-disclaimer">
+        <strong>Financial disclaimer:</strong> CryptoTubers Ranked is an informational
+        analytics platform only. Nothing here is investment advice or an endorsement.
       </div>
     </footer>
   );
