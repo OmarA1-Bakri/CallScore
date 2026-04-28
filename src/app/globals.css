@@ -3,57 +3,134 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --ink-000: #0A0A0B;
+    --ink-050: #0E0F10;
+    --ink-100: #141517;
+    --ink-150: #1A1B1E;
+    --ink-200: #22242A;
+    --ink-250: #2B2D33;
+    --ink-300: #3A3D44;
+    --ink-400: #5B5F68;
+    --ink-500: #7A7F89;
+    --ink-600: #9CA0A9;
+    --ink-700: #C2C5CC;
+    --ink-800: #E1E3E7;
+    --ink-900: #F4F5F7;
+
+    --accent: #C9A24B;
+    --accent-dim: #8E7235;
+    --accent-low: #3A2F17;
+
+    --pos: #6FA56A;
+    --pos-dim: #3E5D3B;
+    --neg: #D47A70;
+    --neg-dim: #6A3631;
+    --warn: #D97757;
+    --stale: #8A7A5E;
+    --lock: #8C8FA0;
+    --new: #7FA6C9;
+    --lown: #A78C6B;
+
+    --font-serif: "Source Serif 4", Georgia, serif;
+    --font-sans: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --row: 36px;
+    --hair: 1px solid var(--ink-200);
+    --hair-strong: 1px solid var(--ink-250);
+    --hair-soft: 1px solid var(--ink-150);
+
+    --z-page: 0;
+    --z-content: 1;
+    --z-sticky: 10;
+    --z-masthead: 50;
+    --z-drawer-overlay: 59;
+    --z-drawer: 60;
+    --z-sheet-overlay: 64;
+    --z-sheet: 65;
+    --z-popover-overlay: 69;
+    --z-popover: 70;
+    --z-tooltip-overlay: 74;
+    --z-tooltip: 75;
+    --z-modal-overlay: 99;
+    --z-modal: 100;
+    --z-toast: 110;
+  }
+
   html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
+  html,
   body {
-    @apply bg-brand-dark text-white;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background: var(--ink-000);
+    color: var(--ink-700);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    font-feature-settings: "tnum", "ss01";
   }
 
-  /* Focus ring — visible keyboard focus on all interactive elements.
-     Terminal-green per design lock. Offset so it never hugs glyphs. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-page);
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle at 20% 0%, rgba(201, 162, 75, 0.025) 0%, transparent 40%),
+      radial-gradient(circle at 80% 100%, rgba(127, 166, 201, 0.012) 0%, transparent 50%);
+  }
+
+  body > * {
+    position: relative;
+    z-index: var(--z-content);
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--ink-000);
+  }
+
   *:focus-visible {
-    outline: 2px solid #3FD67A;
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
-    border-radius: 4px;
+    border-radius: 2px;
   }
 
-  /* Tabular numbers for data tables */
-  .tabular-nums {
+  .tabular-nums,
+  [class*="text-mono"],
+  [class*="font-mono"] {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-brand-dark;
+    background: var(--ink-000);
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-brand-border rounded-full;
+    background: var(--ink-250);
+    border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-brand-muted;
+    background: var(--ink-400);
   }
 
-  /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #1e1e2e #0a0a0f;
+    scrollbar-color: var(--ink-250) var(--ink-000);
   }
 }
 
-/* Respect prefers-reduced-motion — override smooth scroll + transitions
-   for users who've opted out of motion. */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -70,81 +147,70 @@
 }
 
 @layer components {
-  /* Glassmorphism card */
+  .tok {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 5px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--new);
+    border: 1px dashed var(--new);
+    background: rgba(127, 166, 201, 0.06);
+    border-radius: 2px;
+    vertical-align: 1px;
+  }
+
+  .tok::before { content: "{"; opacity: 0.75; margin-right: 1px; }
+  .tok::after { content: "}"; opacity: 0.75; margin-left: 1px; }
+
   .glass-card {
-    @apply bg-brand-card/80 backdrop-blur-xl border border-brand-border rounded-xl;
+    @apply rounded-none border border-ink-200 bg-ink-50/90 backdrop-blur-bar;
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-200 hover:bg-brand-card-hover hover:border-brand-muted/30;
+    @apply glass-card transition-colors duration-200 hover:bg-ink-100 hover:border-ink-300;
   }
 
-  /* Gold gradient text */
-  .text-gradient-gold {
-    @apply bg-gradient-to-r from-brand-gold to-yellow-400 bg-clip-text text-transparent;
-  }
-
-  /* Purple accent gradient */
+  .text-gradient-gold,
   .text-gradient-purple {
-    @apply bg-gradient-to-r from-brand-accent to-purple-400 bg-clip-text text-transparent;
+    color: var(--accent);
   }
 
-  /* Table row hover effect */
   .table-row-hover {
-    @apply transition-colors duration-150 hover:bg-brand-card-hover/50;
+    @apply transition-colors duration-150 hover:bg-ink-100/80;
   }
 
-  /* Positive/Negative value colors */
-  .value-positive {
-    @apply text-brand-green;
-  }
+  .value-positive { color: var(--pos); }
+  .value-negative { color: var(--neg); }
 
-  .value-negative {
-    @apply text-brand-red;
-  }
-
-  /* Tier badges */
-  .badge-elite {
-    @apply bg-brand-gold/10 text-brand-gold border border-brand-gold/20 px-2 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  .badge-pro {
-    @apply bg-brand-accent/10 text-brand-accent border border-brand-accent/20 px-2 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  .badge-free {
-    @apply bg-brand-muted/10 text-brand-muted border border-brand-muted/20 px-2 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  /* Direction badges */
-  .badge-bullish {
-    @apply bg-brand-green/10 text-brand-green border border-brand-green/20 px-2 py-0.5 rounded-full text-xs font-semibold;
-  }
-
-  .badge-bearish {
-    @apply bg-brand-red/10 text-brand-red border border-brand-red/20 px-2 py-0.5 rounded-full text-xs font-semibold;
-  }
-
+  .badge-elite,
+  .badge-pro,
+  .badge-free,
+  .badge-bullish,
+  .badge-bearish,
   .badge-neutral {
-    @apply bg-brand-muted/10 text-brand-muted border border-brand-muted/20 px-2 py-0.5 rounded-full text-xs font-semibold;
+    @apply inline-flex items-center border px-2 py-0.5 text-xs font-medium;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
   }
 
-  /* Glow effect for elite elements */
-  .glow-gold {
-    box-shadow: 0 0 20px rgba(247, 183, 49, 0.15);
-  }
+  .badge-elite { @apply border-accent/30 bg-accent/10 text-accent; }
+  .badge-pro { @apply border-new/30 bg-new/10 text-new; }
+  .badge-free { @apply border-ink-300 bg-ink-100 text-ink-600; }
+  .badge-bullish { @apply border-pos/30 bg-pos/10 text-pos; }
+  .badge-bearish { @apply border-neg/30 bg-neg/10 text-neg; }
+  .badge-neutral { @apply border-ink-300 bg-ink-100 text-ink-600; }
 
+  .glow-gold,
   .glow-purple {
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+    box-shadow: none;
   }
 }
 
 @layer utilities {
-  .animation-delay-200 {
-    animation-delay: 200ms;
-  }
-
-  .animation-delay-400 {
-    animation-delay: 400ms;
-  }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-400 { animation-delay: 400ms; }
 }
+
