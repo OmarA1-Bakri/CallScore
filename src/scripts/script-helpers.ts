@@ -46,8 +46,6 @@ const MARK_VIDEO_EXTRACTED_SQL =
   "UPDATE videos SET calls_extracted = true, extraction_pass = extraction_pass + 1 WHERE id = $1";
 
 export function loadEnv(): void {
-  if (process.env.NEON_DATABASE_URL) return;
-
   const root = path.resolve(__dirname, "../..");
   const envPath = fs.existsSync(path.join(root, ".env.local"))
     ? path.join(root, ".env.local")

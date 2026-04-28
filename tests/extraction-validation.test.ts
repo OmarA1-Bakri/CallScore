@@ -100,3 +100,36 @@ test("does not reject a valid trading call merely because an exchange is mention
 
   assert.equal(result.isValid, true);
 });
+
+test("rejects prompt/example leakage when raw quote is not in transcript", () => {
+  const result = audit({
+    symbol: "BTCUSDT",
+    quote: "if Bitcoin holds above 80,000 then we can see the next leg up",
+    transcript: "This actual transcript discusses macro liquidity but never says the few-shot example sentence.",
+  });
+
+  assert.equal(result.isValid, false);
+  assert.match(result.reasons.join(" "), /raw quote is not present/i);
+});
+
+test("accepts neutral watch calls when quote has actionable support or resistance level", () => {
+  const quote = "Bitcoin is at support around 40-45000, I think we should wait for it to come there once.";
+  const result = audit({
+    symbol: "BTCUSDT",
+    direction: "neutral",
+    quote,
+  });
+
+  assert.equal(result.isValid, true);
+});
+
+test("accepts Hindi support-zone watch language as actionable", () => {
+  const quote = "बिटकॉइन के अंदर यहां पर एक बड़ी अच्छी खासी सपोर्ट यहां पर दिख रही है। $65,000 के आसपास की है।";
+  const result = audit({
+    symbol: "BTCUSDT",
+    direction: "bullish",
+    quote,
+  });
+
+  assert.equal(result.isValid, true);
+});

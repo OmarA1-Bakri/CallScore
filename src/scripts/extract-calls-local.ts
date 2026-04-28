@@ -3,6 +3,8 @@
  * Scans transcripts for coin mentions + directional signals.
  * Designed for fast initial seed; weekly Gemini pipeline refines accuracy.
  */
+import { fileURLToPath } from "url";
+import * as path from "path";
 import { query } from "../lib/db";
 import { TRACKED_SYMBOLS, SYMBOL_NAMES, SYMBOL_TICKERS } from "../lib/constants";
 import { computeSpecificity } from "../lib/scoring";
@@ -205,10 +207,27 @@ function extractCallsFromTranscript(transcript: string): readonly LocalCall[] {
   return calls;
 }
 
-async function main(): Promise<void> {
+export interface LocalExtractionArgs {
+  readonly limit: number;
+}
+
+function numericArg(argv: readonly string[], name: string, fallback: number): number {
+  const idx = argv.indexOf(`--${name}`);
+  const value = idx >= 0 ? Number(argv[idx + 1]) : fallback;
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+export function parseLocalExtractionArgs(argv: readonly string[]): LocalExtractionArgs {
+  return {
+    limit: numericArg(argv, "limit", 250),
+  };
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
 
-  console.log(`[${timestamp()}] Starting LOCAL call extraction (keyword-based)...`);
+  const { limit } = parseLocalExtractionArgs(argv);
+  console.log(`[${timestamp()}] Starting LOCAL call extraction (keyword-based, limit=${limit})...`);
 
   const videos = await query<{
     id: number;
@@ -224,7 +243,9 @@ async function main(): Promise<void> {
      WHERE v.calls_extracted = false
        AND v.transcript IS NOT NULL
        AND v.transcript_quality > 0.2
-     ORDER BY v.published_at DESC`,
+     ORDER BY v.published_at DESC
+     LIMIT $1`,
+    [limit],
   );
 
   console.log(`[${timestamp()}] Found ${videos.length} videos to process`);
@@ -284,7 +305,13 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err) => {
-  console.error(`[${new Date().toISOString()}] Fatal error:`, err);
-  process.exit(1);
-});
+const isEntryPoint =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isEntryPoint) {
+  main().catch((err) => {
+    console.error(`[${new Date().toISOString()}] Fatal error:`, err);
+    process.exit(1);
+  });
+}
