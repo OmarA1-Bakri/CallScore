@@ -43,19 +43,6 @@ const config: Config = {
         lock: "#8C8FA0",
         new: "#7FA6C9",
         lown: "#A78C6B",
-        // Temporary compatibility aliases for legacy components while routes migrate.
-        brand: {
-          gold: "#C9A24B",
-          "gold-dim": "#8E7235",
-          green: "#6FA56A",
-          red: "#D47A70",
-          dark: "#0A0A0B",
-          card: "#141517",
-          "card-hover": "#1A1B1E",
-          border: "#22242A",
-          muted: "#7A7F89",
-          accent: "#C9A24B",
-        },
       },
       fontFamily: {
         serif: ["var(--font-serif)", "Georgia", "serif"],

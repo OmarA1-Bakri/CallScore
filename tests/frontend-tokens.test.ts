@@ -24,6 +24,15 @@ test("breakpoints match the spec contract (phone ≤480, tab 481-1024, desk ≥1
   assert.equal(screens.desk, "1025px", "desk breakpoint must be 1025px (start of desk range)");
 });
 
+test("tailwind config does not declare a `brand` color block", () => {
+  const colors = config.theme?.extend?.colors as Record<string, unknown>;
+  assert.equal(
+    colors.brand,
+    undefined,
+    "tailwind.config.ts must not re-export `brand` aliases — use spec tokens directly",
+  );
+});
+
 test("no `brand-*` Tailwind aliases remain in src/", () => {
   // Match only the legacy alias names defined in tailwind.config.ts to avoid
   // matching English "brand-new" in code comments.
