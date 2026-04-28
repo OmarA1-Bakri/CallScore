@@ -293,7 +293,7 @@ export default async function HomePage({
           </span>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-ink-900 mb-4 leading-tight">
           Most crypto YouTubers are noise.
           <br />
           <span className="text-gradient-gold">
@@ -301,7 +301,7 @@ export default async function HomePage({
           </span>
         </h1>
 
-        <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
+        <p className="text-ink-600 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
           We track {publicCounts.trackedCreators} crypto YouTubers and score
           every eligible altcoin call against real market data. The current
           leaderboard includes {publicCounts.rankedCreators} creators with
@@ -368,8 +368,8 @@ export default async function HomePage({
       <section className="mb-12">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-white font-bold text-xl">Leaderboard</h2>
-            <p className="text-gray-500 text-sm mt-1">
+            <h2 className="text-ink-900 font-bold text-xl">Leaderboard</h2>
+            <p className="text-ink-500 text-sm mt-1">
               Ranked by average Alpha Score across scored calls
             </p>
           </div>
@@ -380,7 +380,7 @@ export default async function HomePage({
           <Leaderboard rows={leaderboard} />
         ) : (
           <div className="glass-card p-12 text-center">
-            <p className="text-gray-500">
+            <p className="text-ink-500">
               Leaderboard data is being computed. Run the data pipeline to populate scores.
             </p>
           </div>
@@ -422,8 +422,8 @@ function StatPill({ icon: Icon, label, value }: StatPillProps): ReactElement {
     <div className="flex items-center gap-2 bg-ink-100 border border-ink-200 rounded-lg px-4 py-2.5">
       <Icon className="w-4 h-4 text-accent" />
       <div className="text-left">
-        <p className="text-white font-bold text-sm tabular-nums">{value}</p>
-        <p className="text-gray-500 text-[10px] uppercase tracking-wider">
+        <p className="text-ink-900 font-bold text-sm tabular-nums">{value}</p>
+        <p className="text-ink-500 text-[10px] uppercase tracking-wider">
           {label}
         </p>
       </div>

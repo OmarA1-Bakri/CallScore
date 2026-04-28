@@ -33,6 +33,34 @@ test("tailwind config does not declare a `brand` color block", () => {
   );
 });
 
+test("no generic Tailwind gray utilities remain in src/", () => {
+  const offenders: string[] = [];
+  const re = /\b(text|bg|border|ring|placeholder|divide)-gray-\d{2,3}\b/g;
+  for (const file of sourceFiles) {
+    const content = readFileSync(file, "utf8");
+    const matches = content.match(re);
+    if (matches) offenders.push(`${file}: ${Array.from(new Set(matches)).join(", ")}`);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `Found generic gray utilities:\n${offenders.join("\n")}`,
+  );
+});
+
+test("no `text-white` literal remains in src/ (use text-ink-900 per spec)", () => {
+  const offenders: string[] = [];
+  for (const file of sourceFiles) {
+    const content = readFileSync(file, "utf8");
+    if (/\btext-white\b/.test(content)) offenders.push(file);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `Found text-white usages:\n${offenders.join("\n")}`,
+  );
+});
+
 test("no `brand-*` Tailwind aliases remain in src/", () => {
   // Match only the legacy alias names defined in tailwind.config.ts to avoid
   // matching English "brand-new" in code comments.

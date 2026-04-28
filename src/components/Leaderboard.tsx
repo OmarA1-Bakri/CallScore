@@ -29,18 +29,18 @@ function RankCell({ rank }: { readonly rank: number }) {
     );
   }
   if (rank === 2) {
-    return <span className="text-gray-300 font-bold">{rank}</span>;
+    return <span className="text-ink-700 font-bold">{rank}</span>;
   }
   if (rank === 3) {
     return <span className="text-orange-400 font-bold">{rank}</span>;
   }
-  return <span className="text-gray-500 font-medium">{rank}</span>;
+  return <span className="text-ink-500 font-medium">{rank}</span>;
 }
 
 function TrendCell({ trend }: { readonly trend: "up" | "down" | "stable" }) {
   if (trend === "up") return <TrendingUp className="w-4 h-4 text-pos" />;
   if (trend === "down") return <TrendingDown className="w-4 h-4 text-neg" />;
-  return <Minus className="w-4 h-4 text-gray-600" />;
+  return <Minus className="w-4 h-4 text-ink-400" />;
 }
 
 function getInitials(name: string): string {
@@ -75,31 +75,31 @@ function LeaderboardTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-ink-200">
-            <th className="text-left text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 w-12">
+            <th className="text-left text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3 w-12">
               #
             </th>
-            <th className="text-left text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3">
+            <th className="text-left text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3">
               Creator
             </th>
-            <th className="text-left text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3">
+            <th className="text-left text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3">
               Alpha Score
             </th>
-            <th className="text-right text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden sm:table-cell">
+            <th className="text-right text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden sm:table-cell">
               Win Rate
             </th>
-            <th className="text-right text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden sm:table-cell">
+            <th className="text-right text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden sm:table-cell">
               Self-Correction
             </th>
-            <th className="text-right text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden md:table-cell">
+            <th className="text-right text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden md:table-cell">
               Avg Alpha
             </th>
-            <th className="text-right text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden lg:table-cell">
+            <th className="text-right text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden lg:table-cell">
               Scored Calls
             </th>
-            <th className="text-left text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden xl:table-cell">
+            <th className="text-left text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden xl:table-cell">
               Best Call
             </th>
-            <th className="text-center text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden sm:table-cell w-16">
+            <th className="text-center text-ink-500 text-xs font-medium uppercase tracking-wider px-4 py-3 hidden sm:table-cell w-16">
               Trend
             </th>
           </tr>
@@ -131,7 +131,7 @@ function LeaderboardTable({
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-white font-medium group-hover:text-accent transition-colors truncate">
+                        <p className="text-ink-900 font-medium group-hover:text-accent transition-colors truncate">
                           {row.creator.name}
                         </p>
                         <RankTierBadge
@@ -140,11 +140,11 @@ function LeaderboardTable({
                           wilsonLb={row.stats.wilson_lb}
                         />
                       </div>
-                      <p className="text-gray-500 text-xs truncate">
+                      <p className="text-ink-500 text-xs truncate">
                         {row.creator.youtube_handle}
                       </p>
                     </div>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-accent transition-colors shrink-0 hidden md:block" />
+                    <ArrowUpRight className="w-3.5 h-3.5 text-ink-400 group-hover:text-accent transition-colors shrink-0 hidden md:block" />
                   </Link>
                 </td>
                 <td className="px-4 py-3">
@@ -152,11 +152,11 @@ function LeaderboardTable({
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums hidden sm:table-cell">
                   <div className="flex flex-col items-end">
-                    <span className="text-white">
+                    <span className="text-ink-900">
                       {(row.stats.win_rate * 100).toFixed(1)}%
                     </span>
                     {row.stats.wilson_lb > 0 && (
-                      <span className="text-[10px] text-gray-500" title="Wilson 95% lower bound">
+                      <span className="text-[10px] text-ink-500" title="Wilson 95% lower bound">
                         &ge;{(row.stats.wilson_lb * 100).toFixed(0)}%
                       </span>
                     )}
@@ -181,7 +181,7 @@ function LeaderboardTable({
                     {row.stats.avg_alpha_30d.toFixed(1)}%
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-gray-400 hidden lg:table-cell">
+                <td className="px-4 py-3 text-right tabular-nums text-ink-600 hidden lg:table-cell">
                   {row.stats.total_calls}
                 </td>
                 <td className="px-4 py-3 hidden xl:table-cell">
@@ -189,7 +189,7 @@ function LeaderboardTable({
                     <Link
                       href={`/call/${row.best_call.id}`}
                       aria-label={`View ${row.creator.name} best call: ${bestTicker} +${row.best_call.return_30d?.toFixed(0) ?? "?"}%`}
-                      className="text-xs text-gray-400 hover:text-accent transition-colors"
+                      className="text-xs text-ink-600 hover:text-accent transition-colors"
                     >
                       {bestTicker}{" "}
                       <span className="value-positive">
@@ -197,7 +197,7 @@ function LeaderboardTable({
                       </span>
                     </Link>
                   ) : (
-                    <span className="text-gray-600 text-xs">--</span>
+                    <span className="text-ink-400 text-xs">--</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-center hidden sm:table-cell">

@@ -37,7 +37,7 @@ export default function PeriodFilter({ value }: PeriodFilterProps) {
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
             value === period.value
               ? "bg-accent/10 text-accent"
-              : "text-gray-500 hover:text-gray-300"
+              : "text-ink-500 hover:text-ink-700"
           }`}
         >
           {period.label}

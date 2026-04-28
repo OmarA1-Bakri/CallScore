@@ -114,7 +114,7 @@ export default async function CallDetailPage({ params }: PageProps) {
       {/* Back link */}
       <Link
         href={`/creator/${creatorHandle}`}
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-6 transition-colors"
+        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-6 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to {creatorName}
@@ -124,7 +124,7 @@ export default async function CallDetailPage({ params }: PageProps) {
       <section className="glass-card p-6 sm:p-8 mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
           <div className="flex-1">
-            <p className="text-gray-500 text-sm mb-1">
+            <p className="text-ink-500 text-sm mb-1">
               {creatorName} &middot;{" "}
               {new Date(serializedCall.call_date).toLocaleDateString("en-US", {
                 month: "long",
@@ -132,7 +132,7 @@ export default async function CallDetailPage({ params }: PageProps) {
                 year: "numeric",
               })}
             </p>
-            <h1 className="text-2xl font-bold text-white">
+            <h1 className="text-2xl font-bold text-ink-900">
               {ticker} --{" "}
               <span className={isBullish ? "text-pos" : "text-neg"}>
                 {serializedCall.direction.charAt(0).toUpperCase() + serializedCall.direction.slice(1)}
@@ -143,7 +143,7 @@ export default async function CallDetailPage({ params }: PageProps) {
           <div
             className={`text-3xl font-bold tabular-nums ${
               serializedCall.score_status !== "scored"
-                ? "text-gray-400"
+                ? "text-ink-600"
                 : displayScore! >= 60
                 ? "text-pos"
                 : displayScore! >= 40
@@ -232,12 +232,12 @@ export default async function CallDetailPage({ params }: PageProps) {
         ) : (
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-white font-semibold text-sm">Alpha Score</h2>
-              <span className="text-gray-400 font-bold text-lg tabular-nums">
+              <h2 className="text-ink-900 font-semibold text-sm">Alpha Score</h2>
+              <span className="text-ink-600 font-bold text-lg tabular-nums">
                 {scoreValue}
               </span>
             </div>
-            <p className="text-gray-400 text-sm leading-relaxed">
+            <p className="text-ink-600 text-sm leading-relaxed">
               {serializedCall.score_status === "excluded_confidence"
                 ? "This call is displayed publicly, but it is not counted because the extraction did not clear the public 70% confidence threshold."
                 : serializedCall.score_status === "invalid_extraction"
@@ -248,12 +248,12 @@ export default async function CallDetailPage({ params }: PageProps) {
         )}
 
         <div className="glass-card p-5">
-          <h2 className="text-white font-semibold text-sm mb-4">
+          <h2 className="text-ink-900 font-semibold text-sm mb-4">
             Market Context
           </h2>
           <div className="space-y-4">
             <div>
-              <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
+              <p className="text-ink-500 text-xs uppercase tracking-wider mb-1">
                 Market Regime at Call
               </p>
               <div className="flex items-center gap-2">
@@ -261,13 +261,13 @@ export default async function CallDetailPage({ params }: PageProps) {
                   className="w-3 h-3 rounded-full inline-block"
                   style={{ backgroundColor: regimeColor }}
                 />
-                <span className="text-white font-medium text-sm">
+                <span className="text-ink-900 font-medium text-sm">
                   {regimeLabel}
                 </span>
               </div>
             </div>
             <div>
-              <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
+              <p className="text-ink-500 text-xs uppercase tracking-wider mb-1">
                 Regime Difficulty
               </p>
               <div className="flex items-center gap-2">
@@ -277,13 +277,13 @@ export default async function CallDetailPage({ params }: PageProps) {
                     style={{ width: `${serializedCall.regime_difficulty * 100}%` }}
                   />
                 </div>
-                <span className="text-gray-300 text-xs tabular-nums">
+                <span className="text-ink-700 text-xs tabular-nums">
                   {(serializedCall.regime_difficulty * 100).toFixed(0)}%
                 </span>
               </div>
             </div>
             <div>
-              <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
+              <p className="text-ink-500 text-xs uppercase tracking-wider mb-1">
                 Direction Correct
               </p>
               <span
@@ -297,7 +297,7 @@ export default async function CallDetailPage({ params }: PageProps) {
               </span>
             </div>
             <div>
-              <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">
+              <p className="text-ink-500 text-xs uppercase tracking-wider mb-1">
                 Hit Target
               </p>
               <span
@@ -322,18 +322,18 @@ export default async function CallDetailPage({ params }: PageProps) {
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-3">
               <Quote className="w-5 h-5 text-accent" />
-              <h2 className="text-white font-semibold text-sm">
+              <h2 className="text-ink-900 font-semibold text-sm">
                 From the Transcript
               </h2>
             </div>
-            <blockquote className="border-l-2 border-accent/40 pl-4 text-gray-300 text-sm leading-relaxed italic">
+            <blockquote className="border-l-2 border-accent/40 pl-4 text-ink-700 text-sm leading-relaxed italic">
               &ldquo;{serializedCall.raw_quote}&rdquo;
             </blockquote>
-            <p className="text-gray-600 text-xs mt-3">
+            <p className="text-ink-400 text-xs mt-3">
               Extraction confidence: {(serializedCall.extraction_confidence * 100).toFixed(0)}%
             </p>
             {serializedCall.extraction_notes.length > 0 && (
-              <p className="text-gray-600 text-xs mt-2">
+              <p className="text-ink-400 text-xs mt-2">
                 Validation: {serializedCall.extraction_notes.join("; ")}
               </p>
             )}
@@ -353,7 +353,7 @@ interface MiniStatProps {
 function MiniStat({ label, value, badge }: MiniStatProps) {
   return (
     <div>
-      <p className="text-gray-500 text-[10px] uppercase tracking-wider mb-1">
+      <p className="text-ink-500 text-[10px] uppercase tracking-wider mb-1">
         {label}
       </p>
       {badge ? (
@@ -361,7 +361,7 @@ function MiniStat({ label, value, badge }: MiniStatProps) {
           {value}
         </span>
       ) : (
-        <p className="text-white text-sm font-medium capitalize">{value}</p>
+        <p className="text-ink-900 text-sm font-medium capitalize">{value}</p>
       )}
     </div>
   );
@@ -388,19 +388,19 @@ function PriceCard({
 
   return (
     <div className="glass-card p-4">
-      <p className="text-gray-500 text-xs uppercase tracking-wider mb-3">
+      <p className="text-ink-500 text-xs uppercase tracking-wider mb-3">
         {label}
       </p>
       {hasData ? (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-gray-400 text-xs">Price</span>
-            <span className="text-white text-sm tabular-nums">
+            <span className="text-ink-600 text-xs">Price</span>
+            <span className="text-ink-900 text-sm tabular-nums">
               ${priceAfter.toLocaleString()}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-gray-400 text-xs">Return</span>
+            <span className="text-ink-600 text-xs">Return</span>
             <span
               className={`text-sm font-bold tabular-nums ${
                 returnPct >= 0 ? "value-positive" : "value-negative"
@@ -412,8 +412,8 @@ function PriceCard({
           </div>
           {btcReturn !== null && (
             <div className="flex items-center justify-between">
-              <span className="text-gray-400 text-xs">BTC Return</span>
-              <span className="text-gray-300 text-sm tabular-nums">
+              <span className="text-ink-600 text-xs">BTC Return</span>
+              <span className="text-ink-700 text-sm tabular-nums">
                 {btcReturn >= 0 ? "+" : ""}
                 {btcReturn.toFixed(1)}%
               </span>
@@ -421,7 +421,7 @@ function PriceCard({
           )}
           {alphaPct !== null && (
             <div className="flex items-center justify-between border-t border-ink-200 pt-2">
-              <span className="text-gray-400 text-xs font-medium">Alpha</span>
+              <span className="text-ink-600 text-xs font-medium">Alpha</span>
               <span
                 className={`text-sm font-bold tabular-nums ${
                   alphaPct >= 0 ? "value-positive" : "value-negative"
@@ -434,7 +434,7 @@ function PriceCard({
           )}
         </div>
       ) : (
-        <p className="text-gray-600 text-sm">
+        <p className="text-ink-400 text-sm">
           {status === "pending" ? "Pending until the horizon elapses" : "Not yet available"}
         </p>
       )}

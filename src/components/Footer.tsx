@@ -18,7 +18,7 @@ export default function Footer() {
                 className="h-8 w-auto"
               />
               <div>
-                <span className="text-white font-extrabold text-sm tracking-tight leading-none">
+                <span className="text-ink-900 font-extrabold text-sm tracking-tight leading-none">
                   CryptoTubers
                 </span>
                 <span className="block text-accent font-bold text-[10px] tracking-[0.2em] uppercase leading-none mt-0.5">
@@ -26,7 +26,7 @@ export default function Footer() {
                 </span>
               </div>
             </div>
-            <p className="text-gray-500 text-sm leading-relaxed">
+            <p className="text-ink-500 text-sm leading-relaxed">
               We track, rank, and score the top 20 crypto YouTube influencers
               by the actual accuracy of their altcoin calls.
             </p>
@@ -34,12 +34,12 @@ export default function Footer() {
 
           {/* Links */}
           <div>
-            <h2 className="text-white font-semibold text-sm mb-3">Navigate</h2>
+            <h2 className="text-ink-900 font-semibold text-sm mb-3">Navigate</h2>
             <ul className="space-y-2">
               <li>
                 <Link
                   href="/"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                  className="text-ink-500 hover:text-ink-700 transition-colors text-sm"
                 >
                   Leaderboard
                 </Link>
@@ -47,7 +47,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/methodology"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                  className="text-ink-500 hover:text-ink-700 transition-colors text-sm"
                 >
                   Methodology
                 </Link>
@@ -55,7 +55,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/pricing"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                  className="text-ink-500 hover:text-ink-700 transition-colors text-sm"
                 >
                   Pricing
                 </Link>
@@ -63,7 +63,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/feedback"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                  className="text-ink-500 hover:text-ink-700 transition-colors text-sm"
                 >
                   Give Feedback
                 </Link>
@@ -71,7 +71,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/about"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                  className="text-ink-500 hover:text-ink-700 transition-colors text-sm"
                 >
                   About
                 </Link>
@@ -81,12 +81,12 @@ export default function Footer() {
 
           {/* Legal */}
           <div>
-            <h2 className="text-white font-semibold text-sm mb-3">Legal</h2>
+            <h2 className="text-ink-900 font-semibold text-sm mb-3">Legal</h2>
             <ul className="space-y-2">
               <li>
                 <Link
                   href="/terms"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                  className="text-ink-500 hover:text-ink-700 transition-colors text-sm"
                 >
                   Terms of Service
                 </Link>
@@ -94,7 +94,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/privacy"
-                  className="text-gray-500 hover:text-gray-300 transition-colors text-sm"
+                  className="text-ink-500 hover:text-ink-700 transition-colors text-sm"
                 >
                   Privacy Policy
                 </Link>
@@ -105,8 +105,8 @@ export default function Footer() {
 
         {/* Disclaimer */}
         <div className="border-t border-ink-200 pt-6">
-          <p className="text-gray-600 text-xs leading-relaxed mb-4">
-            <strong className="text-gray-500">Financial Disclaimer:</strong>{" "}
+          <p className="text-ink-400 text-xs leading-relaxed mb-4">
+            <strong className="text-ink-500">Financial Disclaimer:</strong>{" "}
             CRYPTO-TUBER RANKED is an informational analytics platform only. Nothing
             on this site constitutes financial advice, investment recommendations,
             or endorsements. Cryptocurrency investments are highly volatile and
@@ -114,7 +114,7 @@ export default function Footer() {
             guarantee future results. Always do your own research (DYOR) and consult
             a licensed financial advisor before making any investment decisions.
           </p>
-          <p className="text-gray-600 text-xs">
+          <p className="text-ink-400 text-xs">
             &copy; {new Date().getFullYear()} CRYPTO-TUBER RANKED. All rights
             reserved.
           </p>

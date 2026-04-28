@@ -42,7 +42,7 @@ export default function Header() {
               priority
             />
             <div className="hidden sm:block">
-              <span className="text-white font-extrabold text-base tracking-tight leading-none">
+              <span className="text-ink-900 font-extrabold text-base tracking-tight leading-none">
                 CryptoTubers
               </span>
               <span className="block text-accent font-bold text-[11px] tracking-[0.2em] uppercase leading-none mt-0.5">
@@ -55,19 +55,19 @@ export default function Header() {
           <nav className="hidden md:flex items-center gap-8">
             <Link
               href="/"
-              className="text-gray-300 hover:text-white transition-colors text-sm font-medium"
+              className="text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium"
             >
               Leaderboard
             </Link>
             <Link
               href="/methodology"
-              className="text-gray-300 hover:text-white transition-colors text-sm font-medium"
+              className="text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium"
             >
               Methodology
             </Link>
             <Link
               href="/pricing"
-              className="text-gray-300 hover:text-white transition-colors text-sm font-medium"
+              className="text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium"
             >
               Pricing
             </Link>
@@ -77,7 +77,7 @@ export default function Header() {
                 <TierBadge tier={session.tier} />
                 <Link
                   href="/api/auth/logout"
-                  className="text-gray-400 hover:text-white transition-colors text-sm flex items-center gap-1.5"
+                  className="text-ink-600 hover:text-ink-900 transition-colors text-sm flex items-center gap-1.5"
                 >
                   <LogOut className="w-4 h-4" />
                   <span className="hidden lg:inline">Logout</span>
@@ -88,7 +88,7 @@ export default function Header() {
                 <Link
                   href="/api/auth/whop"
                   prefetch={false}
-                  className="text-gray-300 hover:text-white transition-colors text-sm flex items-center gap-1.5"
+                  className="text-ink-700 hover:text-ink-900 transition-colors text-sm flex items-center gap-1.5"
                 >
                   <LogIn className="w-4 h-4" />
                   Sign In
@@ -106,7 +106,7 @@ export default function Header() {
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileOpen((prev) => !prev)}
-            className="md:hidden text-gray-400 hover:text-white"
+            className="md:hidden text-ink-600 hover:text-ink-900"
             aria-label="Toggle menu"
           >
             {mobileOpen ? (
@@ -123,21 +123,21 @@ export default function Header() {
             <Link
               href="/"
               onClick={() => setMobileOpen(false)}
-              className="block text-gray-300 hover:text-white transition-colors text-sm font-medium py-2"
+              className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
             >
               Leaderboard
             </Link>
             <Link
               href="/methodology"
               onClick={() => setMobileOpen(false)}
-              className="block text-gray-300 hover:text-white transition-colors text-sm font-medium py-2"
+              className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
             >
               Methodology
             </Link>
             <Link
               href="/pricing"
               onClick={() => setMobileOpen(false)}
-              className="block text-gray-300 hover:text-white transition-colors text-sm font-medium py-2"
+              className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
             >
               Pricing
             </Link>
@@ -150,7 +150,7 @@ export default function Header() {
                 <Link
                   href="/api/auth/logout"
                   onClick={() => setMobileOpen(false)}
-                  className="block text-gray-400 hover:text-white transition-colors text-sm font-medium py-2"
+                  className="block text-ink-600 hover:text-ink-900 transition-colors text-sm font-medium py-2"
                 >
                   Logout
                 </Link>
@@ -161,7 +161,7 @@ export default function Header() {
                   href="/api/auth/whop"
                   prefetch={false}
                   onClick={() => setMobileOpen(false)}
-                  className="block text-gray-300 hover:text-white transition-colors text-sm font-medium py-2"
+                  className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
                 >
                   Sign In
                 </Link>
@@ -205,7 +205,7 @@ function TierBadge({ tier }: { readonly tier: string }) {
   }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-400 border border-gray-700">
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-ink-100 text-ink-600 border border-ink-300">
       Free
     </span>
   );

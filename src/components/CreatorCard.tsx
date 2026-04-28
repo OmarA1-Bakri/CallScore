@@ -34,7 +34,7 @@ function getAvatarColor(name: string): string {
 function TrendIcon({ trend }: { readonly trend: "up" | "down" | "stable" }) {
   if (trend === "up") return <TrendingUp className="w-4 h-4 text-pos" />;
   if (trend === "down") return <TrendingDown className="w-4 h-4 text-neg" />;
-  return <Minus className="w-4 h-4 text-gray-500" />;
+  return <Minus className="w-4 h-4 text-ink-500" />;
 }
 
 export default function CreatorCard({ creator, stats, trend }: CreatorCardProps) {
@@ -53,12 +53,12 @@ export default function CreatorCard({ creator, stats, trend }: CreatorCardProps)
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="text-white font-semibold text-sm truncate">
+            <h3 className="text-ink-900 font-semibold text-sm truncate">
               {creator.name}
             </h3>
             <TrendIcon trend={trend} />
           </div>
-          <p className="text-gray-500 text-xs truncate flex items-center gap-1">
+          <p className="text-ink-500 text-xs truncate flex items-center gap-1">
             {creator.youtube_handle}
             <ExternalLink className="w-3 h-3" />
           </p>
@@ -91,14 +91,14 @@ interface StatItemProps {
 function StatItem({ label, value, positive }: StatItemProps) {
   const valueColor =
     positive === undefined
-      ? "text-white"
+      ? "text-ink-900"
       : positive
         ? "text-pos"
         : "text-neg";
 
   return (
     <div>
-      <p className="text-gray-500 text-[10px] uppercase tracking-wider mb-0.5">
+      <p className="text-ink-500 text-[10px] uppercase tracking-wider mb-0.5">
         {label}
       </p>
       <p className={`text-sm font-semibold tabular-nums ${valueColor}`}>{value}</p>

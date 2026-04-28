@@ -73,7 +73,7 @@ export default function AlphaScoreBadge({
           {roundedScore}
         </span>
       </div>
-      <span className={`${sizeStyles.label} text-gray-500 uppercase tracking-wider font-medium`}>
+      <span className={`${sizeStyles.label} text-ink-500 uppercase tracking-wider font-medium`}>
         Alpha Score
       </span>
     </div>

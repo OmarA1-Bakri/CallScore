@@ -34,7 +34,7 @@ export default function ScoreBreakdown({
   return (
     <div className="glass-card p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-white font-semibold text-sm">Score Breakdown</h2>
+        <h2 className="text-ink-900 font-semibold text-sm">Score Breakdown</h2>
         <span className="text-pos font-bold text-lg tabular-nums">
           {total.toFixed(1)}
         </span>
@@ -48,8 +48,8 @@ export default function ScoreBreakdown({
           return (
             <div key={comp.key}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-gray-400 text-xs">{comp.label}</span>
-                <span className="text-gray-300 text-xs tabular-nums">
+                <span className="text-ink-600 text-xs">{comp.label}</span>
+                <span className="text-ink-700 text-xs tabular-nums">
                   {value.toFixed(1)} / {comp.max}
                 </span>
               </div>

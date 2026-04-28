@@ -94,7 +94,7 @@ export default function FeedbackPage() {
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-8 transition-colors"
+        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-8 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Leaderboard
@@ -109,12 +109,12 @@ export default function FeedbackPage() {
           </span>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4 leading-tight">
+        <h1 className="text-3xl sm:text-4xl font-bold text-ink-900 mb-4 leading-tight">
           Help Us{" "}
           <span className="text-gradient-gold">Improve the Rankings</span>
         </h1>
 
-        <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
+        <p className="text-ink-600 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
           We value your input. Share feedback on how we rank creators, what
           criteria you&apos;d like to see, or if you have suggestions to improve
           accuracy. Your voice shapes this platform, and we&apos;re always
@@ -127,17 +127,17 @@ export default function FeedbackPage() {
         {status === "success" ? (
           <div className="glass-card p-8 text-center">
             <CheckCircle2 className="w-12 h-12 text-pos mx-auto mb-4" />
-            <h2 className="text-white font-bold text-xl mb-2">
+            <h2 className="text-ink-900 font-bold text-xl mb-2">
               Thank You for Your Feedback
             </h2>
-            <p className="text-gray-400 text-sm mb-6">
+            <p className="text-ink-600 text-sm mb-6">
               We appreciate you taking the time to share your thoughts. Your
               feedback helps us build a better platform for everyone.
             </p>
             <button
               type="button"
               onClick={() => setStatus("idle")}
-              className="bg-ink-100 hover:bg-ink-150 text-white border border-ink-200 font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
+              className="bg-ink-100 hover:bg-ink-150 text-ink-900 border border-ink-200 font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
             >
               Send More Feedback
             </button>
@@ -151,10 +151,10 @@ export default function FeedbackPage() {
             <div>
               <label
                 htmlFor="feedback-name"
-                className="block text-gray-300 text-sm font-medium mb-1.5"
+                className="block text-ink-700 text-sm font-medium mb-1.5"
               >
                 Name{" "}
-                <span className="text-gray-600 font-normal">(optional)</span>
+                <span className="text-ink-400 font-normal">(optional)</span>
               </label>
               <input
                 id="feedback-name"
@@ -162,7 +162,7 @@ export default function FeedbackPage() {
                 placeholder="Your name"
                 value={form.name}
                 onChange={(e) => updateField("name", e.target.value)}
-                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
+                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
               />
             </div>
 
@@ -170,10 +170,10 @@ export default function FeedbackPage() {
             <div>
               <label
                 htmlFor="feedback-email"
-                className="block text-gray-300 text-sm font-medium mb-1.5"
+                className="block text-ink-700 text-sm font-medium mb-1.5"
               >
                 Email{" "}
-                <span className="text-gray-600 font-normal">(optional)</span>
+                <span className="text-ink-400 font-normal">(optional)</span>
               </label>
               <input
                 id="feedback-email"
@@ -181,7 +181,7 @@ export default function FeedbackPage() {
                 placeholder="you@example.com"
                 value={form.email}
                 onChange={(e) => updateField("email", e.target.value)}
-                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
+                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
               />
             </div>
 
@@ -189,7 +189,7 @@ export default function FeedbackPage() {
             <div>
               <label
                 htmlFor="feedback-category"
-                className="block text-gray-300 text-sm font-medium mb-1.5"
+                className="block text-ink-700 text-sm font-medium mb-1.5"
               >
                 Category
               </label>
@@ -199,7 +199,7 @@ export default function FeedbackPage() {
                 onChange={(e) =>
                   updateField("category", e.target.value as Category)
                 }
-                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors appearance-none cursor-pointer"
+                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-ink-900 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors appearance-none cursor-pointer"
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -213,7 +213,7 @@ export default function FeedbackPage() {
             <div>
               <label
                 htmlFor="feedback-message"
-                className="block text-gray-300 text-sm font-medium mb-1.5"
+                className="block text-ink-700 text-sm font-medium mb-1.5"
               >
                 Message <span className="text-neg">*</span>
               </label>
@@ -224,7 +224,7 @@ export default function FeedbackPage() {
                 value={form.message}
                 onChange={(e) => updateField("message", e.target.value)}
                 required
-                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors resize-vertical min-h-[120px]"
+                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors resize-vertical min-h-[120px]"
               />
             </div>
 

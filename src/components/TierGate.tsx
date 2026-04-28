@@ -47,12 +47,12 @@ export default function TierGate({ tier, children }: TierGateProps) {
         <div
           className={`text-center p-6 rounded-xl border ${config.borderColor} ${config.bgColor} ${config.glowClass}`}
         >
-          <Icon className="w-8 h-8 mx-auto mb-3 text-gray-400" />
+          <Icon className="w-8 h-8 mx-auto mb-3 text-ink-600" />
           <p className={`text-sm font-bold bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent mb-1`}>
             Upgrade to {config.label}
           </p>
-          <p className="text-gray-500 text-xs mb-1">{config.description}</p>
-          <p className="text-white font-bold text-lg mb-3">{config.price}</p>
+          <p className="text-ink-500 text-xs mb-1">{config.description}</p>
+          <p className="text-ink-900 font-bold text-lg mb-3">{config.price}</p>
           <Link
             href="/pricing"
             className={`inline-block ${config.buttonBg} text-ink-0 font-semibold text-sm px-6 py-2 rounded-lg transition-colors`}

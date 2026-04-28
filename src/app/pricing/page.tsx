@@ -383,7 +383,7 @@ function TierRow({
       >
         ..........................
       </span>
-      <span className="text-white font-bold tabular-nums whitespace-nowrap">
+      <span className="text-ink-900 font-bold tabular-nums whitespace-nowrap">
         {price}
       </span>
       <span

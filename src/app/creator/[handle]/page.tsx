@@ -144,7 +144,7 @@ export default async function CreatorPage({ params }: PageProps) {
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-6 transition-colors"
+        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-6 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Leaderboard
@@ -165,7 +165,7 @@ export default async function CreatorPage({ params }: PageProps) {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+              <h1 className="text-2xl sm:text-3xl font-bold text-ink-900">
                 {creator.name}
               </h1>
               {stats && (
@@ -177,7 +177,7 @@ export default async function CreatorPage({ params }: PageProps) {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mb-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-ink-600 mb-3">
               <span className="flex items-center gap-1">
                 <Youtube className="w-4 h-4 text-red-500" />
                 {creator.youtube_handle}
@@ -208,7 +208,7 @@ export default async function CreatorPage({ params }: PageProps) {
               </a>
               <Link
                 href={`/creator/${encodeURIComponent(creator.youtube_handle)}/backtest`}
-                className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-300 text-sm transition-colors"
+                className="inline-flex items-center gap-1 text-ink-500 hover:text-ink-700 text-sm transition-colors"
                 prefetch={false}
               >
                 simulate returns →
@@ -251,7 +251,7 @@ export default async function CreatorPage({ params }: PageProps) {
           <PerformanceChart data={performance} />
         ) : (
           <div className="glass-card p-5 flex items-center justify-center">
-            <p className="text-gray-500 text-sm">No performance data yet</p>
+            <p className="text-ink-500 text-sm">No performance data yet</p>
           </div>
         )}
       </section>
@@ -266,7 +266,7 @@ export default async function CreatorPage({ params }: PageProps) {
           />
         ) : (
           <div className="glass-card p-12 text-center">
-            <p className="text-gray-500">No calls tracked yet for this creator.</p>
+            <p className="text-ink-500">No calls tracked yet for this creator.</p>
           </div>
         )}
       </section>
@@ -283,14 +283,14 @@ interface StatCardProps {
 function StatCard({ label, value, positive }: StatCardProps) {
   const valueColor =
     positive === undefined
-      ? "text-white"
+      ? "text-ink-900"
       : positive
         ? "text-pos"
         : "text-neg";
 
   return (
     <div className="glass-card p-4 text-center">
-      <p className="text-gray-500 text-[10px] uppercase tracking-wider mb-2">
+      <p className="text-ink-500 text-[10px] uppercase tracking-wider mb-2">
         {label}
       </p>
       <p className={`text-xl font-bold tabular-nums ${valueColor}`}>{value}</p>

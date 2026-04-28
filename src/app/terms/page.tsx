@@ -104,7 +104,7 @@ export default function TermsPage() {
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-8 transition-colors"
+        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-8 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Leaderboard
@@ -112,13 +112,13 @@ export default function TermsPage() {
 
       {/* Page header */}
       <section className="mb-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+        <h1 className="text-3xl sm:text-4xl font-bold text-ink-900 mb-3">
           Terms of Service
         </h1>
-        <p className="text-gray-500 text-sm">
+        <p className="text-ink-500 text-sm">
           Last updated: April 11, 2026
         </p>
-        <p className="text-gray-400 text-sm mt-4 leading-relaxed">
+        <p className="text-ink-600 text-sm mt-4 leading-relaxed">
           By accessing or using CryptoTubers Ranked (cryptotuberranked.com), you
           agree to be bound by these terms. If you do not agree to these terms,
           do not use the platform.
@@ -131,7 +131,7 @@ export default function TermsPage() {
           <p className="text-accent font-semibold text-sm mb-2">
             Financial Disclaimer
           </p>
-          <p className="text-gray-400 text-xs leading-relaxed">
+          <p className="text-ink-600 text-xs leading-relaxed">
             CryptoTubers Ranked is an informational analytics platform only.
             Nothing on this site constitutes financial advice, investment
             recommendations, or endorsements. Cryptocurrency investments are
@@ -145,14 +145,14 @@ export default function TermsPage() {
       <div className="space-y-8">
         {TERMS_SECTIONS.map((section, index) => (
           <section key={section.title} className="glass-card p-6">
-            <h2 className="text-white font-semibold text-base mb-4">
+            <h2 className="text-ink-900 font-semibold text-base mb-4">
               {index + 1}. {section.title}
             </h2>
             <div className="space-y-3">
               {section.content.map((paragraph) => (
                 <p
                   key={paragraph.slice(0, 40)}
-                  className="text-gray-400 text-sm leading-relaxed"
+                  className="text-ink-600 text-sm leading-relaxed"
                 >
                   {paragraph}
                 </p>

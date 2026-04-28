@@ -22,13 +22,13 @@ export default function ConsensusSignals({ signals }: ConsensusSignalsProps) {
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Zap className="w-5 h-5 text-accent" />
-        <h3 className="text-white font-semibold text-sm">Consensus Signals</h3>
+        <h3 className="text-ink-900 font-semibold text-sm">Consensus Signals</h3>
         <span className="badge-elite ml-auto">Alpha</span>
       </div>
 
       {/* Signal list */}
       {signals.length === 0 ? (
-        <p className="text-gray-500 text-sm">No recent consensus signals.</p>
+        <p className="text-ink-500 text-sm">No recent consensus signals.</p>
       ) : (
         <div className="space-y-3">
           {signals.map((signal) => {
@@ -56,7 +56,7 @@ export default function ConsensusSignals({ signals }: ConsensusSignalsProps) {
                 {/* Details */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-white font-semibold text-sm">
+                    <span className="text-ink-900 font-semibold text-sm">
                       {ticker}
                     </span>
                     <span
@@ -67,7 +67,7 @@ export default function ConsensusSignals({ signals }: ConsensusSignalsProps) {
                       {signal.direction}
                     </span>
                   </div>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-ink-500 text-xs">
                     {signal.creator_count} creators &middot;{" "}
                     {formatDate(signal.signal_date)}
                   </p>
