@@ -8,11 +8,12 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // Keep Tailwind's default sm/md/lg/xl breakpoints during the gradual route migration;
-      // add the spec's 3-rail aliases for new frontend work.
+      // Spec breakpoint contract: phone ≤480 · tab 481–1024 · desk ≥1025
+      // (phase-3-development-pack §03). Tailwind defaults sm/md/lg/xl remain
+      // available for legacy components during phased migration.
       screens: {
-        tab: "768px",
-        desk: "1280px",
+        tab: "481px",
+        desk: "1025px",
       },
       colors: {
         ink: {
