@@ -5,22 +5,22 @@ interface AlphaScoreBadgeProps {
 
 function getScoreColor(score: number): string {
   if (score >= 70) return "text-pos";
-  if (score >= 50) return "text-yellow-400";
-  if (score >= 30) return "text-orange-400";
+  if (score >= 50) return "text-accent";
+  if (score >= 30) return "text-warn";
   return "text-neg";
 }
 
 function getBarColor(score: number): string {
   if (score >= 70) return "bg-pos";
-  if (score >= 50) return "bg-yellow-400";
-  if (score >= 30) return "bg-orange-400";
+  if (score >= 50) return "bg-accent";
+  if (score >= 30) return "bg-warn";
   return "bg-neg";
 }
 
 function getGlowColor(score: number): string {
   if (score >= 70) return "shadow-pos/20";
-  if (score >= 50) return "shadow-yellow-400/20";
-  if (score >= 30) return "shadow-orange-400/20";
+  if (score >= 50) return "shadow-accent/20";
+  if (score >= 30) return "shadow-warn/20";
   return "shadow-neg/20";
 }
 
@@ -50,7 +50,7 @@ export default function AlphaScoreBadge({
             cy="50"
             r="42"
             fill="none"
-            stroke="#1e1e2e"
+            stroke="var(--ink-200)"
             strokeWidth="6"
           />
           <circle

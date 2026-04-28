@@ -23,9 +23,9 @@ function getAvatarColor(name: string): string {
     "bg-accent/20 text-accent",
     "bg-accent/20 text-accent",
     "bg-pos/20 text-pos",
-    "bg-blue-500/20 text-blue-400",
-    "bg-pink-500/20 text-pink-400",
-    "bg-cyan-500/20 text-cyan-400",
+    "bg-new/20 text-new",
+    "bg-accent-low/20 text-accent",
+    "bg-new/20 text-new",
   ];
   const index = name.charCodeAt(0) % colors.length;
   return colors[index];

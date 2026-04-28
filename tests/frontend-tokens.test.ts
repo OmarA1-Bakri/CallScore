@@ -61,6 +61,22 @@ test("no `text-white` literal remains in src/ (use text-ink-900 per spec)", () =
   );
 });
 
+test("no out-of-palette Tailwind colors in src/ (yellow/orange/blue/pink/cyan/purple)", () => {
+  const offenders: string[] = [];
+  const re =
+    /\b(text|bg|border|ring|from|to|via|shadow)-(yellow|orange|blue|pink|cyan|purple|indigo|teal|emerald|amber|lime|rose|fuchsia|violet|sky)-\d{2,3}\b/g;
+  for (const file of sourceFiles) {
+    const content = readFileSync(file, "utf8");
+    const matches = content.match(re);
+    if (matches) offenders.push(`${file}: ${Array.from(new Set(matches)).join(", ")}`);
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `Found out-of-palette colors:\n${offenders.join("\n")}`,
+  );
+});
+
 test("no `brand-*` Tailwind aliases remain in src/", () => {
   // Match only the legacy alias names defined in tailwind.config.ts to avoid
   // matching English "brand-new" in code comments.

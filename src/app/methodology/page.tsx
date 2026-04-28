@@ -63,9 +63,9 @@ const SCORE_COMPONENTS: readonly ScoreComponent[] = [
   {
     label: "Alpha Over BTC",
     maxPoints: SCORE_WEIGHTS.alpha,
-    color: "text-blue-400",
-    bgColor: "bg-blue-400",
-    borderColor: "border-blue-400/30",
+    color: "text-new",
+    bgColor: "bg-new",
+    borderColor: "border-new/30",
     description:
       `How much did the coin outperform Bitcoin over 30 days? Each 1% of alpha = ${(SCORE_WEIGHTS.alpha / 10).toFixed(1)} points, capped at ${SCORE_WEIGHTS.alpha}.`,
   },
@@ -81,9 +81,9 @@ const SCORE_COMPONENTS: readonly ScoreComponent[] = [
   {
     label: "Regime Difficulty",
     maxPoints: SCORE_WEIGHTS.regime,
-    color: "text-orange-400",
-    bgColor: "bg-orange-400",
-    borderColor: "border-orange-400/30",
+    color: "text-warn",
+    bgColor: "bg-warn",
+    borderColor: "border-warn/30",
     description:
       `How hard was this call given market conditions? Bullish call in a bear market = ${SCORE_WEIGHTS.regime} points. Bullish in a bull market = 1 point.`,
   },
@@ -122,7 +122,7 @@ const PIPELINE_STEPS: readonly PipelineStep[] = [
     icon: Crosshair,
     label: "Match",
     detail: "Each call is matched against 18.7M candle rows from Binance",
-    color: "text-blue-400",
+    color: "text-new",
   },
   {
     icon: BarChart3,
@@ -502,11 +502,11 @@ function AlphaScoreFormula() {
         <p className="text-ink-900 font-mono text-sm sm:text-base">
           <span className="text-pos">Direction</span>{" "}
           <span className="text-ink-400">+</span>{" "}
-          <span className="text-blue-400">Alpha</span>{" "}
+          <span className="text-new">Alpha</span>{" "}
           <span className="text-ink-400">+</span>{" "}
           <span className="text-accent">Specificity</span>{" "}
           <span className="text-ink-400">+</span>{" "}
-          <span className="text-orange-400">Regime</span>{" "}
+          <span className="text-warn">Regime</span>{" "}
           <span className="text-ink-400">+</span>{" "}
           <span className="text-accent">Target</span>{" "}
           <span className="text-ink-400">=</span>{" "}

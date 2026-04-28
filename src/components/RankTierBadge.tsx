@@ -8,7 +8,7 @@ interface RankTierBadgeProps {
 
 function getTier(rank: number): { label: string; color: string } {
   if (rank <= 5) return { label: "T1", color: "bg-accent/20 text-accent border-accent/30" };
-  if (rank <= 12) return { label: "T2", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
+  if (rank <= 12) return { label: "T2", color: "bg-new/20 text-new border-new/30" };
   return { label: "T3", color: "bg-ink-500/20 text-ink-600 border-ink-300/30" };
 }
 
@@ -25,7 +25,7 @@ export default function RankTierBadge({ rank, totalCalls, wilsonLb }: RankTierBa
       </span>
       {lowData && (
         <span
-          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"
+          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent border border-accent/20"
           title={`Only ${totalCalls} scored calls — ranking may shift with more data`}
         >
           Low N

@@ -147,7 +147,7 @@ export default async function CallDetailPage({ params }: PageProps) {
                 : displayScore! >= 60
                 ? "text-pos"
                 : displayScore! >= 40
-                  ? "text-yellow-400"
+                  ? "text-accent"
                   : "text-neg"
             }`}
             aria-label={scoreLabel}
@@ -273,7 +273,7 @@ export default async function CallDetailPage({ params }: PageProps) {
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-2 bg-ink-200 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-orange-400 rounded-full"
+                    className="h-full bg-warn rounded-full"
                     style={{ width: `${serializedCall.regime_difficulty * 100}%` }}
                   />
                 </div>

@@ -8,9 +8,9 @@ interface ScoreBreakdownProps {
 
 const COMPONENTS = [
   { key: "direction", label: "Direction Correct", max: 40, color: "bg-pos" },
-  { key: "alpha", label: "Alpha Over BTC", max: 25, color: "bg-blue-400" },
+  { key: "alpha", label: "Alpha Over BTC", max: 25, color: "bg-new" },
   { key: "specificity", label: "Specificity", max: 15, color: "bg-accent" },
-  { key: "regime", label: "Regime Difficulty", max: 10, color: "bg-orange-400" },
+  { key: "regime", label: "Regime Difficulty", max: 10, color: "bg-warn" },
   { key: "target", label: "Target Hit", max: 10, color: "bg-accent" },
 ] as const;
 
