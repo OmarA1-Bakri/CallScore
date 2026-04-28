@@ -32,9 +32,10 @@
     --new: #7FA6C9;
     --lown: #A78C6B;
 
-    --font-serif: "Source Serif 4", Georgia, serif;
-    --font-sans: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* --font-serif / --font-sans / --font-mono are bound by next/font/google
+       in src/app/fonts.ts and applied via className on <html> in layout.tsx.
+       Each resolves to a metric-adjusted font stack (loaded face + fallback)
+       managed by next/font. Do not redefine those variables here. */
 
     --row: 36px;
     --hair: 1px solid var(--ink-200);

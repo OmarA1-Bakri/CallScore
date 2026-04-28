@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingFeedbackButton from "@/components/FloatingFeedbackButton";
+import { serif, sans, mono } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -41,7 +42,7 @@ export default function RootLayout({
   children,
 }: RootLayoutProps): ReactElement {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} dark`}>
       <body className="min-h-screen flex flex-col bg-ink-0 text-ink-700 font-sans">
         <Header />
         <main className="flex-1">{children}</main>
