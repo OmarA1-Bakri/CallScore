@@ -54,9 +54,9 @@ const SCORE_COMPONENTS: readonly ScoreComponent[] = [
   {
     label: "Direction Correct",
     maxPoints: SCORE_WEIGHTS.direction,
-    color: "text-brand-green",
-    bgColor: "bg-brand-green",
-    borderColor: "border-brand-green/30",
+    color: "text-pos",
+    bgColor: "bg-pos",
+    borderColor: "border-pos/30",
     description:
       `Did the price go the direction they called at 30 days? Bullish call + price went up = ${SCORE_WEIGHTS.direction} points. Wrong direction = 0 points.`,
   },
@@ -72,9 +72,9 @@ const SCORE_COMPONENTS: readonly ScoreComponent[] = [
   {
     label: "Specificity",
     maxPoints: SCORE_WEIGHTS.specificity,
-    color: "text-brand-accent",
-    bgColor: "bg-brand-accent",
-    borderColor: "border-brand-accent/30",
+    color: "text-accent",
+    bgColor: "bg-accent",
+    borderColor: "border-accent/30",
     description:
       `How precise was the call? Entry price (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), target price (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), stop-loss (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), timeframe (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts).`,
   },
@@ -90,9 +90,9 @@ const SCORE_COMPONENTS: readonly ScoreComponent[] = [
   {
     label: "Target Hit",
     maxPoints: SCORE_WEIGHTS.target,
-    color: "text-brand-gold",
-    bgColor: "bg-brand-gold",
-    borderColor: "border-brand-gold/30",
+    color: "text-accent",
+    bgColor: "bg-accent",
+    borderColor: "border-accent/30",
     description:
       `Did the price actually hit their stated target within 90 days? Yes = ${SCORE_WEIGHTS.target} points. No = 0 points.`,
   },
@@ -110,13 +110,13 @@ const PIPELINE_STEPS: readonly PipelineStep[] = [
     icon: Video,
     label: "Scrape",
     detail: `Auto-generated subtitles pulled daily from ${TRACKED_CREATOR_COUNT} creators`,
-    color: "text-brand-red",
+    color: "text-neg",
   },
   {
     icon: Brain,
     label: "Extract",
     detail: "AI identifies specific, actionable predictions from transcripts",
-    color: "text-brand-accent",
+    color: "text-accent",
   },
   {
     icon: Crosshair,
@@ -128,13 +128,13 @@ const PIPELINE_STEPS: readonly PipelineStep[] = [
     icon: BarChart3,
     label: "Score",
     detail: "Alpha Score computed from 5 weighted components (0-100)",
-    color: "text-brand-green",
+    color: "text-pos",
   },
   {
     icon: Award,
     label: "Rank",
     detail: "Creators ranked by average Alpha Score across all scored calls",
-    color: "text-brand-gold",
+    color: "text-accent",
   },
 ] as const;
 
@@ -192,9 +192,9 @@ export default function MethodologyPage() {
 
       {/* Page header */}
       <section className="text-center mb-16">
-        <div className="inline-flex items-center gap-2 bg-brand-accent/10 border border-brand-accent/20 rounded-full px-4 py-1.5 mb-6">
-          <Eye className="w-4 h-4 text-brand-accent" />
-          <span className="text-brand-accent text-xs font-medium">
+        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 rounded-full px-4 py-1.5 mb-6">
+          <Eye className="w-4 h-4 text-accent" />
+          <span className="text-accent text-xs font-medium">
             Full Transparency
           </span>
         </div>
@@ -286,13 +286,13 @@ export default function MethodologyPage() {
           <div className="flex flex-wrap justify-center gap-4">
             <Link
               href="/"
-              className="bg-brand-gold hover:bg-brand-gold-dim text-brand-dark font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
+              className="bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
             >
               View Leaderboard
             </Link>
             <Link
               href="/pricing"
-              className="bg-brand-card hover:bg-brand-card-hover text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors border border-brand-border"
+              className="bg-ink-100 hover:bg-ink-150 text-white font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors border border-ink-200"
             >
               See Pricing
             </Link>
@@ -334,7 +334,7 @@ function PipelineVisual() {
           return (
             <div key={step.label} className="flex items-start flex-1">
               <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-14 h-14 rounded-xl bg-brand-card border border-brand-border flex items-center justify-center mb-3">
+                <div className="w-14 h-14 rounded-xl bg-ink-100 border border-ink-200 flex items-center justify-center mb-3">
                   <Icon className={`w-6 h-6 ${step.color}`} />
                 </div>
                 <span className="text-white font-semibold text-sm mb-1">
@@ -345,7 +345,7 @@ function PipelineVisual() {
                 </span>
               </div>
               {index < PIPELINE_STEPS.length - 1 && (
-                <ChevronRight className="w-5 h-5 text-brand-border mt-4 shrink-0" />
+                <ChevronRight className="w-5 h-5 text-ink-200 mt-4 shrink-0" />
               )}
             </div>
           );
@@ -359,11 +359,11 @@ function PipelineVisual() {
           return (
             <div key={step.label} className="flex items-start gap-4">
               <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-lg bg-brand-card border border-brand-border flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-ink-100 border border-ink-200 flex items-center justify-center">
                   <Icon className={`w-5 h-5 ${step.color}`} />
                 </div>
                 {index < PIPELINE_STEPS.length - 1 && (
-                  <div className="w-px h-6 bg-brand-border mt-2" />
+                  <div className="w-px h-6 bg-ink-200 mt-2" />
                 )}
               </div>
               <div className="pt-1.5">
@@ -388,8 +388,8 @@ function DataSourcesGrid() {
       {/* Market Data */}
       <div className="glass-card p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-brand-green/10 border border-brand-green/20 flex items-center justify-center">
-            <Database className="w-5 h-5 text-brand-green" />
+          <div className="w-10 h-10 rounded-lg bg-pos/10 border border-pos/20 flex items-center justify-center">
+            <Database className="w-5 h-5 text-pos" />
           </div>
           <h3 className="text-white font-semibold">Market Data</h3>
         </div>
@@ -401,7 +401,7 @@ function DataSourcesGrid() {
           <DataPoint label="Coins Tracked" value="18" />
         </div>
 
-        <div className="border-t border-brand-border pt-4">
+        <div className="border-t border-ink-200 pt-4">
           <p className="text-gray-500 text-xs mb-2.5 font-medium uppercase tracking-wider">
             Tracked Coins
           </p>
@@ -409,7 +409,7 @@ function DataSourcesGrid() {
             {TRACKED_COINS.map((coin) => (
               <span
                 key={coin}
-                className="text-[10px] font-medium text-gray-400 bg-brand-card border border-brand-border rounded px-1.5 py-0.5"
+                className="text-[10px] font-medium text-gray-400 bg-ink-100 border border-ink-200 rounded px-1.5 py-0.5"
               >
                 {coin}
               </span>
@@ -421,8 +421,8 @@ function DataSourcesGrid() {
       {/* YouTube Transcripts */}
       <div className="glass-card p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-brand-red/10 border border-brand-red/20 flex items-center justify-center">
-            <Video className="w-5 h-5 text-brand-red" />
+          <div className="w-10 h-10 rounded-lg bg-neg/10 border border-neg/20 flex items-center justify-center">
+            <Video className="w-5 h-5 text-neg" />
           </div>
           <h3 className="text-white font-semibold">YouTube Transcripts</h3>
         </div>
@@ -434,7 +434,7 @@ function DataSourcesGrid() {
           <DataPoint label="Coverage" value="Every new upload" />
         </div>
 
-        <div className="border-t border-brand-border pt-4">
+        <div className="border-t border-ink-200 pt-4">
           <p className="text-gray-500 text-xs leading-relaxed">
             We pull auto-generated subtitles from every new video uploaded by our
             tracked creators. This captures the full spoken content for analysis.
@@ -445,8 +445,8 @@ function DataSourcesGrid() {
       {/* AI Extraction */}
       <div className="glass-card p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-brand-accent/10 border border-brand-accent/20 flex items-center justify-center">
-            <Brain className="w-5 h-5 text-brand-accent" />
+          <div className="w-10 h-10 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
+            <Brain className="w-5 h-5 text-accent" />
           </div>
           <h3 className="text-white font-semibold">AI Extraction</h3>
         </div>
@@ -461,7 +461,7 @@ function DataSourcesGrid() {
           <DataPoint label="Output" value="Structured call data" />
         </div>
 
-        <div className="border-t border-brand-border pt-4">
+        <div className="border-t border-ink-200 pt-4">
           <p className="text-gray-500 text-xs leading-relaxed">
             AI parses transcripts to identify specific, actionable predictions --
             not general commentary. Only calls with confidence above {(EXTRACTION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}% are counted.
@@ -500,15 +500,15 @@ function AlphaScoreFormula() {
           Each individual call is scored on this formula:
         </p>
         <p className="text-white font-mono text-sm sm:text-base">
-          <span className="text-brand-green">Direction</span>{" "}
+          <span className="text-pos">Direction</span>{" "}
           <span className="text-gray-600">+</span>{" "}
           <span className="text-blue-400">Alpha</span>{" "}
           <span className="text-gray-600">+</span>{" "}
-          <span className="text-brand-accent">Specificity</span>{" "}
+          <span className="text-accent">Specificity</span>{" "}
           <span className="text-gray-600">+</span>{" "}
           <span className="text-orange-400">Regime</span>{" "}
           <span className="text-gray-600">+</span>{" "}
-          <span className="text-brand-gold">Target</span>{" "}
+          <span className="text-accent">Target</span>{" "}
           <span className="text-gray-600">=</span>{" "}
           <span className="text-white font-bold">Alpha Score</span>
         </p>
@@ -516,7 +516,7 @@ function AlphaScoreFormula() {
 
       {/* Stacked bar */}
       <div className="mb-4">
-        <div className="flex h-10 sm:h-12 rounded-lg overflow-hidden border border-brand-border">
+        <div className="flex h-10 sm:h-12 rounded-lg overflow-hidden border border-ink-200">
           {SCORE_COMPONENTS.map((comp) => {
             const widthPercent = (comp.maxPoints / totalMax) * 100;
             return (
@@ -526,7 +526,7 @@ function AlphaScoreFormula() {
                 style={{ width: `${widthPercent}%` }}
                 title={`${comp.label}: ${comp.maxPoints} pts`}
               >
-                <span className="text-brand-dark font-bold text-[10px] sm:text-xs">
+                <span className="text-ink-0 font-bold text-[10px] sm:text-xs">
                   {comp.maxPoints}
                 </span>
               </div>
@@ -577,7 +577,7 @@ function ScoreComponentCards() {
           </div>
 
           {/* Mini progress bar showing max */}
-          <div className="h-1.5 bg-brand-border rounded-full overflow-hidden mb-3">
+          <div className="h-1.5 bg-ink-200 rounded-full overflow-hidden mb-3">
             <div
               className={`h-full rounded-full ${comp.bgColor}`}
               style={{ width: `${(comp.maxPoints / 100) * 100}%` }}
@@ -620,7 +620,7 @@ function CreatorRankingsSection() {
           return (
             <div key={metric.label} className="glass-card p-5">
               <div className="flex items-center gap-3 mb-2">
-                <Icon className="w-5 h-5 text-brand-gold" />
+                <Icon className="w-5 h-5 text-accent" />
                 <h3 className="text-white font-semibold text-sm">
                   {metric.label}
                 </h3>
@@ -638,7 +638,7 @@ function CreatorRankingsSection() {
         {/* Ranking periods */}
         <div className="glass-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-5 h-5 text-brand-accent" />
+            <Clock className="w-5 h-5 text-accent" />
             <h3 className="text-white font-semibold text-sm">
               Ranking Periods
             </h3>
@@ -651,7 +651,7 @@ function CreatorRankingsSection() {
             {(["All Time", "90 Days", "30 Days"] as const).map((period) => (
               <div
                 key={period}
-                className="flex items-center gap-2 bg-brand-card border border-brand-border rounded-lg px-3 py-2"
+                className="flex items-center gap-2 bg-ink-100 border border-ink-200 rounded-lg px-3 py-2"
               >
                 <Activity className="w-3.5 h-3.5 text-gray-500" />
                 <span className="text-gray-300 text-xs font-medium">
@@ -665,7 +665,7 @@ function CreatorRankingsSection() {
         {/* Tier system */}
         <div className="glass-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <Layers className="w-5 h-5 text-brand-gold" />
+            <Layers className="w-5 h-5 text-accent" />
             <h3 className="text-white font-semibold text-sm">
               Tier System
             </h3>
@@ -679,7 +679,7 @@ function CreatorRankingsSection() {
             {TIERS.map((tier) => (
               <div
                 key={tier.name}
-                className="flex items-center justify-between bg-brand-card border border-brand-border rounded-lg px-3 py-2"
+                className="flex items-center justify-between bg-ink-100 border border-ink-200 rounded-lg px-3 py-2"
               >
                 <span className={tier.badge}>{tier.name}</span>
                 <span className="text-gray-400 text-xs">{tier.range}</span>
@@ -810,7 +810,7 @@ function TransparencyCard({
   return (
     <div className="glass-card p-5">
       <div className="flex items-center gap-3 mb-2">
-        <Icon className="w-5 h-5 text-brand-accent" />
+        <Icon className="w-5 h-5 text-accent" />
         <h3 className="text-white font-semibold text-sm">{title}</h3>
       </div>
       <p className="text-gray-400 text-xs leading-relaxed">{description}</p>

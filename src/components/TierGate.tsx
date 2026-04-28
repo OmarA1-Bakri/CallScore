@@ -11,10 +11,10 @@ const TIER_CONFIG = {
     label: "Pro",
     price: "$19/mo",
     description: "Deep analytics on every creator",
-    gradient: "from-brand-accent to-purple-400",
-    borderColor: "border-brand-accent/30",
-    bgColor: "bg-brand-accent/10",
-    buttonBg: "bg-brand-accent hover:bg-brand-accent/80",
+    gradient: "from-accent to-purple-400",
+    borderColor: "border-accent/30",
+    bgColor: "bg-accent/10",
+    buttonBg: "bg-accent hover:bg-accent/80",
     icon: Lock,
     glowClass: "glow-purple",
   },
@@ -22,10 +22,10 @@ const TIER_CONFIG = {
     label: "Alpha",
     price: "$49/mo",
     description: "Actionable signals, not just rankings",
-    gradient: "from-brand-gold to-yellow-400",
-    borderColor: "border-brand-gold/30",
-    bgColor: "bg-brand-gold/10",
-    buttonBg: "bg-brand-gold hover:bg-brand-gold-dim",
+    gradient: "from-accent to-yellow-400",
+    borderColor: "border-accent/30",
+    bgColor: "bg-accent/10",
+    buttonBg: "bg-accent hover:bg-accent-dim",
     icon: Crown,
     glowClass: "glow-gold",
   },
@@ -43,7 +43,7 @@ export default function TierGate({ tier, children }: TierGateProps) {
       </div>
 
       {/* Overlay */}
-      <div className="absolute inset-0 flex items-center justify-center bg-brand-dark/60 backdrop-blur-sm">
+      <div className="absolute inset-0 flex items-center justify-center bg-ink-0/60 backdrop-blur-sm">
         <div
           className={`text-center p-6 rounded-xl border ${config.borderColor} ${config.bgColor} ${config.glowClass}`}
         >
@@ -55,7 +55,7 @@ export default function TierGate({ tier, children }: TierGateProps) {
           <p className="text-white font-bold text-lg mb-3">{config.price}</p>
           <Link
             href="/pricing"
-            className={`inline-block ${config.buttonBg} text-brand-dark font-semibold text-sm px-6 py-2 rounded-lg transition-colors`}
+            className={`inline-block ${config.buttonBg} text-ink-0 font-semibold text-sm px-6 py-2 rounded-lg transition-colors`}
           >
             Unlock
           </Link>

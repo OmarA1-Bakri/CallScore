@@ -23,8 +23,8 @@ function RankCell({ rank }: { readonly rank: number }) {
   if (rank === 1) {
     return (
       <div className="flex items-center gap-1.5">
-        <Crown className="w-4 h-4 text-brand-gold" />
-        <span className="text-brand-gold font-bold">1</span>
+        <Crown className="w-4 h-4 text-accent" />
+        <span className="text-accent font-bold">1</span>
       </div>
     );
   }
@@ -38,8 +38,8 @@ function RankCell({ rank }: { readonly rank: number }) {
 }
 
 function TrendCell({ trend }: { readonly trend: "up" | "down" | "stable" }) {
-  if (trend === "up") return <TrendingUp className="w-4 h-4 text-brand-green" />;
-  if (trend === "down") return <TrendingDown className="w-4 h-4 text-brand-red" />;
+  if (trend === "up") return <TrendingUp className="w-4 h-4 text-pos" />;
+  if (trend === "down") return <TrendingDown className="w-4 h-4 text-neg" />;
   return <Minus className="w-4 h-4 text-gray-600" />;
 }
 
@@ -54,9 +54,9 @@ function getInitials(name: string): string {
 
 function getAvatarColor(name: string): string {
   const colors = [
-    "bg-brand-gold/20 text-brand-gold",
-    "bg-brand-accent/20 text-brand-accent",
-    "bg-brand-green/20 text-brand-green",
+    "bg-accent/20 text-accent",
+    "bg-accent/20 text-accent",
+    "bg-pos/20 text-pos",
     "bg-blue-500/20 text-blue-400",
     "bg-pink-500/20 text-pink-400",
     "bg-cyan-500/20 text-cyan-400",
@@ -74,7 +74,7 @@ function LeaderboardTable({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-brand-border">
+          <tr className="border-b border-ink-200">
             <th className="text-left text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3 w-12">
               #
             </th>
@@ -114,7 +114,7 @@ function LeaderboardTable({
             return (
               <tr
                 key={row.creator.id}
-                className="table-row-hover border-b border-brand-border/50"
+                className="table-row-hover border-b border-ink-200/50"
               >
                 <td className="px-4 py-3">
                   <RankCell rank={row.rank} />
@@ -131,7 +131,7 @@ function LeaderboardTable({
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-white font-medium group-hover:text-brand-gold transition-colors truncate">
+                        <p className="text-white font-medium group-hover:text-accent transition-colors truncate">
                           {row.creator.name}
                         </p>
                         <RankTierBadge
@@ -144,7 +144,7 @@ function LeaderboardTable({
                         {row.creator.youtube_handle}
                       </p>
                     </div>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-brand-gold transition-colors shrink-0 hidden md:block" />
+                    <ArrowUpRight className="w-3.5 h-3.5 text-gray-600 group-hover:text-accent transition-colors shrink-0 hidden md:block" />
                   </Link>
                 </td>
                 <td className="px-4 py-3">
@@ -189,7 +189,7 @@ function LeaderboardTable({
                     <Link
                       href={`/call/${row.best_call.id}`}
                       aria-label={`View ${row.creator.name} best call: ${bestTicker} +${row.best_call.return_30d?.toFixed(0) ?? "?"}%`}
-                      className="text-xs text-gray-400 hover:text-brand-gold transition-colors"
+                      className="text-xs text-gray-400 hover:text-accent transition-colors"
                     >
                       {bestTicker}{" "}
                       <span className="value-positive">

@@ -28,7 +28,7 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-brand-dark/80 backdrop-blur-xl border-b border-brand-border">
+    <header className="sticky top-0 z-50 bg-ink-0/80 backdrop-blur-xl border-b border-ink-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
@@ -45,7 +45,7 @@ export default function Header() {
               <span className="text-white font-extrabold text-base tracking-tight leading-none">
                 CryptoTubers
               </span>
-              <span className="block text-brand-gold font-bold text-[11px] tracking-[0.2em] uppercase leading-none mt-0.5">
+              <span className="block text-accent font-bold text-[11px] tracking-[0.2em] uppercase leading-none mt-0.5">
                 Ranked
               </span>
             </div>
@@ -95,7 +95,7 @@ export default function Header() {
                 </Link>
                 <Link
                   href="/pricing"
-                  className="bg-brand-gold hover:bg-brand-gold-dim text-brand-dark font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
+                  className="bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
                 >
                   Get Access
                 </Link>
@@ -168,7 +168,7 @@ export default function Header() {
                 <Link
                   href="/pricing"
                   onClick={() => setMobileOpen(false)}
-                  className="inline-block bg-brand-gold hover:bg-brand-gold-dim text-brand-dark font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
+                  className="inline-block bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-4 py-2 rounded-lg transition-colors"
                 >
                   Get Access
                 </Link>
@@ -188,7 +188,7 @@ export default function Header() {
 function TierBadge({ tier }: { readonly tier: string }) {
   if (tier === "elite") {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-brand-gold/20 text-brand-gold border border-brand-gold/30">
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-accent/20 text-accent border border-accent/30">
         <Crown className="w-3 h-3" />
         Alpha
       </span>
@@ -197,7 +197,7 @@ function TierBadge({ tier }: { readonly tier: string }) {
 
   if (tier === "pro") {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-brand-accent/20 text-brand-accent border border-brand-accent/30">
+      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-accent/20 text-accent border border-accent/30">
         <Zap className="w-3 h-3" />
         Pro
       </span>

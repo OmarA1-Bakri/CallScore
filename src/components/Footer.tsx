@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-brand-border bg-brand-dark">
+    <footer className="border-t border-ink-200 bg-ink-0">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Top section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
@@ -21,7 +21,7 @@ export default function Footer() {
                 <span className="text-white font-extrabold text-sm tracking-tight leading-none">
                   CryptoTubers
                 </span>
-                <span className="block text-brand-gold font-bold text-[10px] tracking-[0.2em] uppercase leading-none mt-0.5">
+                <span className="block text-accent font-bold text-[10px] tracking-[0.2em] uppercase leading-none mt-0.5">
                   Ranked
                 </span>
               </div>
@@ -104,7 +104,7 @@ export default function Footer() {
         </div>
 
         {/* Disclaimer */}
-        <div className="border-t border-brand-border pt-6">
+        <div className="border-t border-ink-200 pt-6">
           <p className="text-gray-600 text-xs leading-relaxed mb-4">
             <strong className="text-gray-500">Financial Disclaimer:</strong>{" "}
             CRYPTO-TUBER RANKED is an informational analytics platform only. Nothing

@@ -127,8 +127,8 @@ export default function TermsPage() {
 
       {/* Financial disclaimer banner */}
       <section className="mb-8">
-        <div className="glass-card p-5 border-l-2 border-brand-gold">
-          <p className="text-brand-gold font-semibold text-sm mb-2">
+        <div className="glass-card p-5 border-l-2 border-accent">
+          <p className="text-accent font-semibold text-sm mb-2">
             Financial Disclaimer
           </p>
           <p className="text-gray-400 text-xs leading-relaxed">

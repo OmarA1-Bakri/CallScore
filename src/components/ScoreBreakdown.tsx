@@ -7,11 +7,11 @@ interface ScoreBreakdownProps {
 }
 
 const COMPONENTS = [
-  { key: "direction", label: "Direction Correct", max: 40, color: "bg-brand-green" },
+  { key: "direction", label: "Direction Correct", max: 40, color: "bg-pos" },
   { key: "alpha", label: "Alpha Over BTC", max: 25, color: "bg-blue-400" },
-  { key: "specificity", label: "Specificity", max: 15, color: "bg-brand-accent" },
+  { key: "specificity", label: "Specificity", max: 15, color: "bg-accent" },
   { key: "regime", label: "Regime Difficulty", max: 10, color: "bg-orange-400" },
-  { key: "target", label: "Target Hit", max: 10, color: "bg-brand-gold" },
+  { key: "target", label: "Target Hit", max: 10, color: "bg-accent" },
 ] as const;
 
 export default function ScoreBreakdown({
@@ -35,7 +35,7 @@ export default function ScoreBreakdown({
     <div className="glass-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-white font-semibold text-sm">Score Breakdown</h2>
-        <span className="text-brand-green font-bold text-lg tabular-nums">
+        <span className="text-pos font-bold text-lg tabular-nums">
           {total.toFixed(1)}
         </span>
       </div>
@@ -53,7 +53,7 @@ export default function ScoreBreakdown({
                   {value.toFixed(1)} / {comp.max}
                 </span>
               </div>
-              <div className="h-2 bg-brand-border rounded-full overflow-hidden">
+              <div className="h-2 bg-ink-200 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full ${comp.color} transition-all duration-500`}
                   style={{ width: `${Math.min(100, percentage)}%` }}

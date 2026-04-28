@@ -29,14 +29,14 @@ export default function PeriodFilter({ value }: PeriodFilterProps) {
   }
 
   return (
-    <div className="flex items-center bg-brand-card border border-brand-border rounded-lg p-1">
+    <div className="flex items-center bg-ink-100 border border-ink-200 rounded-lg p-1">
       {PERIODS.map((period) => (
         <button
           key={period.value}
           onClick={() => handleClick(period.value)}
           className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
             value === period.value
-              ? "bg-brand-gold/10 text-brand-gold"
+              ? "bg-accent/10 text-accent"
               : "text-gray-500 hover:text-gray-300"
           }`}
         >

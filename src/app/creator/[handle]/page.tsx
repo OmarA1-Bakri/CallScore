@@ -154,7 +154,7 @@ export default async function CreatorPage({ params }: PageProps) {
       <section className="glass-card p-6 sm:p-8 mb-8">
         <div className="flex flex-col sm:flex-row items-start gap-6">
           {/* Avatar */}
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-2xl shrink-0">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-2xl shrink-0">
             {creator.name
               .split(" ")
               .map((p) => p[0])
@@ -201,7 +201,7 @@ export default async function CreatorPage({ params }: PageProps) {
                 href={`https://youtube.com/${creator.youtube_handle}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-brand-gold hover:text-brand-gold-dim text-sm transition-colors"
+                className="inline-flex items-center gap-1 text-accent hover:text-accent-dim text-sm transition-colors"
               >
                 View on YouTube
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -285,8 +285,8 @@ function StatCard({ label, value, positive }: StatCardProps) {
     positive === undefined
       ? "text-white"
       : positive
-        ? "text-brand-green"
-        : "text-brand-red";
+        ? "text-pos"
+        : "text-neg";
 
   return (
     <div className="glass-card p-4 text-center">

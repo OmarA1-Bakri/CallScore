@@ -102,9 +102,9 @@ export default function FeedbackPage() {
 
       {/* Hero */}
       <section className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-4 py-1.5 mb-6">
-          <MessageCircle className="w-4 h-4 text-brand-gold" />
-          <span className="text-brand-gold text-xs font-medium">
+        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 rounded-full px-4 py-1.5 mb-6">
+          <MessageCircle className="w-4 h-4 text-accent" />
+          <span className="text-accent text-xs font-medium">
             Your Voice Matters
           </span>
         </div>
@@ -126,7 +126,7 @@ export default function FeedbackPage() {
       <section className="max-w-xl mx-auto mb-16">
         {status === "success" ? (
           <div className="glass-card p-8 text-center">
-            <CheckCircle2 className="w-12 h-12 text-brand-green mx-auto mb-4" />
+            <CheckCircle2 className="w-12 h-12 text-pos mx-auto mb-4" />
             <h2 className="text-white font-bold text-xl mb-2">
               Thank You for Your Feedback
             </h2>
@@ -137,7 +137,7 @@ export default function FeedbackPage() {
             <button
               type="button"
               onClick={() => setStatus("idle")}
-              className="bg-brand-card hover:bg-brand-card-hover text-white border border-brand-border font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
+              className="bg-ink-100 hover:bg-ink-150 text-white border border-ink-200 font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
             >
               Send More Feedback
             </button>
@@ -162,7 +162,7 @@ export default function FeedbackPage() {
                 placeholder="Your name"
                 value={form.name}
                 onChange={(e) => updateField("name", e.target.value)}
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 transition-colors"
+                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
               />
             </div>
 
@@ -181,7 +181,7 @@ export default function FeedbackPage() {
                 placeholder="you@example.com"
                 value={form.email}
                 onChange={(e) => updateField("email", e.target.value)}
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 transition-colors"
+                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
               />
             </div>
 
@@ -199,7 +199,7 @@ export default function FeedbackPage() {
                 onChange={(e) =>
                   updateField("category", e.target.value as Category)
                 }
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 transition-colors appearance-none cursor-pointer"
+                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors appearance-none cursor-pointer"
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -215,7 +215,7 @@ export default function FeedbackPage() {
                 htmlFor="feedback-message"
                 className="block text-gray-300 text-sm font-medium mb-1.5"
               >
-                Message <span className="text-brand-red">*</span>
+                Message <span className="text-neg">*</span>
               </label>
               <textarea
                 id="feedback-message"
@@ -224,15 +224,15 @@ export default function FeedbackPage() {
                 value={form.message}
                 onChange={(e) => updateField("message", e.target.value)}
                 required
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 transition-colors resize-vertical min-h-[120px]"
+                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors resize-vertical min-h-[120px]"
               />
             </div>
 
             {/* Error */}
             {status === "error" && errorMessage && (
-              <div className="flex items-start gap-2 bg-brand-red/10 border border-brand-red/20 rounded-lg px-4 py-3">
-                <AlertCircle className="w-4 h-4 text-brand-red shrink-0 mt-0.5" />
-                <p className="text-brand-red text-sm">{errorMessage}</p>
+              <div className="flex items-start gap-2 bg-neg/10 border border-neg/20 rounded-lg px-4 py-3">
+                <AlertCircle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
+                <p className="text-neg text-sm">{errorMessage}</p>
               </div>
             )}
 
@@ -240,7 +240,7 @@ export default function FeedbackPage() {
             <button
               type="submit"
               disabled={status === "submitting"}
-              className="w-full flex items-center justify-center gap-2 bg-brand-gold hover:bg-brand-gold-dim text-brand-dark font-semibold text-sm px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {status === "submitting" ? (
                 "Sending..."

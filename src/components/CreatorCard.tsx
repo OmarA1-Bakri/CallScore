@@ -20,9 +20,9 @@ function getInitials(name: string): string {
 
 function getAvatarColor(name: string): string {
   const colors = [
-    "bg-brand-gold/20 text-brand-gold",
-    "bg-brand-accent/20 text-brand-accent",
-    "bg-brand-green/20 text-brand-green",
+    "bg-accent/20 text-accent",
+    "bg-accent/20 text-accent",
+    "bg-pos/20 text-pos",
     "bg-blue-500/20 text-blue-400",
     "bg-pink-500/20 text-pink-400",
     "bg-cyan-500/20 text-cyan-400",
@@ -32,8 +32,8 @@ function getAvatarColor(name: string): string {
 }
 
 function TrendIcon({ trend }: { readonly trend: "up" | "down" | "stable" }) {
-  if (trend === "up") return <TrendingUp className="w-4 h-4 text-brand-green" />;
-  if (trend === "down") return <TrendingDown className="w-4 h-4 text-brand-red" />;
+  if (trend === "up") return <TrendingUp className="w-4 h-4 text-pos" />;
+  if (trend === "down") return <TrendingDown className="w-4 h-4 text-neg" />;
   return <Minus className="w-4 h-4 text-gray-500" />;
 }
 
@@ -93,8 +93,8 @@ function StatItem({ label, value, positive }: StatItemProps) {
     positive === undefined
       ? "text-white"
       : positive
-        ? "text-brand-green"
-        : "text-brand-red";
+        ? "text-pos"
+        : "text-neg";
 
   return (
     <div>

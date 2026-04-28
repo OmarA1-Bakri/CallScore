@@ -134,7 +134,7 @@ export default async function CallDetailPage({ params }: PageProps) {
             </p>
             <h1 className="text-2xl font-bold text-white">
               {ticker} --{" "}
-              <span className={isBullish ? "text-brand-green" : "text-brand-red"}>
+              <span className={isBullish ? "text-pos" : "text-neg"}>
                 {serializedCall.direction.charAt(0).toUpperCase() + serializedCall.direction.slice(1)}
               </span>{" "}
               Call
@@ -145,10 +145,10 @@ export default async function CallDetailPage({ params }: PageProps) {
               serializedCall.score_status !== "scored"
                 ? "text-gray-400"
                 : displayScore! >= 60
-                ? "text-brand-green"
+                ? "text-pos"
                 : displayScore! >= 40
                   ? "text-yellow-400"
-                  : "text-brand-red"
+                  : "text-neg"
             }`}
             aria-label={scoreLabel}
           >
@@ -271,7 +271,7 @@ export default async function CallDetailPage({ params }: PageProps) {
                 Regime Difficulty
               </p>
               <div className="flex items-center gap-2">
-                <div className="flex-1 h-2 bg-brand-border rounded-full overflow-hidden">
+                <div className="flex-1 h-2 bg-ink-200 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-orange-400 rounded-full"
                     style={{ width: `${serializedCall.regime_difficulty * 100}%` }}
@@ -288,7 +288,7 @@ export default async function CallDetailPage({ params }: PageProps) {
               </p>
               <span
                 className={`text-sm font-semibold ${
-                  serializedCall.correct_direction ? "text-brand-green" : "text-brand-red"
+                  serializedCall.correct_direction ? "text-pos" : "text-neg"
                 }`}
               >
                 {serializedCall.horizon_status_30d === "pending"
@@ -302,7 +302,7 @@ export default async function CallDetailPage({ params }: PageProps) {
               </p>
               <span
                 className={`text-sm font-semibold ${
-                  serializedCall.hit_target ? "text-brand-green" : "text-brand-red"
+                  serializedCall.hit_target ? "text-pos" : "text-neg"
                 }`}
               >
                 {serializedCall.target_price === null
@@ -321,12 +321,12 @@ export default async function CallDetailPage({ params }: PageProps) {
         <section className="mb-8">
           <div className="glass-card p-6">
             <div className="flex items-center gap-2 mb-3">
-              <Quote className="w-5 h-5 text-brand-gold" />
+              <Quote className="w-5 h-5 text-accent" />
               <h2 className="text-white font-semibold text-sm">
                 From the Transcript
               </h2>
             </div>
-            <blockquote className="border-l-2 border-brand-gold/40 pl-4 text-gray-300 text-sm leading-relaxed italic">
+            <blockquote className="border-l-2 border-accent/40 pl-4 text-gray-300 text-sm leading-relaxed italic">
               &ldquo;{serializedCall.raw_quote}&rdquo;
             </blockquote>
             <p className="text-gray-600 text-xs mt-3">
@@ -420,7 +420,7 @@ function PriceCard({
             </div>
           )}
           {alphaPct !== null && (
-            <div className="flex items-center justify-between border-t border-brand-border pt-2">
+            <div className="flex items-center justify-between border-t border-ink-200 pt-2">
               <span className="text-gray-400 text-xs font-medium">Alpha</span>
               <span
                 className={`text-sm font-bold tabular-nums ${

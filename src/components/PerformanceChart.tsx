@@ -38,7 +38,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   return (
     <div className="glass-card p-3 text-xs">
       <p className="text-gray-400 mb-1">{label}</p>
-      <p className="text-brand-green font-bold tabular-nums">
+      <p className="text-pos font-bold tabular-nums">
         Alpha Score: {payload[0].value.toFixed(1)}
       </p>
     </div>

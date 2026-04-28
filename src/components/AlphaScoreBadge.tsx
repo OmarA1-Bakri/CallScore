@@ -4,24 +4,24 @@ interface AlphaScoreBadgeProps {
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 70) return "text-brand-green";
+  if (score >= 70) return "text-pos";
   if (score >= 50) return "text-yellow-400";
   if (score >= 30) return "text-orange-400";
-  return "text-brand-red";
+  return "text-neg";
 }
 
 function getBarColor(score: number): string {
-  if (score >= 70) return "bg-brand-green";
+  if (score >= 70) return "bg-pos";
   if (score >= 50) return "bg-yellow-400";
   if (score >= 30) return "bg-orange-400";
-  return "bg-brand-red";
+  return "bg-neg";
 }
 
 function getGlowColor(score: number): string {
-  if (score >= 70) return "shadow-brand-green/20";
+  if (score >= 70) return "shadow-pos/20";
   if (score >= 50) return "shadow-yellow-400/20";
   if (score >= 30) return "shadow-orange-400/20";
-  return "shadow-brand-red/20";
+  return "shadow-neg/20";
 }
 
 const SIZE_MAP = {
@@ -90,7 +90,7 @@ export function AlphaScoreBar({ score }: { readonly score: number }) {
       <span className={`text-sm font-bold tabular-nums w-8 ${getScoreColor(roundedScore)}`}>
         {roundedScore}
       </span>
-      <div className="flex-1 h-1.5 bg-brand-border rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-ink-200 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full ${getBarColor(roundedScore)} transition-all duration-500`}
           style={{ width: `${percentage}%` }}

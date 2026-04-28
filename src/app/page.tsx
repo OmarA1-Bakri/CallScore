@@ -286,9 +286,9 @@ export default async function HomePage({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Hero */}
       <section className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-4 py-1.5 mb-6">
-          <Trophy className="w-4 h-4 text-brand-gold" />
-          <span className="text-brand-gold text-xs font-medium">
+        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 rounded-full px-4 py-1.5 mb-6">
+          <Trophy className="w-4 h-4 text-accent" />
+          <span className="text-accent text-xs font-medium">
             {totalCalls} calls scored against real price data
           </span>
         </div>
@@ -419,8 +419,8 @@ function PremiseRow({ claim, source }: PremiseRowProps): ReactElement {
 
 function StatPill({ icon: Icon, label, value }: StatPillProps): ReactElement {
   return (
-    <div className="flex items-center gap-2 bg-brand-card border border-brand-border rounded-lg px-4 py-2.5">
-      <Icon className="w-4 h-4 text-brand-gold" />
+    <div className="flex items-center gap-2 bg-ink-100 border border-ink-200 rounded-lg px-4 py-2.5">
+      <Icon className="w-4 h-4 text-accent" />
       <div className="text-left">
         <p className="text-white font-bold text-sm tabular-nums">{value}</p>
         <p className="text-gray-500 text-[10px] uppercase tracking-wider">

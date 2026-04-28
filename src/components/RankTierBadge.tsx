@@ -7,7 +7,7 @@ interface RankTierBadgeProps {
 }
 
 function getTier(rank: number): { label: string; color: string } {
-  if (rank <= 5) return { label: "T1", color: "bg-brand-gold/20 text-brand-gold border-brand-gold/30" };
+  if (rank <= 5) return { label: "T1", color: "bg-accent/20 text-accent border-accent/30" };
   if (rank <= 12) return { label: "T2", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
   return { label: "T3", color: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
 }

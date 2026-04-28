@@ -87,7 +87,7 @@ export default function CallHistory({
 
   return (
     <div className="glass-card overflow-hidden">
-      <div className="p-4 border-b border-brand-border">
+      <div className="p-4 border-b border-ink-200">
         <h2 className="text-white font-semibold text-sm">Call History</h2>
         <p className="text-gray-500 text-xs mt-1">
           {totalCount !== undefined && totalCount > calls.length
@@ -100,7 +100,7 @@ export default function CallHistory({
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-brand-border">
+            <tr className="border-b border-ink-200">
               <SortableHeader
                 label="Date"
                 sortKey="call_date"
@@ -142,7 +142,7 @@ export default function CallHistory({
                 SYMBOL_TICKERS[call.symbol] ?? call.symbol.replace("USDT", "");
 
               return (
-                <tr key={call.id} className="table-row-hover border-b border-brand-border/50">
+                <tr key={call.id} className="table-row-hover border-b border-ink-200/50">
                   <td className="px-4 py-3 text-gray-400 text-xs tabular-nums whitespace-nowrap">
                     {formatDate(call.call_date)}
                   </td>
@@ -150,7 +150,7 @@ export default function CallHistory({
                     <Link
                       href={`/call/${call.id}`}
                       aria-label={`View ${ticker} ${call.direction} call details`}
-                      className="text-white font-medium hover:text-brand-gold transition-colors"
+                      className="text-white font-medium hover:text-accent transition-colors"
                     >
                       {ticker}
                     </Link>
@@ -225,9 +225,9 @@ export default function CallHistory({
                         Pending
                       </span>
                     ) : call.hit_target === true ? (
-                      <Target className="w-4 h-4 text-brand-green mx-auto" />
+                      <Target className="w-4 h-4 text-pos mx-auto" />
                     ) : call.hit_target === false ? (
-                      <X className="w-4 h-4 text-brand-red mx-auto" />
+                      <X className="w-4 h-4 text-neg mx-auto" />
                     ) : (
                       <span className="text-gray-600">--</span>
                     )}
@@ -241,7 +241,7 @@ export default function CallHistory({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-brand-border">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-ink-200">
           <p className="text-gray-500 text-xs">
             Page {page + 1} of {totalPages}
           </p>
@@ -294,10 +294,10 @@ function SortableHeader({
       >
         {label}
         <ArrowUpDown
-          className={`w-3 h-3 ${isActive ? "text-brand-gold" : ""}`}
+          className={`w-3 h-3 ${isActive ? "text-accent" : ""}`}
         />
         {isActive && (
-          <span className="text-brand-gold text-[8px]">
+          <span className="text-accent text-[8px]">
             {currentDir === "asc" ? "ASC" : "DESC"}
           </span>
         )}
