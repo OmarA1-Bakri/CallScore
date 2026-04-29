@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
+import Link from "next/link";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
+import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { query } from "@/lib/db";
-import { getPublicCounts, PUBLIC_COUNT_LABELS } from "@/lib/public-counts";
+import { getPublicCounts } from "@/lib/public-counts";
 import { getCreatorTier } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
@@ -282,117 +284,135 @@ export default async function HomePage({
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Hero */}
-      <section className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 px-4 py-1.5 mb-6">
-          <span className="text-accent text-xs font-medium">
-            {totalCalls} calls scored against real price data
-          </span>
-        </div>
-
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-ink-900 mb-4 leading-tight">
-          Most crypto YouTubers are noise.
-          <br />
-          <span className="text-gradient-gold">
-            We found the signal.
-          </span>
+    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
+      {/* HERO */}
+      <section className="pb-12 border-b border-ink-250">
+        <h1 className="font-serif text-[34px] tab:text-[44px] desk:text-[52px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
+          Most crypto YouTubers are noise.{" "}
+          <em className="italic font-normal text-accent">We found the signal.</em>
         </h1>
-
-        <p className="text-ink-600 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-          We track {publicCounts.trackedCreators} crypto YouTubers and score
-          every eligible altcoin call against real market data. The current
-          leaderboard includes {publicCounts.rankedCreators} creators with
-          scored call histories across 18.7M candles of market data.
+        <p className="font-serif text-[19px] text-ink-700 leading-relaxed max-w-[760px] mb-7">
+          We track {publicCounts.trackedCreators} crypto YouTubers and score every
+          eligible altcoin call against real market data.{" "}
+          <em className="italic text-accent">{totalCalls}</em> scored calls across
+          18.7M Binance candles.
         </p>
-
-        {/* Stats row */}
-        <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-8">
-          <StatPill
-            label={PUBLIC_COUNT_LABELS.trackedCreators}
-            value={String(publicCounts.trackedCreators)}
-          />
-          <StatPill
-            label={PUBLIC_COUNT_LABELS.scoredCalls}
-            value={totalCalls}
-          />
-          <StatPill
-            label="Creators Beating BTC"
-            value={`${publicCounts.beatBtcCreators} of ${publicCounts.rankedCreators}`}
-          />
-        </div>
+        <MetaStrip
+          cells={[
+            { k: "creators", v: <>{publicCounts.trackedCreators}</> },
+            { k: "scored calls", v: totalCalls },
+            {
+              k: "beating BTC",
+              v: (
+                <>
+                  {publicCounts.beatBtcCreators}{" "}
+                  <span className="text-ink-500">/ {publicCounts.rankedCreators}</span>
+                </>
+              ),
+            },
+            {
+              k: "methodology",
+              v: (
+                <Link
+                  href="/methodology"
+                  className="text-accent hover:text-accent-dim underline-offset-4 hover:underline"
+                >
+                  read
+                </Link>
+              ),
+            },
+          ]}
+        />
       </section>
 
-      {/* Sourced premise strip — terminal aesthetic, muted dividers */}
-      <section
-        aria-labelledby="premise-title"
-        className="mb-10 font-mono"
+      {/* 01 · PREMISE */}
+      <EditorialSection
+        index="01"
+        title={
+          <>
+            The <em className="italic text-accent">premise</em>, sourced.
+          </>
+        }
+        meta={
+          <>
+            three claims · <b className="text-ink-900">peer-reviewed</b>
+            <br />
+            one signature signal · <b className="text-ink-900">self-correction</b>
+          </>
+        }
       >
-        <h2
-          id="premise-title"
-          className="text-[#5B6B63] text-xs uppercase tracking-[0.08em] mb-3"
-        >
-          <span className="text-[#5B6B63] mr-1.5">{"//"}</span>
-          the premise — sourced
-        </h2>
-        <ul className="divide-y divide-[rgba(200,211,202,0.08)] border-y border-[rgba(200,211,202,0.08)] bg-[#121815]">
+        <ul className="border-y border-ink-150">
           <PremiseRow
             claim="76% of influencer-endorsed tokens fail to deliver."
-            source="Arkham · Mar 2025"
+            source={"Arkham · Mar 2025"}
           />
           <PremiseRow
             claim="Top crypto YouTubers are directionally correct ~22% of the time."
-            source="Finance Research Letters · 2024"
+            source={"Finance Research Letters · 2024"}
           />
           <PremiseRow
-            claim={"Influencer-tweeted tokens returned \u221219% over 3 months."}
-            source="HBS · Pacelli"
+            claim={"Influencer-tweeted tokens returned −19% over 3 months."}
+            source={"HBS · Pacelli"}
           />
-          <li className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 px-4 py-3">
-            <span className="text-[#5B6B63] text-sm leading-snug">
-              We also score who admits when they&apos;re wrong. No other tracker does.
+          <li className="flex flex-col tab:flex-row tab:items-baseline tab:justify-between gap-1 px-4 py-3 border-t border-ink-150">
+            <span className="font-serif text-[14px] text-ink-700">
+              We also score who admits when they&apos;re wrong.{" "}
+              <em className="italic text-accent">No other tracker does.</em>
             </span>
-            <span className="text-[#5B6B63] text-[11px] tracking-wide whitespace-nowrap">
+            <span className="font-mono text-[10px] text-ink-500 tracking-wide whitespace-nowrap">
               [self-correction index]
             </span>
           </li>
         </ul>
-      </section>
+      </EditorialSection>
 
-      {/* Period filter + Leaderboard */}
-      <section className="mb-12">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-ink-900 font-bold text-xl">Leaderboard</h2>
-            <p className="text-ink-500 text-sm mt-1">
-              Ranked by average Alpha Score across scored calls
-            </p>
-          </div>
+      {/* 02 · LEADERBOARD */}
+      <EditorialSection
+        index="02"
+        title={
+          <>
+            The ranking, <em className="italic text-accent">by alpha</em>.
+          </>
+        }
+        meta={
+          <>
+            {publicCounts.rankedCreators} ranked creators · {totalCalls} scored calls
+            <br />
+            tier S/A/B/C · low-N flagged
+          </>
+        }
+      >
+        <div className="flex flex-col tab:flex-row tab:items-end tab:justify-between gap-3 mb-4">
+          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+            Sorted by alpha; ties broken by Wilson lower bound.
+          </p>
           <PeriodFilter value={period} />
         </div>
-
         {leaderboard.length > 0 ? (
           <Leaderboard rows={leaderboard} />
         ) : (
           <div className="border-t border-ink-250 py-12 text-center">
-            <p className="text-ink-500">
-              Leaderboard data is being computed. Run the data pipeline to populate scores.
+            <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+              Leaderboard data is being computed. Run the data pipeline to populate
+              scores.
             </p>
           </div>
         )}
-      </section>
+      </EditorialSection>
 
-      {/* Consensus Signals */}
-      <section className="mb-12 max-w-lg">
+      {/* 03 · CONSENSUS */}
+      <EditorialSection
+        index="03"
+        title={
+          <>
+            What&apos;s <em className="italic text-accent">forming</em> across creators.
+          </>
+        }
+      >
         <ConsensusSignals signals={signals} />
-      </section>
+      </EditorialSection>
     </div>
   );
-}
-
-interface StatPillProps {
-  readonly label: string;
-  readonly value: string;
 }
 
 interface PremiseRowProps {
@@ -402,24 +422,11 @@ interface PremiseRowProps {
 
 function PremiseRow({ claim, source }: PremiseRowProps): ReactElement {
   return (
-    <li className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 px-4 py-3">
-      <span className="text-[#C8D3CA] text-sm leading-snug">{claim}</span>
-      <span className="text-[#5B6B63] text-[11px] tracking-wide whitespace-nowrap">
+    <li className="flex flex-col tab:flex-row tab:items-baseline tab:justify-between gap-1 px-4 py-3 border-t border-ink-150 first:border-t-0">
+      <span className="font-serif text-[14px] text-ink-700">{claim}</span>
+      <span className="font-mono text-[10px] text-ink-500 tracking-wide whitespace-nowrap">
         [{source}]
       </span>
     </li>
-  );
-}
-
-function StatPill({ label, value }: StatPillProps): ReactElement {
-  return (
-    <div className="flex items-center gap-2 bg-ink-100 border border-ink-200 px-4 py-2.5">
-      <div className="text-left">
-        <p className="text-ink-900 font-bold text-sm tabular-nums">{value}</p>
-        <p className="text-ink-500 text-[10px] uppercase tracking-wider">
-          {label}
-        </p>
-      </div>
-    </div>
   );
 }
