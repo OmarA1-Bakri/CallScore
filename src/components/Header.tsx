@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { LogIn, LogOut, Crown, Zap } from "lucide-react";
+import { Crown } from "lucide-react";
 import type { ReactElement } from "react";
 import { getSession } from "@/lib/auth";
 import MobileMenu from "./MobileMenu";
@@ -68,9 +68,8 @@ export default async function Header(): Promise<ReactElement> {
                 <TierBadge tier={tier} />
                 <Link
                   href="/api/auth/logout"
-                  className="text-ink-600 hover:text-ink-900 transition-colors text-sm flex items-center gap-1.5"
+                  className="text-ink-600 hover:text-ink-900 transition-colors text-sm"
                 >
-                  <LogOut className="w-4 h-4" />
                   <span className="hidden desk:inline">Logout</span>
                 </Link>
               </div>
@@ -79,9 +78,8 @@ export default async function Header(): Promise<ReactElement> {
                 <Link
                   href="/api/auth/whop"
                   prefetch={false}
-                  className="text-ink-700 hover:text-ink-900 transition-colors text-sm flex items-center gap-1.5"
+                  className="text-ink-700 hover:text-ink-900 transition-colors text-sm"
                 >
-                  <LogIn className="w-4 h-4" />
                   Sign In
                 </Link>
                 <Link
@@ -119,7 +117,7 @@ function TierBadge({ tier }: { readonly tier: string }): ReactElement {
   if (tier === "pro") {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-new/20 text-new border border-new/30">
-        <Zap className="w-3 h-3" />
+        <span aria-hidden="true">★</span>
         Pro
       </span>
     );

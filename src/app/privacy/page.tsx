@@ -125,7 +125,7 @@ export default function PrivacyPage() {
       {/* Policy sections */}
       <div className="space-y-8">
         {POLICY_SECTIONS.map((section, index) => (
-          <section key={section.title} className="glass-card p-6">
+          <section key={section.title} className="border border-ink-200 p-6">
             <h2 className="text-ink-900 font-semibold text-base mb-4">
               {index + 1}. {section.title}
             </h2>

@@ -1,6 +1,5 @@
 "use client";
 
-import { Zap, TrendingUp, TrendingDown } from "lucide-react";
 import type { ConsensusSignal } from "@/lib/types";
 import { SYMBOL_TICKERS } from "@/lib/constants";
 
@@ -18,10 +17,10 @@ function formatDate(dateStr: string): string {
 
 export default function ConsensusSignals({ signals }: ConsensusSignalsProps) {
   return (
-    <div className="glass-card p-5">
+    <div className="border border-ink-200 p-5">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
-        <Zap className="w-5 h-5 text-accent" />
+        <span aria-hidden="true" className="text-accent">★</span>
         <h3 className="text-ink-900 font-semibold text-sm">Consensus Signals</h3>
         <span className="badge-elite ml-auto">Alpha</span>
       </div>
@@ -38,19 +37,15 @@ export default function ConsensusSignals({ signals }: ConsensusSignalsProps) {
             return (
               <div
                 key={signal.id}
-                className="flex items-center gap-3 p-3 rounded-lg bg-ink-0/50 border border-ink-200"
+                className="flex items-center gap-3 p-3 bg-ink-0/50 border border-ink-200"
               >
                 {/* Direction icon */}
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    isBullish ? "bg-pos/10" : "bg-neg/10"
+                  className={`w-8 h-8 flex items-center justify-center text-sm font-bold ${
+                    isBullish ? "bg-pos/10 text-pos" : "bg-neg/10 text-neg"
                   }`}
                 >
-                  {isBullish ? (
-                    <TrendingUp className="w-4 h-4 text-pos" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 text-neg" />
-                  )}
+                  <span aria-hidden="true">{isBullish ? "↑" : "↓"}</span>
                 </div>
 
                 {/* Details */}

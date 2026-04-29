@@ -1,23 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import {
-  ArrowLeft,
-  Database,
-  Video,
-  Brain,
-  Crosshair,
-  TrendingUp,
-  Target,
-  Shield,
-  BarChart3,
-  ChevronRight,
-  Eye,
-  Clock,
-  Filter,
-  Award,
-  Layers,
-  Activity,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import {
   EXTRACTION_CONFIDENCE_THRESHOLD,
   SCORE_WEIGHTS,
@@ -99,7 +82,6 @@ const SCORE_COMPONENTS: readonly ScoreComponent[] = [
 ] as const;
 
 interface PipelineStep {
-  readonly icon: React.ComponentType<{ className?: string }>;
   readonly label: string;
   readonly detail: string;
   readonly color: string;
@@ -107,31 +89,26 @@ interface PipelineStep {
 
 const PIPELINE_STEPS: readonly PipelineStep[] = [
   {
-    icon: Video,
     label: "Scrape",
     detail: `Auto-generated subtitles pulled daily from ${TRACKED_CREATOR_COUNT} creators`,
     color: "text-neg",
   },
   {
-    icon: Brain,
     label: "Extract",
     detail: "AI identifies specific, actionable predictions from transcripts",
     color: "text-accent",
   },
   {
-    icon: Crosshair,
     label: "Match",
     detail: "Each call is matched against 18.7M candle rows from Binance",
     color: "text-new",
   },
   {
-    icon: BarChart3,
     label: "Score",
     detail: "Alpha Score computed from 5 weighted components (0-100)",
     color: "text-pos",
   },
   {
-    icon: Award,
     label: "Rank",
     detail: "Creators ranked by average Alpha Score across all scored calls",
     color: "text-accent",
@@ -141,24 +118,20 @@ const PIPELINE_STEPS: readonly PipelineStep[] = [
 interface RankingMetric {
   readonly label: string;
   readonly description: string;
-  readonly icon: React.ComponentType<{ className?: string }>;
 }
 
 const RANKING_METRICS: readonly RankingMetric[] = [
   {
     label: "Alpha Score",
     description: "Average Alpha Score across all scored calls. This is the primary ranking metric.",
-    icon: BarChart3,
   },
   {
     label: "Win Rate",
     description: "Percentage of calls where the direction was correct at 30 days.",
-    icon: Target,
   },
   {
     label: "Alpha",
     description: "Average excess return over Bitcoin at 30 days across all calls.",
-    icon: TrendingUp,
   },
 ] as const;
 
@@ -192,8 +165,7 @@ export default function MethodologyPage() {
 
       {/* Page header */}
       <section className="text-center mb-16">
-        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 rounded-full px-4 py-1.5 mb-6">
-          <Eye className="w-4 h-4 text-accent" />
+        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 px-4 py-1.5 mb-6">
           <span className="text-accent text-xs font-medium">
             Full Transparency
           </span>
@@ -276,7 +248,7 @@ export default function MethodologyPage() {
 
       {/* CTA */}
       <section className="text-center mb-8">
-        <div className="glass-card p-8 sm:p-12 glow-gold">
+        <div className="border border-ink-200 p-8 sm:p-12">
           <h2 className="text-xl sm:text-2xl font-bold text-ink-900 mb-3">
             Ready to see who actually beats the market?
           </h2>
@@ -286,13 +258,13 @@ export default function MethodologyPage() {
           <div className="flex flex-wrap justify-center gap-4">
             <Link
               href="/"
-              className="bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
+              className="bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-6 py-2.5 transition-colors"
             >
               View Leaderboard
             </Link>
             <Link
               href="/pricing"
-              className="bg-ink-100 hover:bg-ink-150 text-ink-900 font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors border border-ink-200"
+              className="bg-ink-100 hover:bg-ink-150 text-ink-900 font-semibold text-sm px-6 py-2.5 transition-colors border border-ink-200"
             >
               See Pricing
             </Link>
@@ -326,55 +298,58 @@ function SectionHeader({
 
 function PipelineVisual() {
   return (
-    <div className="glass-card p-6 sm:p-8">
+    <div className="border border-ink-200 p-6 sm:p-8">
       {/* Desktop: horizontal */}
       <div className="hidden md:flex items-start justify-between gap-2">
-        {PIPELINE_STEPS.map((step, index) => {
-          const Icon = step.icon;
-          return (
-            <div key={step.label} className="flex items-start flex-1">
-              <div className="flex flex-col items-center text-center flex-1">
-                <div className="w-14 h-14 rounded-xl bg-ink-100 border border-ink-200 flex items-center justify-center mb-3">
-                  <Icon className={`w-6 h-6 ${step.color}`} />
-                </div>
-                <span className="text-ink-900 font-semibold text-sm mb-1">
-                  {step.label}
-                </span>
-                <span className="text-ink-500 text-xs leading-relaxed max-w-[160px]">
-                  {step.detail}
-                </span>
+        {PIPELINE_STEPS.map((step, index) => (
+          <div key={step.label} className="flex items-start flex-1">
+            <div className="flex flex-col items-center text-center flex-1">
+              <div
+                className={`w-14 h-14 bg-ink-100 border border-ink-200 flex items-center justify-center mb-3 font-bold text-lg ${step.color}`}
+              >
+                {index + 1}
               </div>
-              {index < PIPELINE_STEPS.length - 1 && (
-                <ChevronRight className="w-5 h-5 text-ink-200 mt-4 shrink-0" />
-              )}
+              <span className="text-ink-900 font-semibold text-sm mb-1">
+                {step.label}
+              </span>
+              <span className="text-ink-500 text-xs leading-relaxed max-w-[160px]">
+                {step.detail}
+              </span>
             </div>
-          );
-        })}
+            {index < PIPELINE_STEPS.length - 1 && (
+              <span
+                aria-hidden="true"
+                className="text-ink-200 mt-4 shrink-0 px-2"
+              >
+                ›
+              </span>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Mobile: vertical */}
       <div className="md:hidden space-y-4">
-        {PIPELINE_STEPS.map((step, index) => {
-          const Icon = step.icon;
-          return (
-            <div key={step.label} className="flex items-start gap-4">
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-lg bg-ink-100 border border-ink-200 flex items-center justify-center">
-                  <Icon className={`w-5 h-5 ${step.color}`} />
-                </div>
-                {index < PIPELINE_STEPS.length - 1 && (
-                  <div className="w-px h-6 bg-ink-200 mt-2" />
-                )}
+        {PIPELINE_STEPS.map((step, index) => (
+          <div key={step.label} className="flex items-start gap-4">
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-10 h-10 bg-ink-100 border border-ink-200 flex items-center justify-center font-bold ${step.color}`}
+              >
+                {index + 1}
               </div>
-              <div className="pt-1.5">
-                <span className="text-ink-900 font-semibold text-sm">
-                  {step.label}
-                </span>
-                <p className="text-ink-500 text-xs mt-0.5">{step.detail}</p>
-              </div>
+              {index < PIPELINE_STEPS.length - 1 && (
+                <div className="w-px h-6 bg-ink-200 mt-2" />
+              )}
             </div>
-          );
-        })}
+            <div className="pt-1.5">
+              <span className="text-ink-900 font-semibold text-sm">
+                {step.label}
+              </span>
+              <p className="text-ink-500 text-xs mt-0.5">{step.detail}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -386,11 +361,8 @@ function DataSourcesGrid() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* Market Data */}
-      <div className="glass-card p-6">
+      <div className="border border-ink-200 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-pos/10 border border-pos/20 flex items-center justify-center">
-            <Database className="w-5 h-5 text-pos" />
-          </div>
           <h3 className="text-ink-900 font-semibold">Market Data</h3>
         </div>
 
@@ -419,11 +391,8 @@ function DataSourcesGrid() {
       </div>
 
       {/* YouTube Transcripts */}
-      <div className="glass-card p-6">
+      <div className="border border-ink-200 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-neg/10 border border-neg/20 flex items-center justify-center">
-            <Video className="w-5 h-5 text-neg" />
-          </div>
           <h3 className="text-ink-900 font-semibold">YouTube Transcripts</h3>
         </div>
 
@@ -443,11 +412,8 @@ function DataSourcesGrid() {
       </div>
 
       {/* AI Extraction */}
-      <div className="glass-card p-6">
+      <div className="border border-ink-200 p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
-            <Brain className="w-5 h-5 text-accent" />
-          </div>
           <h3 className="text-ink-900 font-semibold">AI Extraction</h3>
         </div>
 
@@ -493,7 +459,7 @@ function AlphaScoreFormula() {
   const totalMax = SCORE_COMPONENTS.reduce((sum, c) => sum + c.maxPoints, 0);
 
   return (
-    <div className="glass-card p-6 sm:p-8">
+    <div className="border border-ink-200 p-6 sm:p-8">
       {/* Formula text */}
       <div className="mb-6 text-center">
         <p className="text-ink-600 text-sm mb-2">
@@ -516,7 +482,7 @@ function AlphaScoreFormula() {
 
       {/* Stacked bar */}
       <div className="mb-4">
-        <div className="flex h-10 sm:h-12 rounded-lg overflow-hidden border border-ink-200">
+        <div className="flex h-10 sm:h-12 overflow-hidden border border-ink-200">
           {SCORE_COMPONENTS.map((comp) => {
             const widthPercent = (comp.maxPoints / totalMax) * 100;
             return (
@@ -564,7 +530,7 @@ function ScoreComponentCards() {
       {SCORE_COMPONENTS.map((comp) => (
         <div
           key={comp.label}
-          className={`glass-card p-5 border-l-2 ${comp.borderColor}`}
+          className={`border border-ink-200 p-5 border-l-2 ${comp.borderColor}`}
         >
           <div className="flex items-center justify-between mb-3">
             <h3 className={`font-semibold text-sm ${comp.color}`}>
@@ -577,9 +543,9 @@ function ScoreComponentCards() {
           </div>
 
           {/* Mini progress bar showing max */}
-          <div className="h-1.5 bg-ink-200 rounded-full overflow-hidden mb-3">
+          <div className="h-1.5 bg-ink-200 overflow-hidden mb-3">
             <div
-              className={`h-full rounded-full ${comp.bgColor}`}
+              className={`h-full ${comp.bgColor}`}
               style={{ width: `${(comp.maxPoints / 100) * 100}%` }}
             />
           </div>
@@ -591,7 +557,7 @@ function ScoreComponentCards() {
       ))}
 
       {/* Total card */}
-      <div className="glass-card p-5 border-l-2 border-white/20 flex flex-col justify-center">
+      <div className="border border-ink-200 p-5 border-l-2 border-l-white/20 flex flex-col justify-center">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-semibold text-sm text-ink-900">Total Maximum</h3>
           <span className="text-gradient-gold font-bold text-2xl tabular-nums">
@@ -615,30 +581,25 @@ function CreatorRankingsSection() {
     <div className="space-y-6">
       {/* Aggregation metrics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {RANKING_METRICS.map((metric) => {
-          const Icon = metric.icon;
-          return (
-            <div key={metric.label} className="glass-card p-5">
-              <div className="flex items-center gap-3 mb-2">
-                <Icon className="w-5 h-5 text-accent" />
-                <h3 className="text-ink-900 font-semibold text-sm">
-                  {metric.label}
-                </h3>
-              </div>
-              <p className="text-ink-600 text-xs leading-relaxed">
-                {metric.description}
-              </p>
+        {RANKING_METRICS.map((metric) => (
+          <div key={metric.label} className="border border-ink-200 p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <h3 className="text-ink-900 font-semibold text-sm">
+                {metric.label}
+              </h3>
             </div>
-          );
-        })}
+            <p className="text-ink-600 text-xs leading-relaxed">
+              {metric.description}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Ranking periods and tiers */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Ranking periods */}
-        <div className="glass-card p-5">
+        <div className="border border-ink-200 p-5">
           <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-5 h-5 text-accent" />
             <h3 className="text-ink-900 font-semibold text-sm">
               Ranking Periods
             </h3>
@@ -651,9 +612,8 @@ function CreatorRankingsSection() {
             {(["All Time", "90 Days", "30 Days"] as const).map((period) => (
               <div
                 key={period}
-                className="flex items-center gap-2 bg-ink-100 border border-ink-200 rounded-lg px-3 py-2"
+                className="flex items-center gap-2 bg-ink-100 border border-ink-200 px-3 py-2"
               >
-                <Activity className="w-3.5 h-3.5 text-ink-500" />
                 <span className="text-ink-700 text-xs font-medium">
                   {period}
                 </span>
@@ -663,9 +623,8 @@ function CreatorRankingsSection() {
         </div>
 
         {/* Tier system */}
-        <div className="glass-card p-5">
+        <div className="border border-ink-200 p-5">
           <div className="flex items-center gap-3 mb-4">
-            <Layers className="w-5 h-5 text-accent" />
             <h3 className="text-ink-900 font-semibold text-sm">
               Tier System
             </h3>
@@ -679,7 +638,7 @@ function CreatorRankingsSection() {
             {TIERS.map((tier) => (
               <div
                 key={tier.name}
-                className="flex items-center justify-between bg-ink-100 border border-ink-200 rounded-lg px-3 py-2"
+                className="flex items-center justify-between bg-ink-100 border border-ink-200 px-3 py-2"
               >
                 <span className={tier.badge}>{tier.name}</span>
                 <span className="text-ink-600 text-xs">{tier.range}</span>
@@ -741,7 +700,7 @@ function StatisticalRigorSection() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {rigorItems.map((item) => (
-        <div key={item.label} className="glass-card p-5">
+        <div key={item.label} className="border border-ink-200 p-5">
           <div className="mb-3">
             <span className="text-gradient-gold font-bold text-2xl tabular-nums">
               {item.stat}
@@ -765,32 +724,26 @@ function TransparencySection() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <TransparencyCard
-        icon={Eye}
         title="Open Formula"
         description="We show you exactly how scores are calculated so you can evaluate our methodology. No proprietary magic -- just math."
       />
       <TransparencyCard
-        icon={Filter}
         title="AI Confidence Filter"
         description={`The extraction AI identifies what qualifies as an actionable call vs. just commentary. Only calls with confidence above ${(EXTRACTION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}% are counted.`}
       />
       <TransparencyCard
-        icon={Crosshair}
         title="Per-Call Transparency"
         description="Users can see each creator's individual calls and exactly how they were scored -- direction, alpha, specificity, regime, and target."
       />
       <TransparencyCard
-        icon={Clock}
         title="Daily Updates"
         description="Rankings update daily as new videos are published and new price data arrives. You always see the latest state of the data."
       />
       <TransparencyCard
-        icon={Shield}
         title="No Conflicts"
         description="We do not accept sponsorships from tracked creators. Rankings are purely data-driven. We have zero incentive to inflate or deflate any creator's score."
       />
       <TransparencyCard
-        icon={Database}
         title="Verifiable Data"
         description="Market data comes directly from Binance. YouTube transcripts are from public auto-generated subtitles. Both are independently verifiable."
       />
@@ -799,18 +752,15 @@ function TransparencySection() {
 }
 
 function TransparencyCard({
-  icon: Icon,
   title,
   description,
 }: {
-  readonly icon: React.ComponentType<{ className?: string }>;
   readonly title: string;
   readonly description: string;
 }) {
   return (
-    <div className="glass-card p-5">
+    <div className="border border-ink-200 p-5">
       <div className="flex items-center gap-3 mb-2">
-        <Icon className="w-5 h-5 text-accent" />
         <h3 className="text-ink-900 font-semibold text-sm">{title}</h3>
       </div>
       <p className="text-ink-600 text-xs leading-relaxed">{description}</p>

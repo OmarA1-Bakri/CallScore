@@ -165,14 +165,6 @@
   .tok::before { content: "{"; opacity: 0.75; margin-right: 1px; }
   .tok::after { content: "}"; opacity: 0.75; margin-left: 1px; }
 
-  .glass-card {
-    @apply rounded-none border border-ink-200 bg-ink-50/90 backdrop-blur-bar;
-  }
-
-  .glass-card-hover {
-    @apply glass-card transition-colors duration-200 hover:bg-ink-100 hover:border-ink-300;
-  }
-
   .text-gradient-gold,
   .text-gradient-purple {
     color: var(--accent);

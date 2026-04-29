@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  ExternalLink,
-  Users,
-  Focus,
-  Youtube,
-  ArrowLeft,
-} from "lucide-react";
+import { ExternalLink, ArrowLeft } from "lucide-react";
 import AlphaScoreBadge from "@/components/AlphaScoreBadge";
 import RankTierBadge from "@/components/RankTierBadge";
 import PerformanceChart from "@/components/PerformanceChart";
@@ -151,10 +145,10 @@ export default async function CreatorPage({ params }: PageProps) {
       </Link>
 
       {/* Hero section */}
-      <section className="glass-card p-6 sm:p-8 mb-8">
+      <section className="border border-ink-200 p-6 sm:p-8 mb-8">
         <div className="flex flex-col sm:flex-row items-start gap-6">
           {/* Avatar */}
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-2xl shrink-0">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-accent/20 flex items-center justify-center text-accent font-bold text-2xl shrink-0">
             {creator.name
               .split(" ")
               .map((p) => p[0])
@@ -178,22 +172,11 @@ export default async function CreatorPage({ params }: PageProps) {
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-sm text-ink-600 mb-3">
-              <span className="flex items-center gap-1">
-                <Youtube className="w-4 h-4 text-red-500" />
-                {creator.youtube_handle}
-              </span>
+              <span>{creator.youtube_handle}</span>
               {creator.subscribers && (
-                <span className="flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5" />
-                  {creator.subscribers} subscribers
-                </span>
+                <span>{creator.subscribers} subscribers</span>
               )}
-              {creator.focus && (
-                <span className="flex items-center gap-1">
-                  <Focus className="w-3.5 h-3.5" />
-                  {creator.focus}
-                </span>
-              )}
+              {creator.focus && <span>{creator.focus}</span>}
             </div>
 
             <div className="flex flex-wrap items-center gap-4">
@@ -220,7 +203,7 @@ export default async function CreatorPage({ params }: PageProps) {
 
       {/* Stats row */}
       <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <div className="glass-card p-4 flex flex-col items-center">
+        <div className="border border-ink-200 p-4 flex flex-col items-center">
           <AlphaScoreBadge score={alphaScore} size="lg" />
         </div>
         <StatCard label="Win Rate" value={`${(winRate * 100).toFixed(1)}%`} />
@@ -250,7 +233,7 @@ export default async function CreatorPage({ params }: PageProps) {
         {performance.length > 0 ? (
           <PerformanceChart data={performance} />
         ) : (
-          <div className="glass-card p-5 flex items-center justify-center">
+          <div className="border border-ink-200 p-5 flex items-center justify-center">
             <p className="text-ink-500 text-sm">No performance data yet</p>
           </div>
         )}
@@ -265,7 +248,7 @@ export default async function CreatorPage({ params }: PageProps) {
             scoredCount={scoredCallCount}
           />
         ) : (
-          <div className="glass-card p-12 text-center">
+          <div className="border-t border-ink-250 py-12 text-center">
             <p className="text-ink-500">No calls tracked yet for this creator.</p>
           </div>
         )}
@@ -289,7 +272,7 @@ function StatCard({ label, value, positive }: StatCardProps) {
         : "text-neg";
 
   return (
-    <div className="glass-card p-4 text-center">
+    <div className="border border-ink-200 p-4 text-center">
       <p className="text-ink-500 text-[10px] uppercase tracking-wider mb-2">
         {label}
       </p>

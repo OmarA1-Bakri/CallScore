@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  MessageCircle,
-  Send,
-  CheckCircle2,
-  AlertCircle,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 const CATEGORIES = [
   "Scoring Methodology",
@@ -102,8 +96,7 @@ export default function FeedbackPage() {
 
       {/* Hero */}
       <section className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 rounded-full px-4 py-1.5 mb-6">
-          <MessageCircle className="w-4 h-4 text-accent" />
+        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 px-4 py-1.5 mb-6">
           <span className="text-accent text-xs font-medium">
             Your Voice Matters
           </span>
@@ -125,8 +118,13 @@ export default function FeedbackPage() {
       {/* Form */}
       <section className="max-w-xl mx-auto mb-16">
         {status === "success" ? (
-          <div className="glass-card p-8 text-center">
-            <CheckCircle2 className="w-12 h-12 text-pos mx-auto mb-4" />
+          <div className="border border-ink-200 p-8 text-center">
+            <p
+              aria-hidden="true"
+              className="text-pos text-3xl font-bold mb-4"
+            >
+              ✓
+            </p>
             <h2 className="text-ink-900 font-bold text-xl mb-2">
               Thank You for Your Feedback
             </h2>
@@ -137,7 +135,7 @@ export default function FeedbackPage() {
             <button
               type="button"
               onClick={() => setStatus("idle")}
-              className="bg-ink-100 hover:bg-ink-150 text-ink-900 border border-ink-200 font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
+              className="bg-ink-100 hover:bg-ink-150 text-ink-900 border border-ink-200 font-semibold text-sm px-6 py-2.5 transition-colors"
             >
               Send More Feedback
             </button>
@@ -145,7 +143,7 @@ export default function FeedbackPage() {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="glass-card p-6 sm:p-8 space-y-5"
+            className="border border-ink-200 p-6 sm:p-8 space-y-5"
           >
             {/* Name */}
             <div>
@@ -162,7 +160,7 @@ export default function FeedbackPage() {
                 placeholder="Your name"
                 value={form.name}
                 onChange={(e) => updateField("name", e.target.value)}
-                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
+                className="w-full bg-ink-0 border border-ink-200 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
               />
             </div>
 
@@ -181,7 +179,7 @@ export default function FeedbackPage() {
                 placeholder="you@example.com"
                 value={form.email}
                 onChange={(e) => updateField("email", e.target.value)}
-                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
+                className="w-full bg-ink-0 border border-ink-200 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
               />
             </div>
 
@@ -199,7 +197,7 @@ export default function FeedbackPage() {
                 onChange={(e) =>
                   updateField("category", e.target.value as Category)
                 }
-                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-ink-900 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors appearance-none cursor-pointer"
+                className="w-full bg-ink-0 border border-ink-200 px-4 py-2.5 text-sm text-ink-900 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors appearance-none cursor-pointer"
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -224,14 +222,16 @@ export default function FeedbackPage() {
                 value={form.message}
                 onChange={(e) => updateField("message", e.target.value)}
                 required
-                className="w-full bg-ink-0 border border-ink-200 rounded-lg px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors resize-vertical min-h-[120px]"
+                className="w-full bg-ink-0 border border-ink-200 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors resize-vertical min-h-[120px]"
               />
             </div>
 
             {/* Error */}
             {status === "error" && errorMessage && (
-              <div className="flex items-start gap-2 bg-neg/10 border border-neg/20 rounded-lg px-4 py-3">
-                <AlertCircle className="w-4 h-4 text-neg shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 bg-neg/10 border border-neg/20 px-4 py-3">
+                <span aria-hidden="true" className="text-neg font-bold">
+                  !
+                </span>
                 <p className="text-neg text-sm">{errorMessage}</p>
               </div>
             )}
@@ -240,16 +240,9 @@ export default function FeedbackPage() {
             <button
               type="submit"
               disabled={status === "submitting"}
-              className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-6 py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {status === "submitting" ? (
-                "Sending..."
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Send Feedback
-                </>
-              )}
+              {status === "submitting" ? "Sending..." : "Send Feedback"}
             </button>
           </form>
         )}
