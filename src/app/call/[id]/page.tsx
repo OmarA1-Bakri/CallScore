@@ -1,21 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
+import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { query } from "@/lib/db";
-import {
-  SYMBOL_NAMES,
-  SYMBOL_TICKERS,
-  REGIME_LABELS,
-  REGIME_COLORS,
-} from "@/lib/constants";
+import { SYMBOL_TICKERS } from "@/lib/constants";
 import { serializeCall } from "@/lib/public-serializer";
 import type { Call, Creator } from "@/lib/types";
 
 interface PageProps {
   readonly params: { id: string };
 }
+
+// Map raw direction enum to trader vocabulary for display. Italic editorial accent
+// reads naturally as "SOL Long" / "SOL Short" — never italicize lowercase enums
+// like "bullish" / "neutral" directly (round2-003).
+const DIRECTION_LABEL: Record<Call["direction"], string> = {
+  bullish: "Long",
+  bearish: "Short",
+  neutral: "Sideways",
+};
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const callId = parseInt(params.id, 10);
@@ -80,147 +84,105 @@ export default async function CallDetailPage({ params }: PageProps) {
     // Creator table may not exist yet
   }
 
+  // Resolve YouTube video id (text) and timestamp from the videos table.
+  // The Call.video_id is an FK to the internal videos.id, not the YouTube id;
+  // we need the youtube_video_id to embed the iframe.
+  let youtubeVideoId: string | null = null;
+  let timestampSeconds: number | null = null;
+  try {
+    const videos = await query<{
+      readonly youtube_video_id: string | null;
+    }>(
+      `SELECT youtube_video_id FROM videos WHERE id = $1 LIMIT 1`,
+      [call.video_id],
+    );
+    if (videos.length > 0) {
+      youtubeVideoId = videos[0].youtube_video_id ?? null;
+    }
+  } catch {
+    // Videos table may not be present in some environments
+  }
+
   const serializedCall = serializeCall(call);
   const creatorName = creator?.name ?? "Unknown Creator";
   const creatorHandle = creator?.youtube_handle ?? "unknown";
-
   const ticker = SYMBOL_TICKERS[serializedCall.symbol] ?? serializedCall.symbol.replace("USDT", "");
-  const coinName = SYMBOL_NAMES[serializedCall.symbol] ?? serializedCall.symbol;
-  const isBullish = serializedCall.direction === "bullish";
-  const regimeLabel = serializedCall.regime_at_call !== null
-    ? REGIME_LABELS[serializedCall.regime_at_call] ?? "Unknown"
-    : "Unknown";
-  const regimeColor = serializedCall.regime_at_call !== null
-    ? REGIME_COLORS[serializedCall.regime_at_call] ?? "#6b7280"
-    : "#6b7280";
-  const displayScore = serializedCall.public_score;
-  const scoreLabel =
-    serializedCall.score_status === "scored"
-      ? "Alpha Score"
-      : serializedCall.score_status === "pending_horizon"
-        ? "Status"
-        : "Call Status";
-  const scoreValue =
-    serializedCall.score_status === "scored"
-      ? displayScore!.toFixed(1)
-      : serializedCall.score_status === "excluded_confidence"
-        ? "Unscored"
-        : serializedCall.score_status === "invalid_extraction"
-          ? "Invalid"
-          : "Pending";
+
+  const directionLabel = DIRECTION_LABEL[serializedCall.direction];
+
+  // Outcome label is derived (Call has no `outcome` column). When the 30d
+  // horizon hasn't elapsed, surface "pending"; otherwise win / loss / flat.
+  const outcomeLabel: string =
+    serializedCall.horizon_status_30d !== "available"
+      ? "pending"
+      : serializedCall.return_30d === null
+        ? "—"
+        : serializedCall.return_30d > 0
+          ? "win"
+          : serializedCall.return_30d < 0
+            ? "loss"
+            : "flat";
+
+  const targetHitLabel: string =
+    serializedCall.target_price === null
+      ? "—"
+      : serializedCall.target_status !== "available"
+        ? "pending"
+        : serializedCall.hit_target === true
+          ? "yes"
+          : serializedCall.hit_target === false
+            ? "no"
+            : "—";
+
+  const scoreCellValue =
+    serializedCall.public_score !== null
+      ? serializedCall.public_score.toFixed(1)
+      : "—";
+
+  const return30dCellValue =
+    serializedCall.return_30d !== null
+      ? `${serializedCall.return_30d >= 0 ? "+" : ""}${serializedCall.return_30d.toFixed(1)}%`
+      : "—";
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back link */}
+    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-12">
       <Link
         href={`/creator/${creatorHandle}`}
-        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-6 transition-colors"
+        className="inline-flex items-center gap-1.5 font-mono text-[10px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mb-8"
       >
-        <ArrowLeft className="w-4 h-4" />
-        Back to {creatorName}
+        <span aria-hidden="true">←</span> {creatorName}
       </Link>
 
-      {/* Header */}
-      <section className="border border-ink-200 p-6 sm:p-8 mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
-          <div className="flex-1">
-            <p className="text-ink-500 text-sm mb-1">
-              {creatorName} &middot;{" "}
-              {new Date(serializedCall.call_date).toLocaleDateString("en-US", {
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </p>
-            <h1 className="text-2xl font-bold text-ink-900">
-              {ticker} --{" "}
-              <span className={isBullish ? "text-pos" : "text-neg"}>
-                {serializedCall.direction.charAt(0).toUpperCase() + serializedCall.direction.slice(1)}
-              </span>{" "}
-              Call
-            </h1>
-          </div>
-          <div
-            className={`text-3xl font-bold tabular-nums ${
-              serializedCall.score_status !== "scored"
-                ? "text-ink-600"
-                : displayScore! >= 60
-                ? "text-pos"
-                : displayScore! >= 40
-                  ? "text-accent"
-                  : "text-neg"
-            }`}
-            aria-label={scoreLabel}
-          >
-            {scoreValue}
-          </div>
+      {/* HERO */}
+      <section className="pb-10 border-b border-ink-250">
+        <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-2">
+          Call · {new Date(serializedCall.call_date).toISOString().slice(0, 10)} · {creatorName}
         </div>
-
-        {/* The call summary */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          <MiniStat label="Coin" value={`${coinName} (${ticker})`} />
-          <MiniStat
-            label="Direction"
-            value={serializedCall.direction}
-            badge={isBullish ? "bullish" : "bearish"}
-          />
-          <MiniStat
-            label="Entry Price"
-            value={serializedCall.entry_price !== null ? `$${serializedCall.entry_price.toLocaleString()}` : "--"}
-          />
-          <MiniStat
-            label="Target Price"
-            value={serializedCall.target_price !== null ? `$${serializedCall.target_price.toLocaleString()}` : "--"}
-          />
-          <MiniStat
-            label="Stop Loss"
-            value={serializedCall.stop_loss !== null ? `$${serializedCall.stop_loss.toLocaleString()}` : "--"}
-          />
-          <MiniStat label="Timeframe" value={serializedCall.timeframe ?? "--"} />
-          <MiniStat
-            label="Confidence"
-            value={`${(serializedCall.extraction_confidence * 100).toFixed(0)}%`}
-          />
-          <MiniStat label={scoreLabel} value={scoreValue} />
-        </div>
-      </section>
-
-      {/* Price performance */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-        <PriceCard
-          label="7 Days"
-          status={serializedCall.horizon_status_7d}
-          priceAfter={serializedCall.price_7d}
-          returnPct={serializedCall.return_7d}
-          alphaPct={serializedCall.alpha_7d}
-          btcReturn={serializedCall.btc_price_at_call && serializedCall.btc_price_7d
-            ? ((serializedCall.btc_price_7d - serializedCall.btc_price_at_call) / serializedCall.btc_price_at_call) * 100
-            : null}
-        />
-        <PriceCard
-          label="30 Days"
-          status={serializedCall.horizon_status_30d}
-          priceAfter={serializedCall.price_30d}
-          returnPct={serializedCall.return_30d}
-          alphaPct={serializedCall.alpha_30d}
-          btcReturn={serializedCall.btc_price_at_call && serializedCall.btc_price_30d
-            ? ((serializedCall.btc_price_30d - serializedCall.btc_price_at_call) / serializedCall.btc_price_at_call) * 100
-            : null}
-        />
-        <PriceCard
-          label="90 Days"
-          status={serializedCall.horizon_status_90d}
-          priceAfter={serializedCall.price_90d}
-          returnPct={serializedCall.return_90d}
-          alphaPct={serializedCall.alpha_90d}
-          btcReturn={serializedCall.btc_price_at_call && serializedCall.btc_price_90d
-            ? ((serializedCall.btc_price_90d - serializedCall.btc_price_at_call) / serializedCall.btc_price_at_call) * 100
-            : null}
+        <h1 className="font-serif text-[34px] tab:text-[44px] text-ink-900 font-medium tracking-tight leading-[1.1] mb-2">
+          {ticker}{" "}
+          <em className="italic font-normal text-accent">{directionLabel}</em>
+        </h1>
+        <p className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px]">
+          Scored against Binance candles for the 30-day window following the call date.
+          {serializedCall.target_price !== null && (
+            <>
+              {" "}Target was{" "}
+              <em className="italic text-accent">${serializedCall.target_price.toFixed(2)}</em>.
+            </>
+          )}
+        </p>
+        <MetaStrip
+          cells={[
+            { k: "alpha score", v: scoreCellValue },
+            { k: "30d return", v: return30dCellValue },
+            { k: "outcome", v: outcomeLabel },
+            { k: "target hit", v: targetHitLabel },
+          ]}
         />
       </section>
 
-      {/* Score breakdown + Market regime */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      {/* 01 — score breakdown */}
+      <EditorialSection index="01" title={<>Score <em className="italic text-accent">breakdown</em>.</>}>
         {serializedCall.public_score_components ? (
           <ScoreBreakdown
             direction={serializedCall.public_score_components.direction}
@@ -230,213 +192,135 @@ export default async function CallDetailPage({ params }: PageProps) {
             target={serializedCall.public_score_components.target}
           />
         ) : (
-          <div className="border border-ink-200 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-ink-900 font-semibold text-sm">Alpha Score</h2>
-              <span className="text-ink-600 font-bold text-lg tabular-nums">
-                {scoreValue}
-              </span>
+          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+            Score is being computed. Check back after the next pipeline run.
+          </p>
+        )}
+      </EditorialSection>
+
+      {/* 02 — performance */}
+      <EditorialSection
+        index="02"
+        title={<><em className="italic text-accent">Performance</em> over 30 days.</>}
+        meta={<>price vs BTC benchmark<br />window: call date → +30d</>}
+      >
+        {serializedCall.return_30d !== null ? (
+          <dl className="grid grid-cols-2 tab:grid-cols-3 gap-[18px]">
+            <div className="border-t border-ink-250 pt-3.5">
+              <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
+                30d return
+              </dt>
+              <dd className="font-serif text-[24px] text-ink-900 font-medium tracking-tight tabular-nums">
+                {serializedCall.return_30d >= 0 ? "+" : ""}
+                {serializedCall.return_30d.toFixed(1)}%
+              </dd>
             </div>
-            <p className="text-ink-600 text-sm leading-relaxed">
-              {serializedCall.score_status === "excluded_confidence"
-                ? "This call is displayed publicly, but it is not counted because the extraction did not clear the public 70% confidence threshold."
-                : serializedCall.score_status === "invalid_extraction"
-                  ? "This extraction failed the public sanity checks for asset, direction, or target labeling, so it is not scored."
-                  : "This call is still pending because the full scoring window has not elapsed yet."}
+            {serializedCall.alpha_30d !== null && (
+              <div className="border-t border-ink-250 pt-3.5">
+                <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
+                  alpha vs BTC
+                </dt>
+                <dd className="font-serif text-[24px] text-ink-900 font-medium tracking-tight tabular-nums">
+                  {serializedCall.alpha_30d >= 0 ? "+" : ""}
+                  {serializedCall.alpha_30d.toFixed(1)}%
+                </dd>
+              </div>
+            )}
+            {serializedCall.price_30d !== null && (
+              <div className="border-t border-ink-250 pt-3.5">
+                <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
+                  price at +30d
+                </dt>
+                <dd className="font-serif text-[24px] text-ink-900 font-medium tracking-tight tabular-nums">
+                  ${serializedCall.price_30d.toLocaleString()}
+                </dd>
+              </div>
+            )}
+          </dl>
+        ) : (
+          <div className="border-t border-ink-250 py-12 text-center">
+            <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+              Performance data not yet computed for this call.
             </p>
           </div>
         )}
+      </EditorialSection>
 
-        <div className="border border-ink-200 p-5">
-          <h2 className="text-ink-900 font-semibold text-sm mb-4">
-            Market Context
-          </h2>
-          <div className="space-y-4">
-            <div>
-              <p className="text-ink-500 text-xs uppercase tracking-wider mb-1">
-                Market Regime at Call
-              </p>
-              <div className="flex items-center gap-2">
-                <span
-                  className="w-3 h-3 rounded-full inline-block"
-                  style={{ backgroundColor: regimeColor }}
-                />
-                <span className="text-ink-900 font-medium text-sm">
-                  {regimeLabel}
-                </span>
-              </div>
-            </div>
-            <div>
-              <p className="text-ink-500 text-xs uppercase tracking-wider mb-1">
-                Regime Difficulty
-              </p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-2 bg-ink-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-warn rounded-full"
-                    style={{ width: `${serializedCall.regime_difficulty * 100}%` }}
-                  />
-                </div>
-                <span className="text-ink-700 text-xs tabular-nums">
-                  {(serializedCall.regime_difficulty * 100).toFixed(0)}%
-                </span>
-              </div>
-            </div>
-            <div>
-              <p className="text-ink-500 text-xs uppercase tracking-wider mb-1">
-                Direction Correct
-              </p>
-              <span
-                className={`text-sm font-semibold ${
-                  serializedCall.correct_direction ? "text-pos" : "text-neg"
-                }`}
-              >
-                {serializedCall.horizon_status_30d === "pending"
-                  ? "Pending"
-                  : serializedCall.correct_direction ? "Yes" : "No"}
-              </span>
-            </div>
-            <div>
-              <p className="text-ink-500 text-xs uppercase tracking-wider mb-1">
-                Hit Target
-              </p>
-              <span
-                className={`text-sm font-semibold ${
-                  serializedCall.hit_target ? "text-pos" : "text-neg"
-                }`}
-              >
-                {serializedCall.target_price === null
-                  ? "No target"
-                  : serializedCall.target_status === "pending"
-                  ? "Pending"
-                  : serializedCall.hit_target ? "Yes" : "No"}
-              </span>
-            </div>
+      {/* 03 — source clip
+          Always render the section to preserve index numbering across calls
+          (round2-009). Three states: (a) timestamped clip → embed iframe;
+          (b) video known but no timestamp → fallback link to full video;
+          (c) no video at all → editorial empty-state copy. */}
+      <EditorialSection index="03" title={<>Source <em className="italic text-accent">clip</em>.</>}>
+        {youtubeVideoId && timestampSeconds !== null ? (
+          <div className="aspect-video max-w-[680px] border border-ink-200" style={{ borderRadius: 2 }}>
+            <iframe
+              src={`https://www.youtube.com/embed/${youtubeVideoId}?start=${timestampSeconds}`}
+              title={`${creatorName} — ${ticker} call`}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+            />
           </div>
-        </div>
-      </section>
-
-      {/* Raw quote */}
-      {serializedCall.raw_quote && (
-        <section className="mb-8">
-          <div className="border border-ink-200 p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-ink-900 font-semibold text-sm">
-                From the Transcript
-              </h2>
-            </div>
-            <blockquote className="border-l-2 border-accent/40 pl-4 text-ink-700 text-sm leading-relaxed italic">
-              &ldquo;{serializedCall.raw_quote}&rdquo;
-            </blockquote>
-            <p className="text-ink-400 text-xs mt-3">
-              Extraction confidence: {(serializedCall.extraction_confidence * 100).toFixed(0)}%
-            </p>
-            {serializedCall.extraction_notes.length > 0 && (
-              <p className="text-ink-400 text-xs mt-2">
-                Validation: {serializedCall.extraction_notes.join("; ")}
-              </p>
-            )}
-          </div>
-        </section>
-      )}
-    </div>
-  );
-}
-
-interface MiniStatProps {
-  readonly label: string;
-  readonly value: string;
-  readonly badge?: "bullish" | "bearish";
-}
-
-function MiniStat({ label, value, badge }: MiniStatProps) {
-  return (
-    <div>
-      <p className="text-ink-500 text-[10px] uppercase tracking-wider mb-1">
-        {label}
-      </p>
-      {badge ? (
-        <span className={badge === "bullish" ? "badge-bullish" : "badge-bearish"}>
-          {value}
-        </span>
-      ) : (
-        <p className="text-ink-900 text-sm font-medium capitalize">{value}</p>
-      )}
-    </div>
-  );
-}
-
-interface PriceCardProps {
-  readonly label: string;
-  readonly status: "pending" | "available";
-  readonly priceAfter: number | null;
-  readonly returnPct: number | null;
-  readonly alphaPct: number | null;
-  readonly btcReturn: number | null;
-}
-
-function PriceCard({
-  label,
-  status,
-  priceAfter,
-  returnPct,
-  alphaPct,
-  btcReturn,
-}: PriceCardProps) {
-  const hasData = status === "available" && priceAfter !== null && returnPct !== null;
-
-  return (
-    <div className="border border-ink-200 p-4">
-      <p className="text-ink-500 text-xs uppercase tracking-wider mb-3">
-        {label}
-      </p>
-      {hasData ? (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-ink-600 text-xs">Price</span>
-            <span className="text-ink-900 text-sm tabular-nums">
-              ${priceAfter.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-ink-600 text-xs">Return</span>
-            <span
-              className={`text-sm font-bold tabular-nums ${
-                returnPct >= 0 ? "value-positive" : "value-negative"
-              }`}
+        ) : youtubeVideoId ? (
+          <p className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px]">
+            Timestamp not yet linked.{" "}
+            <a
+              href={`https://www.youtube.com/watch?v=${youtubeVideoId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:underline underline-offset-4"
             >
-              {returnPct >= 0 ? "+" : ""}
-              {returnPct.toFixed(1)}%
-            </span>
-          </div>
-          {btcReturn !== null && (
-            <div className="flex items-center justify-between">
-              <span className="text-ink-600 text-xs">BTC Return</span>
-              <span className="text-ink-700 text-sm tabular-nums">
-                {btcReturn >= 0 ? "+" : ""}
-                {btcReturn.toFixed(1)}%
-              </span>
-            </div>
-          )}
-          {alphaPct !== null && (
-            <div className="flex items-center justify-between border-t border-ink-200 pt-2">
-              <span className="text-ink-600 text-xs font-medium">Alpha</span>
-              <span
-                className={`text-sm font-bold tabular-nums ${
-                  alphaPct >= 0 ? "value-positive" : "value-negative"
-                }`}
-              >
-                {alphaPct >= 0 ? "+" : ""}
-                {alphaPct.toFixed(1)}%
-              </span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <p className="text-ink-400 text-sm">
-          {status === "pending" ? "Pending until the horizon elapses" : "Not yet available"}
-        </p>
-      )}
+              Open the full video on YouTube →
+            </a>
+          </p>
+        ) : (
+          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+            Source clip not yet linked to this call. The transcript is in our pipeline but the video URL is pending.
+          </p>
+        )}
+      </EditorialSection>
+
+      {/* 04 — recompute log
+          NOTE: pending real call_audit_log integration. Until then, show ONLY
+          the deterministic extraction confidence (no synthesized timestamps).
+          Do NOT use new Date() to fake "score computed at" timestamps — that
+          would lie about provenance on every render. (round2-006) */}
+      <EditorialSection
+        index="04"
+        title={<>Recompute <em className="italic text-accent">log</em>.</>}
+        meta={<>extraction provenance<br />reproduce with: npm run audit:recompute</>}
+      >
+        {serializedCall.extraction_confidence !== null ? (
+          <table className="w-full font-mono text-[11px]">
+            <thead>
+              <tr className="border-b border-ink-250">
+                <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-32">When</th>
+                <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-24">Stage</th>
+                <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-4">Output</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-ink-150">
+                <td className="py-2.5 text-ink-600 tabular-nums">
+                  {new Date(serializedCall.call_date).toISOString().slice(0, 19).replace("T", " ")}
+                </td>
+                <td className="py-2.5 text-accent">extract</td>
+                <td className="py-2.5 pl-4 text-ink-700">
+                  Confidence {(serializedCall.extraction_confidence * 100).toFixed(0)}%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        ) : (
+          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+            No recompute history yet. This call was scored once at extraction.
+          </p>
+        )}
+        {/* TODO: when call_audit_log table lands, query it for this call.id and
+            render real rows. Drop the single-row fallback above. */}
+      </EditorialSection>
     </div>
   );
 }
