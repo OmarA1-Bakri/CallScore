@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowLeft } from "lucide-react";
+import type { ReactElement } from "react";
+import { EditorialSection, MetaStrip, Chip } from "@/components/primitives";
 import {
   EXTRACTION_CONFIDENCE_THRESHOLD,
   SCORE_WEIGHTS,
@@ -15,755 +16,306 @@ export const metadata: Metadata = {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Static data used across the page                                  */
+/*  Static data                                                        */
 /* ------------------------------------------------------------------ */
 
-const TRACKED_COINS: readonly string[] = [
+const TRACKED_COINS = [
   "BTC", "ETH", "SOL", "BNB", "XRP", "DOGE",
   "ADA", "AVAX", "DOT", "LINK", "TAO", "RENDER",
   "FET", "NEAR", "AR", "INJ", "SUI", "PENDLE",
 ] as const;
 
-interface ScoreComponent {
-  readonly label: string;
-  readonly maxPoints: number;
-  readonly color: string;
-  readonly bgColor: string;
-  readonly borderColor: string;
-  readonly description: string;
-}
-
-const SCORE_COMPONENTS: readonly ScoreComponent[] = [
-  {
-    label: "Direction Correct",
-    maxPoints: SCORE_WEIGHTS.direction,
-    color: "text-pos",
-    bgColor: "bg-pos",
-    borderColor: "border-pos/30",
-    description:
-      `Did the price go the direction they called at 30 days? Bullish call + price went up = ${SCORE_WEIGHTS.direction} points. Wrong direction = 0 points.`,
-  },
-  {
-    label: "Alpha Over BTC",
-    maxPoints: SCORE_WEIGHTS.alpha,
-    color: "text-new",
-    bgColor: "bg-new",
-    borderColor: "border-new/30",
-    description:
-      `How much did the coin outperform Bitcoin over 30 days? Each 1% of alpha = ${(SCORE_WEIGHTS.alpha / 10).toFixed(1)} points, capped at ${SCORE_WEIGHTS.alpha}.`,
-  },
-  {
-    label: "Specificity",
-    maxPoints: SCORE_WEIGHTS.specificity,
-    color: "text-accent",
-    bgColor: "bg-accent",
-    borderColor: "border-accent/30",
-    description:
-      `How precise was the call? Entry price (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), target price (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), stop-loss (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts), timeframe (${(SCORE_WEIGHTS.specificity / 4).toFixed(2)} pts).`,
-  },
-  {
-    label: "Regime Difficulty",
-    maxPoints: SCORE_WEIGHTS.regime,
-    color: "text-warn",
-    bgColor: "bg-warn",
-    borderColor: "border-warn/30",
-    description:
-      `How hard was this call given market conditions? Bullish call in a bear market = ${SCORE_WEIGHTS.regime} points. Bullish in a bull market = 1 point.`,
-  },
-  {
-    label: "Target Hit",
-    maxPoints: SCORE_WEIGHTS.target,
-    color: "text-accent",
-    bgColor: "bg-accent",
-    borderColor: "border-accent/30",
-    description:
-      `Did the price actually hit their stated target within 90 days? Yes = ${SCORE_WEIGHTS.target} points. No = 0 points.`,
-  },
-] as const;
-
 interface PipelineStep {
-  readonly label: string;
+  readonly name: string;
   readonly detail: string;
-  readonly color: string;
 }
 
 const PIPELINE_STEPS: readonly PipelineStep[] = [
-  {
-    label: "Scrape",
-    detail: `Auto-generated subtitles pulled daily from ${TRACKED_CREATOR_COUNT} creators`,
-    color: "text-neg",
-  },
-  {
-    label: "Extract",
-    detail: "AI identifies specific, actionable predictions from transcripts",
-    color: "text-accent",
-  },
-  {
-    label: "Match",
-    detail: "Each call is matched against 18.7M candle rows from Binance",
-    color: "text-new",
-  },
-  {
-    label: "Score",
-    detail: "Alpha Score computed from 5 weighted components (0-100)",
-    color: "text-pos",
-  },
-  {
-    label: "Rank",
-    detail: "Creators ranked by average Alpha Score across all scored calls",
-    color: "text-accent",
-  },
+  { name: "Scrape", detail: "Auto-generated subtitles, daily" },
+  { name: "Extract", detail: "AI identifies actionable predictions" },
+  { name: "Match", detail: "Each call ↔ Binance candles" },
+  { name: "Score", detail: "5 components → 0–100" },
+  { name: "Rank", detail: "Avg Alpha across scored calls" },
 ] as const;
 
-interface RankingMetric {
+interface ScoreRow {
   readonly label: string;
-  readonly description: string;
+  readonly max: number;
+  readonly how: string;
 }
 
-const RANKING_METRICS: readonly RankingMetric[] = [
+const SCORE_ROWS: readonly ScoreRow[] = [
   {
-    label: "Alpha Score",
-    description: "Average Alpha Score across all scored calls. This is the primary ranking metric.",
+    label: "Direction correct",
+    max: SCORE_WEIGHTS.direction,
+    how: "Bullish call + price up at 30d (or vice versa).",
   },
   {
-    label: "Win Rate",
-    description: "Percentage of calls where the direction was correct at 30 days.",
+    label: "Alpha over BTC",
+    max: SCORE_WEIGHTS.alpha,
+    how: `Each 1% excess return = ${(SCORE_WEIGHTS.alpha / 10).toFixed(1)}pt, capped at ${SCORE_WEIGHTS.alpha}.`,
   },
   {
-    label: "Alpha",
-    description: "Average excess return over Bitcoin at 30 days across all calls.",
+    label: "Specificity",
+    max: SCORE_WEIGHTS.specificity,
+    how: "Entry, target, stop-loss, timeframe (¼ each).",
+  },
+  {
+    label: "Regime difficulty",
+    max: SCORE_WEIGHTS.regime,
+    how: "Bullish in bear / bearish in bull = max.",
+  },
+  {
+    label: "Target hit",
+    max: SCORE_WEIGHTS.target,
+    how: "Stated target reached within 90d.",
   },
 ] as const;
 
-interface TierInfo {
-  readonly name: string;
+interface TierRow {
+  readonly tier: string;
   readonly range: string;
-  readonly badge: string;
+  readonly read: string;
 }
 
-const TIERS: readonly TierInfo[] = [
-  { name: "Alpha", range: "Signals & Intelligence", badge: "badge-elite" },
-  { name: "Pro", range: "Deep Analytics", badge: "badge-pro" },
-  { name: "Free", range: "Full Leaderboard", badge: "badge-free" },
+// Alpha-Score thresholds per current `compute-scores` output. S/A/B/C
+// banding is the public dev-pack contract for tier badges.
+const TIERS: readonly TierRow[] = [
+  { tier: "S", range: "70 – 100", read: "Elite — beats BTC consistently with high specificity." },
+  { tier: "A", range: "55 – 69",  read: "Strong — directional edge, partial specificity." },
+  { tier: "B", range: "40 – 54",  read: "Mixed — directional hit but thin alpha." },
+  { tier: "C", range: "0 – 39",   read: "Underperforming — frequent misses or low-conviction." },
 ] as const;
 
 /* ------------------------------------------------------------------ */
-/*  Page component                                                     */
+/*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function MethodologyPage() {
+export default function MethodologyPage(): ReactElement {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-8 transition-colors"
+        className="inline-flex items-center gap-1.5 font-mono text-[10px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mt-8 mb-8"
       >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Leaderboard
+        <span aria-hidden="true">←</span> Leaderboard
       </Link>
 
-      {/* Page header */}
-      <section className="text-center mb-16">
-        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 px-4 py-1.5 mb-6">
-          <span className="text-accent text-xs font-medium">
-            Full Transparency
-          </span>
+      {/* HERO */}
+      <section className="pb-12 border-b border-ink-250">
+        <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-4">
+          Methodology · Public
         </div>
-
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-ink-900 mb-4 leading-tight">
-          How We Score{" "}
-          <span className="text-gradient-gold">Every Call</span>
+        <h1 className="font-serif text-[34px] tab:text-[44px] desk:text-[52px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
+          How we score.{" "}
+          <em className="italic font-normal text-accent">In public.</em>
         </h1>
-
-        <p className="text-ink-600 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-          We show you exactly how scores are calculated so you can evaluate our
-          methodology. No black boxes. Every formula, every weight, every data
-          source -- laid out right here.
+        <p className="font-serif text-[19px] text-ink-700 leading-relaxed max-w-[760px]">
+          One formula, five components, capped 0–100. Every score reproducible
+          from the published pipeline.{" "}
+          <em className="italic text-accent">If a number looks wrong, audit me.</em>
         </p>
-      </section>
-
-      {/* Pipeline visual */}
-      <section className="mb-16">
-        <SectionHeader
-          title="How Rankings Work"
-          subtitle="From video to verdict in 5 steps"
+        <MetaStrip
+          cells={[
+            { k: "components", v: "5" },
+            { k: "candles", v: "18.7M" },
+            { k: "creators tracked", v: TRACKED_CREATOR_COUNT },
+            {
+              k: "extraction floor",
+              v: `${Math.round(EXTRACTION_CONFIDENCE_THRESHOLD * 100)}%`,
+            },
+          ]}
         />
-        <PipelineVisual />
       </section>
 
-      {/* Data Sources */}
-      <section className="mb-16">
-        <SectionHeader
-          title="Data Sources"
-          subtitle="What feeds the accuracy scoring"
-        />
-        <DataSourcesGrid />
-      </section>
-
-      {/* Alpha Score Formula */}
-      <section className="mb-16">
-        <SectionHeader
-          title="The Alpha Score"
-          subtitle="A weighted composite from 0 to 100"
-        />
-        <AlphaScoreFormula />
-      </section>
-
-      {/* Score Components Detail */}
-      <section className="mb-16">
-        <SectionHeader
-          title="Score Components"
-          subtitle="What each piece measures and why it matters"
-        />
-        <ScoreComponentCards />
-      </section>
-
-      {/* Creator Rankings */}
-      <section className="mb-16">
-        <SectionHeader
-          title="Creator Rankings"
-          subtitle="How individual call scores become creator rankings"
-        />
-        <CreatorRankingsSection />
-      </section>
-
-      {/* Statistical Rigor */}
-      <section className="mb-16">
-        <SectionHeader
-          title="Statistical Rigor"
-          subtitle="We don't just rank -- we quantify our confidence"
-        />
-        <StatisticalRigorSection />
-      </section>
-
-      {/* Transparency section */}
-      <section className="mb-16">
-        <SectionHeader
-          title="Our Transparency Commitment"
-          subtitle="What we believe you deserve to know"
-        />
-        <TransparencySection />
-      </section>
-
-      {/* CTA */}
-      <section className="text-center mb-8">
-        <div className="border border-ink-200 p-8 sm:p-12">
-          <h2 className="text-xl sm:text-2xl font-bold text-ink-900 mb-3">
-            Ready to see who actually beats the market?
-          </h2>
-          <p className="text-ink-600 text-sm mb-6 max-w-md mx-auto">
-            Now that you know how we score, check the leaderboard to see the results.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link
-              href="/"
-              className="bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-6 py-2.5 transition-colors"
-            >
-              View Leaderboard
-            </Link>
-            <Link
-              href="/pricing"
-              className="bg-ink-100 hover:bg-ink-150 text-ink-900 font-semibold text-sm px-6 py-2.5 transition-colors border border-ink-200"
-            >
-              See Pricing
-            </Link>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Reusable sub-components (co-located, single file)                 */
-/* ------------------------------------------------------------------ */
-
-function SectionHeader({
-  title,
-  subtitle,
-}: {
-  readonly title: string;
-  readonly subtitle: string;
-}) {
-  return (
-    <div className="mb-8">
-      <h2 className="text-ink-900 font-bold text-xl sm:text-2xl">{title}</h2>
-      <p className="text-ink-500 text-sm mt-1">{subtitle}</p>
-    </div>
-  );
-}
-
-/* ---------- Pipeline Visual ---------- */
-
-function PipelineVisual() {
-  return (
-    <div className="border border-ink-200 p-6 sm:p-8">
-      {/* Desktop: horizontal */}
-      <div className="hidden md:flex items-start justify-between gap-2">
-        {PIPELINE_STEPS.map((step, index) => (
-          <div key={step.label} className="flex items-start flex-1">
-            <div className="flex flex-col items-center text-center flex-1">
-              <div
-                className={`w-14 h-14 bg-ink-100 border border-ink-200 flex items-center justify-center mb-3 font-bold text-lg ${step.color}`}
-              >
-                {index + 1}
+      {/* 01 — pipeline */}
+      <EditorialSection
+        index="01"
+        title={<>The <em className="italic text-accent">pipeline</em>.</>}
+        meta={<>Scrape → Extract → Match → Score → Rank</>}
+      >
+        <ol className="grid grid-cols-1 tab:grid-cols-5 gap-4">
+          {PIPELINE_STEPS.map((step, i) => (
+            <li key={step.name} className="border-t border-ink-250 pt-3">
+              <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-1">
+                step {String(i + 1).padStart(2, "0")}
               </div>
-              <span className="text-ink-900 font-semibold text-sm mb-1">
-                {step.label}
-              </span>
-              <span className="text-ink-500 text-xs leading-relaxed max-w-[160px]">
+              <div className="font-serif text-[18px] text-ink-900 font-medium leading-tight mb-1">
+                {step.name}
+              </div>
+              <div className="font-mono text-[11px] text-ink-600 leading-relaxed">
                 {step.detail}
-              </span>
-            </div>
-            {index < PIPELINE_STEPS.length - 1 && (
-              <span
-                aria-hidden="true"
-                className="text-ink-200 mt-4 shrink-0 px-2"
-              >
-                ›
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Mobile: vertical */}
-      <div className="md:hidden space-y-4">
-        {PIPELINE_STEPS.map((step, index) => (
-          <div key={step.label} className="flex items-start gap-4">
-            <div className="flex flex-col items-center">
-              <div
-                className={`w-10 h-10 bg-ink-100 border border-ink-200 flex items-center justify-center font-bold ${step.color}`}
-              >
-                {index + 1}
               </div>
-              {index < PIPELINE_STEPS.length - 1 && (
-                <div className="w-px h-6 bg-ink-200 mt-2" />
-              )}
-            </div>
-            <div className="pt-1.5">
-              <span className="text-ink-900 font-semibold text-sm">
-                {step.label}
-              </span>
-              <p className="text-ink-500 text-xs mt-0.5">{step.detail}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+            </li>
+          ))}
+        </ol>
+      </EditorialSection>
 
-/* ---------- Data Sources ---------- */
-
-function DataSourcesGrid() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Market Data */}
-      <div className="border border-ink-200 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <h3 className="text-ink-900 font-semibold">Market Data</h3>
-        </div>
-
-        <div className="space-y-3 mb-5">
-          <DataPoint label="Candle Rows" value="18.7 Million" />
-          <DataPoint label="Source" value="Binance OHLCV" />
-          <DataPoint label="Timespan" value="April 2024 - Present" />
-          <DataPoint label="Coins Tracked" value="18" />
-        </div>
-
-        <div className="border-t border-ink-200 pt-4">
-          <p className="text-ink-500 text-xs mb-2.5 font-medium uppercase tracking-wider">
-            Tracked Coins
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {TRACKED_COINS.map((coin) => (
-              <span
-                key={coin}
-                className="text-[10px] font-medium text-ink-600 bg-ink-100 border border-ink-200 rounded px-1.5 py-0.5"
-              >
-                {coin}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* YouTube Transcripts */}
-      <div className="border border-ink-200 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <h3 className="text-ink-900 font-semibold">YouTube Transcripts</h3>
-        </div>
-
-        <div className="space-y-3 mb-5">
-          <DataPoint label="Creators" value={`${TRACKED_CREATOR_COUNT} Tracked`} />
-          <DataPoint label="Source" value="Auto-generated subtitles" />
-          <DataPoint label="Frequency" value="Scraped daily" />
-          <DataPoint label="Coverage" value="Every new upload" />
-        </div>
-
-        <div className="border-t border-ink-200 pt-4">
-          <p className="text-ink-500 text-xs leading-relaxed">
-            We pull auto-generated subtitles from every new video uploaded by our
-            tracked creators. This captures the full spoken content for analysis.
-          </p>
-        </div>
-      </div>
-
-      {/* AI Extraction */}
-      <div className="border border-ink-200 p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <h3 className="text-ink-900 font-semibold">AI Extraction</h3>
-        </div>
-
-        <div className="space-y-3 mb-5">
-          <DataPoint label="Task" value="Call Identification" />
-          <DataPoint label="Filters" value="Actionable predictions only" />
-          <DataPoint
-            label="Confidence"
-            value={`> ${(EXTRACTION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}% threshold`}
-          />
-          <DataPoint label="Output" value="Structured call data" />
-        </div>
-
-        <div className="border-t border-ink-200 pt-4">
-          <p className="text-ink-500 text-xs leading-relaxed">
-            AI parses transcripts to identify specific, actionable predictions --
-            not general commentary. Only calls with confidence above {(EXTRACTION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}% are counted.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DataPoint({
-  label,
-  value,
-}: {
-  readonly label: string;
-  readonly value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-ink-500 text-xs">{label}</span>
-      <span className="text-ink-700 text-xs font-medium">{value}</span>
-    </div>
-  );
-}
-
-/* ---------- Alpha Score Formula ---------- */
-
-function AlphaScoreFormula() {
-  const totalMax = SCORE_COMPONENTS.reduce((sum, c) => sum + c.maxPoints, 0);
-
-  return (
-    <div className="border border-ink-200 p-6 sm:p-8">
-      {/* Formula text */}
-      <div className="mb-6 text-center">
-        <p className="text-ink-600 text-sm mb-2">
-          Each individual call is scored on this formula:
-        </p>
-        <p className="text-ink-900 font-mono text-sm sm:text-base">
-          <span className="text-pos">Direction</span>{" "}
-          <span className="text-ink-400">+</span>{" "}
-          <span className="text-new">Alpha</span>{" "}
-          <span className="text-ink-400">+</span>{" "}
-          <span className="text-accent">Specificity</span>{" "}
-          <span className="text-ink-400">+</span>{" "}
-          <span className="text-warn">Regime</span>{" "}
-          <span className="text-ink-400">+</span>{" "}
-          <span className="text-accent">Target</span>{" "}
-          <span className="text-ink-400">=</span>{" "}
-          <span className="text-ink-900 font-bold">Alpha Score</span>
-        </p>
-      </div>
-
-      {/* Stacked bar */}
-      <div className="mb-4">
-        <div className="flex h-10 sm:h-12 overflow-hidden border border-ink-200">
-          {SCORE_COMPONENTS.map((comp) => {
-            const widthPercent = (comp.maxPoints / totalMax) * 100;
-            return (
-              <div
-                key={comp.label}
-                className={`${comp.bgColor} flex items-center justify-center relative group`}
-                style={{ width: `${widthPercent}%` }}
-                title={`${comp.label}: ${comp.maxPoints} pts`}
-              >
-                <span className="text-ink-0 font-bold text-[10px] sm:text-xs">
-                  {comp.maxPoints}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex flex-wrap justify-center gap-x-5 gap-y-2">
-        {SCORE_COMPONENTS.map((comp) => (
-          <div key={comp.label} className="flex items-center gap-1.5">
-            <div className={`w-2.5 h-2.5 rounded-sm ${comp.bgColor}`} />
-            <span className="text-ink-600 text-xs">
-              {comp.label}{" "}
-              <span className="text-ink-500">({comp.maxPoints})</span>
+      {/* 02 — score */}
+      <EditorialSection
+        index="02"
+        title={<>The <em className="italic text-accent">score</em>.</>}
+        meta={
+          <>
+            5 components · max 100 ·{" "}
+            <span className="text-ink-700">
+              floor {Math.round(EXTRACTION_CONFIDENCE_THRESHOLD * 100)}%
             </span>
-          </div>
-        ))}
-        <div className="flex items-center gap-1.5">
-          <span className="text-ink-700 text-xs font-semibold">
-            = {totalMax} max
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
+          </>
+        }
+      >
+        <table className="w-full font-mono text-[12px]">
+          <thead>
+            <tr className="border-b border-ink-250">
+              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2">
+                Component
+              </th>
+              <th className="text-right text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-20">
+                Max
+              </th>
+              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-6">
+                How it&apos;s earned
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {SCORE_ROWS.map((c) => (
+              <tr key={c.label} className="border-b border-ink-200">
+                <td className="py-3 font-serif text-[14px] text-ink-900">{c.label}</td>
+                <td className="py-3 text-right tabular-nums text-ink-700">{c.max}</td>
+                <td className="py-3 pl-6 text-ink-600 leading-relaxed">{c.how}</td>
+              </tr>
+            ))}
+            <tr>
+              <td className="py-3 font-serif text-[14px] text-ink-900 font-medium">
+                Total
+              </td>
+              <td className="py-3 text-right tabular-nums text-accent font-medium">
+                {SCORE_ROWS.reduce((sum, r) => sum + r.max, 0)}
+              </td>
+              <td className="py-3 pl-6 text-ink-500 leading-relaxed">
+                Sum of components, no rescaling.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </EditorialSection>
 
-/* ---------- Score Component Cards ---------- */
-
-function ScoreComponentCards() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {SCORE_COMPONENTS.map((comp) => (
-        <div
-          key={comp.label}
-          className={`border border-ink-200 p-5 border-l-2 ${comp.borderColor}`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <h3 className={`font-semibold text-sm ${comp.color}`}>
-              {comp.label}
-            </h3>
-            <span className="text-ink-900 font-bold text-lg tabular-nums">
-              {comp.maxPoints}
-              <span className="text-ink-400 text-xs font-normal ml-0.5">pts</span>
-            </span>
-          </div>
-
-          {/* Mini progress bar showing max */}
-          <div className="h-1.5 bg-ink-200 overflow-hidden mb-3">
-            <div
-              className={`h-full ${comp.bgColor}`}
-              style={{ width: `${(comp.maxPoints / 100) * 100}%` }}
-            />
-          </div>
-
-          <p className="text-ink-600 text-xs leading-relaxed">
-            {comp.description}
-          </p>
-        </div>
-      ))}
-
-      {/* Total card */}
-      <div className="border border-ink-200 p-5 border-l-2 border-l-white/20 flex flex-col justify-center">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-sm text-ink-900">Total Maximum</h3>
-          <span className="text-gradient-gold font-bold text-2xl tabular-nums">
-            100
-          </span>
-        </div>
-        <p className="text-ink-500 text-xs leading-relaxed">
-          A perfect score means correct direction, maximum alpha over BTC, full
-          specificity with entry/target/stop/timeframe, difficult regime, and
-          target hit.
+      {/* 03 — tracked coins */}
+      <EditorialSection
+        index="03"
+        title={<>Tracked <em className="italic text-accent">coins</em>.</>}
+        meta={<>{TRACKED_COINS.length} symbols · Binance OHLCV</>}
+      >
+        <p className="font-serif text-[15px] text-ink-700 leading-relaxed mb-5 max-w-[680px]">
+          Calls on these tickers are matched against minute-grained Binance
+          candles. Anything outside this universe is logged but not scored.
         </p>
-      </div>
-    </div>
-  );
-}
+        <div className="flex flex-wrap gap-1.5">
+          {TRACKED_COINS.map((coin) => (
+            <Chip key={coin}>{coin}</Chip>
+          ))}
+        </div>
+      </EditorialSection>
 
-/* ---------- Creator Rankings ---------- */
-
-function CreatorRankingsSection() {
-  return (
-    <div className="space-y-6">
-      {/* Aggregation metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {RANKING_METRICS.map((metric) => (
-          <div key={metric.label} className="border border-ink-200 p-5">
-            <div className="flex items-center gap-3 mb-2">
-              <h3 className="text-ink-900 font-semibold text-sm">
-                {metric.label}
-              </h3>
-            </div>
-            <p className="text-ink-600 text-xs leading-relaxed">
-              {metric.description}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Ranking periods and tiers */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Ranking periods */}
-        <div className="border border-ink-200 p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <h3 className="text-ink-900 font-semibold text-sm">
-              Ranking Periods
-            </h3>
-          </div>
-          <p className="text-ink-600 text-xs leading-relaxed mb-4">
-            Rankings are recomputed daily across three time windows as new videos
-            are published and new price data arrives.
-          </p>
-          <div className="space-y-2">
-            {(["All Time", "90 Days", "30 Days"] as const).map((period) => (
-              <div
-                key={period}
-                className="flex items-center gap-2 bg-ink-100 border border-ink-200 px-3 py-2"
-              >
-                <span className="text-ink-700 text-xs font-medium">
-                  {period}
-                </span>
-              </div>
+      {/* 04 — tier ranges */}
+      <EditorialSection
+        index="04"
+        title={<>Tier <em className="italic text-accent">ranges</em>.</>}
+        meta={<>S / A / B / C bands</>}
+      >
+        <table className="w-full font-mono text-[12px]">
+          <thead>
+            <tr className="border-b border-ink-250">
+              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-16">
+                Tier
+              </th>
+              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-32">
+                Alpha range
+              </th>
+              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-6">
+                Reading
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {TIERS.map((t) => (
+              <tr key={t.tier} className="border-b border-ink-200">
+                <td className="py-3">
+                  <Chip tone={tierTone(t.tier)}>{t.tier}</Chip>
+                </td>
+                <td className="py-3 tabular-nums text-ink-700">{t.range}</td>
+                <td className="py-3 pl-6 font-serif text-[14px] text-ink-700 leading-relaxed">
+                  {t.read}
+                </td>
+              </tr>
             ))}
-          </div>
-        </div>
+          </tbody>
+        </table>
+      </EditorialSection>
 
-        {/* Tier system */}
-        <div className="border border-ink-200 p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <h3 className="text-ink-900 font-semibold text-sm">
-              Tier System
-            </h3>
-          </div>
-          <p className="text-ink-600 text-xs leading-relaxed mb-4">
-            The public research surface is free. Premium delivery workflows are
-            roadmap items and are not required to view creator history or
-            per-call score breakdowns.
+      {/* 05 — audit me */}
+      <EditorialSection
+        index="05"
+        title={<><em className="italic text-accent">Audit</em> me.</>}
+        meta={<>Reproducible · open source</>}
+      >
+        <div className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px] space-y-4">
+          <p>
+            The recompute pipeline is reproducible. Every score traces to a
+            transcript line, a Binance candle range, and a deterministic
+            formula. There is no hand-tuned weighting per creator.
           </p>
-          <div className="space-y-2">
-            {TIERS.map((tier) => (
-              <div
-                key={tier.name}
-                className="flex items-center justify-between bg-ink-100 border border-ink-200 px-3 py-2"
-              >
-                <span className={tier.badge}>{tier.name}</span>
-                <span className="text-ink-600 text-xs">{tier.range}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Statistical Rigor ---------- */
-
-function StatisticalRigorSection() {
-  const rigorItems: readonly {
-    readonly stat: string;
-    readonly label: string;
-    readonly detail: string;
-  }[] = [
-    {
-      stat: "5,000",
-      label: "Bootstrap Resamples",
-      detail:
-        "We resample the entire dataset 5,000 times to compute 95% confidence intervals for every rank. Top 5 creators overlap -- we tell you that honestly.",
-    },
-    {
-      stat: "0.95+",
-      label: "Spearman Stability",
-      detail:
-        "Every formula weight was perturbed by +/-25%. Rankings remained stable (Spearman > 0.95) across all variations. The formula is robust, not fragile.",
-    },
-    {
-      stat: "1.4%",
-      label: "ICC (Signal Strength)",
-      detail:
-        "Only 1.4% of call-level score variance is between creators. The rest is market noise. This is why we need thousands of calls to separate skill from luck.",
-    },
-    {
-      stat: "3x",
-      label: "Contrarian Edge",
-      detail:
-        "Calls that go against peer consensus score 3x higher on average. This is a statistically significant pattern across 4,600+ scored calls.",
-    },
-    {
-      stat: "18.7M",
-      label: "Candle Data Points",
-      detail:
-        "Every call is matched against Binance OHLCV candle data across 18 coins. No estimates, no approximations -- real prices at call date and evaluation windows.",
-    },
-    {
-      stat: "136+",
-      label: "Analysis Iterations",
-      detail:
-        "The scoring formula has been stress-tested across 136+ statistical analyses: bootstrap, Bayesian estimation, regime splits, decay curves, and more.",
-    },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {rigorItems.map((item) => (
-        <div key={item.label} className="border border-ink-200 p-5">
-          <div className="mb-3">
-            <span className="text-gradient-gold font-bold text-2xl tabular-nums">
-              {item.stat}
-            </span>
-          </div>
-          <h3 className="text-ink-900 font-semibold text-sm mb-1">
-            {item.label}
-          </h3>
-          <p className="text-ink-600 text-xs leading-relaxed">
-            {item.detail}
+          <p>
+            Disagree with a number? The source is published; clone it, rerun
+            the score, and tell us where it diverges.
           </p>
+          <AuditLinks />
         </div>
-      ))}
+      </EditorialSection>
     </div>
   );
 }
 
-/* ---------- Transparency ---------- */
+/* ------------------------------------------------------------------ */
+/*  Sub-components                                                     */
+/* ------------------------------------------------------------------ */
 
-function TransparencySection() {
+function AuditLinks(): ReactElement {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <TransparencyCard
-        title="Open Formula"
-        description="We show you exactly how scores are calculated so you can evaluate our methodology. No proprietary magic -- just math."
-      />
-      <TransparencyCard
-        title="AI Confidence Filter"
-        description={`The extraction AI identifies what qualifies as an actionable call vs. just commentary. Only calls with confidence above ${(EXTRACTION_CONFIDENCE_THRESHOLD * 100).toFixed(0)}% are counted.`}
-      />
-      <TransparencyCard
-        title="Per-Call Transparency"
-        description="Users can see each creator's individual calls and exactly how they were scored -- direction, alpha, specificity, regime, and target."
-      />
-      <TransparencyCard
-        title="Daily Updates"
-        description="Rankings update daily as new videos are published and new price data arrives. You always see the latest state of the data."
-      />
-      <TransparencyCard
-        title="No Conflicts"
-        description="We do not accept sponsorships from tracked creators. Rankings are purely data-driven. We have zero incentive to inflate or deflate any creator's score."
-      />
-      <TransparencyCard
-        title="Verifiable Data"
-        description="Market data comes directly from Binance. YouTube transcripts are from public auto-generated subtitles. Both are independently verifiable."
-      />
-    </div>
+    <p className="font-mono text-[12px] text-ink-600 not-italic">
+      <Link
+        href="https://github.com/dave-builder/crypto-tuber-ranked"
+        className="text-accent hover:underline underline-offset-4"
+      >
+        View the source
+      </Link>
+      <span className="text-ink-400" aria-hidden="true"> · </span>
+      <a
+        href="mailto:dave.shipsbuilds@proton.me?subject=CryptoTubers%20Ranked%20-%20score%20dispute"
+        className="text-accent hover:underline underline-offset-4"
+      >
+        flag a wrong score
+      </a>
+    </p>
   );
 }
 
-function TransparencyCard({
-  title,
-  description,
-}: {
-  readonly title: string;
-  readonly description: string;
-}) {
-  return (
-    <div className="border border-ink-200 p-5">
-      <div className="flex items-center gap-3 mb-2">
-        <h3 className="text-ink-900 font-semibold text-sm">{title}</h3>
-      </div>
-      <p className="text-ink-600 text-xs leading-relaxed">{description}</p>
-    </div>
-  );
+type ChipTone = "accent" | "pos" | "new" | "warn" | "neg" | "neutral";
+
+function tierTone(tier: string): ChipTone {
+  switch (tier) {
+    case "S":
+      return "accent";
+    case "A":
+      return "pos";
+    case "B":
+      return "new";
+    case "C":
+      return "neg";
+    default:
+      return "neutral";
+  }
 }
+
