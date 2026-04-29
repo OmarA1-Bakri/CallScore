@@ -12,7 +12,7 @@ export default async function Header(): Promise<ReactElement> {
 
   return (
     <header className="sticky top-0 z-masthead bg-ink-0/90 backdrop-blur-bar border-b border-ink-250">
-      <div className="max-w-7xl mx-auto px-4 tab:px-6 desk:px-8">
+      <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <Link
