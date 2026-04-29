@@ -2,13 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import {
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  Target,
-  X,
-} from "lucide-react";
+import { X } from "lucide-react";
 import { SYMBOL_TICKERS } from "@/lib/constants";
 import type { SerializedCall } from "@/lib/public-serializer";
 
@@ -86,7 +80,7 @@ export default function CallHistory({
   }
 
   return (
-    <div className="glass-card overflow-hidden">
+    <div className="border border-ink-200 overflow-hidden">
       <div className="p-4 border-b border-ink-200">
         <h2 className="text-ink-900 font-semibold text-sm">Call History</h2>
         <p className="text-ink-500 text-xs mt-1">
@@ -225,7 +219,7 @@ export default function CallHistory({
                         Pending
                       </span>
                     ) : call.hit_target === true ? (
-                      <Target className="w-4 h-4 text-pos mx-auto" />
+                      <span aria-hidden="true" className="text-pos">✓</span>
                     ) : call.hit_target === false ? (
                       <X className="w-4 h-4 text-neg mx-auto" />
                     ) : (
@@ -250,17 +244,17 @@ export default function CallHistory({
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
               aria-label="Previous page"
-              className="p-1 rounded text-ink-600 hover:text-ink-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="px-2 py-1 text-ink-600 hover:text-ink-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <span aria-hidden="true">‹</span>
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
               aria-label="Next page"
-              className="p-1 rounded text-ink-600 hover:text-ink-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="px-2 py-1 text-ink-600 hover:text-ink-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm"
             >
-              <ChevronRight className="w-4 h-4" />
+              <span aria-hidden="true">›</span>
             </button>
           </div>
         </div>
@@ -293,9 +287,12 @@ function SortableHeader({
         className="flex items-center gap-1 text-ink-500 hover:text-ink-700 text-xs font-medium uppercase tracking-wider transition-colors"
       >
         {label}
-        <ArrowUpDown
-          className={`w-3 h-3 ${isActive ? "text-accent" : ""}`}
-        />
+        <span
+          aria-hidden="true"
+          className={isActive ? "text-accent" : "text-ink-400"}
+        >
+          ⇅
+        </span>
         {isActive && (
           <span className="text-accent text-[8px]">
             {currentDir === "asc" ? "ASC" : "DESC"}

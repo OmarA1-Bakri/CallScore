@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
-import { Trophy, BarChart3, Target, Users } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
@@ -286,8 +285,7 @@ export default async function HomePage({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Hero */}
       <section className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 rounded-full px-4 py-1.5 mb-6">
-          <Trophy className="w-4 h-4 text-accent" />
+        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 px-4 py-1.5 mb-6">
           <span className="text-accent text-xs font-medium">
             {totalCalls} calls scored against real price data
           </span>
@@ -311,17 +309,14 @@ export default async function HomePage({
         {/* Stats row */}
         <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-8">
           <StatPill
-            icon={Users}
             label={PUBLIC_COUNT_LABELS.trackedCreators}
             value={String(publicCounts.trackedCreators)}
           />
           <StatPill
-            icon={BarChart3}
             label={PUBLIC_COUNT_LABELS.scoredCalls}
             value={totalCalls}
           />
           <StatPill
-            icon={Target}
             label="Creators Beating BTC"
             value={`${publicCounts.beatBtcCreators} of ${publicCounts.rankedCreators}`}
           />
@@ -379,7 +374,7 @@ export default async function HomePage({
         {leaderboard.length > 0 ? (
           <Leaderboard rows={leaderboard} />
         ) : (
-          <div className="glass-card p-12 text-center">
+          <div className="border-t border-ink-250 py-12 text-center">
             <p className="text-ink-500">
               Leaderboard data is being computed. Run the data pipeline to populate scores.
             </p>
@@ -396,7 +391,6 @@ export default async function HomePage({
 }
 
 interface StatPillProps {
-  readonly icon: React.ComponentType<{ className?: string }>;
   readonly label: string;
   readonly value: string;
 }
@@ -417,10 +411,9 @@ function PremiseRow({ claim, source }: PremiseRowProps): ReactElement {
   );
 }
 
-function StatPill({ icon: Icon, label, value }: StatPillProps): ReactElement {
+function StatPill({ label, value }: StatPillProps): ReactElement {
   return (
-    <div className="flex items-center gap-2 bg-ink-100 border border-ink-200 rounded-lg px-4 py-2.5">
-      <Icon className="w-4 h-4 text-accent" />
+    <div className="flex items-center gap-2 bg-ink-100 border border-ink-200 px-4 py-2.5">
       <div className="text-left">
         <p className="text-ink-900 font-bold text-sm tabular-nums">{value}</p>
         <p className="text-ink-500 text-[10px] uppercase tracking-wider">

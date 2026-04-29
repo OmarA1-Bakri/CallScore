@@ -32,7 +32,7 @@ export default function ScoreBreakdown({
   const total = direction + alpha + specificity + regime + target;
 
   return (
-    <div className="glass-card p-5">
+    <div className="border border-ink-200 p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-ink-900 font-semibold text-sm">Score Breakdown</h2>
         <span className="text-pos font-bold text-lg tabular-nums">
@@ -53,9 +53,9 @@ export default function ScoreBreakdown({
                   {value.toFixed(1)} / {comp.max}
                 </span>
               </div>
-              <div className="h-2 bg-ink-200 rounded-full overflow-hidden">
+              <div className="h-2 bg-ink-200 overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${comp.color} transition-all duration-500`}
+                  className={`h-full ${comp.color} transition-all duration-500`}
                   style={{ width: `${Math.min(100, percentage)}%` }}
                 />
               </div>

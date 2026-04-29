@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Quote } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { query } from "@/lib/db";
 import {
@@ -121,7 +121,7 @@ export default async function CallDetailPage({ params }: PageProps) {
       </Link>
 
       {/* Header */}
-      <section className="glass-card p-6 sm:p-8 mb-8">
+      <section className="border border-ink-200 p-6 sm:p-8 mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
           <div className="flex-1">
             <p className="text-ink-500 text-sm mb-1">
@@ -230,7 +230,7 @@ export default async function CallDetailPage({ params }: PageProps) {
             target={serializedCall.public_score_components.target}
           />
         ) : (
-          <div className="glass-card p-5">
+          <div className="border border-ink-200 p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-ink-900 font-semibold text-sm">Alpha Score</h2>
               <span className="text-ink-600 font-bold text-lg tabular-nums">
@@ -247,7 +247,7 @@ export default async function CallDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        <div className="glass-card p-5">
+        <div className="border border-ink-200 p-5">
           <h2 className="text-ink-900 font-semibold text-sm mb-4">
             Market Context
           </h2>
@@ -319,9 +319,8 @@ export default async function CallDetailPage({ params }: PageProps) {
       {/* Raw quote */}
       {serializedCall.raw_quote && (
         <section className="mb-8">
-          <div className="glass-card p-6">
+          <div className="border border-ink-200 p-6">
             <div className="flex items-center gap-2 mb-3">
-              <Quote className="w-5 h-5 text-accent" />
               <h2 className="text-ink-900 font-semibold text-sm">
                 From the Transcript
               </h2>
@@ -387,7 +386,7 @@ function PriceCard({
   const hasData = status === "available" && priceAfter !== null && returnPct !== null;
 
   return (
-    <div className="glass-card p-4">
+    <div className="border border-ink-200 p-4">
       <p className="text-ink-500 text-xs uppercase tracking-wider mb-3">
         {label}
       </p>

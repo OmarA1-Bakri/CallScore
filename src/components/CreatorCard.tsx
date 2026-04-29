@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import AlphaScoreBadge from "./AlphaScoreBadge";
 import type { Creator, CreatorStats } from "@/lib/types";
 
@@ -32,21 +32,35 @@ function getAvatarColor(name: string): string {
 }
 
 function TrendIcon({ trend }: { readonly trend: "up" | "down" | "stable" }) {
-  if (trend === "up") return <TrendingUp className="w-4 h-4 text-pos" />;
-  if (trend === "down") return <TrendingDown className="w-4 h-4 text-neg" />;
-  return <Minus className="w-4 h-4 text-ink-500" />;
+  if (trend === "up")
+    return (
+      <span aria-hidden="true" className="text-pos text-sm">
+        ↑
+      </span>
+    );
+  if (trend === "down")
+    return (
+      <span aria-hidden="true" className="text-neg text-sm">
+        ↓
+      </span>
+    );
+  return (
+    <span aria-hidden="true" className="text-ink-500 text-sm">
+      —
+    </span>
+  );
 }
 
 export default function CreatorCard({ creator, stats, trend }: CreatorCardProps) {
   return (
     <Link
       href={`/creator/${creator.youtube_handle}`}
-      className="glass-card-hover p-5 block"
+      className="border border-ink-200 hover:border-ink-300 hover:bg-ink-100 transition-colors duration-200 p-5 block"
     >
       <div className="flex items-start gap-4 mb-4">
         {/* Avatar */}
         <div
-          className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ${getAvatarColor(creator.name)}`}
+          className={`w-12 h-12 flex items-center justify-center font-bold text-sm ${getAvatarColor(creator.name)}`}
         >
           {getInitials(creator.name)}
         </div>
