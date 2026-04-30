@@ -69,13 +69,15 @@ export default function MobileMenu({
               <div className="py-2 text-xs text-ink-500 uppercase tracking-caps">
                 Tier · {tier}
               </div>
-              <Link
-                href="/api/auth/logout"
-                onClick={() => setOpen(false)}
-                className="block text-ink-600 hover:text-ink-900 transition-colors text-sm font-medium py-2"
-              >
-                Logout
-              </Link>
+              <form action="/api/auth/logout" method="post">
+                <button
+                  type="submit"
+                  onClick={() => setOpen(false)}
+                  className="block text-ink-600 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+                >
+                  Logout
+                </button>
+              </form>
             </>
           ) : (
             <>
