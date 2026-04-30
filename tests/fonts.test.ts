@@ -8,13 +8,11 @@ const fontsTs = readFileSync(join(root, "src/app/fonts.ts"), "utf8");
 const layoutTsx = readFileSync(join(root, "src/app/layout.tsx"), "utf8");
 const globalsCss = readFileSync(join(root, "src/app/globals.css"), "utf8");
 
-test("fonts.ts declares the three editorial faces", () => {
-  assert.match(fontsTs, /Source_Serif_4/);
-  assert.match(fontsTs, /Inter_Tight/);
-  assert.match(fontsTs, /JetBrains_Mono/);
-  assert.match(fontsTs, /variable:\s*"--font-serif"/);
-  assert.match(fontsTs, /variable:\s*"--font-sans"/);
-  assert.match(fontsTs, /variable:\s*"--font-mono"/);
+test("fonts.ts declares local CSS variable class hooks", () => {
+  assert.doesNotMatch(fontsTs, /next\/font\/google/);
+  assert.match(fontsTs, /variable:\s*"font-serif-vars"/);
+  assert.match(fontsTs, /variable:\s*"font-sans-vars"/);
+  assert.match(fontsTs, /variable:\s*"font-mono-vars"/);
 });
 
 test("layout.tsx applies the font CSS variables on <html>", () => {
@@ -24,11 +22,10 @@ test("layout.tsx applies the font CSS variables on <html>", () => {
   assert.match(layoutTsx, /mono\.variable/);
 });
 
-test("globals.css references next/font CSS variables, not raw font literals", () => {
-  // The --font-serif/--font-sans/--font-mono CSS vars defined in globals.css
-  // must reference the next/font variables (which arrive as --font-serif etc.
-  // from layout.tsx's <html className=...>) — never the raw "Source Serif 4"
-  // literal, which would prevent next/font from kicking in.
+test("globals.css defines local font stacks without Google font literals", () => {
+  assert.match(globalsCss, /\.font-serif-vars/);
+  assert.match(globalsCss, /\.font-sans-vars/);
+  assert.match(globalsCss, /\.font-mono-vars/);
   assert.doesNotMatch(globalsCss, /"Source Serif 4"/);
   assert.doesNotMatch(globalsCss, /"Inter Tight"/);
   assert.doesNotMatch(globalsCss, /"JetBrains Mono"/);
