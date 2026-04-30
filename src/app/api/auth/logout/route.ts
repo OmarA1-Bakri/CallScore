@@ -14,7 +14,7 @@ export async function POST(): Promise<NextResponse> {
       ? "https://cryptotuberranked.com"
       : "http://localhost:3000");
 
-  return NextResponse.redirect(`${baseUrl}/`);
+  return NextResponse.redirect(`${baseUrl}/`, 303);
 }
 
 export async function GET(): Promise<NextResponse> {
