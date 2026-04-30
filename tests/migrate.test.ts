@@ -1,14 +1,12 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { join, normalize } from "node:path";
+import { join, normalize, relative } from "node:path";
 import { getMigrationFiles, splitSqlStatements } from "../src/scripts/migrate";
 
 const root = join(__dirname, "..");
 
 test("migration plan applies schema then numbered migrations in order", () => {
-  const labels = getMigrationFiles(root).map((file) =>
-    normalize(file.filePath).replace(`${normalize(root)}\\`, ""),
-  );
+  const labels = getMigrationFiles(root).map((file) => normalize(relative(root, file.filePath)));
 
   assert.deepEqual(labels, [
     "schema.sql",

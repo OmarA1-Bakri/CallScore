@@ -1,17 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildOllamaHeaders,
   extractJsonArrayText,
   openRouterPrompt,
   parseOpenRouterExtractionArgs,
   splitTranscriptIntoChunks,
 } from "../src/scripts/extract-calls-openrouter";
 
-test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback", () => {
-  const args = parseOpenRouterExtractionArgs([]);
+function withoutOllamaHost<T>(fn: () => T): T {
+  const previous = process.env.OLLAMA_HOST;
+  delete process.env.OLLAMA_HOST;
+  try {
+    return fn();
+  } finally {
+    if (previous === undefined) delete process.env.OLLAMA_HOST;
+    else process.env.OLLAMA_HOST = previous;
+  }
+}
 
+test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback", () => {
+  const args = withoutOllamaHost(() => parseOpenRouterExtractionArgs([]));
+
+  assert.equal(args.provider, "openrouter");
   assert.equal(args.model, "google/gemma-4-31b-it:free");
   assert.equal(args.fallbackModel, "google/gemma-4-31b-it");
+  assert.equal(args.ollamaHost, "https://ollama.com");
   assert.equal(args.limit, 10);
   assert.equal(args.dryRun, true);
   assert.equal(args.write, false);
@@ -19,6 +33,7 @@ test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback"
   assert.equal(args.chunkChars, 8000);
   assert.equal(args.chunkOverlap, 500);
   assert.equal(args.maxChunks, 100);
+  assert.equal(args.requestTimeoutMs, 60_000);
 });
 
 test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
@@ -42,6 +57,64 @@ test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
   const tooManyChunks = parseOpenRouterExtractionArgs(["--max-chunks", "999999"]);
 
   assert.equal(tooManyChunks.maxChunks, 100);
+
+  const explicitTimeout = parseOpenRouterExtractionArgs(["--request-timeout-ms", "120000"]);
+  assert.equal(explicitTimeout.requestTimeoutMs, 120_000);
+
+  const invalidTimeout = parseOpenRouterExtractionArgs(["--request-timeout-ms", "0"]);
+  assert.equal(invalidTimeout.requestTimeoutMs, 60_000);
+});
+
+test("Ollama provider defaults to direct Ollama Cloud host and cloud model", () => {
+  const args = withoutOllamaHost(() => parseOpenRouterExtractionArgs(["--provider", "ollama"]));
+
+  assert.equal(args.provider, "ollama");
+  assert.equal(args.model, "gemma4:31b");
+  assert.equal(args.fallbackModel, null);
+  assert.equal(args.ollamaHost, "https://ollama.com");
+  assert.equal(args.dryRun, true);
+});
+
+test("Ollama provider accepts explicit model, fallback, and host", () => {
+  const args = parseOpenRouterExtractionArgs([
+    "--provider",
+    "ollama",
+    "--model",
+    "deepseek-v4-pro",
+    "--fallback-model",
+    "gemma4:31b",
+    "--ollama-host",
+    "http://127.0.0.1:11434",
+  ]);
+
+  assert.equal(args.provider, "ollama");
+  assert.equal(args.model, "deepseek-v4-pro");
+  assert.equal(args.fallbackModel, "gemma4:31b");
+  assert.equal(args.ollamaHost, "http://127.0.0.1:11434");
+});
+
+test("Ollama headers only attach the API key to Ollama Cloud", () => {
+  assert.deepEqual(buildOllamaHeaders("https://ollama.com", "secret"), {
+    "Content-Type": "application/json",
+    Authorization: "Bearer secret",
+  });
+  assert.deepEqual(buildOllamaHeaders("https://ollama.com/", "secret"), {
+    "Content-Type": "application/json",
+    Authorization: "Bearer secret",
+  });
+  assert.deepEqual(buildOllamaHeaders("http://127.0.0.1:11434", "secret"), {
+    "Content-Type": "application/json",
+  });
+  assert.deepEqual(buildOllamaHeaders("https://example.invalid", "secret"), {
+    "Content-Type": "application/json",
+  });
+});
+
+test("unknown extraction provider is rejected instead of silently falling back", () => {
+  assert.throws(
+    () => parseOpenRouterExtractionArgs(["--provider", "olama"]),
+    /Unsupported extraction provider: olama/,
+  );
 });
 
 test("splitTranscriptIntoChunks returns one metadata-rich chunk for short transcripts", () => {

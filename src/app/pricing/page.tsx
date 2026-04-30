@@ -207,7 +207,7 @@ export default function PricingPage(): ReactElement {
             cadence="/mo"
             tagline="The full apparatus. Backtest, anti-consensus alerts, API, webhooks."
             cta="Upgrade to Alpha"
-            ctaHref="/api/checkout/elite"
+            ctaHref="/api/checkout/alpha"
           />
         </div>
       </EditorialSection>
