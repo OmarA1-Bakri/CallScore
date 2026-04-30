@@ -66,12 +66,14 @@ export default async function Header(): Promise<ReactElement> {
             {loggedIn ? (
               <div className="flex items-center gap-3">
                 <TierBadge tier={tier} />
-                <Link
-                  href="/api/auth/logout"
-                  className="text-ink-600 hover:text-ink-900 transition-colors text-sm"
-                >
-                  <span className="hidden desk:inline">Logout</span>
-                </Link>
+                <form action="/api/auth/logout" method="post">
+                  <button
+                    type="submit"
+                    className="text-ink-600 hover:text-ink-900 transition-colors text-sm"
+                  >
+                    <span className="hidden desk:inline">Logout</span>
+                  </button>
+                </form>
               </div>
             ) : (
               <div className="flex items-center gap-3">
