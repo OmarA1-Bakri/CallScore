@@ -73,6 +73,21 @@ export async function listWatches(userId: string): Promise<WatchRow[]> {
   );
 }
 
+export async function recordAlertUnsubscribe(userId: string): Promise<void> {
+  await query(
+    `INSERT INTO alerts_unsubscribes (user_id)
+     VALUES ($1)
+     ON CONFLICT (user_id) DO UPDATE
+       SET created_at = alerts_unsubscribes.created_at`,
+    [userId],
+  );
+
+  await query(
+    `DELETE FROM watchlists WHERE user_id = $1`,
+    [userId],
+  );
+}
+
 /**
  * Enqueue a "new call" alert. Idempotent on (user_id, call_id) — the
  * unique partial index ensures the same call is never queued twice for
@@ -162,7 +177,7 @@ export async function claimPendingAlerts(
   if (!Number.isInteger(limit) || limit <= 0) return [];
 
   const emailExpr = hasUsersTable
-    ? `(SELECT u.email FROM users u WHERE u.id = claimed.user_id LIMIT 1)`
+    ? `(SELECT u.email FROM users u WHERE u.id = marked.user_id LIMIT 1)`
     : `NULL::text`;
 
   return query<ClaimedAlertRow>(
@@ -171,6 +186,10 @@ export async function claimPendingAlerts(
        FROM alerts_queue
        WHERE sent_at IS NULL
          AND event_type = 'new_call'
+         AND NOT EXISTS (
+           SELECT 1 FROM alerts_unsubscribes au
+           WHERE au.user_id = alerts_queue.user_id
+         )
        ORDER BY user_id ASC, created_at ASC
        LIMIT $1
        FOR UPDATE SKIP LOCKED
