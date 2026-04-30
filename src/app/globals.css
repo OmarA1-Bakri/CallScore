@@ -32,11 +32,6 @@
     --new: #7FA6C9;
     --lown: #A78C6B;
 
-    /* --font-serif / --font-sans / --font-mono are bound by next/font/google
-       in src/app/fonts.ts and applied via className on <html> in layout.tsx.
-       Each resolves to a metric-adjusted font stack (loaded face + fallback)
-       managed by next/font. Do not redefine those variables here. */
-
     --row: 36px;
     --hair: 1px solid var(--ink-200);
     --hair-strong: 1px solid var(--ink-250);
@@ -57,6 +52,18 @@
     --z-modal-overlay: 99;
     --z-modal: 100;
     --z-toast: 110;
+  }
+
+  .font-serif-vars {
+    --font-serif: Georgia, Cambria, "Times New Roman", Times, serif;
+  }
+
+  .font-sans-vars {
+    --font-sans: Arial, Helvetica, sans-serif;
+  }
+
+  .font-mono-vars {
+    --font-mono: Consolas, "Courier New", monospace;
   }
 
   html {
@@ -206,4 +213,3 @@
   .animation-delay-200 { animation-delay: 200ms; }
   .animation-delay-400 { animation-delay: 400ms; }
 }
-
