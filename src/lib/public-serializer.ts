@@ -148,7 +148,12 @@ export function computeCreatorWinRate(
 ): number {
   const scored = getScoredCalls(calls, now);
   if (scored.length === 0) return 0;
-  const wins = scored.filter((call) => (call.return_30d ?? 0) > 0).length;
+  const wins = scored.filter((call) => {
+    if (call.correct_direction !== null) return call.correct_direction;
+    if (call.direction === "bullish") return (call.return_30d ?? 0) > 0;
+    if (call.direction === "bearish") return (call.return_30d ?? 0) < 0;
+    return false;
+  }).length;
   return wins / scored.length;
 }
 
