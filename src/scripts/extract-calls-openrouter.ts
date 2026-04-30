@@ -10,6 +10,10 @@ const DEFAULT_MODEL = "google/gemma-4-31b-it:free";
 const DEFAULT_FALLBACK_MODEL = "google/gemma-4-31b-it";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TRANSCRIPT_CHARS = 8_000;
+const DEFAULT_CHUNK_CHARS = MAX_TRANSCRIPT_CHARS;
+const DEFAULT_CHUNK_OVERLAP = 500;
+const DEFAULT_MAX_CHUNKS = 100;
+const MAX_ALLOWED_CHUNKS = 100;
 
 interface OpenRouterArgs {
   readonly creatorHandle: string | null;
@@ -23,6 +27,23 @@ interface OpenRouterArgs {
   readonly dryRun: boolean;
   readonly write: boolean;
   readonly auditOut: string | null;
+  readonly chunkChars: number;
+  readonly chunkOverlap: number;
+  readonly maxChunks: number;
+}
+
+interface ChunkSettings {
+  readonly chunkChars: number;
+  readonly chunkOverlap: number;
+  readonly maxChunks: number;
+}
+
+export interface TranscriptChunk {
+  readonly index: number;
+  readonly total: number;
+  readonly start: number;
+  readonly end: number;
+  readonly text: string;
 }
 
 interface OpenRouterCandidate {
@@ -60,8 +81,24 @@ function positiveIntList(value: string | null): number[] {
     .filter((parsed) => Number.isInteger(parsed) && parsed > 0);
 }
 
+function sanitizeChunkSettings(settings: Partial<ChunkSettings>): ChunkSettings {
+  const chunkChars = positiveInt(settings.chunkChars == null ? null : String(settings.chunkChars), DEFAULT_CHUNK_CHARS);
+  const maxChunksInput = positiveInt(settings.maxChunks == null ? null : String(settings.maxChunks), DEFAULT_MAX_CHUNKS);
+  const maxChunks = Math.min(maxChunksInput, MAX_ALLOWED_CHUNKS);
+  let chunkOverlap = positiveInt(settings.chunkOverlap == null ? null : String(settings.chunkOverlap), DEFAULT_CHUNK_OVERLAP);
+  if (chunkOverlap >= chunkChars) {
+    chunkOverlap = DEFAULT_CHUNK_OVERLAP < chunkChars ? DEFAULT_CHUNK_OVERLAP : Math.max(0, chunkChars - 1);
+  }
+  return { chunkChars, chunkOverlap, maxChunks };
+}
+
 export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): OpenRouterArgs {
   const write = argv.includes("--write");
+  const chunkSettings = sanitizeChunkSettings({
+    chunkChars: positiveInt(argValue(argv, "--chunk-chars"), DEFAULT_CHUNK_CHARS),
+    chunkOverlap: positiveInt(argValue(argv, "--chunk-overlap"), DEFAULT_CHUNK_OVERLAP),
+    maxChunks: positiveInt(argValue(argv, "--max-chunks"), DEFAULT_MAX_CHUNKS),
+  });
   return {
     creatorHandle: argValue(argv, "--creator"),
     videoIds: positiveIntList(argValue(argv, "--video-ids")),
@@ -74,6 +111,7 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
     write,
     dryRun: !write || argv.includes("--dry-run"),
     auditOut: argValue(argv, "--audit-out"),
+    ...chunkSettings,
   };
 }
 
@@ -143,12 +181,39 @@ function inferPrimarySymbol(title: string | null | undefined, transcript: string
   return pairs.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
 }
 
-function openRouterPrompt(transcript: string, title?: string | null): string {
-  const truncated = transcript.length > MAX_TRANSCRIPT_CHARS ? transcript.slice(0, MAX_TRANSCRIPT_CHARS) : transcript;
+export function splitTranscriptIntoChunks(transcript: string, settings: ChunkSettings): TranscriptChunk[] {
+  const safe = sanitizeChunkSettings(settings);
+  if (transcript.length <= safe.chunkChars) {
+    return [{ index: 0, total: 1, start: 0, end: transcript.length, text: transcript }];
+  }
+
+  const chunks: Array<Omit<TranscriptChunk, "total">> = [];
+  const step = Math.max(1, safe.chunkChars - safe.chunkOverlap);
+  let start = 0;
+  while (start < transcript.length && chunks.length < safe.maxChunks) {
+    const end = Math.min(transcript.length, start + safe.chunkChars);
+    chunks.push({ index: chunks.length, start, end, text: transcript.slice(start, end) });
+    if (end >= transcript.length) break;
+    start += step;
+  }
+
+  const total = chunks.length;
+  return chunks.map((chunk) => ({ ...chunk, total }));
+}
+
+export function openRouterPrompt(
+  transcript: string,
+  title?: string | null,
+  chunk?: TranscriptChunk,
+  fullTranscriptForHints = transcript,
+): string {
   const symbols = TRACKED_SYMBOLS.join(", ");
-  const primarySymbol = inferPrimarySymbol(title, transcript);
+  const primarySymbol = inferPrimarySymbol(title, fullTranscriptForHints);
   const symbolHint = primarySymbol ? `Primary symbol hint: use ${primarySymbol} for the main coin if the transcript supports it.\n` : "";
-  return `Extract crypto trading calls from this transcript. Be more intelligent than a strict regex. Return ONLY a JSON array.
+  const chunkContext = chunk
+    ? `Transcript chunk: ${chunk.index + 1} of ${chunk.total} (offsets ${chunk.start}-${chunk.end})\n`
+    : "Transcript chunk: 1 of 1 (offsets 0-${transcript.length})\n";
+  return `Extract crypto trading calls from this transcript chunk. Be more intelligent than a strict regex. Return ONLY a JSON array.
 
 Video title: ${title ?? "unknown"}
 ${symbolHint}Allowed symbols: ${symbols}
@@ -189,11 +254,13 @@ Each item must use this shape:
 
 If there are no actionable tracked-coin calls, return [].
 
-Transcript:
-${truncated}`;
+Transcript chunk metadata:
+${chunkContext}
+Transcript chunk text:
+${transcript}`;
 }
 
-async function callOpenRouter(model: string, transcript: string, title?: string | null): Promise<string> {
+async function callOpenRouter(model: string, transcript: string, title?: string | null, chunk?: TranscriptChunk, fullTranscript?: string): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured");
 
@@ -212,7 +279,7 @@ async function callOpenRouter(model: string, transcript: string, title?: string 
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: "user", content: openRouterPrompt(transcript, title) }],
+        messages: [{ role: "user", content: openRouterPrompt(transcript, title, chunk, fullTranscript ?? transcript) }],
         temperature: 0,
         max_tokens: 2000,
         reasoning: model.includes("gemini-2.5-pro")
@@ -240,38 +307,79 @@ async function callOpenRouter(model: string, transcript: string, title?: string 
   return content;
 }
 
+interface ChunkExtractionAudit {
+  readonly chunk: TranscriptChunk;
+  readonly model: string;
+  readonly rawText: string;
+  readonly candidates: readonly OpenRouterCandidate[];
+  readonly audited: ReturnType<typeof auditExtractedCallCandidates>;
+}
+
 interface ExtractionResult {
   readonly model: string;
   readonly rawText: string;
   readonly candidates: readonly OpenRouterCandidate[];
   readonly audited: ReturnType<typeof auditExtractedCallCandidates>;
   readonly calls: ReturnType<typeof normalizeExtractedCalls>;
+  readonly chunks: readonly ChunkExtractionAudit[];
+  readonly chunkSettings: ChunkSettings;
 }
 
-async function extractWithModelFallback(args: OpenRouterArgs, transcript: string, title?: string | null): Promise<ExtractionResult> {
+async function extractChunkWithModelFallback(
+  args: OpenRouterArgs,
+  chunk: TranscriptChunk,
+  fullTranscript: string,
+  title?: string | null,
+): Promise<ChunkExtractionAudit> {
   const models = [args.model, ...(args.fallbackModel && args.fallbackModel !== args.model ? [args.fallbackModel] : [])];
   let lastError: unknown = null;
+  const validationTranscript = title ? `${title}\n${fullTranscript}` : fullTranscript;
 
   for (const model of models) {
     try {
-      const text = await callOpenRouter(model, transcript, title);
+      const text = await callOpenRouter(model, chunk.text, title, chunk, fullTranscript);
       const candidates = parseCandidates(text);
       if (args.debugRaw) {
-        console.log(`[${timestamp()}] raw ${model}: ${text.slice(0, 2000)}`);
-        console.log(`[${timestamp()}] parsed candidates: ${JSON.stringify(candidates).slice(0, 2000)}`);
+        console.log(`[${timestamp()}] raw ${model} chunk ${chunk.index + 1}/${chunk.total}: ${text.slice(0, 2000)}`);
+        console.log(`[${timestamp()}] parsed candidates chunk ${chunk.index + 1}/${chunk.total}: ${JSON.stringify(candidates).slice(0, 2000)}`);
       }
-      const validationTranscript = title ? `${title}\n${transcript}` : transcript;
       const audited = auditExtractedCallCandidates(validationTranscript, candidates);
-      const calls = normalizeExtractedCalls(validationTranscript, candidates);
-      return { model, rawText: text, candidates, audited, calls };
+      return { chunk, model, rawText: text, candidates, audited };
     } catch (error: unknown) {
       lastError = error;
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[${timestamp()}] model ${model} failed: ${message}`);
+      console.error(`[${timestamp()}] model ${model} failed on chunk ${chunk.index + 1}/${chunk.total}: ${message}`);
     }
   }
 
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+async function extractWithModelFallback(args: OpenRouterArgs, transcript: string, title?: string | null): Promise<ExtractionResult> {
+  const chunks = splitTranscriptIntoChunks(transcript, args);
+  const chunkResults: ChunkExtractionAudit[] = [];
+
+  for (const chunk of chunks) {
+    chunkResults.push(await extractChunkWithModelFallback(args, chunk, transcript, title));
+  }
+
+  const candidates = chunkResults.flatMap((result) => [...result.candidates]);
+  const validationTranscript = title ? `${title}\n${transcript}` : transcript;
+  const audited = auditExtractedCallCandidates(validationTranscript, candidates);
+  const calls = normalizeExtractedCalls(validationTranscript, candidates);
+  return {
+    model: Array.from(new Set(chunkResults.map((result) => result.model))).join(","),
+    rawText: chunkResults.map((result) => result.rawText).join("\n"),
+    candidates,
+    audited,
+    calls,
+    chunks: chunkResults,
+    chunkSettings: {
+      chunkChars: args.chunkChars,
+      chunkOverlap: args.chunkOverlap,
+      maxChunks: args.maxChunks,
+    },
+  };
 }
 
 async function loadPendingVideos(args: OpenRouterArgs): Promise<PendingVideo[]> {
@@ -321,6 +429,41 @@ function appendAuditRecord(args: OpenRouterArgs, video: PendingVideo, result: Ex
     },
     candidate_count: result.candidates.length,
     accepted_count: result.calls.length,
+    chunk_settings: result.chunkSettings,
+    chunk_summary: {
+      transcript_length: video.transcript?.length ?? 0,
+      chunk_count: result.chunks.length,
+      covered_until_offset: result.chunks.at(-1)?.chunk.end ?? 0,
+      reached_transcript_end: (result.chunks.at(-1)?.chunk.end ?? 0) >= (video.transcript?.length ?? 0),
+      processed_offsets: result.chunks.map((item) => ({
+        index: item.chunk.index,
+        total: item.chunk.total,
+        start: item.chunk.start,
+        end: item.chunk.end,
+        text_length: item.chunk.text.length,
+        model: item.model,
+        raw_candidate_count: item.candidates.length,
+        accepted_candidate_count: item.audited.filter((candidate) => candidate.isValid).length,
+      })),
+    },
+    chunks: result.chunks.map((item) => ({
+      chunk: {
+        index: item.chunk.index,
+        total: item.chunk.total,
+        start: item.chunk.start,
+        end: item.chunk.end,
+        text_length: item.chunk.text.length,
+      },
+      model: item.model,
+      raw_candidate_count: item.candidates.length,
+      accepted_candidate_count: item.audited.filter((candidate) => candidate.isValid).length,
+      candidates: item.audited.map((candidate) => ({
+        raw: candidate.candidate,
+        normalized: candidate.normalized,
+        is_valid: candidate.isValid,
+        validation_notes: candidate.validation_notes,
+      })),
+    })),
     candidates: result.audited.map((item) => ({
       raw: item.candidate,
       normalized: item.normalized,

@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   extractJsonArrayText,
+  openRouterPrompt,
   parseOpenRouterExtractionArgs,
+  splitTranscriptIntoChunks,
 } from "../src/scripts/extract-calls-openrouter";
 
 test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback", () => {
@@ -14,6 +16,77 @@ test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback"
   assert.equal(args.dryRun, true);
   assert.equal(args.write, false);
   assert.equal(args.auditOut, null);
+  assert.equal(args.chunkChars, 8000);
+  assert.equal(args.chunkOverlap, 500);
+  assert.equal(args.maxChunks, 100);
+});
+
+test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
+  const explicit = parseOpenRouterExtractionArgs(["--chunk-chars", "1200", "--chunk-overlap", "200", "--max-chunks", "7"]);
+
+  assert.equal(explicit.chunkChars, 1200);
+  assert.equal(explicit.chunkOverlap, 200);
+  assert.equal(explicit.maxChunks, 7);
+
+  const invalid = parseOpenRouterExtractionArgs(["--chunk-chars", "0", "--chunk-overlap", "8000", "--max-chunks", "-1"]);
+
+  assert.equal(invalid.chunkChars, 8000);
+  assert.equal(invalid.chunkOverlap, 500);
+  assert.equal(invalid.maxChunks, 100);
+
+  const tooLargeOverlap = parseOpenRouterExtractionArgs(["--chunk-chars", "1000", "--chunk-overlap", "1000"]);
+
+  assert.equal(tooLargeOverlap.chunkChars, 1000);
+  assert.equal(tooLargeOverlap.chunkOverlap, 500);
+
+  const tooManyChunks = parseOpenRouterExtractionArgs(["--max-chunks", "999999"]);
+
+  assert.equal(tooManyChunks.maxChunks, 100);
+});
+
+test("splitTranscriptIntoChunks returns one metadata-rich chunk for short transcripts", () => {
+  const chunks = splitTranscriptIntoChunks("short transcript", { chunkChars: 8000, chunkOverlap: 500, maxChunks: 100 });
+
+  assert.deepEqual(chunks, [
+    {
+      index: 0,
+      total: 1,
+      start: 0,
+      end: 16,
+      text: "short transcript",
+    },
+  ]);
+});
+
+test("splitTranscriptIntoChunks covers text beyond first chunk with overlap and bounded total", () => {
+  const transcript = "abcdefghijklmnopqrstuvwxyz";
+  const chunks = splitTranscriptIntoChunks(transcript, { chunkChars: 10, chunkOverlap: 3, maxChunks: 100 });
+
+  assert.deepEqual(
+    chunks.map((chunk) => [chunk.index, chunk.total, chunk.start, chunk.end, chunk.text]),
+    [
+      [0, 4, 0, 10, "abcdefghij"],
+      [1, 4, 7, 17, "hijklmnopq"],
+      [2, 4, 14, 24, "opqrstuvwx"],
+      [3, 4, 21, 26, "vwxyz"],
+    ],
+  );
+
+  assert.equal(chunks.at(-1)?.end, transcript.length);
+
+  const bounded = splitTranscriptIntoChunks(transcript, { chunkChars: 10, chunkOverlap: 3, maxChunks: 2 });
+  assert.equal(bounded.length, 2);
+  assert.equal(bounded[1]?.total, 2);
+});
+
+test("openRouterPrompt uses chunk text and includes chunk metadata", () => {
+  const transcript = `${"a".repeat(20)} later SOL call`;
+  const chunk = splitTranscriptIntoChunks(transcript, { chunkChars: 12, chunkOverlap: 2, maxChunks: 10 })[1];
+  const prompt = openRouterPrompt(chunk.text, "Solana update", chunk, transcript);
+
+  assert.match(prompt, /Transcript chunk: 2 of 4 \(offsets 10-22\)/);
+  assert.match(prompt, /aaaaaaaaaa l/);
+  assert.doesNotMatch(prompt, /later SOL call/);
 });
 
 test("OpenRouter extraction parses explicit CLI arguments safely", () => {
