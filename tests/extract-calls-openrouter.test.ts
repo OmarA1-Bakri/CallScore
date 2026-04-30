@@ -69,10 +69,19 @@ test("Ollama provider defaults to direct Ollama Cloud host and cloud model", () 
   const args = withoutOllamaHost(() => parseOpenRouterExtractionArgs(["--provider", "ollama"]));
 
   assert.equal(args.provider, "ollama");
-  assert.equal(args.model, "gemma4:31b");
+  assert.equal(args.model, "deepseek-v4-flash");
   assert.equal(args.fallbackModel, null);
   assert.equal(args.ollamaHost, "https://ollama.com");
   assert.equal(args.dryRun, true);
+});
+
+test("Ollama provider defaults local daemon cloud-offload model when using a local host", () => {
+  const args = parseOpenRouterExtractionArgs(["--provider", "ollama", "--ollama-host", "http://127.0.0.1:11434"]);
+
+  assert.equal(args.provider, "ollama");
+  assert.equal(args.model, "deepseek-v4-flash:cloud");
+  assert.equal(args.fallbackModel, null);
+  assert.equal(args.ollamaHost, "http://127.0.0.1:11434");
 });
 
 test("Ollama provider accepts explicit model, fallback, and host", () => {

@@ -9,7 +9,8 @@ import { loadEnv, replaceStoredCallsForVideo, sleep, timestamp } from "./script-
 const DEFAULT_PROVIDER = "openrouter";
 const DEFAULT_MODEL = "google/gemma-4-31b-it:free";
 const DEFAULT_FALLBACK_MODEL = "google/gemma-4-31b-it";
-const DEFAULT_OLLAMA_MODEL = "gemma4:31b";
+const DEFAULT_OLLAMA_CLOUD_MODEL = "deepseek-v4-flash";
+const DEFAULT_OLLAMA_LOCAL_CLOUD_MODEL = "deepseek-v4-flash:cloud";
 const DEFAULT_OLLAMA_HOST = "https://ollama.com";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TRANSCRIPT_CHARS = 8_000;
@@ -121,15 +122,20 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
     chunkOverlap: positiveInt(argValue(argv, "--chunk-overlap"), DEFAULT_CHUNK_OVERLAP),
     maxChunks: positiveInt(argValue(argv, "--max-chunks"), DEFAULT_MAX_CHUNKS),
   });
+  const ollamaHost = argValue(argv, "--ollama-host") ?? process.env.OLLAMA_HOST ?? DEFAULT_OLLAMA_HOST;
+  const normalizedOllamaHost = ollamaHost.replace(/\/+$/, "");
+  const defaultOllamaModel = normalizedOllamaHost === DEFAULT_OLLAMA_HOST
+    ? DEFAULT_OLLAMA_CLOUD_MODEL
+    : DEFAULT_OLLAMA_LOCAL_CLOUD_MODEL;
   return {
     creatorHandle: argValue(argv, "--creator"),
     videoIds: positiveIntList(argValue(argv, "--video-ids")),
     includeExtracted: argv.includes("--include-extracted"),
     debugRaw: argv.includes("--debug-raw"),
     provider,
-    model: argValue(argv, "--model") ?? (provider === "ollama" ? DEFAULT_OLLAMA_MODEL : DEFAULT_MODEL),
+    model: argValue(argv, "--model") ?? (provider === "ollama" ? defaultOllamaModel : DEFAULT_MODEL),
     fallbackModel: argValue(argv, "--fallback-model") ?? (provider === "ollama" ? null : DEFAULT_FALLBACK_MODEL),
-    ollamaHost: argValue(argv, "--ollama-host") ?? process.env.OLLAMA_HOST ?? DEFAULT_OLLAMA_HOST,
+    ollamaHost,
     limit: positiveInt(argValue(argv, "--limit"), 10),
     gapMs: positiveInt(argValue(argv, "--gap-ms"), 5_000),
     write,
