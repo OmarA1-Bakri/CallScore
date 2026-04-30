@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CTR — Phase 3 · D5 · Metric Hover Library · v0.1 · 2026-04-24</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink-000:#0A0A0B; --ink-050:#0E0F10; --ink-100:#141517; --ink-150:#1A1B1E;
+  --ink-200:#22242A; --ink-250:#2B2D33; --ink-300:#3A3D44;
+  --ink-400:#5B5F68; --ink-500:#7A7F89; --ink-600:#9CA0A9; --ink-700:#C2C5CC; --ink-800:#E1E3E7; --ink-900:#F4F5F7;
+  --accent:#C9A24B; --accent-dim:#8E7235; --accent-low:#3A2F17;
+  --pos:#6FA56A; --pos-dim:#3E5D3B;
+  --neg:#D47A70; --neg-dim:#6A3631;
+  --warn:#D97757;
+  --stale:#8A7A5E; --new:#7FA6C9;
+  --font-serif:"Source Serif 4", Georgia, serif;
+  --font-sans:"Inter Tight", -apple-system, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, monospace;
+  --hair:1px solid var(--ink-200);
+  --hair-strong:1px solid var(--ink-250);
+  --hair-soft:1px solid var(--ink-150);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--ink-000);color:var(--ink-700);font-family:var(--font-sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum","ss01"}
+a{color:inherit;text-decoration:none}
+button{background:none;border:none;color:inherit;font:inherit;cursor:pointer}
+
+.mast{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.92);backdrop-filter:blur(12px);border-bottom:var(--hair-strong)}
+.mast-in{max-width:1360px;margin:0 auto;padding:12px 32px;display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center}
+.wm{font-family:var(--font-serif);font-weight:500;font-size:16px;letter-spacing:-.01em;color:var(--ink-900)}
+.wm em{font-style:italic;color:var(--accent);font-weight:400}
+.bc{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em}
+.bc a{color:var(--accent);border-bottom:1px solid var(--accent-dim);padding-bottom:1px}
+.bc .sep{padding:0 8px;color:var(--ink-400)}
+.meta{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);display:flex;gap:16px;letter-spacing:.04em}
+.meta b{color:var(--ink-900);font-weight:500}
+
+main{max-width:1360px;margin:0 auto;padding:48px 32px 120px;position:relative;z-index:1}
+
+.section{padding:40px 0;border-top:var(--hair-strong)}
+.section:first-of-type{border-top:none}
+.sh{display:grid;grid-template-columns:72px 1fr 260px;gap:32px;align-items:baseline;margin-bottom:28px}
+.sn{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);letter-spacing:.1em;text-transform:uppercase}
+.sh h2{font-family:var(--font-serif);font-size:30px;color:var(--ink-900);font-weight:500;letter-spacing:-.015em;line-height:1.15}
+.sh h2 em{font-style:italic;color:var(--accent);font-weight:400}
+.sm{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em;line-height:1.7;text-align:right}
+.sm b{color:var(--ink-800);font-weight:500}
+.prose{font-family:var(--font-serif);font-size:15px;line-height:1.65;color:var(--ink-700);max-width:68ch;margin-bottom:20px}
+.prose p{margin-bottom:14px}
+.prose em{font-style:italic;color:var(--accent)}
+.prose b{color:var(--ink-900);font-weight:500}
+.prose code{font-family:var(--font-mono);font-size:12px;color:var(--accent);background:var(--ink-100);padding:1px 5px;border-radius:2px}
+
+/* === HOVER POPOVER — the actual component === */
+.pop-wrap{position:relative;display:inline-block}
+.pop-trigger{font-family:var(--font-mono);font-size:11px;color:var(--ink-800);border-bottom:1px dotted var(--accent-dim);cursor:help;padding:0 1px;letter-spacing:.02em}
+.pop-trigger .v{color:var(--accent);font-weight:500;padding-left:4px}
+
+/* static popover showcase */
+.pop{background:var(--ink-000);border:1px solid var(--accent-dim);box-shadow:0 16px 48px rgba(0,0,0,.6),0 0 0 1px rgba(201,162,75,.12);width:360px;padding:0;position:relative;font-family:var(--font-sans);font-size:12px}
+.pop::before{content:"";position:absolute;top:-6px;left:32px;width:10px;height:10px;background:var(--ink-000);border-top:1px solid var(--accent-dim);border-left:1px solid var(--accent-dim);transform:rotate(45deg)}
+.pop .ph{padding:14px 16px 10px;border-bottom:var(--hair)}
+.pop .ph-k{font-family:var(--font-mono);font-size:9px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;font-weight:500}
+.pop .ph-n{font-family:var(--font-serif);font-size:17px;color:var(--ink-900);font-weight:500;letter-spacing:-.005em;line-height:1.2;display:flex;align-items:baseline;gap:8px}
+.pop .ph-n .sym{font-family:var(--font-mono);font-size:14px;color:var(--accent);font-weight:500}
+.pop .ph-n em{font-style:italic;color:var(--accent);font-weight:400}
+.pop .ph-n .av{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em;font-weight:400}
+
+.pop .body{padding:14px 16px;display:flex;flex-direction:column;gap:13px}
+.pop .blk{display:grid;grid-template-columns:56px 1fr;gap:10px;align-items:baseline}
+.pop .blk .k{font-family:var(--font-mono);font-size:9px;color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase;font-weight:500;padding-top:1px}
+.pop .blk .v{font-family:var(--font-serif);font-size:13px;color:var(--ink-800);line-height:1.5}
+.pop .blk .v b{color:var(--ink-900);font-weight:500}
+.pop .blk .v em{font-style:italic;color:var(--accent)}
+.pop .blk.how .v{font-family:var(--font-mono);font-size:10.5px;color:var(--ink-700);letter-spacing:.02em;line-height:1.55}
+.pop .blk.how .v code{background:var(--ink-100);padding:1px 4px;color:var(--accent);font-size:10px;border-radius:2px}
+
+/* good value scale */
+.scale{display:flex;flex-direction:column;gap:4px}
+.scale-bar{height:6px;background:linear-gradient(90deg,var(--neg) 0%,var(--stale) 40%,var(--pos) 70%,var(--accent) 100%);border-radius:2px;position:relative}
+.scale-mark{position:absolute;top:-2px;width:2px;height:10px;background:var(--ink-900);box-shadow:0 0 0 1.5px var(--ink-000)}
+.scale-lbl{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:9px;color:var(--ink-500);letter-spacing:.04em}
+.scale-lbl b{color:var(--ink-800);font-weight:500}
+
+.pop .src{padding:10px 16px;border-top:var(--hair);background:var(--ink-050);font-family:var(--font-mono);font-size:9.5px;color:var(--ink-500);letter-spacing:.04em;line-height:1.55;display:flex;gap:12px;align-items:baseline}
+.pop .src .k{color:var(--accent);text-transform:uppercase;letter-spacing:.08em;font-weight:500;flex-shrink:0}
+.pop .src .v b{color:var(--ink-800);font-weight:500}
+.pop .src .v a{color:var(--accent);border-bottom:1px dotted var(--accent-dim);padding-bottom:1px}
+
+/* caveat badge */
+.pop .cav{padding:8px 16px;border-top:var(--hair);background:rgba(217,119,87,.06);font-family:var(--font-mono);font-size:9.5px;color:var(--warn);letter-spacing:.04em;line-height:1.5;display:flex;gap:8px;align-items:flex-start}
+.pop .cav::before{content:"!";flex-shrink:0;width:14px;height:14px;border:1px solid var(--warn);font-size:10px;line-height:12px;text-align:center;font-weight:600;border-radius:50%}
+
+/* popover showcase grid */
+.pop-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:36px 48px;margin-top:24px}
+.pop-cell{display:flex;flex-direction:column;gap:18px}
+.pop-label{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase;padding-bottom:8px;border-bottom:var(--hair-soft);display:flex;justify-content:space-between;align-items:baseline}
+.pop-label b{color:var(--ink-800);font-weight:500}
+.pop-label .idx{color:var(--accent);font-weight:500}
+
+.trigger-demo{padding:16px 20px;background:var(--ink-100);border:var(--hair);font-family:var(--font-mono);font-size:12px;color:var(--ink-500);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.trigger-demo .ctx{font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em}
+
+.pop-holder{position:relative;padding-top:14px}
+
+/* === ANATOMY ANNOTATION (first popover gets labeled) === */
+.anatomy{display:grid;grid-template-columns:420px 1fr;gap:48px;align-items:start;margin-top:12px}
+.anatomy .an-lines{position:relative;padding-top:14px}
+.anatomy .marks{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em;line-height:1.6;display:flex;flex-direction:column;gap:14px;padding-top:20px}
+.anatomy .marks .m{display:grid;grid-template-columns:28px 1fr;gap:12px;padding-bottom:12px;border-bottom:var(--hair-soft)}
+.anatomy .marks .m:last-child{border-bottom:none}
+.anatomy .marks .m .n{color:var(--accent);font-weight:600;font-size:11px;letter-spacing:.05em}
+.anatomy .marks .m b{color:var(--ink-900);font-weight:500}
+.anatomy .marks .m em{color:var(--accent);font-style:italic;font-family:var(--font-serif)}
+
+/* bullet for anatomy target numbers inside popover */
+.pin{position:absolute;width:18px;height:18px;border-radius:50%;background:var(--accent);color:var(--ink-000);font-family:var(--font-mono);font-size:10px;font-weight:600;text-align:center;line-height:18px;box-shadow:0 2px 8px rgba(0,0,0,.4);z-index:5}
+
+/* === APPLICATION MATRIX === */
+.matrix{border:var(--hair-strong);overflow:hidden}
+.matrix table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px}
+.matrix th{text-align:left;padding:12px 14px;background:var(--ink-050);border-bottom:var(--hair-strong);border-right:var(--hair-soft);color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase;font-size:10px;font-weight:500;vertical-align:bottom}
+.matrix th:last-child{border-right:none}
+.matrix th.surf{text-align:center;width:98px}
+.matrix td{padding:11px 14px;border-bottom:var(--hair-soft);border-right:var(--hair-soft);color:var(--ink-700);vertical-align:top;line-height:1.45}
+.matrix td:last-child{border-right:none}
+.matrix td.m-name{color:var(--ink-900);font-weight:500}
+.matrix td.m-name .sym{color:var(--accent);margin-right:6px}
+.matrix td.m-name em{font-style:italic;color:var(--accent);font-family:var(--font-serif);font-weight:400}
+.matrix td.m-form{color:var(--ink-500);font-size:10px;letter-spacing:.02em}
+.matrix td.surf{text-align:center;padding:10px 6px}
+.matrix td.surf .y{display:inline-block;width:18px;height:18px;border-radius:50%;background:rgba(201,162,75,.12);border:1px solid var(--accent-dim);color:var(--accent);font-size:10px;line-height:16px;font-weight:600}
+.matrix td.surf .y.prim{background:var(--accent);color:var(--ink-000);border-color:var(--accent)}
+.matrix td.surf .n{color:var(--ink-400)}
+.matrix td.note-col{color:var(--ink-500);font-size:10px;line-height:1.5}
+.matrix td.note-col b{color:var(--ink-800);font-weight:500}
+
+/* === BEHAVIOR TABLE === */
+.beh{border:var(--hair-strong);background:var(--ink-050)}
+.beh .row{display:grid;grid-template-columns:170px 1fr;gap:0;border-bottom:var(--hair-soft)}
+.beh .row:last-child{border-bottom:none}
+.beh .row .k{padding:14px 18px;background:var(--ink-100);font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-right:var(--hair-soft)}
+.beh .row .v{padding:14px 18px;font-family:var(--font-sans);font-size:12.5px;color:var(--ink-700);line-height:1.6}
+.beh .row .v b{color:var(--ink-900);font-weight:500}
+.beh .row .v em{font-style:italic;color:var(--accent);font-family:var(--font-serif)}
+.beh .row .v code{font-family:var(--font-mono);font-size:11px;background:var(--ink-150);padding:1px 5px;color:var(--accent);border-radius:2px}
+.beh .row .v .kbd{display:inline-block;font-family:var(--font-mono);font-size:10px;padding:1px 6px;border:1px solid var(--ink-300);background:var(--ink-150);color:var(--ink-800);border-radius:2px;margin:0 2px}
+
+/* === IN-SITU PREVIEW === */
+.situ{border:var(--hair-strong);background:var(--ink-100);padding:24px 24px 360px;margin-top:20px;position:relative}
+.situ .surf-lbl{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;display:flex;justify-content:space-between;align-items:baseline}
+.situ .surf-lbl b{color:var(--accent);font-weight:500}
+
+/* mini leaderboard */
+.mini-lb{background:var(--ink-000);border:var(--hair)}
+.mini-lb table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px}
+.mini-lb th,.mini-lb td{padding:9px 12px;border-bottom:var(--hair-soft);text-align:left}
+.mini-lb th{background:var(--ink-050);color:var(--ink-500);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-bottom:var(--hair-strong)}
+.mini-lb td{color:var(--ink-700)}
+.mini-lb td b{color:var(--ink-900)}
+.mini-lb td.r{color:var(--accent);font-weight:500}
+.mini-lb td .pos{color:var(--pos)}
+.mini-lb td .neg{color:var(--neg)}
+.mini-lb tr.active td{background:rgba(201,162,75,.04)}
+.mini-lb .m-hd{border-bottom:2px solid var(--accent) !important;color:var(--accent) !important;cursor:help}
+
+/* floating pop in situ */
+.situ-pop{position:absolute;top:56px;left:410px;z-index:10}
+
+.note{padding:18px 22px;border:var(--hair-strong);background:var(--ink-050);font-family:var(--font-mono);font-size:11px;color:var(--ink-500);letter-spacing:.04em;line-height:1.7}
+.note b{color:var(--ink-900);font-weight:500}
+.note em{color:var(--accent);font-style:italic;font-family:var(--font-serif)}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="mast-in">
+    <div class="wm">CryptoTubers <em>Ranked</em></div>
+    <div class="bc">
+      <a>Phase 1</a><span class="sep">/</span>
+      <a>P2 v0.2</a><span class="sep">/</span>
+      <a>P3 v0.3</a><span class="sep">/</span>
+      <a>D4 v0.1.1</a><span class="sep">/</span>
+      D5 · Metric Hover Library · v0.1
+    </div>
+    <div class="meta">
+      <span>rev · <b>D5 · v0.1.1</b></span>
+      <span>date · <b>2026-04-24</b></span>
+      <span>open rules · <b>6</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ 00 · PREAMBLE ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">00 · preamble</div>
+    <h2>D5 · A <em>single popover</em> for every metric — same anatomy, ten metrics, every surface.</h2>
+    <div class="sm">
+      metrics · <b>10</b><br>
+      anatomy · <b>name · what · how · good · source · caveat</b><br>
+      surfaces · <b>5</b>
+    </div>
+  </div>
+  <div class="prose">
+    <p>Across Leaderboard / Profile / Signals / Compare / Dashboard, users see the same numbers over and over — <b>α</b>, <b>β-α</b>, <b>CI</b>, <b>tier-weighted N</b>, <b>win rate</b>, <b>retraction rate</b>, <b>first-mover rate</b>, <b>median horizon</b>, <b>velocity</b>, <b>overlap-with-you</b>. Right now each surface explains them differently (or not at all). D5 fixes that with one popover component, applied ten times. Hover any metric → same anatomy, same tone, same evidence trail.</p>
+    <p><em>Design bet:</em> metrics people can't explain, people don't trust. A 4-part popover — <b>what it is · how we compute it · what's good/bad · where the numbers come from</b> — is the cheapest possible trust investment. A 5th optional slot (<em>caveat</em>) surfaces when the metric is fragile: low N, wide CI, recent-only, etc.</p>
+    <p style="padding:12px 14px;border-left:2px solid var(--warn);background:rgba(217,119,87,.05);font-size:13.5px;line-height:1.55"><b style="color:var(--warn)">v0.1.1 note ·</b> Building the popovers forced <b>6 scoring-logic questions</b> the product side hasn't settled. The popovers still ship with placeholder values so the component can be approved, but the math/policy is held in §08 — nothing below is canonical until product signs off.</p>
+  </div>
+</section>
+
+<!-- ============ 01 · ANATOMY ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">01 · anatomy</div>
+    <h2>One component · <em>five slots</em> · everything after is variation.</h2>
+    <div class="sm">
+      slots · <b>1 header + 3 body + 1 source + 1 caveat</b><br>
+      width · <b>360 fixed</b><br>
+      trigger · <b>hover + tap</b>
+    </div>
+  </div>
+
+  <div class="anatomy">
+    <div class="pop-holder">
+      <div class="pop">
+        <div class="ph">
+          <span class="pin" style="top:-10px;left:-10px">1</span>
+          <div class="ph-k">Metric · leaderboard rank driver</div>
+          <div class="ph-n"><span class="sym">α</span> <em>Alpha</em> <span class="av">avg · 90d</span></div>
+        </div>
+        <div class="body">
+          <div class="blk">
+            <span class="pin" style="top:8px;left:-10px">2</span>
+            <div class="k">What</div>
+            <div class="v">Log-return on resolved directional calls, <b>relative to the asset's benchmark</b> over the same window. Positive α = beat the benchmark.</div>
+          </div>
+          <div class="blk how">
+            <span class="pin" style="top:8px;left:-10px">3</span>
+            <div class="k">How</div>
+            <div class="v">For each resolved call, <code>r = ln(p₁/p₀) − ln(b₁/b₀)</code> where <em>b</em> is the asset's tracked benchmark. Then <code>α = Σrᵢ / N</code>, tier-weighted, decayed to 90d.</div>
+          </div>
+          <div class="blk">
+            <span class="pin" style="top:8px;left:-10px">4</span>
+            <div class="k">Good</div>
+            <div class="v">
+              <div class="scale">
+                <div class="scale-bar"><span class="scale-mark" style="left:72%"></span></div>
+                <div class="scale-lbl"><span>−5</span><span><b>+3 typical</b></span><span>+5 elite</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="src">
+          <span class="pin" style="top:10px;left:-10px">5</span>
+          <span class="k">Source</span>
+          <span class="v">Resolved calls ledger · <b>N=214</b> · <a>methodology</a></span>
+        </div>
+        <div class="cav">
+          <span class="pin" style="top:8px;left:-10px">6</span>
+          <div>Wide CI when N<30 on any single asset — check <b>tier-weighted N</b> before ranking.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="marks">
+      <div class="m"><div class="n">1</div><div><b>Header · metric role</b><br>Kicker tells users <em>where this metric drives a decision</em> ("rank driver", "confidence input", "evidence"). Name + greek symbol + qualifier (window / aggregation).</div></div>
+      <div class="m"><div class="n">2</div><div><b>What</b> · plain-English definition, one sentence. Never a formula here. Always reads as "X is Y, so positive/high = Z".</div></div>
+      <div class="m"><div class="n">3</div><div><b>How</b> · the formula, monospaced, with a one-line gloss. The only slot where math lives. If the formula depends on another metric, that metric is linked.</div></div>
+      <div class="m"><div class="n">4</div><div><b>Good</b> · calibrated scale — where's typical, where's elite, where's a red flag? <em>Not</em> generic good/bad; values keyed to what this product actually sees across <em>resolved</em> calls.</div></div>
+      <div class="m"><div class="n">5</div><div><b>Source</b> · primitive the number rolls up from, plus N and a link to full methodology. <em>Trust anchor.</em> Consistent location (bottom, ink-050).</div></div>
+      <div class="m"><div class="n">6</div><div><b>Caveat</b> · optional · appears when the metric is <em>fragile in this context</em>: low N, wide CI, stale, recent regime shift. Same warn color as §9 tension in Signals.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 · THE TEN POPOVERS ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">02 · library</div>
+    <h2>Ten metrics · <em>one anatomy</em>.</h2>
+    <div class="sm">
+      row 1 · <b>rank drivers</b><br>
+      row 2 · <b>confidence / integrity</b><br>
+      row 3 · <b>behavioral</b>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>Left column = <em>more-is-better</em> metrics. Right column = <em>context</em> metrics. Caveat slot only appears where the metric is commonly misread.</p>
+  </div>
+
+  <div class="pop-grid">
+
+    <!-- 01 α -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">01</span> · α · <b>Alpha</b></span><span>rank driver</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · leaderboard rank driver</div>
+            <div class="ph-n"><span class="sym">α</span> <em>Alpha</em> <span class="av">avg · 90d</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">Log-return on resolved directional calls, <b>relative to the asset's benchmark</b>. Positive α = beat the benchmark.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v"><code>r = ln(p₁/p₀) − ln(b₁/b₀)</code>; <code>α = Σrᵢ/N</code>, tier-weighted, 90d decay.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v"><div class="scale"><div class="scale-bar"><span class="scale-mark" style="left:72%"></span></div><div class="scale-lbl"><span>−5</span><span><b>+3 typical</b></span><span>+5 elite</span></div></div></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Resolved calls ledger · <b>N=214</b> · <a>methodology</a></span></div>
+          <div class="cav">Wide CI when N<30 on a single asset. Check tier-weighted N.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 β-α -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">02</span> · β-α · <b>Beta-adjusted alpha</b></span><span>gate.beta.column · Pro</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · risk-adjusted performance</div>
+            <div class="ph-n"><span class="sym">β-α</span> <em>Beta-α</em> <span class="av">avg · 90d</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">α <b>after stripping out</b> what was explainable by general crypto-market movement. Isolates skill from regime luck.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v"><code>β-α = α − (β · r_market)</code>. β from 30-day rolling regression vs. CMC Top-10 index.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v"><div class="scale"><div class="scale-bar"><span class="scale-mark" style="left:64%"></span></div><div class="scale-lbl"><span>−3</span><span><b>+1.5 typical</b></span><span>+3 elite</span></div></div></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">α ledger × rolling β · <b>30d window</b> · <a>β spec</a></span></div>
+          <div class="cav">Unstable during regime changes (β re-estimates). Treat as directional for 90d.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 03 CI -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">03</span> · CI · <b>Confidence interval</b></span><span>confidence input</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · how sure are we</div>
+            <div class="ph-n"><span class="sym">CI</span> <em>95% interval</em> <span class="av">bootstrap · 1000x</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">The range α would land in if we <b>re-sampled this creator's calls 1,000 times</b>. Narrow = stable. Wide = few or noisy calls.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v">Bootstrap resample of resolved calls, 1000 iterations, 95% percentile band reported as <code>[α_low, α_high]</code>.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v"><div class="scale"><div class="scale-bar" style="background:linear-gradient(90deg,var(--pos) 0%,var(--stale) 50%,var(--neg) 100%)"><span class="scale-mark" style="left:30%"></span></div><div class="scale-lbl"><span><b>±0.8 tight</b></span><span>±2.0 wide</span><span>±4.0 flag</span></div></div></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Resolved calls · <b>per-creator bootstrap</b> · <a>explain</a></span></div>
+          <div class="cav">Always visualized as the <em>shaded band</em> behind α on profile charts. Never collapse to ±.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 04 tier-weighted N -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">04</span> · N · <b>Tier-weighted N</b></span><span>sample size</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · sample adequacy</div>
+            <div class="ph-n"><span class="sym">N</span> <em>Tier-weighted calls</em> <span class="av">90d window</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">Resolved calls in the window, <b>weighted by tier</b> — Tier-S calls count 1.0, Tier-A 0.7, Tier-B 0.4. Penalizes creators who only make throwaway predictions.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v"><code>N_eff = Σ w(tier_i)</code> over resolved calls in window. <code>w = {S:1.0, A:0.7, B:0.4, C:0.2}</code>.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v"><div class="scale"><div class="scale-bar"><span class="scale-mark" style="left:55%"></span></div><div class="scale-lbl"><span>&lt;12 low</span><span><b>30 adequate</b></span><span>80+ rich</span></div></div></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Call ledger × tier registry · <a>tier criteria</a></span></div>
+          <div class="cav">Below 12: α is shown in gray italic + "low-N" tag — do not rank on it.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 05 win rate -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">05</span> · WR · <b>Win rate</b></span><span>supporting</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · hit rate on direction</div>
+            <div class="ph-n"><span class="sym">WR</span> <em>Win rate</em> <span class="av">%, 90d</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">Share of resolved calls where the <b>direction</b> was right — regardless of size. Simple, but easy to game with small moves.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v"><code>WR = #{rᵢ &gt; 0} / N</code> over resolved calls. Not weighted.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v"><div class="scale"><div class="scale-bar"><span class="scale-mark" style="left:60%"></span></div><div class="scale-lbl"><span>45% low</span><span><b>58% typical</b></span><span>70% elite</span></div></div></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Call ledger · directional outcome · <a>resolution logic</a></span></div>
+          <div class="cav">High WR + low α = small wins, big losses. Always pair with α.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 06 retraction rate -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">06</span> · RR · <b>Retraction rate</b></span><span>integrity</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · intellectual honesty</div>
+            <div class="ph-n"><span class="sym">RR</span> <em>Retraction rate</em> <span class="av">%, 90d</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">Share of calls the creator <b>publicly revised or canceled</b> before resolution. Counterintuitively, <em>higher is healthier</em> — means they update on new evidence.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v"><code>RR = #{retracted within 24h of adverse signal} / N</code>. Tagged from creator's own follow-up posts.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v"><div class="scale"><div class="scale-bar" style="background:linear-gradient(90deg,var(--neg) 0%,var(--stale) 20%,var(--pos) 45%,var(--pos) 80%,var(--stale) 100%)"><span class="scale-mark" style="left:50%"></span></div><div class="scale-lbl"><span>0% stubborn</span><span><b>8-15% healthy</b></span><span>&gt;25% unstable</span></div></div></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Retraction log · creator-authored follow-ups · <a>method</a></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 07 first-mover rate -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">07</span> · FM · <b>First-mover rate</b></span><span>originator</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · originator identification</div>
+            <div class="ph-n"><span class="sym">FM</span> <em>First-mover rate</em> <span class="av">%, 90d</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">Share of this creator's calls where they were <b>first to voice the thesis</b> that later became consensus. Distinguishes leaders from echoes.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v"><code>FM = #{first by &gt;2h on 2+ aligned thesis} / thesis count</code>. 2h lead threshold to ignore simultaneous posts.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v"><div class="scale"><div class="scale-bar"><span class="scale-mark" style="left:55%"></span></div><div class="scale-lbl"><span>&lt;10% follower</span><span><b>30% mix</b></span><span>50%+ leader</span></div></div></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Thesis graph · <b>originator glyph</b> derives from this · <a>graph</a></span></div>
+          <div class="cav">FM without α = loud but wrong. Pair with α before crediting "calls it first".</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 08 median horizon -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">08</span> · H · <b>Median horizon</b></span><span>style context</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · trading style</div>
+            <div class="ph-n"><span class="sym">H</span> <em>Median horizon</em> <span class="av">days to resolution</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">Typical <b>time between call and resolution</b>. Characterizes style — scalpers, swing, position.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v">Median of <code>t_resolved − t_call</code> over resolved calls in 90d. Median, not mean, to resist outliers.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v" style="font-size:12px;line-height:1.55"><b>Not better or worse</b> — just context. Match horizon to your own holding period.<br><span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500)">&lt;3d scalper · 3-10d swing · &gt;10d position</span></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Call ledger timestamps · <a>resolution rules</a></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 09 velocity -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">09</span> · V · <b>Velocity</b> <span style="color:var(--new);font-size:9px">NEW</span></span><span>recency proxy</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · publishing cadence</div>
+            <div class="ph-n"><span class="sym">V</span> <em>Velocity</em> <span class="av">calls / week</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">How many directional calls this creator publishes per week, over the <b>last 30 days</b>. Distinguishes <em>actively publishing</em> from <em>dormant</em>, independent of α. <b>Not a quality signal</b> — use alongside α, never instead of.</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v"><code>V = N_calls_30d / 4.3</code>. Only includes calls that will eventually resolve (directional + asset-specific).</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v" style="font-size:12px;line-height:1.55"><b>Context, not rank.</b> Too high (>15/wk) = noise risk. Too low (<0.5/wk) = dormant.<br><span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500)">1-4/wk healthy cadence</span></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Call ledger · last 30d · <a>what counts</a></span></div>
+          <div class="cav">Dormancy flag fires at V &lt; 0.3 for 14d — surfaced on profile as <em>stale</em>.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10 overlap-with-you -->
+    <div class="pop-cell">
+      <div class="pop-label"><span><span class="idx">10</span> · OL · <b>Overlap-with-you</b> <span style="color:var(--new);font-size:9px">NEW</span></span><span>personal</span></div>
+      <div class="pop-holder">
+        <div class="pop">
+          <div class="ph">
+            <div class="ph-k">Metric · thesis agreement with your positions</div>
+            <div class="ph-n"><span class="sym">OL</span> <em>Overlap-with-you</em> <span class="av">%, 30d</span></div>
+          </div>
+          <div class="body">
+            <div class="blk"><div class="k">What</div><div class="v">Share of this creator's <b>active theses</b> that align with assets <em>you</em> currently hold (from connected wallet or manual portfolio).</div></div>
+            <div class="blk how"><div class="k">How</div><div class="v"><code>OL = #{thesis on your asset ∩ your direction} / thesis count</code>. Only active, not resolved.</div></div>
+            <div class="blk"><div class="k">Good</div><div class="v" style="font-size:12px;line-height:1.55"><b>High ≠ better.</b> High overlap = echo chamber risk; low overlap = diversifying voice.<br><span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500)">Use as a <em>filter</em>, not a ranker.</span></div></div>
+          </div>
+          <div class="src"><span class="k">Source</span><span class="v">Your portfolio × active thesis graph · <b>computed server-side, not retained</b> · <a>privacy</a></span></div>
+          <div class="cav">Requires portfolio connection. Hidden if none connected — no placeholder %.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 03 · APPLICATION MATRIX ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">03 · application</div>
+    <h2>Which metrics live on <em>which surface</em>.</h2>
+    <div class="sm">
+      surfaces · <b>5</b> × metrics · <b>10</b><br>
+      ● primary column · ○ secondary<br>
+      — not applied
+    </div>
+  </div>
+  <div class="prose">
+    <p>Not every metric belongs on every surface. <b>●</b> = primary (part of ranking / decision), <b>○</b> = secondary (available on hover or in a drawer), <b>—</b> = deliberately absent. Hover semantics are identical wherever it appears — same popover, same 4-part anatomy.</p>
+  </div>
+
+  <div class="matrix">
+    <table>
+      <thead>
+        <tr>
+          <th>metric</th>
+          <th>formula at a glance</th>
+          <th class="surf">Leaderb.</th>
+          <th class="surf">Profile</th>
+          <th class="surf">Signals</th>
+          <th class="surf">Compare</th>
+          <th class="surf">Dashbd.</th>
+          <th style="width:220px">role / notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="m-name"><span class="sym">α</span> <em>Alpha</em></td>
+          <td class="m-form">Σ log-return excess / N</td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="note-col">Primary rank driver on Leaderboard and Compare. Hover reveals 90d value + CI band.</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">β-α</span> <em>Beta-α</em></td>
+          <td class="m-form">α − β·r_market</td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="note-col"><b>Pro-gated column</b> (<code>gate.beta.column</code>). Absent on Signals — thesis surface doesn't need regime-stripping.</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">CI</span> <em>Confidence</em></td>
+          <td class="m-form">bootstrap 95% on α</td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="note-col">Always visualized as shaded band on profile α chart. Never collapsed to "±x.xx" alone.</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">N</span> <em>Tier-weighted N</em></td>
+          <td class="m-form">Σ w(tier) over resolved</td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="note-col">Gatekeeper. N&lt;12 shows α in gray italic + "low-N" tag everywhere.</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">WR</span> <em>Win rate</em></td>
+          <td class="m-form">#positive / N</td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="note-col">Always paired with α on profile header — WR without α is misleading.</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">RR</span> <em>Retraction rate</em></td>
+          <td class="m-form">#retracted / N</td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="note-col">Integrity signal. <b>Promoted to primary on Compare</b> — synthesis headlines flag when one voice retracts 3× more than the other (trust-asymmetry). Dashboard surfaces it on the "Retracted last 30d" saved view.</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">FM</span> <em>First-mover rate</em></td>
+          <td class="m-form">#{first by &gt;2h} / thesis</td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="note-col">Drives the <b>originator glyph</b> (<em>orig</em>) everywhere thesis logic applies. Primary on Signals + Compare.</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">H</span> <em>Median horizon</em></td>
+          <td class="m-form">median(t_r − t_0)</td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="note-col">Style tag. Compare surfaces it as the answer to "can I actually act on this voice?"</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">V</span> <em>Velocity</em> <span style="color:var(--new);font-size:9px;font-family:var(--font-mono)">NEW</span></td>
+          <td class="m-form">N_calls_30d / 4.3</td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="note-col">Dormancy flag on Dashboard watched creators. Profile shows full 90d sparkline.</td>
+        </tr>
+        <tr>
+          <td class="m-name"><span class="sym">OL</span> <em>Overlap-with-you</em> <span style="color:var(--new);font-size:9px;font-family:var(--font-mono)">NEW</span></td>
+          <td class="m-form">theses∩your assets / theses</td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y">○</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="surf"><span class="n">—</span></td>
+          <td class="surf"><span class="y prim">●</span></td>
+          <td class="note-col">Requires portfolio connection. Hidden entirely if none — no placeholder %.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 04 · BEHAVIOR ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">04 · behavior</div>
+    <h2>Trigger rules · <em>the same everywhere</em>.</h2>
+    <div class="sm">
+      desktop · <b>hover + focus</b><br>
+      mobile · <b>tap · tap-away</b><br>
+      a11y · <b>keyboard + screenreader</b>
+    </div>
+  </div>
+
+  <div class="beh">
+    <div class="row"><div class="k">Trigger</div><div class="v"><b>Desktop:</b> hover (180ms delay) or <span class="kbd">Tab</span> + focus. <b>Mobile:</b> tap (pop anchors above tap point, tap-away to dismiss). <b>Never</b> on-click-navigation — the trigger element stays navigable.</div></div>
+    <div class="row"><div class="k">Dismiss</div><div class="v"><b>Desktop:</b> mouse-out + 120ms grace. <b>Mobile:</b> tap outside, scroll, or <span class="kbd">Esc</span>. Auto-dismiss on any route change.</div></div>
+    <div class="row"><div class="k">Position</div><div class="v">Anchored to trigger, 8px offset, arrow toward trigger. Flips to opposite side near viewport edges. <em>Never covers the number it's explaining.</em></div></div>
+    <div class="row"><div class="k">Value binding</div><div class="v">Header <code>.av</code> slot renders the <b>current context value</b> — if user is looking at @CryptoInsights' α on 90d, the popover header reads <code>avg · 90d</code>. Same metric, different context → different popover header, <em>same anatomy</em>.</div></div>
+    <div class="row"><div class="k">Scale calibration</div><div class="v">The "good" scale marker shows the user's <b>current value</b> on the typical-to-elite range. So on @CryptoInsights (+8.42) the α popover's marker sits near the right edge; on a Tier-B creator (+0.3) it sits near the middle. <em>Calibration per-view, anatomy fixed.</em></div></div>
+    <div class="row"><div class="k">Caveat firing</div><div class="v">Caveat slot appears when <em>this specific instance</em> is fragile: <code>N &lt; 12</code>, <code>CI width &gt; 4.0</code>, <code>last call &gt; 14d</code>. On a healthy @CryptoInsights α value, no caveat; on a new creator's α, caveat appears automatically. <b>Multi-caveat:</b> if 2+ conditions fire, caveats concatenate in priority order (<code>low-N</code> → <code>wide CI</code> → <code>stale</code>), separated by ·, max 2 lines. A 3rd+ condition collapses to <em>"+ see methodology"</em>.</div></div>
+    <div class="row"><div class="k">Scale style</div><div class="v">Most "Good" scales are <b>monotonic</b> (right = better). Three are explicitly <b>non-monotonic</b> — #03 CI (narrow=good, wide=bad), #06 RR (U-shaped: 0% stubborn, 8–15% healthy, &gt;25% unstable), #09 V (U-shaped: dormant vs noisy). Three are <b>not ranked at all</b> — #08 H, #10 OL, and non-ranking slots of #09. Non-monotonic scales use a different gradient and always state "<em>context, not rank</em>" in the <b>Good</b> copy.</div></div>
+    <div class="row"><div class="k">Persistence</div><div class="v">Popover is <b>ephemeral</b>, not pinned. But a ℹ︎ button inside the popover opens full <a style="color:var(--accent);border-bottom:1px dotted var(--accent-dim)">methodology drawer</a> — same one linked from the footer <em>source</em> row. One source of truth for the full math.</div></div>
+    <div class="row"><div class="k">Accessibility</div><div class="v">Trigger has <code>aria-describedby</code> pointing at popover. Popover is <code>role="tooltip"</code>. Focus returns to trigger on <span class="kbd">Esc</span>. Screenreader reads <em>"α, 8.42 — Alpha, leaderboard rank driver. Log-return excess..."</em> — same 4 slots in order.</div></div>
+  </div>
+</section>
+
+<!-- ============ 05 · IN-SITU ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">05 · in-situ</div>
+    <h2>One popover · <em>shown in context</em> — leaderboard row hover.</h2>
+    <div class="sm">
+      surface · <b>Leaderboard</b><br>
+      trigger · <b>α header</b><br>
+      caveat · <b>hidden · healthy N</b>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>This is how the α popover lands on the actual Leaderboard surface. User hovers the <em>column header</em> (not the cell) to see the anatomy; the current context value binds to whichever row is focused.</p>
+  </div>
+
+  <div class="situ">
+    <div class="surf-lbl"><span>Leaderboard · <b>Tier S · 90d</b></span><span>hover target · α column header</span></div>
+    <div class="mini-lb">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Creator</th>
+            <th>Tier</th>
+            <th class="m-hd">α ▾</th>
+            <th>N</th>
+            <th>WR</th>
+            <th>FM</th>
+            <th>H</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="active">
+            <td class="r">01</td>
+            <td><b>@CryptoInsights</b></td>
+            <td>S</td>
+            <td><b class="pos">+8.42</b></td>
+            <td>214</td>
+            <td>68%</td>
+            <td>47%</td>
+            <td>6d</td>
+          </tr>
+          <tr>
+            <td class="r">02</td>
+            <td>@MacroMaxi</td>
+            <td>S</td>
+            <td><span class="pos">+7.11</span></td>
+            <td>189</td>
+            <td>62%</td>
+            <td>23%</td>
+            <td>4d</td>
+          </tr>
+          <tr>
+            <td class="r">03</td>
+            <td>@OnchainOliver</td>
+            <td>S</td>
+            <td><span class="pos">+6.40</span></td>
+            <td>156</td>
+            <td>59%</td>
+            <td>34%</td>
+            <td>9d</td>
+          </tr>
+          <tr>
+            <td class="r">04</td>
+            <td>@AlphaDigger</td>
+            <td>A</td>
+            <td><span class="pos">+5.60</span></td>
+            <td>98</td>
+            <td>55%</td>
+            <td>38%</td>
+            <td>3d</td>
+          </tr>
+          <tr>
+            <td class="r">05</td>
+            <td>@ChainChaser</td>
+            <td>A</td>
+            <td><span class="pos">+4.92</span></td>
+            <td>72</td>
+            <td>54%</td>
+            <td>41%</td>
+            <td>7d</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- in-situ pop -->
+    <div class="situ-pop">
+      <div class="pop">
+        <div class="ph">
+          <div class="ph-k">Metric · leaderboard rank driver</div>
+          <div class="ph-n"><span class="sym">α</span> <em>Alpha</em> <span class="av">+8.42 · @CryptoInsights · 90d</span></div>
+        </div>
+        <div class="body">
+          <div class="blk"><div class="k">What</div><div class="v">Log-return on resolved directional calls, <b>relative to the asset's benchmark</b>. Positive α = beat the benchmark.</div></div>
+          <div class="blk how"><div class="k">How</div><div class="v"><code>r = ln(p₁/p₀) − ln(b₁/b₀)</code>; <code>α = Σrᵢ/N</code>, tier-weighted, 90d decay.</div></div>
+          <div class="blk"><div class="k">Good</div><div class="v"><div class="scale"><div class="scale-bar"><span class="scale-mark" style="left:96%"></span></div><div class="scale-lbl"><span>−5</span><span>+3 typical</span><span><b>+5 elite</b></span></div></div></div></div>
+        </div>
+        <div class="src"><span class="k">Source</span><span class="v">Resolved calls · <b>N=214</b> · tier-weighted · <a>methodology</a></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:18px">
+    <b>Note on the marker:</b> @CryptoInsights' α (+8.42) is above our "elite" anchor of +5, so the marker pins at ~96%. The scale doesn't need to be re-labelled — "+5 elite" stays as the calibration anchor; the marker communicates "you are <em>past</em> elite here". Same anatomy, personalized calibration.
+  </div>
+</section>
+
+<!-- ============ 06 · TOKEN REGISTRY ADDITIONS ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">06 · tokens</div>
+    <h2>Three new <em>tunable values</em> wired up.</h2>
+    <div class="sm">
+      new tokens · <b>3</b><br>
+      carried fwd · <b>D4 discipline</b><br>
+      total · <b>22 / 22</b>
+    </div>
+  </div>
+  <div class="prose">
+    <p>The popover anatomy surfaces three values that should be product-tunable, not hardcoded. Same token discipline D4 established for plan / pricing — these flip on sign-off, propagate everywhere the popover appears.</p>
+  </div>
+
+  <div class="matrix">
+    <table>
+      <thead><tr><th style="width:220px">token</th><th style="width:120px">placeholder</th><th>drives</th><th style="width:200px">used in popover(s)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="m-name" style="font-family:var(--font-mono);font-size:10.5px;color:var(--new)">metric.lowN.threshold</td>
+          <td class="m-form"><b>12</b></td>
+          <td class="note-col">Below this, α renders gray italic + "low-N" tag. Drives caveat firing on the <b>N</b> and <b>α</b> popovers.</td>
+          <td class="note-col">#01 α · #04 N</td>
+        </tr>
+        <tr>
+          <td class="m-name" style="font-family:var(--font-mono);font-size:10.5px;color:var(--new)">metric.dormancy.v_min</td>
+          <td class="m-form"><b>0.3</b></td>
+          <td class="note-col">Velocity under this for 14d triggers the <em>dormancy</em> flag on Dashboard + Profile.</td>
+          <td class="note-col">#09 V</td>
+        </tr>
+        <tr>
+          <td class="m-name" style="font-family:var(--font-mono);font-size:10.5px;color:var(--new)">metric.fm.lead_threshold</td>
+          <td class="m-form"><b>2h</b></td>
+          <td class="note-col">Minimum lead time to count as "first-mover" on a thesis. Tightens or loosens the originator glyph attribution.</td>
+          <td class="note-col">#07 FM</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 08 · OPEN PRODUCT RULES ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">08 · open rules</div>
+    <h2>Six <em>scoring-logic questions</em> the popovers forced into the open.</h2>
+    <div class="sm">
+      owner · <b>product</b><br>
+      blocker for · <b>canonical math</b><br>
+      D6 unblocked
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>D5's anatomy is settled. These are product-definition calls — not design rework. Listing them explicitly so the popovers' placeholder values don't quietly become canonical.</p>
+  </div>
+
+  <div class="matrix">
+    <table>
+      <thead><tr><th style="width:48px">#</th><th style="width:180px">question</th><th style="width:130px">current placeholder</th><th>resolution needed</th></tr></thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--accent);font-weight:500">OQ-1</td>
+          <td class="m-name">α tier-weighting + 90d decay</td>
+          <td class="m-form">tier-wtd · 90d exp decay</td>
+          <td class="note-col">Confirm: (a) tier weights <code>S:1.0 / A:0.7 / B:0.4 / C:0.2</code>, (b) decay half-life (currently 45d implicit), (c) whether decay applies to α only or to N too. Affects §02 #01 α + #04 N.</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:500">OQ-2</td>
+          <td class="m-name">β regression window + benchmark</td>
+          <td class="m-form">30d · CMC Top-10</td>
+          <td class="note-col">Confirm benchmark (CMC Top-10 index vs. BTC-only vs. custom basket). Confirm regression window (30d rolling vs. fixed-epoch). Choice determines whether β-α is stable week-to-week. Affects §02 #02 β-α.</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:500">OQ-3</td>
+          <td class="m-name">Tier-weight coefficients</td>
+          <td class="m-form">S:1.0 / A:0.7 / B:0.4 / C:0.2</td>
+          <td class="note-col">Surfaced in #04 N popover. Whatever product picks propagates to α (OQ-1) + Leaderboard rank + compare synthesis. Should become a single <span class="tok" style="color:var(--new);border:1px dashed var(--new);padding:0 4px;font-family:var(--font-mono);font-size:10px">metric.tier.weights</span> token.</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:500">OQ-4</td>
+          <td class="m-name">RR "adverse signal" trigger</td>
+          <td class="m-form">24h after adverse signal</td>
+          <td class="note-col">Undefined term. Candidates: (a) price move &gt;1σ against call, (b) contradicting post by another Tier-S, (c) resolved against. Affects #06 RR firing window and whether healthy range (8–15%) stays calibrated.</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:500">OQ-5</td>
+          <td class="m-name">FM lead threshold</td>
+          <td class="m-form">2h</td>
+          <td class="note-col"><b>Conflicts with v0.3 originator glyph's 6h rule.</b> Pick one: 2h (FM metric + glyph both use it) or 6h (glyph stays, FM retunes). Currently exposed via <code>metric.fm.lead_threshold</code> but both surfaces must agree.</td>
+        </tr>
+        <tr>
+          <td style="color:var(--accent);font-weight:500">OQ-6</td>
+          <td class="m-name">"Good" scale anchors</td>
+          <td class="m-form">hardcoded per metric</td>
+          <td class="note-col">Typical / elite anchors (α: +3 / +5, WR: 58% / 70%, etc.) are designer guesses. Either (a) derive from live percentile distributions (p50 / p90), or (b) tokenize as <code>metric.&lt;id&gt;.scale.*</code>. Affects all 7 ranked "Good" scales.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 09 · OWED ARTIFACTS + CHANGELOG ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">09 · artifacts</div>
+    <h2>Tracked artifact · <em>methodology drawer</em>.</h2>
+    <div class="sm">
+      drawer · <b>owed</b><br>
+      links from · <b>every ·src· slot</b>
+    </div>
+  </div>
+
+  <div class="note" style="margin-bottom:20px">
+    <b>Methodology drawer</b> · <em>not yet drawn</em>. Every popover's <code>Source</code> row and its <code>ℹ︎</code> button link to a full-page drawer containing formulas, N, tier weights, decay, β spec, resolution logic, CI bootstrap steps, retraction definition, and thesis-graph construction. P2's Score Explanation drawer is the template — D5's drawer is the 10-metric extension of it. <b>Scheduled for D7</b> (post-mobile). Until then, <code>&lt;a&gt;methodology&lt;/a&gt;</code> links are dead — no drawer exists.
+  </div>
+
+  <div class="sh" style="margin-top:32px">
+    <div class="sn">changelog</div>
+    <h2>D5 · <em>v0.1.1</em> changes.</h2>
+    <div class="sm">applied · <b>7</b></div>
+  </div>
+
+  <div class="matrix">
+    <table>
+      <thead><tr><th style="width:60px">ref</th><th style="width:220px">change</th><th>where</th></tr></thead>
+      <tbody>
+        <tr><td style="color:var(--accent);font-weight:500">CL-1</td><td class="m-name">6 open scoring questions registered</td><td class="note-col">New §08. Popover values now explicitly placeholder until product sign-off on OQ-1…OQ-6.</td></tr>
+        <tr><td style="color:var(--accent);font-weight:500">CL-2</td><td class="m-name">OL privacy copy tightened</td><td class="note-col">#10 Overlap-with-you · Source row: "never leaves client" → <b>"computed server-side, not retained"</b>. Matches real architecture.</td></tr>
+        <tr><td style="color:var(--accent);font-weight:500">CL-3</td><td class="m-name">Methodology drawer tracked as owed</td><td class="note-col">New §09. Scheduled D7. Dead links flagged.</td></tr>
+        <tr><td style="color:var(--accent);font-weight:500">CL-4</td><td class="m-name">Multi-caveat firing defined</td><td class="note-col">§04 Behavior · Caveat firing row. Priority order + collapse rule for 3+ conditions.</td></tr>
+        <tr><td style="color:var(--accent);font-weight:500">CL-5</td><td class="m-name">RR promoted to primary on Compare</td><td class="note-col">§03 matrix · synthesis flags trust-asymmetry when one voice retracts 3× more than the other.</td></tr>
+        <tr><td style="color:var(--accent);font-weight:500">CL-6</td><td class="m-name">Scale-style rule named</td><td class="note-col">§04 Behavior · new row. Monotonic vs. non-monotonic vs. context-only. #03 CI / #06 RR / #09 V are non-monotonic; #08 H / #10 OL are context-only.</td></tr>
+        <tr><td style="color:var(--accent);font-weight:500">CL-7</td><td class="m-name">Velocity copy sharpened</td><td class="note-col">#09 V · What slot now explicitly "Not a quality signal — use alongside α, never instead of."</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 10 · CARRY-FORWARD + NEXT ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">10 · pause</div>
+    <h2>D5 landed. <em>Pausing</em> before D6.</h2>
+    <div class="sm">
+      D6 · <b>mobile responsive</b><br>
+      paused · per working method
+    </div>
+  </div>
+
+  <div class="note">
+    <b>D5 complete.</b> 10 metrics · one anatomy · same popover everywhere. Application matrix documents primary vs. secondary surfaces. Three new product-tunable tokens (<code>metric.lowN.threshold</code>, <code>metric.dormancy.v_min</code>, <code>metric.fm.lead_threshold</code>) added to registry — total now <b>22 tokens</b> across D4+D5, all <code>.tok</code>-rendered. <br><br>
+    <b>Carry-forward held:</b> Caveat slot integrates with P2's low-N gray-italic treatment · originator glyph sourced directly from FM metric (#07) · β-α still Pro-gated (<code>gate.beta.column</code>) · CI always visualized as band, never collapsed to ±. <br><br>
+    <b>D6 · mobile responsive</b> is next. All P2 + P3 + D4 + D5 surfaces at @375 and @768. Thesis cards collapse voices to 3 + count. Compare becomes vertical scroll-and-snap with sticky metric labels. Dashboard 12-col grid → single stack with Watched creators pinned. Pricing tiers stack with <b>rec</b> first. Hover popovers → tap-to-open bottom sheet (same 4-part anatomy, sheet chrome instead of arrow-pop).<br><br>
+    Ready to pick up D6 on go.
+  </div>
+</section>
+
+</main>
+</body>
+</html>

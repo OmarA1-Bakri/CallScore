@@ -1,0 +1,1946 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CTR — Phase 2 · Components + Screens · v0.1 · 2026-04-24</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script>
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "accent":"#C9A24B",
+  "density":"comfortable",
+  "screen":"leaderboard",
+  "state":"default",
+  "show_grid":false
+}/*EDITMODE-END*/;
+</script>
+<style>
+:root{
+  --ink-000:#0A0A0B; --ink-050:#0E0F10; --ink-100:#141517; --ink-150:#1A1B1E;
+  --ink-200:#22242A; --ink-250:#2B2D33; --ink-300:#3A3D44;
+  --ink-400:#5B5F68; --ink-500:#7A7F89; --ink-600:#9CA0A9; --ink-700:#C2C5CC; --ink-800:#E1E3E7; --ink-900:#F4F5F7;
+  --accent:#C9A24B; --accent-dim:#8E7235; --accent-low:#3A2F17;
+  --pos:#6FA56A; --pos-dim:#3E5D3B;
+  --neg:#D47A70; --neg-dim:#6A3631;
+  --warn:#D97757;
+  --stale:#8A7A5E; --lock:#8C8FA0; --new:#7FA6C9; --lown:#A78C6B;
+  --font-serif:"Source Serif 4", Georgia, serif;
+  --font-sans:"Inter Tight", -apple-system, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, monospace;
+  --row:36px;
+  --hair:1px solid var(--ink-200);
+  --hair-strong:1px solid var(--ink-250);
+  --hair-soft:1px solid var(--ink-150);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--ink-000);color:var(--ink-700);font-family:var(--font-sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum","ss01"}
+body::before{content:"";position:fixed;inset:0;background-image:radial-gradient(circle at 20% 0%,rgba(201,162,75,.025) 0%,transparent 40%),radial-gradient(circle at 80% 100%,rgba(127,166,201,.012) 0%,transparent 50%);pointer-events:none;z-index:0}
+
+a{color:inherit;text-decoration:none}
+button{background:none;border:none;color:inherit;font:inherit;cursor:pointer}
+
+/* Masthead */
+.mast{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.88);backdrop-filter:blur(12px);border-bottom:var(--hair-strong)}
+.mast-in{max-width:1360px;margin:0 auto;padding:10px 32px;display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center}
+.wm{font-family:var(--font-serif);font-weight:500;font-size:16px;letter-spacing:-.01em;color:var(--ink-900)}
+.wm em{font-style:italic;color:var(--accent);font-weight:400}
+.bc{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em}
+.bc a{color:var(--accent);border-bottom:1px solid var(--accent-dim);padding-bottom:1px}
+.bc .sep{color:var(--ink-400);padding:0 8px}
+.meta{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;display:flex;gap:24px;justify-content:flex-end}
+.meta b{color:var(--ink-800);font-weight:500}
+
+main{max-width:1360px;margin:0 auto;padding:56px 32px 120px;position:relative;z-index:1}
+
+/* Hero */
+.hero{display:grid;grid-template-columns:1fr 320px;gap:56px;padding-bottom:40px;border-bottom:var(--hair-strong);margin-bottom:56px}
+.kicker{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);margin-bottom:16px}
+.hero h1{font-family:var(--font-serif);font-weight:400;font-size:44px;line-height:1.08;letter-spacing:-.015em;color:var(--ink-900);max-width:22ch;margin-bottom:20px}
+.hero h1 em{font-style:italic;color:var(--accent)}
+.lede{font-size:15px;line-height:1.55;color:var(--ink-600);max-width:62ch}
+.lede b{color:var(--ink-900);font-weight:500}
+.aside{border-left:var(--hair-strong);padding-left:24px;font-size:12px;color:var(--ink-500);line-height:1.55}
+.aside h4{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-900);margin-bottom:12px;font-weight:500}
+.aside dl{display:grid;grid-template-columns:auto 1fr;gap:10px 12px}
+.aside dd{line-height:1.4}
+.aside dt{color:var(--ink-500);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+.aside dd{color:var(--ink-800);font-size:11px}
+
+/* Section */
+.section{margin-bottom:96px;scroll-margin-top:80px}
+.sh{display:grid;grid-template-columns:120px 1fr 220px;gap:32px;padding-bottom:20px;margin-bottom:32px;border-bottom:var(--hair-strong);align-items:baseline}
+.sn{font-family:var(--font-mono);font-size:11px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase}
+.section h2{font-family:var(--font-serif);font-weight:400;font-size:28px;line-height:1.2;color:var(--ink-900);letter-spacing:-.01em}
+.section h2 em{font-style:italic;color:var(--accent)}
+.sm{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;text-align:right}
+
+.prose{max-width:72ch;font-size:13px;line-height:1.55;color:var(--ink-700)}
+.prose p+p{margin-top:16px}
+.prose b{color:var(--ink-900);font-weight:500}
+.prose em{font-family:var(--font-serif);font-style:italic;color:var(--accent)}
+
+.cite{font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.04em;padding:1px 5px;border:1px solid var(--accent-dim);border-radius:2px;white-space:nowrap;background:rgba(201,162,75,.06);vertical-align:2px;margin:0 2px}
+
+/* TOC */
+.toc{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink-200);border:var(--hair-strong);margin-bottom:64px}
+.toc a{background:var(--ink-050);padding:14px 18px;color:var(--ink-700);font-family:var(--font-mono);font-size:11px;letter-spacing:.02em;display:flex;flex-direction:column;gap:2px;border-bottom:2px solid transparent}
+.toc a:hover{background:var(--ink-100);border-bottom-color:var(--accent);color:var(--ink-900)}
+.toc a .no{font-size:9px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase}
+.toc a .ti{color:var(--ink-800)}
+
+/* Component spec block */
+.cspec{border:var(--hair-strong);background:var(--ink-050);margin-bottom:40px}
+.cspec-head{padding:20px 24px;border-bottom:var(--hair-strong);display:grid;grid-template-columns:80px 1fr 220px;gap:24px;align-items:baseline}
+.cspec-num{font-family:var(--font-mono);font-size:11px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase}
+.cspec-title{font-family:var(--font-serif);font-size:22px;color:var(--ink-900);font-weight:500;letter-spacing:-.005em}
+.cspec-sub{font-size:12px;color:var(--ink-500);margin-top:4px}
+.cspec-cite{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-align:right;letter-spacing:.06em;line-height:1.6}
+.cspec-cite b{color:var(--accent);font-weight:400}
+.cspec-body{padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.cspec-stage{padding:32px;background:var(--ink-100);border:var(--hair);min-height:180px;display:flex;align-items:center;justify-content:center}
+.cspec-notes{font-size:12px;color:var(--ink-600);line-height:1.6}
+.cspec-notes h5{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-900);margin:0 0 8px;font-weight:500}
+.cspec-notes h5:not(:first-child){margin-top:16px}
+.cspec-notes ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.cspec-notes ul li{padding-left:14px;position:relative;font-size:12px;color:var(--ink-700)}
+.cspec-notes ul li::before{content:"";width:4px;height:1px;background:var(--accent);position:absolute;left:0;top:9px}
+.cspec-notes ul li b{color:var(--ink-900);font-weight:500}
+.cspec-states{padding:0 24px 24px;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--ink-200);border-top:var(--hair)}
+.cspec-state{background:var(--ink-100);padding:20px;min-height:120px;display:flex;flex-direction:column;gap:10px}
+.cspec-state .slabel{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-500)}
+.cspec-state .scaption{font-size:11px;color:var(--ink-500);line-height:1.45;margin-top:auto}
+
+/* =========== PRIMITIVES =========== */
+
+/* Alpha Score — the hero metric primitive */
+.alpha{display:inline-flex;align-items:baseline;gap:10px;font-family:var(--font-serif);color:var(--ink-900);position:relative}
+.alpha-num{font-size:36px;font-weight:500;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:var(--ink-900)}
+.alpha-unit{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.12em;padding-top:4px}
+.alpha-bar{position:absolute;left:0;bottom:-8px;height:2px;width:100%;background:var(--ink-200)}
+.alpha-bar::before{content:"";position:absolute;left:0;top:0;bottom:0;background:var(--accent);width:var(--alpha-fill,85%)}
+.alpha-bar .tick{position:absolute;top:-3px;width:1px;height:8px;background:var(--ink-400)}
+.alpha-bar .tick.peer{left:62%;background:var(--ink-500)}
+.alpha-bar .tick.peer::after{content:"peer";position:absolute;left:4px;top:-2px;font-family:var(--font-mono);font-size:9px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+
+.alpha-inline{display:inline-flex;align-items:baseline;gap:6px}
+.alpha-inline .n{font-family:var(--font-mono);font-size:15px;color:var(--ink-900);font-weight:500;font-variant-numeric:tabular-nums}
+.alpha-inline .bar{display:inline-block;height:2px;width:32px;background:var(--ink-300);position:relative;vertical-align:middle;margin-left:4px}
+.alpha-inline .bar::before{content:"";position:absolute;left:0;top:0;bottom:0;background:var(--accent);width:var(--fill,70%)}
+.alpha-inline.low .n{opacity:.6;border-bottom:1px dotted var(--lown)}
+
+/* Confidence / Low N */
+.conf{display:inline-flex;align-items:center;gap:6px;padding:2px 6px;border:1px solid var(--lown);background:rgba(167,140,107,.08);color:var(--lown);font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;border-radius:2px}
+.conf.solid{color:var(--ink-900);border-color:var(--ink-300);background:var(--ink-100)}
+.conf .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.conf .n{color:var(--ink-800);font-weight:500}
+
+.conf-bar{display:inline-grid;grid-template-columns:repeat(5,4px);gap:2px;vertical-align:middle}
+.conf-bar span{height:10px;background:var(--ink-300)}
+.conf-bar span.on{background:var(--accent)}
+.conf-bar.low span.on{background:var(--lown)}
+.conf-bar.v-low span.on{background:var(--lown);opacity:.5}
+
+/* Provenance indicator — first-class UI primitive (§7) */
+.prov{display:inline-flex;align-items:center;gap:8px;padding:4px 8px;border-left:2px solid var(--accent);background:var(--ink-100);font-family:var(--font-mono);font-size:10px;color:var(--ink-600);letter-spacing:.04em}
+.prov .sym{width:8px;height:8px;border:1px solid var(--accent);position:relative;flex-shrink:0}
+.prov .sym::after{content:"";position:absolute;left:1px;top:1px;right:1px;bottom:1px;background:var(--accent)}
+.prov .src{color:var(--ink-800);font-weight:500}
+.prov .ts{color:var(--ink-500)}
+.prov .arch{color:var(--accent);text-decoration:underline dotted;cursor:pointer}
+
+.prov-inline{display:inline-flex;align-items:baseline;gap:4px;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em}
+.prov-inline::before{content:"";width:6px;height:6px;border:1px solid var(--accent);background:var(--accent);display:inline-block;position:relative;top:1px;margin-right:3px}
+.prov-inline .link{color:var(--accent);text-decoration:underline dotted;cursor:pointer}
+.prov-inline .tier{color:var(--ink-700)}
+
+/* Signal freshness — ownable treatment */
+.fresh{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;color:var(--ink-600)}
+.fresh .pulse{width:7px;height:7px;border-radius:50%;background:var(--new);position:relative}
+.fresh.hot .pulse{background:var(--accent)}
+.fresh.hot .pulse::after{content:"";position:absolute;inset:-4px;border:1px solid var(--accent);border-radius:50%;opacity:.4;animation:fresh-ring 2.4s ease-out infinite}
+@keyframes fresh-ring{0%{transform:scale(.6);opacity:.6}100%{transform:scale(1.4);opacity:0}}
+.fresh .age{color:var(--ink-800);font-weight:500}
+.fresh .abs{color:var(--ink-500)}
+.fresh.stale .pulse{background:var(--stale)}
+.fresh.stale .age{color:var(--stale)}
+
+/* Sparkline-style freshness ladder */
+.fresh-ladder{display:inline-flex;align-items:flex-end;gap:1px;height:14px;vertical-align:middle}
+.fresh-ladder span{width:3px;background:var(--ink-300)}
+.fresh-ladder span.on{background:var(--accent)}
+
+/* Premium lock */
+.lock{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--ink-300);background:var(--ink-100);color:var(--lock);font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;border-radius:2px}
+.lock svg{flex-shrink:0}
+.lock.cta{border-color:var(--accent-dim);background:rgba(201,162,75,.08);color:var(--accent)}
+
+.preview-lock{position:relative;border:var(--hair);background:var(--ink-100);padding:16px;overflow:hidden}
+.preview-lock .blurred{filter:blur(4px);opacity:.5;pointer-events:none;user-select:none}
+.preview-lock .veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 0%,rgba(14,15,16,.85) 60%,var(--ink-050) 100%);display:flex;flex-direction:column;justify-content:flex-end;padding:20px;gap:8px}
+.preview-lock .veil h6{font-family:var(--font-serif);font-size:15px;color:var(--ink-900);font-weight:500}
+.preview-lock .veil p{font-size:11px;color:var(--ink-600);line-height:1.5;max-width:40ch}
+.preview-lock .veil .row{display:flex;gap:8px;align-items:center;margin-top:6px}
+.btn{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:7px 12px;border:1px solid var(--ink-250);background:transparent;color:var(--ink-700)}
+.btn:hover{border-color:var(--ink-400);color:var(--ink-900);background:var(--ink-100)}
+.btn.p{border-color:var(--accent);background:rgba(201,162,75,.1);color:var(--accent)}
+.btn.p:hover{background:var(--accent);color:var(--ink-000)}
+
+/* Badges (from Phase 1) */
+.bg{display:inline-flex;align-items:center;gap:4px;padding:2px 6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--ink-250);border-radius:2px;color:var(--ink-800);background:var(--ink-100)}
+.bg .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.bg.lown{color:var(--lown);border-color:var(--lown);background:rgba(167,140,107,.08)}
+.bg.lock{color:var(--lock);border-color:var(--ink-300)}
+.bg.stale{color:var(--stale);border-color:var(--stale);background:rgba(138,122,94,.08)}
+.bg.new{color:var(--new);border-color:var(--new);background:rgba(127,166,201,.08)}
+.bg.pos{color:var(--pos);border-color:var(--pos-dim);background:rgba(111,165,106,.08)}
+.bg.neg{color:var(--neg);border-color:var(--neg-dim);background:rgba(212,122,112,.08)}
+.bg.warn{color:var(--warn);border-color:var(--warn);background:rgba(217,119,87,.08)}
+.bg.acc{color:var(--accent);border-color:var(--accent-dim);background:rgba(201,162,75,.08)}
+
+/* =========== SCREENS =========== */
+.screen{border:var(--hair-strong);background:var(--ink-000);margin-bottom:48px;overflow:hidden}
+.screen-header{padding:14px 24px;border-bottom:var(--hair-strong);background:var(--ink-050);display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-500)}
+.screen-header b{color:var(--ink-900);font-weight:500}
+.screen-header .state-tabs{display:flex;gap:2px;background:var(--ink-100);border:var(--hair)}
+.screen-header .state-tabs button{padding:5px 10px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-500);border-right:var(--hair)}
+.screen-header .state-tabs button:last-child{border-right:none}
+.screen-header .state-tabs button.active{color:var(--accent);background:var(--ink-000)}
+
+.screen-body{position:relative}
+
+/* App chrome simulated */
+.app-chrome{padding:0;background:var(--ink-000)}
+.app-top{display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center;padding:14px 28px;border-bottom:var(--hair-strong)}
+.app-wm{font-family:var(--font-serif);font-size:15px;color:var(--ink-900);font-weight:500}
+.app-wm em{font-style:italic;color:var(--accent);font-weight:400}
+.app-nav{display:flex;gap:24px;font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.app-nav a{color:var(--ink-500);padding:4px 0;border-bottom:1px solid transparent}
+.app-nav a.on{color:var(--ink-900);border-bottom-color:var(--accent)}
+.app-u{display:flex;gap:16px;align-items:center;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em}
+.app-u .kbd{font-family:var(--font-mono);font-size:10px;padding:1px 5px;border:1px solid var(--ink-300);border-radius:2px;color:var(--ink-700);background:var(--ink-100)}
+.app-u .signin{color:var(--accent);border:1px solid var(--accent-dim);padding:5px 12px;border-radius:2px;background:rgba(201,162,75,.06)}
+
+/* === LEADERBOARD SCREEN === */
+.lb-thesis{padding:40px 28px 28px;border-bottom:var(--hair-strong);display:grid;grid-template-columns:1fr auto;gap:32px;align-items:end}
+.lb-thesis h1{font-family:var(--font-serif);font-weight:400;font-size:34px;line-height:1.12;letter-spacing:-.015em;color:var(--ink-900);max-width:22ch}
+.lb-thesis h1 em{font-style:italic;color:var(--accent)}
+.lb-thesis .sub{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;margin-top:10px}
+.lb-thesis .sub b{color:var(--ink-800);font-weight:500}
+.lb-thesis .side{display:flex;flex-direction:column;gap:8px;align-items:flex-end;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em}
+.lb-thesis .side b{color:var(--accent);font-weight:400}
+.lb-thesis .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--pos);box-shadow:0 0 0 2px rgba(111,165,106,.2);margin-right:6px;vertical-align:middle}
+
+.lb-body{display:grid;grid-template-columns:1fr 320px;min-height:600px}
+.lb-table-wrap{border-right:var(--hair-strong)}
+.lb-controls{padding:12px 20px;border-bottom:var(--hair-strong);display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;background:var(--ink-050)}
+.timeframe{display:flex;background:var(--ink-100);border:var(--hair)}
+.timeframe button{padding:5px 10px;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-500);border-right:var(--hair)}
+.timeframe button:last-child{border-right:none}
+.timeframe button.on{color:var(--ink-000);background:var(--accent)}
+.search{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--ink-100);border:var(--hair);min-width:240px;font-family:var(--font-mono);font-size:11px;color:var(--ink-500)}
+.search .ico{color:var(--ink-400)}
+.search .ph{color:var(--ink-500);flex:1}
+.search .kbd{font-family:var(--font-mono);font-size:9px;padding:1px 4px;border:1px solid var(--ink-300);border-radius:2px;color:var(--ink-600)}
+.filters{display:flex;gap:8px;font-family:var(--font-mono);font-size:10px}
+.fchip{display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:var(--hair);background:var(--ink-100);color:var(--ink-700);text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+.fchip b{color:var(--ink-900);font-weight:500}
+.fchip .x{color:var(--ink-400);padding-left:2px}
+.fchip.active{border-color:var(--accent-dim);background:rgba(201,162,75,.08);color:var(--accent)}
+.fchip.active b{color:var(--accent)}
+.density{display:flex;border:var(--hair);font-family:var(--font-mono)}
+.density button{padding:4px 8px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-500);border-right:var(--hair)}
+.density button:last-child{border-right:none}
+.density button.on{color:var(--ink-900);background:var(--ink-150)}
+
+/* Table */
+.lb-table{width:100%;border-collapse:separate;border-spacing:0;font-family:var(--font-mono);font-size:12px}
+.lb-table thead th{position:sticky;top:0;background:var(--ink-050);text-align:left;font-weight:400;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-500);padding:10px 12px;border-bottom:var(--hair-strong);white-space:nowrap;user-select:none;cursor:pointer}
+.lb-table thead th.active{color:var(--ink-900)}
+.lb-table thead th.active::after{content:" ↓";color:var(--accent)}
+.lb-table thead th.num{text-align:right}
+.lb-table tbody tr{height:var(--row);border-bottom:var(--hair-soft);transition:background 80ms}
+.lb-table tbody tr:hover{background:var(--ink-050);cursor:pointer}
+.lb-table tbody tr.selected{background:rgba(201,162,75,.04);box-shadow:inset 2px 0 0 var(--accent)}
+.lb-table td{padding:8px 12px;vertical-align:middle;color:var(--ink-700);border-bottom:var(--hair-soft)}
+.lb-table td.rank{color:var(--ink-500);font-size:11px;width:48px;font-variant-numeric:tabular-nums}
+.lb-table td.rank .mvr{font-size:9px;margin-left:6px;color:var(--pos)}
+.lb-table td.rank .mvr.dn{color:var(--neg)}
+.lb-table td.creator{color:var(--ink-900);min-width:220px}
+.lb-table td.creator .avatar{display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--ink-250);vertical-align:middle;margin-right:8px;border:1px solid var(--ink-300);position:relative;overflow:hidden;font-family:var(--font-serif);font-size:10px;color:var(--ink-800);text-align:center;line-height:22px;font-weight:500}
+.lb-table td.creator .handle{color:var(--ink-900);font-weight:500;font-size:12px}
+.lb-table td.creator .handle em{font-family:var(--font-serif);color:var(--accent);font-style:normal;margin-left:4px;font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.lb-table td.creator .pf{display:block;font-size:10px;color:var(--ink-500);margin-top:1px;letter-spacing:.02em}
+.lb-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-900)}
+.lb-table td.delta{text-align:right;font-variant-numeric:tabular-nums;font-size:12px}
+.lb-table td.delta.pos{color:var(--pos)}
+.lb-table td.delta.neg{color:var(--neg)}
+.lb-table td.delta.neutral{color:var(--neutral,#9CA0A9)}
+.lb-table td.n{text-align:right;color:var(--ink-600);font-size:11px}
+.lb-table td.trend{width:80px;text-align:center}
+.lb-table td.trend svg{overflow:visible}
+.lb-table td.last{color:var(--ink-500);font-size:10px;text-align:right;letter-spacing:.02em}
+.lb-table td.tier{text-align:center;width:68px}
+.lb-table td.chk{width:28px}
+.chk-box{width:14px;height:14px;border:1px solid var(--ink-300);display:inline-block;vertical-align:middle;position:relative;cursor:pointer}
+.chk-box.on{background:var(--accent);border-color:var(--accent)}
+.chk-box.on::after{content:"";position:absolute;left:3px;top:1px;width:4px;height:8px;border:solid var(--ink-000);border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+tr.rank-1 td.rank{color:var(--accent);font-weight:500;font-family:var(--font-serif);font-size:14px;font-style:italic}
+
+/* Skeleton row */
+.sk{height:var(--row);padding:8px 12px;display:grid;grid-template-columns:48px 220px 1fr 80px 80px 50px 80px 80px 68px;gap:12px;align-items:center;border-bottom:var(--hair-soft)}
+.sk span{height:10px;background:linear-gradient(90deg,var(--ink-200),var(--ink-150),var(--ink-200));background-size:200% 100%;animation:sh 1.4s infinite}
+.sk span.sm{height:8px}
+@keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+
+/* Rail / consensus */
+.rail{padding:0;overflow-y:auto}
+.rail h3{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-500);padding:12px 20px;border-bottom:var(--hair);display:flex;justify-content:space-between;align-items:center;background:var(--ink-050)}
+.rail h3 .live{font-size:9px;color:var(--pos)}
+.rail h3 .live::before{content:"•";color:var(--pos);margin-right:4px;font-size:14px;line-height:0;position:relative;top:1px}
+.csignal{padding:14px 20px;border-bottom:var(--hair-soft);display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.csignal:hover{background:var(--ink-050)}
+.csignal .asset{font-family:var(--font-mono);font-size:11px;color:var(--ink-900);font-weight:500;display:flex;align-items:center;gap:8px}
+.csignal .asset .dir{font-size:9px;padding:1px 5px;border:1px solid;border-radius:2px;letter-spacing:.06em;text-transform:uppercase}
+.csignal .asset .dir.b{color:var(--pos);border-color:var(--pos-dim);background:rgba(111,165,106,.08)}
+.csignal .asset .dir.r{color:var(--neg);border-color:var(--neg-dim);background:rgba(212,122,112,.08)}
+.csignal .conf-row{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:10px;color:var(--ink-500)}
+.csignal .conf-row .pct{color:var(--accent);font-weight:500}
+.csignal .avastack{display:flex;align-items:center;gap:8px;margin-top:2px}
+.csignal .avs{display:flex}
+.csignal .avs .av{width:18px;height:18px;border-radius:50%;background:var(--ink-250);border:1px solid var(--ink-100);margin-left:-4px;font-family:var(--font-serif);font-size:9px;text-align:center;line-height:18px;color:var(--ink-800);font-weight:500}
+.csignal .avs .av:first-child{margin-left:0}
+.csignal .avs .more{font-family:var(--font-mono);font-size:9px;color:var(--ink-500);margin-left:4px;align-self:center}
+.csignal .spark{height:18px}
+
+/* Compare bar */
+.cmp-bar{position:absolute;left:0;right:320px;bottom:0;padding:12px 20px;border-top:var(--hair-strong);background:rgba(14,15,16,.96);backdrop-filter:blur(6px);display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;font-family:var(--font-mono);font-size:11px}
+.cmp-bar .c{color:var(--accent);letter-spacing:.06em}
+.cmp-bar .c b{color:var(--ink-900);font-weight:500}
+.cmp-bar .chips{display:flex;gap:6px}
+.cmp-bar .chips .cp{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border:1px solid var(--accent-dim);background:rgba(201,162,75,.08);color:var(--ink-900);font-size:10px;border-radius:2px}
+.cmp-bar .chips .cp .x{color:var(--accent);cursor:pointer;margin-left:4px}
+
+/* Cell helpers */
+td.cell-prov{font-size:10px;color:var(--ink-500);white-space:nowrap}
+td.cell-prov::before{content:"";width:6px;height:6px;border:1px solid var(--accent);background:var(--accent);display:inline-block;margin-right:5px;vertical-align:-1px}
+.cell-prov:not(td){display:inline-flex;align-items:center;gap:4px;font-size:10px;color:var(--ink-500)}
+.cell-prov:not(td)::before{content:"";width:6px;height:6px;border:1px solid var(--accent);background:var(--accent);display:inline-block;flex-shrink:0}
+
+/* Tier chip */
+.tier{display:inline-block;font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:1px 5px;border:1px solid;border-radius:2px}
+.tier.S{color:var(--accent);border-color:var(--accent-dim);background:rgba(201,162,75,.1)}
+.tier.A{color:var(--ink-800);border-color:var(--ink-300);background:var(--ink-100)}
+.tier.B{color:var(--ink-600);border-color:var(--ink-300)}
+.tier.C{color:var(--ink-500);border-color:var(--ink-300)}
+.tier.F{color:var(--neg);border-color:var(--neg-dim);background:rgba(212,122,112,.08)}
+
+/* Hover tooltip sample */
+.tip{position:absolute;background:var(--ink-150);border:var(--hair-strong);padding:10px 12px;font-family:var(--font-mono);font-size:10px;color:var(--ink-700);line-height:1.55;max-width:240px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:2;pointer-events:none}
+.tip b{color:var(--ink-900)}
+.tip .row{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
+.tip .row span{color:var(--ink-500)}
+.tip::after{content:"";position:absolute;width:8px;height:8px;background:var(--ink-150);border-right:var(--hair-strong);border-bottom:var(--hair-strong);transform:rotate(45deg);left:20px;bottom:-5px}
+
+/* === CREATOR PROFILE === */
+.prof-head{padding:32px 28px 24px;border-bottom:var(--hair-strong);display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:start}
+.prof-avatar{width:84px;height:84px;border-radius:50%;background:var(--ink-200);border:2px solid var(--accent);position:relative;font-family:var(--font-serif);font-size:28px;color:var(--ink-900);text-align:center;line-height:80px;font-weight:500;flex-shrink:0}
+.prof-avatar::after{content:"01";position:absolute;bottom:-6px;right:-6px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--ink-000);font-family:var(--font-mono);font-size:11px;font-weight:500;line-height:26px;letter-spacing:.04em}
+.prof-id h1{font-family:var(--font-serif);font-weight:400;font-size:32px;line-height:1.1;color:var(--ink-900);letter-spacing:-.015em}
+.prof-id h1 em{font-style:italic;color:var(--accent);font-size:20px;padding-left:8px;vertical-align:1px}
+.prof-meta{display:flex;gap:16px;margin-top:10px;font-family:var(--font-mono);font-size:11px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em}
+.prof-meta b{color:var(--ink-800);font-weight:500}
+.prof-tag{display:inline-block;padding:3px 8px;font-family:var(--font-mono);font-size:10px;color:var(--pos);border:1px solid var(--pos-dim);background:rgba(111,165,106,.1);letter-spacing:.06em;text-transform:uppercase;margin-top:10px}
+.prof-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.prof-why{padding:20px 28px;border-bottom:var(--hair-strong);background:var(--ink-050);display:grid;grid-template-columns:120px 1fr auto;gap:24px;align-items:baseline}
+.prof-why-k{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent)}
+.prof-why-b{font-family:var(--font-serif);font-size:16px;line-height:1.45;color:var(--ink-800);max-width:80ch}
+.prof-why-b em{font-style:italic;color:var(--accent)}
+.prof-why-b b{color:var(--ink-900);font-weight:500}
+.prof-why-link{font-family:var(--font-mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px dotted var(--accent-dim);padding-bottom:1px;white-space:nowrap}
+
+.prof-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--ink-200);border-bottom:var(--hair-strong)}
+.metric{background:var(--ink-000);padding:20px 24px;display:flex;flex-direction:column;gap:6px}
+.metric .mk{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-500);display:flex;justify-content:space-between;align-items:center}
+.metric .mk .help{color:var(--ink-400);cursor:help;border-bottom:1px dotted var(--ink-400)}
+.metric .mv{font-family:var(--font-serif);font-size:32px;line-height:1;letter-spacing:-.02em;color:var(--ink-900);font-weight:500;font-variant-numeric:tabular-nums}
+.metric .mv.neutral{color:var(--neutral)}
+.metric .mv.low-conf{opacity:.6;border-bottom:1px dotted var(--lown);padding-bottom:2px;display:inline-block}
+.metric .mvsub{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em;margin-top:4px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.metric .mvsub .explain{color:var(--accent);text-decoration:underline dotted;cursor:pointer}
+.metric .mbar{height:3px;background:var(--ink-200);position:relative;margin-top:4px}
+.metric .mbar::before{content:"";position:absolute;left:0;top:0;bottom:0;background:var(--accent);width:var(--fill,60%)}
+.metric .mbar .peer{position:absolute;top:-2px;width:1px;height:7px;background:var(--ink-500);left:var(--peer,50%)}
+.metric .mbar .peer::after{content:"peer";position:absolute;left:4px;top:-1px;font-family:var(--font-mono);font-size:8px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
+
+.prof-body{display:grid;grid-template-columns:1fr 360px;min-height:500px}
+.prof-main{padding:24px 28px;border-right:var(--hair-strong)}
+.prof-main h3{font-family:var(--font-serif);font-size:18px;color:var(--ink-900);font-weight:500;letter-spacing:-.005em;margin-bottom:14px;padding-bottom:10px;border-bottom:var(--hair);display:flex;justify-content:space-between;align-items:baseline}
+.prof-main h3 .ctl{display:flex;gap:2px}
+.prof-main h3 .ctl button{padding:3px 8px;font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-500);border:var(--hair)}
+.prof-main h3 .ctl button.on{color:var(--accent);border-color:var(--accent-dim);background:rgba(201,162,75,.08)}
+
+.perf-chart{height:200px;background:var(--ink-050);border:var(--hair);margin-bottom:32px;position:relative}
+.perf-chart svg{display:block;width:100%;height:100%}
+.perf-chart .legend{position:absolute;top:10px;left:14px;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);display:flex;gap:16px;letter-spacing:.04em}
+.perf-chart .legend span b{color:var(--ink-800);margin-left:4px}
+.perf-chart .legend .swv{display:inline-block;width:10px;height:2px;vertical-align:middle;margin-right:4px}
+
+.calls-tbl{width:100%;border-collapse:separate;border-spacing:0;font-family:var(--font-mono);font-size:11px;margin-bottom:32px}
+.calls-tbl thead th{text-align:left;font-weight:400;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-500);padding:8px 10px;border-bottom:var(--hair-strong)}
+.calls-tbl thead th.num{text-align:right}
+.calls-tbl tbody tr{height:32px;border-bottom:var(--hair-soft)}
+.calls-tbl tbody tr:hover{background:var(--ink-050);cursor:pointer}
+.calls-tbl td{padding:6px 10px;color:var(--ink-700)}
+.calls-tbl td.asset{color:var(--ink-900);font-weight:500}
+.calls-tbl td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-900)}
+.calls-tbl td.num.pos{color:var(--pos)}
+.calls-tbl td.num.neg{color:var(--neg)}
+.calls-tbl td.res .bg{font-size:9px}
+.calls-tbl td.src{color:var(--accent);text-align:right;font-size:10px;letter-spacing:.04em}
+.calls-tbl td.src::before{content:"";width:6px;height:6px;background:var(--accent);display:inline-block;margin-right:4px;vertical-align:-1px}
+
+/* Right rail on profile: alerts + evidence trail */
+.prof-rail{padding:24px;display:flex;flex-direction:column;gap:24px;background:var(--ink-050)}
+.prof-rail section h4{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-500);margin-bottom:10px;padding-bottom:8px;border-bottom:var(--hair)}
+.alrt{display:flex;flex-direction:column;gap:8px}
+.alrt-row{display:flex;justify-content:space-between;align-items:center;font-family:var(--font-mono);font-size:11px;padding:8px 0;border-bottom:var(--hair-soft)}
+.alrt-row:last-child{border-bottom:none}
+.alrt-row .ttl{color:var(--ink-800)}
+.alrt-row .tgl{width:26px;height:14px;background:var(--ink-250);border-radius:7px;position:relative;cursor:pointer}
+.alrt-row .tgl::before{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--ink-700)}
+.alrt-row .tgl.on{background:var(--accent)}
+.alrt-row .tgl.on::before{left:14px;background:var(--ink-000)}
+.alrt-row.locked .ttl{color:var(--lock)}
+.alrt-row.locked .tgl{background:var(--ink-200);cursor:not-allowed}
+
+.evtrail{font-family:var(--font-mono);font-size:11px;color:var(--ink-700);line-height:1.6}
+.evtrail-row{padding:10px 0;border-bottom:var(--hair-soft);display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start}
+.evtrail-row:last-child{border-bottom:none}
+.evtrail-row .ts{color:var(--ink-500);font-size:10px;white-space:nowrap}
+.evtrail-row .ev{color:var(--ink-800);font-size:11px}
+.evtrail-row .ev a{color:var(--accent);text-decoration:underline dotted}
+
+/* === CALLS EXPLORER + DRAWER === */
+.calls-screen{display:grid;grid-template-columns:1fr 540px;min-height:640px;position:relative}
+.calls-list{border-right:var(--hair-strong)}
+.calls-ctrls{padding:12px 20px;border-bottom:var(--hair-strong);display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;background:var(--ink-050)}
+.calls-ctrls .search{min-width:auto}
+.calls-ctrls .filters-row{display:flex;gap:6px;flex-wrap:wrap}
+.calls-big{width:100%;border-collapse:separate;border-spacing:0;font-family:var(--font-mono);font-size:12px}
+.calls-big thead th{position:sticky;top:0;background:var(--ink-050);text-align:left;font-weight:400;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-500);padding:10px 12px;border-bottom:var(--hair-strong);white-space:nowrap}
+.calls-big thead th.num{text-align:right}
+.calls-big tbody tr{height:36px;border-bottom:var(--hair-soft);cursor:pointer}
+.calls-big tbody tr:hover{background:var(--ink-050)}
+.calls-big tbody tr.active{background:rgba(201,162,75,.06);box-shadow:inset 2px 0 0 var(--accent)}
+.calls-big td{padding:8px 12px;color:var(--ink-700)}
+.calls-big td.asset{color:var(--ink-900);font-weight:500}
+.calls-big td.creator .av{display:inline-block;width:16px;height:16px;border-radius:50%;background:var(--ink-300);vertical-align:-3px;margin-right:6px;font-size:8px;text-align:center;line-height:16px;font-family:var(--font-serif);color:var(--ink-800)}
+.calls-big td.dir{font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.calls-big td.dir.b{color:var(--pos)}
+.calls-big td.dir.r{color:var(--neg)}
+.calls-big td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-900)}
+.calls-big td.num.pos{color:var(--pos)}
+.calls-big td.num.neg{color:var(--neg)}
+.calls-big td.src{color:var(--accent);text-align:center;font-size:10px}
+.calls-big td.src::before{content:"";width:6px;height:6px;background:var(--accent);display:inline-block;margin-right:4px;vertical-align:-1px}
+
+/* Drawer */
+.drawer{background:var(--ink-150);box-shadow:-1px 0 0 0 var(--ink-250);overflow-y:auto;padding:0}
+.dr-head{padding:20px 24px 16px;border-bottom:var(--hair-strong);background:var(--ink-150);position:sticky;top:0;z-index:2}
+.dr-crumb{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;display:flex;justify-content:space-between}
+.dr-crumb .close{color:var(--ink-400);cursor:pointer}
+.dr-title{font-family:var(--font-serif);font-size:22px;color:var(--ink-900);letter-spacing:-.01em;line-height:1.2;margin-bottom:8px}
+.dr-title em{font-style:italic;color:var(--accent)}
+.dr-tags{display:flex;gap:6px;flex-wrap:wrap}
+.dr-section{padding:20px 24px;border-bottom:var(--hair-soft)}
+.dr-section h5{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-500);margin-bottom:10px}
+.dr-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px 24px;font-family:var(--font-mono);font-size:11px}
+.dr-grid .k{color:var(--ink-500);text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+.dr-grid .v{color:var(--ink-900);font-weight:500;font-variant-numeric:tabular-nums;margin-top:2px}
+.dr-grid .v.pos{color:var(--pos)}
+.dr-grid .v.neg{color:var(--neg)}
+.dr-grid .v.neutral{color:var(--neutral)}
+.dr-prov{padding:14px 16px;background:var(--ink-100);border-left:2px solid var(--accent);font-family:var(--font-mono);font-size:11px;color:var(--ink-700);line-height:1.6}
+.dr-prov b{color:var(--ink-900);font-weight:500}
+.dr-prov a{color:var(--accent);text-decoration:underline dotted}
+.dr-prov .ts{color:var(--ink-500);font-size:10px;display:block;margin-top:6px}
+.dr-logic{font-family:var(--font-mono);font-size:11px;color:var(--ink-700);line-height:1.7;padding:12px;background:var(--ink-100);border:var(--hair)}
+.dr-logic .formula{color:var(--ink-900);font-size:12px;padding:6px 0;border-bottom:var(--hair-soft);margin-bottom:6px}
+.dr-logic .formula span.op{color:var(--accent)}
+.dr-price{height:140px;background:var(--ink-100);border:var(--hair);position:relative}
+.dr-price svg{display:block;width:100%;height:100%}
+.dr-actions{padding:20px 24px;display:flex;gap:10px;border-top:var(--hair-strong);background:var(--ink-100)}
+
+/* Annotations legend */
+.annotations{margin-top:32px;padding:20px;background:var(--ink-050);border:var(--hair-strong);display:grid;grid-template-columns:repeat(4,1fr);gap:20px;font-family:var(--font-mono);font-size:11px;color:var(--ink-600)}
+.annotations h5{font-family:var(--font-mono);font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:500}
+.annotations ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px}
+.annotations ul li{color:var(--ink-700);font-size:11px;line-height:1.5}
+.annotations ul li b{color:var(--ink-900);font-weight:500}
+.kbd{font-family:var(--font-mono);font-size:10px;padding:1px 5px;border:1px solid var(--ink-300);border-radius:2px;color:var(--ink-700);background:var(--ink-100)}
+
+/* State variant stages */
+.state-stage{border:var(--hair-strong);margin-top:16px;background:var(--ink-000);position:relative}
+.state-stage .state-caption{padding:10px 16px;background:var(--ink-050);border-bottom:var(--hair);font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between}
+.state-stage .state-caption b{color:var(--accent)}
+
+/* Empty state */
+.empty{padding:48px 40px;text-align:left;max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.empty .ek{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-500)}
+.empty h4{font-family:var(--font-serif);font-size:20px;color:var(--ink-900);font-weight:400;line-height:1.3}
+.empty h4 em{font-style:italic;color:var(--accent)}
+.empty p{font-size:13px;color:var(--ink-600);line-height:1.55}
+.empty p b{color:var(--ink-900);font-weight:500}
+.empty .actions{display:flex;gap:8px;margin-top:8px}
+
+.err{padding:48px 40px;max-width:520px;margin:0 auto;border-left:2px solid var(--neg);background:rgba(212,122,112,.04);display:flex;flex-direction:column;gap:14px}
+.err .ek{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--neg)}
+.err h4{font-family:var(--font-serif);font-size:20px;color:var(--ink-900);font-weight:400}
+.err p{font-size:13px;color:var(--ink-700);line-height:1.55}
+.err .meta{font-family:var(--font-mono);font-size:10px;color:var(--ink-500)}
+
+.noresults{padding:32px;font-size:12px;color:var(--ink-600);line-height:1.6;border:1px dashed var(--ink-250);margin:16px}
+.noresults b{color:var(--ink-900);font-weight:500}
+.noresults .suggest{margin-top:12px;padding:12px;background:var(--ink-100);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.noresults .suggest span{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em}
+
+::selection{background:var(--accent);color:var(--ink-000)}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="mast-in">
+    <div class="wm">CryptoTubers <em>Ranked</em></div>
+    <div class="bc">
+      <a href="phase-1-ia-tokens.html">Phase 1 v0.1</a><span class="sep">›</span>
+      <a href="phase-1-ia-tokens-v0.2.html">Rev v0.2</a><span class="sep">›</span>
+      <span style="color:var(--ink-900)">Phase 2 · components + screens</span>
+    </div>
+    <div class="meta">
+      <span>Doc · <b>P2</b></span><span>Rev · <b>v0.1</b></span><span>Date · <b>2026-04-24</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero">
+    <div>
+      <div class="kicker">Phase 2 · ownable product primitives + 3 priority screens</div>
+      <h1>From <em>tokens</em> to a working <em>terminal</em>.</h1>
+      <p class="lede">
+        Phase 2 sharpens five product-specific treatments — <b>Alpha Score</b>, <b>confidence / Low N</b>, <b>provenance</b>, <b>signal freshness</b>, <b>premium preview</b> — into ownable primitives, then deploys them through the three priority screens: <b>Leaderboard</b>, <b>Creator profile</b>, <b>Calls explorer + drawer</b> <span class="cite">§18</span>. Each screen ships with Default + 3 §13 states and inline interaction annotations.
+      </p>
+    </div>
+    <aside class="aside">
+      <h4>This phase ships</h4>
+      <dl>
+        <dt>Primitives</dt><dd>5 ownable treatments</dd>
+        <dt>Composites</dt><dd>badges · cells · tiers · lock previews</dd>
+        <dt>Screens</dt><dd>Leaderboard · Creator profile · Calls explorer</dd>
+        <dt>States</dt><dd>Default + Loading + Sparse · Low-conf + Empty / No-results · Error</dd>
+        <dt>Annotations</dt><dd>Hover · sort · filter · keyboard · compare · drawer-vs-page</dd>
+      </dl>
+    </aside>
+  </section>
+
+  <nav class="toc">
+    <a href="#primitives"><span class="no">01 · primitives</span><span class="ti">Ownable product treatments</span></a>
+    <a href="#leaderboard"><span class="no">02 · screen</span><span class="ti">Leaderboard · §5A</span></a>
+    <a href="#profile"><span class="no">03 · screen</span><span class="ti">Creator profile · §5B</span></a>
+    <a href="#calls"><span class="no">04 · screen</span><span class="ti">Calls explorer + drawer · §5C</span></a>
+  </nav>
+
+  <!-- ============ 01 · PRIMITIVES ============ -->
+  <section class="section" id="primitives">
+    <div class="sh">
+      <div class="sn">01</div>
+      <h2>Five ownable product <em>primitives</em>.</h2>
+      <div class="sm">§14 metric · §7 trust · §13 states · §16 conversion</div>
+    </div>
+
+    <div class="prose" style="margin-bottom:32px">
+      <p>These primitives are where the product expression lives. Each is specified once, then deployed consistently across the screens. The goal is recognition — a user should identify a CTR screen on a glance because of how Alpha Score, confidence, provenance, freshness, and lock read. Not decoration; each primitive earns its place by answering a §7 trust question or a §14 "how good is this number" question.</p>
+    </div>
+
+    <!-- PRIMITIVE 1: ALPHA SCORE -->
+    <div class="cspec">
+      <div class="cspec-head">
+        <div class="cspec-num">01 · A</div>
+        <div>
+          <div class="cspec-title">Alpha Score</div>
+          <div class="cspec-sub">The canonical product metric. Every Alpha figure carries its peer context and a drawer entrypoint.</div>
+        </div>
+        <div class="cspec-cite"><b>serves</b><br>§14 canonical weight<br>§7 path to provenance</div>
+      </div>
+      <div class="cspec-body">
+        <div class="cspec-stage">
+          <span class="alpha" style="--alpha-fill:85%">
+            <span class="alpha-num">84.6</span>
+            <span class="alpha-unit">alpha · 90d</span>
+            <span class="alpha-bar">
+              <span class="tick peer"></span>
+            </span>
+          </span>
+        </div>
+        <div class="cspec-notes">
+          <h5>Anatomy</h5>
+          <ul>
+            <li><b>Figure</b> — serif, tabular-num, no unit glyph. "Figures read as <em>verdicts</em>, not counters." <span class="cite">§3</span></li>
+            <li><b>Unit</b> — mono caption, fixed "alpha · <window>". Never abbreviated to just "α" in primary use.</li>
+            <li><b>Peer rail</b> — 2px bar beneath. Fill = absolute score; tick = peer-tier median. Answers "how good is this number" inline. <span class="cite">§14</span></li>
+            <li><b>Click target</b> — entire primitive. Opens Score Explanation drawer (§7, 1 interaction to provenance).</li>
+          </ul>
+          <h5>Variants</h5>
+          <ul>
+            <li><b>Hero</b> — 36px, used once per profile above-fold.</li>
+            <li><b>Inline</b> — 15px mono + 32px bar, used in every leaderboard row and calls list.</li>
+            <li><b>Low-confidence</b> — opacity .6 + dotted underline (<em>not</em> hidden — §13).</li>
+          </ul>
+        </div>
+      </div>
+      <div class="cspec-states">
+        <div class="cspec-state">
+          <div class="slabel">Default</div>
+          <span class="alpha-inline" style="--fill:85%"><span class="n">84.6</span><span class="bar"></span></span>
+          <div class="scaption">Inline variant · leaderboard row</div>
+        </div>
+        <div class="cspec-state">
+          <div class="slabel">Hover · drawer affordance</div>
+          <span class="alpha-inline" style="--fill:85%"><span class="n" style="color:var(--accent);border-bottom:1px solid var(--accent)">84.6</span><span class="bar"></span></span>
+          <div class="scaption">Underline signals "click for why"</div>
+        </div>
+        <div class="cspec-state">
+          <div class="slabel">Low confidence · N&lt;10</div>
+          <span class="alpha-inline low" style="--fill:40%"><span class="n">52.3</span><span class="bar"></span></span>
+          <span class="conf" style="margin-top:6px"><span class="dot"></span>Low N · <span class="n">8</span></span>
+          <div class="scaption">Attenuated, never hidden <span class="cite">§13</span></div>
+        </div>
+        <div class="cspec-state">
+          <div class="slabel">Stale</div>
+          <span class="alpha-inline" style="--fill:85%;opacity:.7"><span class="n" style="color:var(--stale)">84.6</span><span class="bar" style="opacity:.5"></span></span>
+          <span class="bg stale" style="margin-top:6px"><span class="dot"></span>Stale · 14h</span>
+          <div class="scaption">Timestamp-led, with refresh affordance</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRIMITIVE 2: CONFIDENCE / LOW N -->
+    <div class="cspec">
+      <div class="cspec-head">
+        <div class="cspec-num">01 · B</div>
+        <div>
+          <div class="cspec-title">Confidence &amp; Low N</div>
+          <div class="cspec-sub">Always co-located with the score it qualifies. Never buries the number — severity ≠ hide.</div>
+        </div>
+        <div class="cspec-cite"><b>serves</b><br>§14 N+confidence<br>§13 sparse · low-conf</div>
+      </div>
+      <div class="cspec-body">
+        <div class="cspec-stage" style="gap:24px;flex-direction:column">
+          <div style="display:flex;gap:12px;align-items:center">
+            <span class="conf-bar" aria-label="Confidence: 5/5"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>
+            <span class="conf solid"><span class="dot"></span>N · <span class="n">147</span></span>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <span class="conf-bar low"><span class="on"></span><span class="on"></span><span></span><span></span><span></span></span>
+            <span class="conf"><span class="dot"></span>Low N · <span class="n">18</span></span>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <span class="conf-bar v-low"><span class="on"></span><span></span><span></span><span></span><span></span></span>
+            <span class="conf" style="opacity:.9"><span class="dot"></span>Low N · <span class="n">8</span> · attenuated</span>
+          </div>
+        </div>
+        <div class="cspec-notes">
+          <h5>Thresholds (assumed · §04 assumption)</h5>
+          <ul>
+            <li><b>N ≥ 20</b> — solid confidence, ranked at full weight.</li>
+            <li><b>10 ≤ N &lt; 20</b> — Low N badge, still ranked, confidence bar at 2/5.</li>
+            <li><b>N &lt; 10</b> — Low N + score attenuated (opacity .6, dotted underline). Ranked but visibly caveated.</li>
+          </ul>
+          <h5>Copy directive</h5>
+          <ul>
+            <li>Label reads <b>"Low N · 8"</b> — declarative, not hedged. Never "Limited data available for this creator." <span class="cite">§3</span></li>
+            <li>Tooltip reveals 95% CI: <em>"95% CI ±8.2 · N=8 · 90d window."</em></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRIMITIVE 3: PROVENANCE -->
+    <div class="cspec">
+      <div class="cspec-head">
+        <div class="cspec-num">01 · C</div>
+        <div>
+          <div class="cspec-title">Provenance indicator</div>
+          <div class="cspec-sub">The first-class UI primitive of this product. Every score, rank, call, and signal has one. <span class="cite">§7</span></div>
+        </div>
+        <div class="cspec-cite"><b>serves</b><br>§7 trust mechanic<br>§8 evidence trail</div>
+      </div>
+      <div class="cspec-body">
+        <div class="cspec-stage" style="flex-direction:column;gap:16px;align-items:stretch">
+          <span class="prov"><span class="sym"></span><span class="src">YouTube · @CryptoInsights</span><span class="ts">2026-04-18 14:03 UTC</span><span class="arch">archive</span></span>
+          <span class="prov-inline">Source: <span class="link">YouTube clip · 03:12</span> <span class="tier">· archived</span></span>
+          <div style="display:flex;gap:12px;align-items:center">
+            <span class="cell-prov">YT · 03:12</span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500)">(table-cell variant)</span>
+          </div>
+        </div>
+        <div class="cspec-notes">
+          <h5>The rule</h5>
+          <ul>
+            <li>The accent-filled square is <b>"trust-verified"</b>. It means this datum has a canonical source and a click resolves to that source.</li>
+            <li>Every instance is <em>one interaction</em> away from the raw source + archive snapshot + resolution logic. <span class="cite">§7</span></li>
+          </ul>
+          <h5>Three scales</h5>
+          <ul>
+            <li><b>Full</b> (hero, drawer) — source + timestamp + archive button. <span class="cite">§5C call detail</span></li>
+            <li><b>Inline</b> (profile evidence trail) — source link + archive tier.</li>
+            <li><b>Cell</b> (table col) — 6px square + platform code + clip timestamp. Hover reveals full.</li>
+          </ul>
+          <h5>Missing source</h5>
+          <ul>
+            <li>If provenance cannot be established, the square is <b>outlined, not filled</b>, and the row is flagged <span class="bg warn" style="font-size:9px"><span class="dot"></span>Unverified</span>. Never silently omitted.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRIMITIVE 4: SIGNAL FRESHNESS -->
+    <div class="cspec">
+      <div class="cspec-head">
+        <div class="cspec-num">01 · D</div>
+        <div>
+          <div class="cspec-title">Signal freshness</div>
+          <div class="cspec-sub">Age-first, magnitude-second. A §9 <em>freshness vs noise</em> resolution: quiet when stable, ringed when &lt;24h.</div>
+        </div>
+        <div class="cspec-cite"><b>serves</b><br>§5D freshness<br>§13 new · stale</div>
+      </div>
+      <div class="cspec-body">
+        <div class="cspec-stage" style="flex-direction:column;gap:16px;align-items:stretch">
+          <span class="fresh hot"><span class="pulse"></span><span class="age">4h ago</span><span class="abs">· 2026-04-24 10:12</span></span>
+          <span class="fresh"><span class="pulse"></span><span class="age">18h ago</span><span class="abs">· 2026-04-23 20:40</span></span>
+          <span class="fresh stale"><span class="pulse"></span><span class="age">3d ago</span><span class="abs">· stale</span></span>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+            <span class="fresh-ladder" title="Freshness over 72h"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span><span></span><span></span></span>
+            <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500)">72h activity · each bar = 9h</span>
+          </div>
+        </div>
+        <div class="cspec-notes">
+          <h5>The three states</h5>
+          <ul>
+            <li><b>Hot</b> (&lt;24h) — accent pulse, concentric ring animation. One signal can be "hot" at a time visually — if multiple, they de-escalate oldest-first.</li>
+            <li><b>Fresh</b> (24h–72h) — static dot in <span style="color:var(--new)">--new</span>. No animation.</li>
+            <li><b>Stale</b> (&gt;72h) — stale color, timestamp label prefixed with "stale".</li>
+          </ul>
+          <h5>Copy directive</h5>
+          <ul>
+            <li>Relative + absolute, always paired. <em>"4h ago · 2026-04-24 10:12 UTC"</em>. Never relative alone (timezone ambiguity).</li>
+            <li>Labels: "detected", "forming", "consensus", "fading", "invalidated" — verbs. No adjectives like "strong" or "weak" (that's what confidence-% is for).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRIMITIVE 5: PREMIUM LOCK / PREVIEW -->
+    <div class="cspec">
+      <div class="cspec-head">
+        <div class="cspec-num">01 · E</div>
+        <div>
+          <div class="cspec-title">Premium preview / lock</div>
+          <div class="cspec-sub">Preview-with-lock, never a wall. Every instance answers "what would I get?" with the real data gently obscured. <span class="cite">§16</span></div>
+        </div>
+        <div class="cspec-cite"><b>serves</b><br>§13 locked<br>§15 · §16 conversion</div>
+      </div>
+      <div class="cspec-body">
+        <div class="cspec-stage" style="padding:20px;align-items:stretch">
+          <div class="preview-lock" style="width:100%">
+            <div class="blurred">
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-700);margin-bottom:8px">2026-04-24 · 02:14 UTC</div>
+              <div style="font-family:var(--font-serif);font-size:18px;color:var(--ink-900);margin-bottom:6px">ETH · Bullish · 87% confidence · 6 creators</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-600)">Entry band $3,410 – $3,475 · target horizon 14d · signal formed 04-23 22:00</div>
+            </div>
+            <div class="veil">
+              <span class="lock cta" style="align-self:flex-start"><svg width="10" height="10" viewBox="0 0 10 10"><rect x="2" y="4" width="6" height="5" fill="none" stroke="currentColor" stroke-width="1"/><path d="M3.5 4 V 2.5 a 1.5 1.5 0 0 1 3 0 V 4" fill="none" stroke="currentColor" stroke-width="1"/></svg>Live signal · &lt; 24h</span>
+              <h6>Live signals are a premium feature.</h6>
+              <p>You're seeing this signal formed. Premium gets you the constituent calls, entry bands, and an alert the moment a signal fires — before it shows up on the free feed.</p>
+              <div class="row">
+                <button class="btn p">Upgrade — $24/mo</button>
+                <button class="btn">See everything premium</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cspec-notes">
+          <h5>The rule</h5>
+          <ul>
+            <li>Real data renders behind <b>4–6px blur</b>. Never a solid placeholder — the user must see that something real is there.</li>
+            <li>Lock chip sits at the <em>top</em> of the veil so it's visible without scrolling to the CTA.</li>
+            <li>Value prop is <em>intent-anchored</em>: the copy names what the user just tried to do, not generic features. <span class="cite">§16</span></li>
+          </ul>
+          <h5>Six conversion moments · mapping</h5>
+          <ul>
+            <li><b>§16.1 full history</b> — calls list tail blurred past the 30-day mark.</li>
+            <li><b>§16.2 alerts</b> — configurable types disabled in alert panel; "Follow" stays free.</li>
+            <li><b>§16.3 compare</b> — 3rd-row select triggers lock chip on compare bar.</li>
+            <li><b>§16.4 export / advanced filters</b> — export button carries lock; advanced filter chips are visible-but-disabled.</li>
+            <li><b>§16.5 live signals</b> — shown above.</li>
+            <li><b>§16.6 curated lists</b> — dashboard module previewed with blur.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ============ 02 · LEADERBOARD ============ -->
+  <section class="section" id="leaderboard">
+    <div class="sh">
+      <div class="sn">02</div>
+      <h2>Leaderboard <em>· §5A</em></h2>
+      <div class="sm">§4.1 best/worst at a glance · §6.1/.2/.4 above-fold · §8 sort+filter+compare</div>
+    </div>
+
+    <div class="prose" style="margin-bottom:20px">
+      <p><b>§9 tension resolved on this surface:</b> <em>density vs readability</em> — density is user-selectable (compact / comfortable / relaxed, default comfortable); <em>editorial sharpness vs perceived bias</em> — severity comes from rank position and §14 self-decoding, not color drama; bottom-of-leaderboard rows do not get red-washed <span class="cite">§3 severe, fair with evidence</span>.</p>
+    </div>
+
+    <!-- DEFAULT STATE -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Leaderboard</b> · <span style="color:var(--ink-700)">default</span> · /</div>
+        <div></div>
+        <div class="state-tabs">
+          <button class="active">Default</button>
+          <button>Loading</button>
+          <button>Compare · 3rd → gate</button>
+          <button>Empty filter</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="app-chrome">
+          <div class="app-top">
+            <div class="app-wm">CryptoTubers <em>Ranked</em></div>
+            <div class="app-nav">
+              <a class="on">Leaderboard</a><a>Creators</a><a>Calls</a><a>Signals</a><a>Pricing</a>
+            </div>
+            <div class="app-u">
+              <span>⌘K <span class="kbd">search</span></span>
+              <span class="signin">Sign in</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thesis -->
+        <div class="lb-thesis">
+          <div>
+            <h1>Who's <em>actually</em> worth listening to.</h1>
+            <div class="sub"><b>Ranked</b> by realized alpha · <b>audited</b> to source · <b>updated</b> every 15 minutes</div>
+          </div>
+          <div class="side">
+            <span><b><span class="live-dot"></span>Live</span> · 147 creators · 12,842 calls scored · N ≥ 10</span>
+            <span>Last resolve <b style="color:var(--ink-800)">04-24 14:32 UTC</b></span>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="lb-controls">
+          <div class="timeframe">
+            <button>7d</button>
+            <button>30d</button>
+            <button class="on">90d</button>
+            <button>YTD</button>
+            <button>All</button>
+          </div>
+          <div class="filters">
+            <span class="fchip"><b>Category</b> · All <span class="x">▾</span></span>
+            <span class="fchip active"><b>Sample N ≥</b> <b>10</b> <span class="x">▾</span></span>
+            <span class="fchip"><b>Tier</b> · All <span class="x">▾</span></span>
+            <span class="fchip" style="opacity:.65"><span class="lock" style="font-size:9px;padding:0 4px;border:none;background:none;color:var(--lock)">🔒</span><b>Multi-asset</b> <span class="x">▾</span></span>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="search"><span class="ico">⌕</span><span class="ph">Creator, handle, asset</span><span class="kbd">/</span></div>
+            <div class="density">
+              <button>Compact</button><button class="on">Comfortable</button><button>Relaxed</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="lb-body" style="position:relative">
+          <div class="lb-table-wrap">
+            <table class="lb-table">
+              <thead>
+                <tr>
+                  <th style="width:28px"></th>
+                  <th>Rank</th>
+                  <th>Creator</th>
+                  <th class="active num">Alpha</th>
+                  <th class="num">30d Δ</th>
+                  <th class="num">Win %</th>
+                  <th class="num">N</th>
+                  <th>Trend</th>
+                  <th>Tier</th>
+                  <th>Provenance</th>
+                  <th class="num">Last call</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="rank-1 selected">
+                  <td class="chk"><span class="chk-box on"></span></td>
+                  <td class="rank">01<span class="mvr">+2</span></td>
+                  <td class="creator">
+                    <span class="avatar">CI</span>
+                    <span><span class="handle">@CryptoInsights <em>verified</em></span><span class="pf">YouTube · 840k subs</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline" style="--fill:92%"><span class="n">84.6</span><span class="bar"></span></span></td>
+                  <td class="delta pos">+12.4</td>
+                  <td class="num">72</td>
+                  <td class="n">147</td>
+                  <td class="trend">
+                    <svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#6FA56A" stroke-width="1.2" points="0,14 10,12 20,10 30,8 40,9 50,6 60,4 70,3"/></svg>
+                  </td>
+                  <td class="tier"><span class="tier S">S</span></td>
+                  <td class="cell-prov">YT · 03:12</td>
+                  <td class="last">2h ago</td>
+                </tr>
+                <tr class="selected">
+                  <td class="chk"><span class="chk-box on"></span></td>
+                  <td class="rank">02<span class="mvr">+1</span></td>
+                  <td class="creator">
+                    <span class="avatar">AM</span>
+                    <span><span class="handle">@altmaxxer</span><span class="pf">X · 312k followers</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline" style="--fill:88%"><span class="n">82.1</span><span class="bar"></span></span></td>
+                  <td class="delta pos">+08.9</td>
+                  <td class="num">68</td>
+                  <td class="n">92</td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#6FA56A" stroke-width="1.2" points="0,12 10,10 20,11 30,8 40,6 50,7 60,5 70,6"/></svg></td>
+                  <td class="tier"><span class="tier S">S</span></td>
+                  <td class="cell-prov">X · post</td>
+                  <td class="last">5h ago</td>
+                </tr>
+                <tr>
+                  <td class="chk"><span class="chk-box"></span></td>
+                  <td class="rank">03<span class="mvr dn">−1</span></td>
+                  <td class="creator">
+                    <span class="avatar">LF</span>
+                    <span><span class="handle">@lowfloat.research</span><span class="pf">Substack · 48k subs</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline" style="--fill:82%"><span class="n">79.8</span><span class="bar"></span></span></td>
+                  <td class="delta neg">−03.2</td>
+                  <td class="num">66</td>
+                  <td class="n">74</td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#9CA0A9" stroke-width="1.2" points="0,8 10,9 20,8 30,10 40,9 50,11 60,10 70,12"/></svg></td>
+                  <td class="tier"><span class="tier A">A</span></td>
+                  <td class="cell-prov">SS · post</td>
+                  <td class="last">1d ago</td>
+                </tr>
+                <tr>
+                  <td class="chk"><span class="chk-box"></span></td>
+                  <td class="rank">04</td>
+                  <td class="creator">
+                    <span class="avatar">DV</span>
+                    <span><span class="handle">@defivoice</span><span class="pf">YouTube · 217k</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline" style="--fill:76%"><span class="n">76.4</span><span class="bar"></span></span></td>
+                  <td class="delta neutral">+00.8</td>
+                  <td class="num">64</td>
+                  <td class="n">211</td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#9CA0A9" stroke-width="1.2" points="0,10 10,10 20,9 30,11 40,10 50,9 60,10 70,9"/></svg></td>
+                  <td class="tier"><span class="tier A">A</span></td>
+                  <td class="cell-prov">YT · 12:04</td>
+                  <td class="last">6h ago</td>
+                </tr>
+                <tr>
+                  <td class="chk"><span class="chk-box"></span></td>
+                  <td class="rank">05<span class="mvr">+3</span></td>
+                  <td class="creator">
+                    <span class="avatar">NB</span>
+                    <span><span class="handle">@nodebook</span><span class="pf">Podcast · 128k</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline low" style="--fill:70%"><span class="n">70.1</span><span class="bar"></span></span></td>
+                  <td class="delta pos">+14.7</td>
+                  <td class="num">68</td>
+                  <td class="n"><span class="conf" style="font-size:9px;padding:0 4px"><span class="dot"></span>18</span></td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#6FA56A" stroke-width="1.2" points="0,14 10,14 20,12 30,10 40,8 50,6 60,5 70,4"/></svg></td>
+                  <td class="tier"><span class="tier B">B</span></td>
+                  <td class="cell-prov">Pod · 24m</td>
+                  <td class="last">12h ago</td>
+                </tr>
+                <tr>
+                  <td class="chk"><span class="chk-box"></span></td>
+                  <td class="rank">06<span class="mvr dn">−2</span></td>
+                  <td class="creator">
+                    <span class="avatar">HD</span>
+                    <span><span class="handle">@hodldad</span><span class="pf">YouTube · 1.2m</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline" style="--fill:68%"><span class="n">68.9</span><span class="bar"></span></span></td>
+                  <td class="delta neg">−04.6</td>
+                  <td class="num">58</td>
+                  <td class="n">302</td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#D47A70" stroke-width="1.2" points="0,4 10,6 20,5 30,8 40,9 50,10 60,12 70,14"/></svg></td>
+                  <td class="tier"><span class="tier B">B</span></td>
+                  <td class="cell-prov">YT · 08:45</td>
+                  <td class="last">4h ago</td>
+                </tr>
+                <tr>
+                  <td class="chk"><span class="chk-box"></span></td>
+                  <td class="rank">07</td>
+                  <td class="creator">
+                    <span class="avatar">OC</span>
+                    <span><span class="handle">@onchain.oracle</span><span class="pf">X · 88k</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline" style="--fill:64%"><span class="n">64.2</span><span class="bar"></span></span></td>
+                  <td class="delta neutral">−00.4</td>
+                  <td class="num">55</td>
+                  <td class="n">127</td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#9CA0A9" stroke-width="1.2" points="0,10 10,11 20,10 30,9 40,10 50,11 60,10 70,10"/></svg></td>
+                  <td class="tier"><span class="tier B">B</span></td>
+                  <td class="cell-prov">X · thread</td>
+                  <td class="last">3h ago</td>
+                </tr>
+                <tr>
+                  <td class="chk"><span class="chk-box"></span></td>
+                  <td class="rank">08<span class="mvr dn">−4</span></td>
+                  <td class="creator">
+                    <span class="avatar">MV</span>
+                    <span><span class="handle">@moonvoice</span><span class="pf">YouTube · 640k</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline" style="--fill:44%"><span class="n">44.8</span><span class="bar"></span></span></td>
+                  <td class="delta neg">−18.2</td>
+                  <td class="num">41</td>
+                  <td class="n">198</td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#D47A70" stroke-width="1.2" points="0,4 10,5 20,8 30,10 40,12 50,13 60,14 70,16"/></svg></td>
+                  <td class="tier"><span class="tier C">C</span></td>
+                  <td class="cell-prov">YT · 02:18</td>
+                  <td class="last">22h ago</td>
+                </tr>
+                <tr>
+                  <td class="chk"><span class="chk-box"></span></td>
+                  <td class="rank" style="color:var(--neg)">09</td>
+                  <td class="creator">
+                    <span class="avatar">SP</span>
+                    <span><span class="handle">@shillpro</span><span class="pf">X · 410k</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline" style="--fill:22%"><span class="n" style="color:var(--neg)">21.4</span><span class="bar"></span></span></td>
+                  <td class="delta neg">−22.0</td>
+                  <td class="num" style="color:var(--neg)">28</td>
+                  <td class="n">156</td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#D47A70" stroke-width="1.2" points="0,3 10,5 20,7 30,10 40,13 50,15 60,17 70,18"/></svg></td>
+                  <td class="tier"><span class="tier F">F</span></td>
+                  <td class="cell-prov">X · thread</td>
+                  <td class="last">8h ago</td>
+                </tr>
+                <tr>
+                  <td class="chk"><span class="chk-box"></span></td>
+                  <td class="rank">10<span class="mvr">new</span></td>
+                  <td class="creator">
+                    <span class="avatar">TB</span>
+                    <span><span class="handle">@tapebase</span><span class="pf">Substack · 12k</span></span>
+                  </td>
+                  <td class="num"><span class="alpha-inline low" style="--fill:50%"><span class="n">50.2</span><span class="bar"></span></span></td>
+                  <td class="delta pos">+06.1</td>
+                  <td class="num">60</td>
+                  <td class="n"><span class="conf"><span class="dot"></span>N=9</span></td>
+                  <td class="trend"><svg width="70" height="20" viewBox="0 0 70 20"><polyline fill="none" stroke="#9CA0A9" stroke-width="1.2" points="0,12 10,10 20,11 30,9 40,8 50,10 60,9 70,8"/></svg></td>
+                  <td class="tier"><span class="tier C">C</span></td>
+                  <td class="cell-prov">SS · post</td>
+                  <td class="last" style="color:var(--new)">14m ago</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Rail -->
+          <aside class="rail">
+            <h3>Consensus snapshot <span class="live">live</span></h3>
+            <div class="csignal">
+              <div class="asset">BTC <span class="dir b">Bullish</span> <span style="margin-left:auto"><span class="fresh hot" style="font-size:9px"><span class="pulse" style="width:5px;height:5px"></span><span class="age">4h</span></span></span></div>
+              <div class="conf-row"><span class="pct">82%</span><span>confidence · 9 creators</span></div>
+              <div class="avastack">
+                <div class="avs"><span class="av">CI</span><span class="av">AM</span><span class="av">DV</span><span class="av">LF</span><span class="more">+5</span></div>
+                <svg class="spark" width="96" height="18" viewBox="0 0 96 18" style="margin-left:auto"><polyline fill="none" stroke="#6FA56A" stroke-width="1.2" points="0,14 12,12 24,11 36,9 48,7 60,5 72,4 84,3 96,2"/></svg>
+              </div>
+            </div>
+            <div class="csignal">
+              <div class="asset">ETH <span class="dir b">Bullish</span> <span style="margin-left:auto"><span class="fresh hot" style="font-size:9px"><span class="pulse" style="width:5px;height:5px"></span><span class="age">6h</span></span></span></div>
+              <div class="conf-row"><span class="pct">74%</span><span>confidence · 7 creators</span></div>
+              <div class="avastack">
+                <div class="avs"><span class="av">AM</span><span class="av">NB</span><span class="av">OC</span><span class="more">+4</span></div>
+                <svg class="spark" width="96" height="18" viewBox="0 0 96 18" style="margin-left:auto"><polyline fill="none" stroke="#6FA56A" stroke-width="1.2" points="0,11 12,10 24,8 36,9 48,7 60,6 72,7 84,5 96,4"/></svg>
+              </div>
+            </div>
+            <div class="csignal">
+              <div class="asset">SOL <span class="dir b">Bullish</span> <span style="margin-left:auto"><span class="fresh" style="font-size:9px"><span class="pulse" style="width:5px;height:5px"></span><span class="age">19h</span></span></span></div>
+              <div class="conf-row"><span class="pct">64%</span><span>forming · 5 creators</span></div>
+              <div class="avastack">
+                <div class="avs"><span class="av">LF</span><span class="av">NB</span><span class="av">TB</span><span class="more">+2</span></div>
+                <svg class="spark" width="96" height="18" viewBox="0 0 96 18" style="margin-left:auto"><polyline fill="none" stroke="#9CA0A9" stroke-width="1.2" points="0,10 12,11 24,10 36,9 48,10 60,8 72,9 84,8 96,7"/></svg>
+              </div>
+            </div>
+            <h3 style="margin-top:6px">Bearish</h3>
+            <div class="csignal">
+              <div class="asset">DOGE <span class="dir r">Bearish</span> <span style="margin-left:auto"><span class="fresh" style="font-size:9px"><span class="pulse" style="width:5px;height:5px"></span><span class="age">1d</span></span></span></div>
+              <div class="conf-row"><span class="pct">58%</span><span>forming · 4 creators</span></div>
+              <div class="avastack">
+                <div class="avs"><span class="av">CI</span><span class="av">HD</span><span class="av">OC</span><span class="more">+1</span></div>
+                <svg class="spark" width="96" height="18" viewBox="0 0 96 18" style="margin-left:auto"><polyline fill="none" stroke="#D47A70" stroke-width="1.2" points="0,4 12,5 24,7 36,8 48,10 60,11 72,12 84,13 96,14"/></svg>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Compare bar -->
+          <div class="cmp-bar">
+            <span class="c"><b>2</b> creators selected for comparison</span>
+            <div class="chips">
+              <span class="cp">@CryptoInsights <span class="x">×</span></span>
+              <span class="cp">@altmaxxer <span class="x">×</span></span>
+              <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500);align-self:center;margin-left:6px">+ select 1 more · <span style="color:var(--lock)">Paid unlocks up to 4</span></span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn">Clear</button>
+              <button class="btn p">Open comparison ⇢</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOADING STATE -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Leaderboard</b> · <span style="color:var(--ink-700)">loading · skeleton</span></div>
+        <div></div>
+        <div class="state-tabs">
+          <button>Default</button><button class="active">Loading</button><button>Compare → gate</button><button>Empty filter</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="lb-controls">
+          <div class="timeframe"><button>7d</button><button>30d</button><button class="on">90d</button><button>YTD</button><button>All</button></div>
+          <div style="flex:1"></div>
+          <div class="search" style="opacity:.5"><span class="ico">⌕</span><span class="ph">Creator, handle, asset</span><span class="kbd">/</span></div>
+        </div>
+        <div>
+          <div class="sk"><span></span><span></span><span class="sm" style="width:60%"></span><span></span><span></span><span class="sm" style="width:50%"></span><span class="sm" style="width:40%"></span><span></span><span class="sm" style="width:30%"></span></div>
+          <div class="sk"><span></span><span></span><span class="sm" style="width:70%"></span><span></span><span></span><span class="sm" style="width:45%"></span><span class="sm" style="width:35%"></span><span></span><span class="sm" style="width:25%"></span></div>
+          <div class="sk"><span></span><span></span><span class="sm" style="width:55%"></span><span></span><span></span><span class="sm" style="width:40%"></span><span class="sm" style="width:40%"></span><span></span><span class="sm" style="width:35%"></span></div>
+          <div class="sk"><span></span><span></span><span class="sm" style="width:65%"></span><span></span><span></span><span class="sm" style="width:50%"></span><span class="sm" style="width:30%"></span><span></span><span class="sm" style="width:28%"></span></div>
+          <div class="sk"><span></span><span></span><span class="sm" style="width:50%"></span><span></span><span></span><span class="sm" style="width:42%"></span><span class="sm" style="width:32%"></span><span></span><span class="sm" style="width:22%"></span></div>
+        </div>
+        <div style="padding:16px 20px;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;border-top:var(--hair)">
+          Row heights, column widths match final layout — page does not reflow on arrival. <span class="cite">§13 loading</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPARE → GATE STATE (§16.3) -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Leaderboard</b> · <span style="color:var(--ink-700)">compare · 3rd row triggers §16.3</span></div>
+        <div></div>
+        <div class="state-tabs">
+          <button>Default</button><button>Loading</button><button class="active">Compare → gate</button><button>Empty filter</button>
+        </div>
+      </div>
+      <div class="screen-body" style="position:relative;min-height:280px;background:var(--ink-000)">
+        <div style="padding:32px 28px 80px">
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">User clicks a 3rd checkbox in compare flow →</div>
+          <div class="cmp-bar" style="position:static;display:grid;grid-template-columns:auto 1fr auto;padding:16px 20px;margin-bottom:16px">
+            <span class="c"><b>2</b> creators selected</span>
+            <div class="chips">
+              <span class="cp">@CryptoInsights <span class="x">×</span></span>
+              <span class="cp">@altmaxxer <span class="x">×</span></span>
+              <span class="cp" style="border-color:var(--accent);background:rgba(201,162,75,.18);opacity:.9">@lowfloat.research <span class="x">×</span></span>
+            </div>
+            <button class="btn p">Open comparison ⇢</button>
+          </div>
+          <div class="preview-lock" style="max-width:520px">
+            <div class="blurred">
+              <div style="font-family:var(--font-serif);font-size:18px;color:var(--ink-900);margin-bottom:8px">Side-by-side comparison · 3 of 4 slots</div>
+              <div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-600);line-height:1.6">Overlay · Alpha · 30d Δ · Win · Self-correction · Breakdown by asset · Benchmark vs peer tier</div>
+            </div>
+            <div class="veil">
+              <span class="lock cta" style="align-self:flex-start">🔒 3-way compare · premium</span>
+              <h6>Free compares 2 creators side-by-side. Premium compares up to 4.</h6>
+              <p>You've tried to add @lowfloat.research to compare @CryptoInsights and @altmaxxer. Premium unlocks 3- and 4-way comparison with asset-by-asset overlay and self-correction alignment.</p>
+              <div class="row">
+                <button class="btn p">Upgrade — $24/mo</button>
+                <button class="btn">Keep 2-way · free</button>
+              </div>
+            </div>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500);margin-top:12px;letter-spacing:.04em">If user "Keeps 2-way", 3rd chip is un-selected; 2-way comparison opens as normal. <span class="cite">§16.3 · §9 gating vs frustration</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMPTY FILTER STATE -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Leaderboard</b> · <span style="color:var(--ink-700)">no-results / over-filtered</span></div>
+        <div></div>
+        <div class="state-tabs">
+          <button>Default</button><button>Loading</button><button>Compare → gate</button><button class="active">Empty filter</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="lb-controls">
+          <div class="timeframe"><button class="on">7d</button><button>30d</button><button>90d</button><button>YTD</button><button>All</button></div>
+          <div class="filters">
+            <span class="fchip active"><b>Category</b> · DeFi <span class="x">×</span></span>
+            <span class="fchip active"><b>Sample N ≥</b> <b>50</b> <span class="x">×</span></span>
+            <span class="fchip active"><b>Tier</b> · S <span class="x">×</span></span>
+          </div>
+          <div style="flex:1"></div>
+        </div>
+        <div class="empty">
+          <div class="ek">No results · filter too narrow</div>
+          <h4>Nothing matches <em>DeFi</em> at tier S with N ≥ 50 in the 7-day window.</h4>
+          <p><b>Relax one filter:</b> drop the tier floor to A, or widen to 30d. No tier-S DeFi creator has 50+ calls in the last week — that's expected given the category's cadence.</p>
+          <div class="actions">
+            <button class="btn p">Drop tier → A (shows 4)</button>
+            <button class="btn">Widen → 30d (shows 11)</button>
+            <button class="btn">Clear all filters</button>
+          </div>
+        </div>
+        <div style="padding:16px 20px;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;border-top:var(--hair)">
+          "Suggests filter relaxation, not a dead end." Projected counts are real. <span class="cite">§13 no-results</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interaction annotations -->
+    <div class="annotations">
+      <div>
+        <h5>Hover / click</h5>
+        <ul>
+          <li><b>Row hover</b> — background --ink-050, cursor pointer</li>
+          <li><b>Row click</b> — navigates to creator profile</li>
+          <li><b>Alpha cell click</b> — opens Score Explanation drawer</li>
+          <li><b>Provenance cell hover</b> — reveals full source + archive link</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Sort &amp; filter</h5>
+        <ul>
+          <li><b>Header click</b> — sort desc; click again → asc; shift-click → multi-column</li>
+          <li><b>Active sort</b> — column header accent + arrow</li>
+          <li><b>Filter chip</b> — dropdown on click; chip active state on --accent</li>
+          <li><b>Filters persist</b> in URL + localStorage</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Row select / compare</h5>
+        <ul>
+          <li><b>Min 2, max 4</b> · free tier 2 · paid 4 <span class="cite">§16.3</span></li>
+          <li><b>Compare bar</b> appears at ≥2 selection</li>
+          <li><b>3rd row</b> on free → §16.3 upgrade prompt</li>
+          <li><b>Clear</b> resets selection without leaving page</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Keyboard</h5>
+        <ul>
+          <li><span class="kbd">/</span> focus search · <span class="kbd">⌘K</span> global palette</li>
+          <li><span class="kbd">↑</span> <span class="kbd">↓</span> row navigation · <span class="kbd">↵</span> open profile</li>
+          <li><span class="kbd">Space</span> toggle row select · <span class="kbd">c</span> open comparison</li>
+          <li><span class="kbd">1</span>–<span class="kbd">5</span> jump timeframe · <span class="kbd">d</span> cycle density</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 03 · CREATOR PROFILE ============ -->
+  <section class="section" id="profile">
+    <div class="sh">
+      <div class="sn">03</div>
+      <h2>Creator profile <em>· §5B</em></h2>
+      <div class="sm">§4.2 why they rank · §6.3/.5/.7 above-fold · §7 provenance · §14 metrics</div>
+    </div>
+
+    <div class="prose" style="margin-bottom:20px">
+      <p><b>§9 tension resolved on this surface:</b> <em>explainability vs clutter</em> — the "Why they rank here" panel sits directly under the header as a full-width editorial sentence; everything further is on-demand (drawer, breakdown tabs). <em>Confidence vs overclaiming</em> — every above-fold metric carries confidence and peer context; none stand bare.</p>
+    </div>
+
+    <!-- DEFAULT -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Creator profile · @CryptoInsights</b> · default</div>
+        <div></div>
+        <div class="state-tabs">
+          <button class="active">Default</button>
+          <button>Sparse · Low conf</button>
+          <button>History tail · locked</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="app-chrome">
+          <div class="app-top">
+            <div class="app-wm">CryptoTubers <em>Ranked</em></div>
+            <div class="app-nav"><a>Leaderboard</a><a class="on">Creators</a><a>Calls</a><a>Signals</a><a>Pricing</a></div>
+            <div class="app-u"><span>⌘K <span class="kbd">search</span></span><span class="signin">Sign in</span></div>
+          </div>
+        </div>
+
+        <!-- Header -->
+        <div class="prof-head">
+          <div class="prof-avatar">CI</div>
+          <div class="prof-id">
+            <h1>@CryptoInsights <em>verified</em></h1>
+            <div class="prof-meta">
+              <span>Platform · <b>YouTube</b></span>
+              <span>Followers · <b>840,214</b></span>
+              <span>Active since · <b>2022-03</b></span>
+              <span>Active window · <b>90d</b></span>
+            </div>
+            <span class="prof-tag">Top performer · §3 editorial judgment</span>
+          </div>
+          <div class="prof-actions">
+            <button class="btn p">⊕ Follow — free</button>
+            <button class="btn">🔔 Configure alerts <span style="color:var(--lock);margin-left:4px">🔒</span></button>
+            <button class="btn">⇔ Compare</button>
+          </div>
+        </div>
+
+        <!-- WHY THEY RANK HERE -->
+        <div class="prof-why">
+          <div class="prof-why-k">Why they rank here</div>
+          <div class="prof-why-b">
+            CryptoInsights ranks <em>#1</em> on <b>realized 90-day alpha</b> driven by <b>early BTC &amp; ETH conviction calls</b> (avg α <b>+12.4</b>), a <b>72% win rate</b> across <b>147 resolved calls</b>, and a <b>self-correction rate in the top decile</b> — they retract cleanly when wrong, which the model rewards.
+          </div>
+          <span class="prof-why-link">Open score explanation ⇢</span>
+        </div>
+
+        <!-- METRICS -->
+        <div class="prof-metrics">
+          <div class="metric">
+            <div class="mk">Alpha · 90d <span class="help">?</span></div>
+            <div class="mv">84.6</div>
+            <div class="mbar" style="--fill:85%;--peer:62%"><span class="peer"></span></div>
+            <div class="mvsub"><span>tier S · rank 01</span><span class="explain">why?</span></div>
+          </div>
+          <div class="metric">
+            <div class="mk">Win rate <span class="help">?</span></div>
+            <div class="mv">72<span style="font-size:16px;color:var(--ink-500)">%</span></div>
+            <div class="mvsub"><span>N=147 · 90d</span><span class="conf solid" style="font-size:9px;padding:1px 4px"><span class="dot"></span>High conf</span></div>
+          </div>
+          <div class="metric">
+            <div class="mk">Self-correction <span class="help">?</span></div>
+            <div class="mv">top <span style="font-size:22px;color:var(--ink-500)">10%</span></div>
+            <div class="mvsub"><span>4 retracts · avg 2.1d</span><span>↗ improving</span></div>
+          </div>
+          <div class="metric">
+            <div class="mk">Avg α / call <span class="help">?</span></div>
+            <div class="mv" style="color:var(--pos)">+12.4<span style="font-size:16px;color:var(--ink-500)">bps</span></div>
+            <div class="mvsub"><span>vs peer +3.1 · vs zero +12.4</span></div>
+          </div>
+          <div class="metric">
+            <div class="mk">Best call <span class="help">?</span></div>
+            <div class="mv" style="color:var(--accent)">+38.7</div>
+            <div class="mvsub"><span>SOL · long · 14d horizon · 2026-02-11</span></div>
+          </div>
+        </div>
+
+        <!-- BODY -->
+        <div class="prof-body">
+          <div class="prof-main">
+
+            <h3>Performance vs benchmark
+              <span class="ctl">
+                <button>7d</button><button>30d</button><button class="on">90d</button><button>YTD</button><button>All</button>
+              </span>
+            </h3>
+            <div class="perf-chart">
+              <div class="legend">
+                <span><span class="swv" style="background:var(--accent)"></span><b>@CryptoInsights</b></span>
+                <span><span class="swv" style="background:var(--ink-500)"></span>Peer tier median</span>
+                <span><span class="swv" style="background:var(--ink-300);border-top:1px dashed var(--ink-300)"></span>Zero line</span>
+              </div>
+              <svg viewBox="0 0 700 200" preserveAspectRatio="none">
+                <defs>
+                  <pattern id="grid" width="70" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 70 0 L 0 0 0 40" fill="none" stroke="#22242A" stroke-width="1"/>
+                  </pattern>
+                </defs>
+                <rect width="700" height="200" fill="url(#grid)"/>
+                <line x1="0" y1="140" x2="700" y2="140" stroke="#3A3D44" stroke-width="1" stroke-dasharray="2 3"/>
+                <polyline fill="none" stroke="#7A7F89" stroke-width="1" points="0,130 50,128 100,125 150,127 200,123 250,120 300,115 350,118 400,116 450,113 500,110 550,108 600,105 650,103 700,100"/>
+                <polyline fill="none" stroke="#C9A24B" stroke-width="1.6" points="0,150 50,140 100,135 150,125 200,118 250,105 300,92 350,98 400,85 450,72 500,64 550,58 600,48 650,42 700,36"/>
+                <circle cx="350" cy="98" r="2.5" fill="#D47A70"/>
+                <text x="355" y="95" font-family="JetBrains Mono" font-size="9" fill="#D47A70">call invalidated · 03-08</text>
+                <circle cx="500" cy="64" r="2.5" fill="#C9A24B"/>
+                <text x="505" y="61" font-family="JetBrains Mono" font-size="9" fill="#C9A24B">best call · SOL +38.7</text>
+              </svg>
+            </div>
+
+            <h3>Recent calls <span class="ctl"><button>All</button><button class="on">Open</button><button>Resolved</button></span></h3>
+            <table class="calls-tbl">
+              <thead><tr><th>Asset</th><th>Dir</th><th>Called</th><th>Horizon</th><th class="num">α contribution</th><th>Result</th><th style="text-align:right">Source</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td class="asset">BTC</td><td style="color:var(--pos)">Long</td><td>04-22 09:14</td><td>14d</td>
+                  <td class="num pos">+4.2</td><td class="res"><span class="bg pos"><span class="dot"></span>Open</span></td><td class="src">YT · 03:12</td>
+                </tr>
+                <tr>
+                  <td class="asset">ETH</td><td style="color:var(--pos)">Long</td><td>04-18 14:03</td><td>30d</td>
+                  <td class="num pos">+8.7</td><td class="res"><span class="bg pos"><span class="dot"></span>Resolved +</span></td><td class="src">YT · 08:41</td>
+                </tr>
+                <tr>
+                  <td class="asset">SOL</td><td style="color:var(--pos)">Long</td><td>04-15 18:22</td><td>14d</td>
+                  <td class="num pos">+12.1</td><td class="res"><span class="bg pos"><span class="dot"></span>Resolved +</span></td><td class="src">YT · 12:04</td>
+                </tr>
+                <tr>
+                  <td class="asset">LINK</td><td style="color:var(--neg)">Short</td><td>04-12 11:30</td><td>7d</td>
+                  <td class="num neg">−3.8</td><td class="res"><span class="bg neg"><span class="dot"></span>Resolved −</span></td><td class="src">YT · 02:18</td>
+                </tr>
+                <tr>
+                  <td class="asset">DOGE</td><td style="color:var(--pos)">Long</td><td>04-08 15:45</td><td>14d</td>
+                  <td class="num" style="color:var(--warn)">±1.2</td><td class="res"><span class="bg warn"><span class="dot"></span>Partial</span></td><td class="src">YT · 06:55</td>
+                </tr>
+                <tr>
+                  <td class="asset">AVAX</td><td style="color:var(--pos)">Long</td><td>04-04 12:10</td><td>30d</td>
+                  <td class="num pos">+5.9</td><td class="res"><span class="bg pos"><span class="dot"></span>Resolved +</span></td><td class="src">YT · 11:29</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>Breakdown <span class="ctl"><button class="on">By asset</button><button>By category</button><button>By horizon</button><button>By direction</button></span></h3>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;font-family:var(--font-mono);font-size:11px">
+              <div style="padding:14px;background:var(--ink-050);border:var(--hair)">
+                <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em">BTC · N=42</div>
+                <div style="font-family:var(--font-serif);font-size:20px;color:var(--ink-900);margin-top:6px">+9.8<span style="font-size:10px;color:var(--ink-500);margin-left:4px">α</span></div>
+                <div style="height:3px;background:var(--ink-200);margin-top:8px;position:relative"><span style="position:absolute;inset:0;width:78%;background:var(--accent)"></span></div>
+              </div>
+              <div style="padding:14px;background:var(--ink-050);border:var(--hair)">
+                <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em">ETH · N=38</div>
+                <div style="font-family:var(--font-serif);font-size:20px;color:var(--ink-900);margin-top:6px">+14.1<span style="font-size:10px;color:var(--ink-500);margin-left:4px">α</span></div>
+                <div style="height:3px;background:var(--ink-200);margin-top:8px;position:relative"><span style="position:absolute;inset:0;width:92%;background:var(--accent)"></span></div>
+              </div>
+              <div style="padding:14px;background:var(--ink-050);border:var(--hair)">
+                <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em">SOL · N=22</div>
+                <div style="font-family:var(--font-serif);font-size:20px;color:var(--ink-900);margin-top:6px">+18.3<span style="font-size:10px;color:var(--ink-500);margin-left:4px">α</span></div>
+                <div style="height:3px;background:var(--ink-200);margin-top:8px;position:relative"><span style="position:absolute;inset:0;width:100%;background:var(--accent)"></span></div>
+              </div>
+              <div style="padding:14px;background:var(--ink-050);border:var(--hair)">
+                <div style="font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em">Alts · N=45</div>
+                <div style="font-family:var(--font-serif);font-size:20px;color:var(--ink-900);margin-top:6px">+8.2<span style="font-size:10px;color:var(--ink-500);margin-left:4px">α</span></div>
+                <div style="height:3px;background:var(--ink-200);margin-top:8px;position:relative"><span style="position:absolute;inset:0;width:65%;background:var(--accent)"></span></div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="prof-rail">
+            <section>
+              <h4>Alerts</h4>
+              <div class="alrt">
+                <div class="alrt-row"><span class="ttl">Follow · base notifications</span><span class="tgl on"></span></div>
+                <div class="alrt-row locked"><span class="ttl">Rank movement <span style="color:var(--lock);font-size:9px">· 🔒 paid</span></span><span class="tgl"></span></div>
+                <div class="alrt-row locked"><span class="ttl">New call · threshold <span style="color:var(--lock);font-size:9px">· 🔒 paid</span></span><span class="tgl"></span></div>
+                <div class="alrt-row locked"><span class="ttl">Consensus flip <span style="color:var(--lock);font-size:9px">· 🔒 paid</span></span><span class="tgl"></span></div>
+                <div class="alrt-row locked"><span class="ttl">Score threshold breach <span style="color:var(--lock);font-size:9px">· 🔒 paid</span></span><span class="tgl"></span></div>
+              </div>
+              <div style="padding:10px 0 0;font-family:var(--font-mono);font-size:10px;color:var(--lock);line-height:1.5">
+                Configurable types unlock with premium. <span class="cite">§16.2</span>
+              </div>
+            </section>
+
+            <section>
+              <h4>Evidence trail · last 7d</h4>
+              <div class="evtrail">
+                <div class="evtrail-row">
+                  <span class="ts">04-22 09:14</span>
+                  <span class="ev"><b>BTC long · 14d</b> · <a>YT clip 03:12</a> · <span class="prov-inline" style="margin-left:0"><span class="link">archived</span></span></span>
+                </div>
+                <div class="evtrail-row">
+                  <span class="ts">04-18 14:03</span>
+                  <span class="ev"><b>ETH long · 30d resolved +8.7</b> · <a>YT clip 08:41</a></span>
+                </div>
+                <div class="evtrail-row">
+                  <span class="ts">04-15 18:22</span>
+                  <span class="ev"><b>SOL long · 14d resolved +12.1</b> · <a>YT clip 12:04</a></span>
+                </div>
+                <div class="evtrail-row">
+                  <span class="ts">04-12 11:30</span>
+                  <span class="ev"><b>LINK short · 7d resolved −3.8</b> · <a>YT clip 02:18</a></span>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPARSE / LOW CONF STATE -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Creator profile</b> · sparse-data creator · N=8</div>
+        <div></div>
+        <div class="state-tabs">
+          <button>Default</button><button class="active">Sparse · Low conf</button><button>History · locked</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="prof-head">
+          <div class="prof-avatar" style="border-color:var(--lown)">TB</div>
+          <div class="prof-id">
+            <h1>@tapebase</h1>
+            <div class="prof-meta">
+              <span>Platform · <b>Substack</b></span>
+              <span>Followers · <b>12,400</b></span>
+              <span>Active since · <b>2026-02</b></span>
+              <span>Active window · <b>90d</b></span>
+            </div>
+            <span class="prof-tag" style="color:var(--lown);border-color:var(--lown);background:rgba(167,140,107,.1)">New entrant · low sample</span>
+          </div>
+          <div class="prof-actions">
+            <button class="btn p">⊕ Follow — free</button>
+            <button class="btn">🔔 Configure alerts <span style="color:var(--lock);margin-left:4px">🔒</span></button>
+          </div>
+        </div>
+
+        <div class="prof-why">
+          <div class="prof-why-k">Why they rank here</div>
+          <div class="prof-why-b">
+            Tapebase has posted <b>8 resolved calls</b> over <b>52 days</b>. Their early alpha is <em>promising</em> at <b>+6.1</b>, but <b>sample size is insufficient</b> for tier S/A assignment — ranked at tier C until N ≥ 20. Severe with bad performers; fair with evidence.
+          </div>
+          <span class="prof-why-link">Score methodology ⇢</span>
+        </div>
+
+        <div class="prof-metrics">
+          <div class="metric">
+            <div class="mk">Alpha · 90d <span class="help">?</span></div>
+            <div class="mv low-conf">50.2</div>
+            <div class="mbar" style="--fill:50%;--peer:62%"><span class="peer"></span></div>
+            <div class="mvsub"><span class="conf"><span class="dot"></span>Low N · 8 · attenuated</span><span class="explain">95% CI ±8.2</span></div>
+          </div>
+          <div class="metric">
+            <div class="mk">Win rate</div>
+            <div class="mv low-conf">60<span style="font-size:16px;color:var(--ink-500)">%</span></div>
+            <div class="mvsub"><span>N=8 · 90d</span><span class="conf"><span class="dot"></span>Low conf</span></div>
+          </div>
+          <div class="metric">
+            <div class="mk">Self-correction</div>
+            <div class="mv neutral" style="font-size:18px;opacity:.7">insufficient</div>
+            <div class="mvsub"><span>Need ≥ 1 retract observed · 0/8</span></div>
+          </div>
+          <div class="metric">
+            <div class="mk">Avg α / call</div>
+            <div class="mv" style="color:var(--pos)">+6.1</div>
+            <div class="mvsub"><span>vs peer +3.1 · low conf</span></div>
+          </div>
+          <div class="metric">
+            <div class="mk">Best call</div>
+            <div class="mv" style="color:var(--accent)">+14.2</div>
+            <div class="mvsub"><span>ETH · long · 14d · 2026-03-29</span></div>
+          </div>
+        </div>
+        <div style="padding:16px 28px;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;border-top:var(--hair)">
+          Attenuated figures still rank · Low N badge co-located with every score. <span class="cite">§13 · §14</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAIL LOCKED (§16.1) -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Creator profile</b> · history tail · <span style="color:var(--accent)">§16.1 conversion moment</span></div>
+        <div></div>
+        <div class="state-tabs">
+          <button>Default</button><button>Sparse · Low conf</button><button class="active">History · locked</button>
+        </div>
+      </div>
+      <div class="screen-body" style="padding:24px 28px">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Recent calls · scrolled past the 30-day free window →</div>
+        <table class="calls-tbl" style="margin-bottom:0">
+          <thead><tr><th>Asset</th><th>Dir</th><th>Called</th><th>Horizon</th><th class="num">α</th><th>Result</th><th style="text-align:right">Source</th></tr></thead>
+          <tbody>
+            <tr><td class="asset">BTC</td><td style="color:var(--pos)">Long</td><td>04-22</td><td>14d</td><td class="num pos">+4.2</td><td class="res"><span class="bg pos"><span class="dot"></span>Open</span></td><td class="src">YT · 03:12</td></tr>
+            <tr><td class="asset">ETH</td><td style="color:var(--pos)">Long</td><td>04-18</td><td>30d</td><td class="num pos">+8.7</td><td class="res"><span class="bg pos"><span class="dot"></span>Resolved</span></td><td class="src">YT · 08:41</td></tr>
+            <tr><td class="asset">SOL</td><td style="color:var(--pos)">Long</td><td>03-28</td><td>14d</td><td class="num pos">+12.1</td><td class="res"><span class="bg pos"><span class="dot"></span>Resolved</span></td><td class="src">YT · 12:04</td></tr>
+          </tbody>
+        </table>
+
+        <div class="preview-lock" style="margin-top:0;border-top:none">
+          <div class="blurred">
+            <table style="width:100%;font-family:var(--font-mono);font-size:11px;border-collapse:collapse">
+              <tr style="border-bottom:var(--hair-soft)"><td style="padding:6px 10px">AVAX</td><td style="padding:6px 10px;color:var(--pos)">Long</td><td style="padding:6px 10px">03-04</td><td style="padding:6px 10px;text-align:right;color:var(--pos)">+5.9</td></tr>
+              <tr style="border-bottom:var(--hair-soft)"><td style="padding:6px 10px">MATIC</td><td style="padding:6px 10px;color:var(--neg)">Short</td><td style="padding:6px 10px">02-28</td><td style="padding:6px 10px;text-align:right;color:var(--pos)">+2.1</td></tr>
+              <tr style="border-bottom:var(--hair-soft)"><td style="padding:6px 10px">LINK</td><td style="padding:6px 10px;color:var(--pos)">Long</td><td style="padding:6px 10px">02-14</td><td style="padding:6px 10px;text-align:right;color:var(--neg)">−1.8</td></tr>
+              <tr style="border-bottom:var(--hair-soft)"><td style="padding:6px 10px">DOT</td><td style="padding:6px 10px;color:var(--pos)">Long</td><td style="padding:6px 10px">01-22</td><td style="padding:6px 10px;text-align:right;color:var(--pos)">+3.4</td></tr>
+            </table>
+          </div>
+          <div class="veil">
+            <span class="lock cta" style="align-self:flex-start">🔒 Full history · paid</span>
+            <h6>You've reached the 30-day free window. Premium unlocks all-time history.</h6>
+            <p>@CryptoInsights has <b>141 more resolved calls</b> going back to 2022. Premium unlocks the full ledger with per-call provenance, CSV export, and side-by-side peer comparison at any point in time.</p>
+            <div class="row">
+              <button class="btn p">Upgrade — $24/mo</button>
+              <button class="btn">What else premium unlocks</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500);margin-top:12px;letter-spacing:.04em">
+          Real data rendered behind 4px blur · value stated in user-intent terms ("141 more calls back to 2022"). Preview-with-lock, not a wall. <span class="cite">§13 · §15 · §16.1</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="annotations">
+      <div>
+        <h5>Above-fold (§6)</h5>
+        <ul>
+          <li><b>Why they rank here</b> sits within 120px of the header</li>
+          <li>5 metrics · all with peer / CI / low-N context</li>
+          <li><b>Follow</b> (free) + <b>Alerts</b> (paid CTA) visible without scroll</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Drawer / page decision</h5>
+        <ul>
+          <li><b>Score explanation</b> · drawer (preserves profile context)</li>
+          <li><b>Call detail</b> · drawer from recent-calls row</li>
+          <li><b>Compare</b> · full page (cross-profile)</li>
+          <li><b>Source click</b> · opens external · archive in drawer</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Timeframe</h5>
+        <ul>
+          <li>Default <b>90d</b> · assumed per §04 assumption</li>
+          <li>Chart + breakdown + calls sync to same timeframe</li>
+          <li>Self-correction window is fixed 90d regardless — base-rate comparability</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Keyboard</h5>
+        <ul>
+          <li><span class="kbd">f</span> follow · <span class="kbd">a</span> alerts · <span class="kbd">c</span> compare</li>
+          <li><span class="kbd">w</span> open "why" drawer · <span class="kbd">esc</span> close</li>
+          <li><span class="kbd">[</span> <span class="kbd">]</span> cycle timeframe</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 04 · CALLS EXPLORER ============ -->
+  <section class="section" id="calls">
+    <div class="sh">
+      <div class="sn">04</div>
+      <h2>Calls explorer + <em>call detail drawer</em> <em>· §5C</em></h2>
+      <div class="sm">§4.3 verify evidence · §7 provenance first-class · §8 calls-layer spec</div>
+    </div>
+
+    <div class="prose" style="margin-bottom:20px">
+      <p><b>§9 tension resolved on this surface:</b> <em>density vs readability</em> — the table is intentionally dense (this is the terminal surface), but the 540px drawer gives the user room to read evidence without losing list position. <em>Editorial sharpness vs perceived bias</em> — resolution logic is <em>visible</em>, not inferred; formula is printed in plain mono.</p>
+    </div>
+
+    <!-- DEFAULT with drawer open -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Calls explorer</b> · default · drawer open</div>
+        <div></div>
+        <div class="state-tabs">
+          <button class="active">Default + drawer</button>
+          <button>Open calls only</button>
+          <button>Error · partial load</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="calls-screen">
+          <div class="calls-list">
+            <div class="calls-ctrls">
+              <div style="display:flex;gap:8px;align-items:center">
+                <div class="search" style="min-width:200px"><span class="ico">⌕</span><span class="ph">Asset, creator, or call id</span><span class="kbd">/</span></div>
+                <span class="fchip"><b>Asset</b> · All <span class="x">▾</span></span>
+                <span class="fchip"><b>Direction</b> · All <span class="x">▾</span></span>
+                <span class="fchip active"><b>State</b> · Open+Resolved <span class="x">×</span></span>
+                <span class="fchip"><b>Horizon</b> · All <span class="x">▾</span></span>
+                <span class="fchip" style="opacity:.65;color:var(--lock)">🔒 <b>Advanced</b> <span class="x">▾</span></span>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn" style="font-size:10px;padding:5px 8px">1,284 calls</button>
+                <button class="btn" style="font-size:10px;padding:5px 8px;color:var(--lock)">🔒 Export</button>
+              </div>
+            </div>
+            <table class="calls-big">
+              <thead>
+                <tr>
+                  <th>Asset</th><th>Creator</th><th>Dir</th><th>Called</th><th>Horizon</th><th class="num">α</th><th>State</th><th style="text-align:center">Src</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="active">
+                  <td class="asset">SOL</td>
+                  <td class="creator"><span class="av">CI</span>@CryptoInsights</td>
+                  <td class="dir b">Long</td>
+                  <td>04-15 18:22</td>
+                  <td>14d</td>
+                  <td class="num pos">+12.1</td>
+                  <td><span class="bg pos"><span class="dot"></span>Resolved</span></td>
+                  <td class="src">YT</td>
+                </tr>
+                <tr>
+                  <td class="asset">BTC</td><td class="creator"><span class="av">AM</span>@altmaxxer</td>
+                  <td class="dir b">Long</td><td>04-22 09:14</td><td>14d</td>
+                  <td class="num pos">+4.2</td><td><span class="bg pos"><span class="dot"></span>Open</span></td>
+                  <td class="src">X</td>
+                </tr>
+                <tr>
+                  <td class="asset">ETH</td><td class="creator"><span class="av">CI</span>@CryptoInsights</td>
+                  <td class="dir b">Long</td><td>04-18 14:03</td><td>30d</td>
+                  <td class="num pos">+8.7</td><td><span class="bg pos"><span class="dot"></span>Resolved</span></td>
+                  <td class="src">YT</td>
+                </tr>
+                <tr>
+                  <td class="asset">LINK</td><td class="creator"><span class="av">CI</span>@CryptoInsights</td>
+                  <td class="dir r">Short</td><td>04-12 11:30</td><td>7d</td>
+                  <td class="num neg">−3.8</td><td><span class="bg neg"><span class="dot"></span>Resolved −</span></td>
+                  <td class="src">YT</td>
+                </tr>
+                <tr>
+                  <td class="asset">DOGE</td><td class="creator"><span class="av">CI</span>@CryptoInsights</td>
+                  <td class="dir b">Long</td><td>04-08 15:45</td><td>14d</td>
+                  <td class="num" style="color:var(--warn)">±1.2</td><td><span class="bg warn"><span class="dot"></span>Partial</span></td>
+                  <td class="src">YT</td>
+                </tr>
+                <tr>
+                  <td class="asset">SOL</td><td class="creator"><span class="av">LF</span>@lowfloat.research</td>
+                  <td class="dir b">Long</td><td>04-06 22:14</td><td>30d</td>
+                  <td class="num pos">+7.3</td><td><span class="bg pos"><span class="dot"></span>Open</span></td>
+                  <td class="src">SS</td>
+                </tr>
+                <tr>
+                  <td class="asset">MATIC</td><td class="creator"><span class="av">HD</span>@hodldad</td>
+                  <td class="dir b">Long</td><td>04-04 10:08</td><td>14d</td>
+                  <td class="num neg">−4.8</td><td><span class="bg neg"><span class="dot"></span>Invalidated</span></td>
+                  <td class="src">YT</td>
+                </tr>
+                <tr>
+                  <td class="asset">AVAX</td><td class="creator"><span class="av">DV</span>@defivoice</td>
+                  <td class="dir b">Long</td><td>04-02 13:55</td><td>30d</td>
+                  <td class="num pos">+5.9</td><td><span class="bg pos"><span class="dot"></span>Resolved</span></td>
+                  <td class="src">YT</td>
+                </tr>
+                <tr>
+                  <td class="asset">APE</td><td class="creator"><span class="av">SP</span>@shillpro</td>
+                  <td class="dir b">Long</td><td>04-01 18:20</td><td>7d</td>
+                  <td class="num neg">−8.4</td><td><span class="bg neg"><span class="dot"></span>Invalidated</span></td>
+                  <td class="src">X</td>
+                </tr>
+                <tr>
+                  <td class="asset">RNDR</td><td class="creator"><span class="av">NB</span>@nodebook</td>
+                  <td class="dir b">Long</td><td>03-28 14:14</td><td>14d</td>
+                  <td class="num pos">+11.2</td><td><span class="bg pos"><span class="dot"></span>Resolved</span></td>
+                  <td class="src">Pod</td>
+                </tr>
+                <tr>
+                  <td class="asset">DOT</td><td class="creator"><span class="av">OC</span>@onchain.oracle</td>
+                  <td class="dir r">Short</td><td>03-25 08:44</td><td>14d</td>
+                  <td class="num" style="color:var(--warn)">±0.6</td><td><span class="bg warn"><span class="dot"></span>Partial</span></td>
+                  <td class="src">X</td>
+                </tr>
+                <tr>
+                  <td class="asset">ETH</td><td class="creator"><span class="av">AM</span>@altmaxxer</td>
+                  <td class="dir b">Long</td><td>03-22 15:00</td><td>30d</td>
+                  <td class="num pos">+6.1</td><td><span class="bg pos"><span class="dot"></span>Resolved</span></td>
+                  <td class="src">X</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- DRAWER -->
+          <aside class="drawer">
+            <div class="dr-head">
+              <div class="dr-crumb">
+                <span>Call · <span style="color:var(--ink-800)">CALL-4812</span> · <a style="color:var(--accent);text-decoration:underline dotted">share link</a></span>
+                <span class="close">esc ✕</span>
+              </div>
+              <div class="dr-title">SOL · long · <em>+12.1α</em></div>
+              <div class="dr-tags">
+                <span class="bg pos"><span class="dot"></span>Resolved</span>
+                <span class="bg acc"><span class="dot"></span>Tier S creator</span>
+                <span class="bg"><span class="dot"></span>14d horizon</span>
+              </div>
+            </div>
+
+            <div class="dr-section">
+              <h5>Timestamps</h5>
+              <div class="dr-grid">
+                <div><div class="k">Called at</div><div class="v">2026-04-15 18:22 UTC</div></div>
+                <div><div class="k">Horizon end</div><div class="v">2026-04-29 18:22 UTC</div></div>
+                <div><div class="k">Resolved at</div><div class="v">2026-04-24 08:14 UTC</div></div>
+                <div><div class="k">Early by</div><div class="v">5d 10h</div></div>
+              </div>
+            </div>
+
+            <div class="dr-section">
+              <h5>Provenance</h5>
+              <div class="dr-prov">
+                <b>Source</b> · <a>YouTube clip · 12:04 in "Late-Apr Outlook"</a><br>
+                <b>Creator</b> · @CryptoInsights (verified)<br>
+                <b>Archive</b> · <a>archive.org snapshot 2026-04-15 18:23</a>
+                <span class="ts">Captured 61s after publication · SHA 2a7f…e19c</span>
+              </div>
+            </div>
+
+            <div class="dr-section">
+              <h5>Resolution logic</h5>
+              <div class="dr-logic">
+                <div class="formula">α = ln(Pᵣ / Pₑ) <span class="op">−</span> ln(Pᵦ,ᵣ / Pᵦ,ₑ)</div>
+                Entry price Pₑ @ <b>$142.80</b> (mid, 2026-04-15 18:22)<br>
+                Resolve price Pᵣ @ <b>$164.20</b> (close at horizon-end)<br>
+                Benchmark BTC β-adj · Pᵦ,ₑ $62,140 → Pᵦ,ᵣ $66,820 → +7.2%<br>
+                Asset return +14.98% · β-adj excess +12.10% → <b style="color:var(--pos)">α = +12.1</b>
+              </div>
+            </div>
+
+            <div class="dr-section">
+              <h5>Price trace</h5>
+              <div class="dr-price">
+                <svg viewBox="0 0 500 140" preserveAspectRatio="none">
+                  <line x1="0" y1="100" x2="500" y2="100" stroke="#3A3D44" stroke-dasharray="2 3"/>
+                  <polyline fill="none" stroke="#C9A24B" stroke-width="1.6" points="0,100 50,98 100,92 150,88 200,82 250,75 300,62 350,55 400,48 450,42 500,40"/>
+                  <line x1="0" y1="100" x2="0" y2="30" stroke="#7A7F89" stroke-dasharray="1 2"/>
+                  <text x="4" y="28" font-family="JetBrains Mono" font-size="9" fill="#7A7F89">entry · $142.80</text>
+                  <line x1="500" y1="40" x2="500" y2="30" stroke="#6FA56A" stroke-dasharray="1 2"/>
+                  <text x="400" y="28" font-family="JetBrains Mono" font-size="9" fill="#6FA56A">resolve · $164.20</text>
+                </svg>
+              </div>
+            </div>
+
+            <div class="dr-actions">
+              <button class="btn">⎘ Deeplink</button>
+              <button class="btn">⚑ Report dispute</button>
+              <button class="btn p" style="margin-left:auto">Open full call page ⇢</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPEN CALLS ONLY -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Calls explorer</b> · Open-only filter · 87 results</div>
+        <div></div>
+        <div class="state-tabs">
+          <button>Default + drawer</button><button class="active">Open calls only</button><button>Error · partial load</button>
+        </div>
+      </div>
+      <div class="screen-body" style="padding:0">
+        <div class="calls-ctrls">
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="search" style="min-width:200px"><span class="ico">⌕</span><span class="ph">Asset, creator, or call id</span></div>
+            <span class="fchip active"><b>State</b> · Open <span class="x">×</span></span>
+            <span class="fchip"><b>Asset</b> · All <span class="x">▾</span></span>
+            <span class="fchip"><b>Direction</b> · All <span class="x">▾</span></span>
+            <span class="fchip" style="color:var(--lock);opacity:.65">🔒 Advanced <span class="x">▾</span></span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-500)">87 of 1,284 · <span style="color:var(--accent)">sort</span> Horizon-end ↑</div>
+        </div>
+        <table class="calls-big">
+          <thead><tr><th>Asset</th><th>Creator</th><th>Dir</th><th>Called</th><th>Horizon end</th><th class="num">Days left</th><th class="num">Interim α</th><th style="text-align:center">Src</th></tr></thead>
+          <tbody>
+            <tr><td class="asset">BTC</td><td class="creator"><span class="av">AM</span>@altmaxxer</td><td class="dir b">Long</td><td>04-22</td><td>05-06</td><td class="num">12</td><td class="num pos">+4.2</td><td class="src">X</td></tr>
+            <tr><td class="asset">SOL</td><td class="creator"><span class="av">LF</span>@lowfloat.research</td><td class="dir b">Long</td><td>04-06</td><td>05-06</td><td class="num">12</td><td class="num pos">+7.3</td><td class="src">SS</td></tr>
+            <tr><td class="asset">ARB</td><td class="creator"><span class="av">NB</span>@nodebook</td><td class="dir b">Long</td><td>04-18</td><td>05-02</td><td class="num">8</td><td class="num pos">+2.1</td><td class="src">Pod</td></tr>
+            <tr><td class="asset">ETH</td><td class="creator"><span class="av">CI</span>@CryptoInsights</td><td class="dir b">Long</td><td>04-22</td><td>05-06</td><td class="num">12</td><td class="num pos">+1.8</td><td class="src">YT</td></tr>
+            <tr><td class="asset">INJ</td><td class="creator"><span class="av">DV</span>@defivoice</td><td class="dir b">Long</td><td>04-16</td><td>04-30</td><td class="num" style="color:var(--warn)">6</td><td class="num neg">−2.4</td><td class="src">YT</td></tr>
+            <tr><td class="asset">RNDR</td><td class="creator"><span class="av">OC</span>@onchain.oracle</td><td class="dir r">Short</td><td>04-20</td><td>05-04</td><td class="num">10</td><td class="num pos">+1.2</td><td class="src">X</td></tr>
+            <tr><td class="asset">AVAX</td><td class="creator"><span class="av">AM</span>@altmaxxer</td><td class="dir b">Long</td><td>04-17</td><td>05-01</td><td class="num" style="color:var(--warn)">7</td><td class="num neutral">+0.4</td><td class="src">X</td></tr>
+          </tbody>
+        </table>
+        <div style="padding:16px 20px;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em;border-top:var(--hair)">
+          Open-state column substitution: "Horizon end · Days left · Interim α" replaces "Result". Sort default: horizon-end ↑ (nearest resolve first).
+        </div>
+      </div>
+    </div>
+
+    <!-- ERROR STATE -->
+    <div class="screen">
+      <div class="screen-header">
+        <div><b>Calls explorer</b> · error · partial load</div>
+        <div></div>
+        <div class="state-tabs">
+          <button>Default + drawer</button><button>Open calls only</button><button class="active">Error · partial load</button>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="calls-ctrls">
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="search" style="min-width:200px"><span class="ico">⌕</span><span class="ph">Asset, creator, or call id</span></div>
+            <span class="fchip active"><b>State</b> · Open+Resolved</span>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--neg)">
+            ⚠ Partial load · 312 of 1,284 shown
+          </div>
+        </div>
+        <div class="err">
+          <div class="ek">Error · calls service timeout</div>
+          <h4>We couldn't load all calls. 312 of 1,284 are shown — the rest failed on fetch.</h4>
+          <p><b>Your filters are preserved.</b> Retry fetches the remaining calls only; your sort, selection, and scroll position stay intact.</p>
+          <div class="meta">err-id · <b>ctr-calls-tfc-2026-04-24T14:33Z</b> · recovery <span style="color:var(--pos)">state-preserved</span></div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn p">Retry fetch</button>
+            <button class="btn">Report issue</button>
+            <button class="btn">Continue with 312 shown</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="annotations">
+      <div>
+        <h5>Drawer vs page</h5>
+        <ul>
+          <li>Row click → <b>drawer</b>, preserves list context + scroll</li>
+          <li><b>Open full call page</b> from drawer for linking / sharing</li>
+          <li>Drawer closes with <span class="kbd">esc</span> or click outside · list retains selection</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Provenance is the primitive</h5>
+        <ul>
+          <li>Every call row shows <b>src column</b> (platform + clip ts)</li>
+          <li>Drawer expands to full provenance: source, archive, capture time, hash</li>
+          <li>Dispute → creates a §13 warn state + ticket id</li>
+        </ul>
+      </div>
+      <div>
+        <h5>State columns substitute by filter</h5>
+        <ul>
+          <li><b>Open</b> filter → columns: Horizon-end · Days-left · Interim α</li>
+          <li><b>Resolved</b> filter → columns: Resolved-at · Final α · Result</li>
+          <li><b>All</b> → merged with state badge column</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Keyboard</h5>
+        <ul>
+          <li><span class="kbd">↑</span> <span class="kbd">↓</span> row nav · drawer updates live</li>
+          <li><span class="kbd">⌘↵</span> open full call page</li>
+          <li><span class="kbd">⌘d</span> deeplink · <span class="kbd">!</span> report dispute</li>
+          <li><span class="kbd">esc</span> close drawer (keyboard focus returns to list)</li>
+        </ul>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- SIGN-OFF -->
+  <section style="margin-top:80px;padding:40px;border:1px solid var(--ink-250);background:linear-gradient(180deg,rgba(201,162,75,.03),transparent 40%),var(--ink-050)">
+    <h3 style="font-family:var(--font-serif);font-weight:400;font-size:24px;color:var(--ink-900);margin-bottom:12px;letter-spacing:-.01em">Phase 2 delivered · ready for review.</h3>
+    <p style="font-size:13px;color:var(--ink-600);max-width:68ch;line-height:1.55">
+      Five primitives specified with anatomy, variants, and states. Three priority screens delivered with Default + three §13 states each, plus interaction annotations per screen. The five primitives show up consistently across the screens — Alpha Score in leaderboard rows, profile header, call drawer; provenance square in every row, drawer, evidence trail; lock-preview in compare gate, history tail, advanced filters, export, live signals. After your note, <b>Phase 3</b> targets Signals page + Dashboard + Upgrade surfaces end-to-end, plus the §14 metric explanation patterns rendered as a full hover/focus reveal library, then mobile responsive for surfaces 1–5.
+    </p>
+  </section>
+
+</main>
+
+</body>
+</html>

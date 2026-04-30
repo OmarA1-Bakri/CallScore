@@ -13,6 +13,8 @@ out/
 .vscode/
 .worktrees/
 .playwright-mcp/
+.hermes/
+.tmp/
 temp/
 audit-output/
 CRYPTOTUBER-FIXES.md
