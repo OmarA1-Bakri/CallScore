@@ -1,0 +1,10 @@
+.git
+.github
+.next
+.omx
+.serena
+node_modules
+docs
+coverage
+*.log
+*.local
