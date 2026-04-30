@@ -2,6 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import { getDb } from "../lib/db";
 
+type MigrationFile = {
+  label: string;
+  filePath: string;
+};
+
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
   const root = path.resolve(__dirname, "../..");
@@ -27,46 +32,93 @@ function timestamp(): string {
   return new Date().toISOString();
 }
 
-async function main(): Promise<void> {
-  loadEnv();
-
-  const schemaPath = path.resolve(__dirname, "../../schema.sql");
-  if (!fs.existsSync(schemaPath)) {
-    console.error(`[${timestamp()}] ERROR: schema.sql not found at ${schemaPath}`);
-    process.exit(1);
-  }
-
-  const schemaSql = fs.readFileSync(schemaPath, "utf-8");
-
-  // Remove standalone comment lines, then split on semicolons
-  const cleaned = schemaSql
+export function stripSqlCommentLines(sql: string): string {
+  return sql
     .split("\n")
     .filter((line) => !line.trimStart().startsWith("--"))
     .join("\n");
+}
 
-  const statements = cleaned
+export function splitSqlStatements(sql: string): string[] {
+  return stripSqlCommentLines(sql)
     .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+    .map((statement) => statement.trim())
+    .filter((statement) => statement.length > 0);
+}
+
+export function getMigrationFiles(root: string): MigrationFile[] {
+  const schemaPath = path.join(root, "schema.sql");
+  if (!fs.existsSync(schemaPath)) {
+    throw new Error(`schema.sql not found at ${schemaPath}`);
+  }
+
+  const migrationsDir = path.join(root, "migrations");
+  const numberedMigrations = fs.existsSync(migrationsDir)
+    ? fs
+        .readdirSync(migrationsDir)
+        .filter((fileName) => /^\d+-.+\.sql$/.test(fileName))
+        .sort((a, b) => a.localeCompare(b))
+        .map((fileName) => ({
+          label: `migrations/${fileName}`,
+          filePath: path.join(migrationsDir, fileName),
+        }))
+    : [];
+
+  return [
+    {
+      label: "schema.sql",
+      filePath: schemaPath,
+    },
+    ...numberedMigrations,
+  ];
+}
+
+async function main(): Promise<void> {
+  loadEnv();
+
+  const root = path.resolve(__dirname, "../..");
+  let migrationFiles: MigrationFile[];
+  try {
+    migrationFiles = getMigrationFiles(root);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[${timestamp()}] ERROR: ${msg}`);
+    process.exit(1);
+  }
 
   const db = getDb();
 
-  console.log(`[${timestamp()}] Starting migration with ${statements.length} statements...`);
+  const filesWithStatements = migrationFiles.map((file) => ({
+    ...file,
+    statements: splitSqlStatements(fs.readFileSync(file.filePath, "utf-8")),
+  }));
+
+  const statementCount = filesWithStatements.reduce(
+    (sum, file) => sum + file.statements.length,
+    0,
+  );
+
+  console.log(
+    `[${timestamp()}] Starting migration with ${statementCount} statements across ${filesWithStatements.length} files...`,
+  );
 
   let success = 0;
   let failed = 0;
 
-  for (const statement of statements) {
-    const preview = statement.replace(/\s+/g, " ").slice(0, 80);
-    try {
-      await db(`${statement};`);
-      success++;
-      console.log(`[${timestamp()}] OK: ${preview}...`);
-    } catch (error: unknown) {
-      failed++;
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[${timestamp()}] FAIL: ${preview}...`);
-      console.error(`  -> ${msg}`);
+  for (const file of filesWithStatements) {
+    console.log(`[${timestamp()}] Applying ${file.label}...`);
+    for (const statement of file.statements) {
+      const preview = statement.replace(/\s+/g, " ").slice(0, 80);
+      try {
+        await db(`${statement};`);
+        success++;
+        console.log(`[${timestamp()}] OK: ${file.label}: ${preview}...`);
+      } catch (error: unknown) {
+        failed++;
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[${timestamp()}] FAIL: ${file.label}: ${preview}...`);
+        console.error(`  -> ${msg}`);
+      }
     }
   }
 
@@ -74,7 +126,9 @@ async function main(): Promise<void> {
   process.exit(failed > 0 ? 1 : 0);
 }
 
-main().catch((err) => {
-  console.error(`[${new Date().toISOString()}] Fatal error:`, err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`[${new Date().toISOString()}] Fatal error:`, err);
+    process.exit(1);
+  });
+}
