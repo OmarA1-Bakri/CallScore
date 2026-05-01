@@ -14,35 +14,35 @@ const MOCK_CREATORS: readonly Creator[] = [
   {
     id: 1, name: "Altcoin Daily", youtube_handle: "@AltcoinDaily",
     youtube_channel_id: null, subscribers: "1.65M",
-    focus: "Daily altcoin picks, BTC/ETH/ADA/SOL, AI tokens", tier: "elite",
+    focus: "Daily altcoin picks, BTC/ETH/ADA/SOL, AI tokens", tier: "alpha",
     total_calls: 210, win_rate: 59.5, avg_return: 9.7, alpha_score: 64,
     accuracy_rank: 1, last_scraped_at: null, created_at: "2025-01-01T00:00:00Z",
   },
   {
     id: 2, name: "Alex Becker", youtube_handle: "@AlexBeckersChannel",
     youtube_channel_id: null, subscribers: "1.6M",
-    focus: "Bold altcoin calls, AI crypto (RENDER, FET, TAO)", tier: "elite",
+    focus: "Bold altcoin calls, AI crypto (RENDER, FET, TAO)", tier: "alpha",
     total_calls: 55, win_rate: 54.5, avg_return: 25.0, alpha_score: 59,
     accuracy_rank: 2, last_scraped_at: null, created_at: "2025-01-01T00:00:00Z",
   },
   {
     id: 3, name: "Discover Crypto", youtube_handle: "@DiscoverCrypto_",
     youtube_channel_id: null, subscribers: "1.4M",
-    focus: "SOL ecosystem, broad altcoin analysis", tier: "elite",
+    focus: "SOL ecosystem, broad altcoin analysis", tier: "alpha",
     total_calls: 180, win_rate: 57.2, avg_return: 8.4, alpha_score: 54,
     accuracy_rank: 3, last_scraped_at: null, created_at: "2025-01-01T00:00:00Z",
   },
   {
     id: 4, name: "Benjamin Cowen", youtube_handle: "@intothecryptoverse",
     youtube_channel_id: null, subscribers: "817K",
-    focus: "Quantitative cycle analysis, BTC/ETH/ADA/DOT", tier: "elite",
+    focus: "Quantitative cycle analysis, BTC/ETH/ADA/DOT", tier: "alpha",
     total_calls: 63, win_rate: 68.2, avg_return: 15.1, alpha_score: 52,
     accuracy_rank: 4, last_scraped_at: null, created_at: "2025-01-01T00:00:00Z",
   },
   {
     id: 5, name: "CryptosRUs", youtube_handle: "@CryptosRUs",
     youtube_channel_id: null, subscribers: "810K",
-    focus: "Daily BTC/ETH updates, broad alt coverage", tier: "elite",
+    focus: "Daily BTC/ETH updates, broad alt coverage", tier: "alpha",
     total_calls: 156, win_rate: 45.5, avg_return: -0.8, alpha_score: 51,
     accuracy_rank: 5, last_scraped_at: null, created_at: "2025-01-01T00:00:00Z",
   },
@@ -187,7 +187,7 @@ function buildLeaderboardRows(): readonly LeaderboardRow[] {
     const rank = idx + 1;
     const stats = makeStat(creator, rank);
     const tierRequired =
-      rank <= 5 ? "elite" : rank <= 10 ? "pro" : "free";
+      rank <= 5 ? "alpha" : rank <= 10 ? "pro" : "free";
 
     const trends: readonly ("up" | "down" | "stable")[] = [
       "up", "stable", "up", "down", "stable",

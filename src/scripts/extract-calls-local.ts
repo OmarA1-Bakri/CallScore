@@ -3,36 +3,16 @@
  * Scans transcripts for coin mentions + directional signals.
  * Designed for fast initial seed; weekly Gemini pipeline refines accuracy.
  */
-import * as fs from "fs";
+import { fileURLToPath } from "url";
 import * as path from "path";
 import { query } from "../lib/db";
 import { TRACKED_SYMBOLS, SYMBOL_NAMES, SYMBOL_TICKERS } from "../lib/constants";
 import { computeSpecificity } from "../lib/scoring";
-
-function loadEnv(): void {
-  if (process.env.NEON_DATABASE_URL) return;
-  const root = path.resolve(__dirname, "../..");
-  const envPath = fs.existsSync(path.join(root, ".env.local"))
-    ? path.join(root, ".env.local")
-    : path.join(root, ".env");
-  if (!fs.existsSync(envPath)) return;
-  const lines = fs.readFileSync(envPath, "utf-8").split("\n");
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eqIdx = line.indexOf("=");
-    if (eqIdx < 0) continue;
-    const key = line.slice(0, eqIdx).trim();
-    const value = line.slice(eqIdx + 1).trim();
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
-  }
-}
-
-function timestamp(): string {
-  return new Date().toISOString();
-}
+import {
+  loadEnv,
+  replaceStoredCallsForVideo,
+  timestamp,
+} from "./script-helpers";
 
 // Build lookup: keyword → symbol
 function buildCoinKeywords(): Map<string, string> {
@@ -227,10 +207,27 @@ function extractCallsFromTranscript(transcript: string): readonly LocalCall[] {
   return calls;
 }
 
-async function main(): Promise<void> {
+export interface LocalExtractionArgs {
+  readonly limit: number;
+}
+
+function numericArg(argv: readonly string[], name: string, fallback: number): number {
+  const idx = argv.indexOf(`--${name}`);
+  const value = idx >= 0 ? Number(argv[idx + 1]) : fallback;
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+export function parseLocalExtractionArgs(argv: readonly string[]): LocalExtractionArgs {
+  return {
+    limit: numericArg(argv, "limit", 250),
+  };
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
 
-  console.log(`[${timestamp()}] Starting LOCAL call extraction (keyword-based)...`);
+  const { limit } = parseLocalExtractionArgs(argv);
+  console.log(`[${timestamp()}] Starting LOCAL call extraction (keyword-based, limit=${limit})...`);
 
   const videos = await query<{
     id: number;
@@ -246,7 +243,9 @@ async function main(): Promise<void> {
      WHERE v.calls_extracted = false
        AND v.transcript IS NOT NULL
        AND v.transcript_quality > 0.2
-     ORDER BY v.published_at DESC`,
+     ORDER BY v.published_at DESC
+     LIMIT $1`,
+    [limit],
   );
 
   console.log(`[${timestamp()}] Found ${videos.length} videos to process`);
@@ -258,60 +257,40 @@ async function main(): Promise<void> {
     if (!video.transcript) continue;
 
     const calls = extractCallsFromTranscript(video.transcript);
-
-    for (const call of calls) {
-      const specificityScore = computeSpecificity({
+    const persistedCalls = calls.map((call) => ({
+      symbol: call.symbol,
+      direction: call.direction,
+      call_type: call.call_type,
+      entry_price: null,
+      target_price: call.target_price,
+      stop_loss: null,
+      timeframe: null,
+      confidence: call.confidence,
+      strategy_type: call.strategy_type,
+      raw_quote: call.raw_quote,
+      extraction_confidence: 0.6,
+      specificity_score: computeSpecificity({
         entry_price: null,
         target_price: call.target_price,
         stop_loss: null,
         timeframe: null,
+      }),
+    }));
+
+    try {
+      await replaceStoredCallsForVideo({
+        creatorId: video.creator_id,
+        videoId: video.id,
+        callDate: video.published_at ?? video.created_at,
+        calls: persistedCalls,
+        markVideoExtracted: true,
       });
-
-      const callDate = video.published_at ?? video.created_at;
-
-      try {
-        await query(
-          `INSERT INTO calls (
-            creator_id, video_id, symbol, direction, call_type,
-            entry_price, target_price, stop_loss, timeframe,
-            confidence, strategy_type, raw_quote,
-            extraction_confidence, specificity_score, call_date
-          ) VALUES (
-            $1, $2, $3, $4, $5,
-            $6, $7, $8, $9,
-            $10, $11, $12,
-            $13, $14, $15
-          )`,
-          [
-            video.creator_id,
-            video.id,
-            call.symbol,
-            call.direction,
-            call.call_type,
-            null, // entry_price
-            call.target_price,
-            null, // stop_loss
-            null, // timeframe
-            call.confidence,
-            call.strategy_type,
-            call.raw_quote,
-            0.6, // extraction_confidence (keyword-based is moderate)
-            specificityScore,
-            callDate,
-          ],
-        );
-        totalCalls++;
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[${timestamp()}]   Insert call error: ${msg}`);
-      }
+      totalCalls += calls.length;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`[${timestamp()}]   Insert call error: ${msg}`);
+      continue;
     }
-
-    // Mark video as extracted
-    await query(
-      "UPDATE videos SET calls_extracted = true, extraction_pass = extraction_pass + 1 WHERE id = $1",
-      [video.id],
-    );
 
     processed++;
     if (processed % 100 === 0 || calls.length > 0) {
@@ -326,7 +305,13 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err) => {
-  console.error(`[${new Date().toISOString()}] Fatal error:`, err);
-  process.exit(1);
-});
+const isEntryPoint =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isEntryPoint) {
+  main().catch((err) => {
+    console.error(`[${new Date().toISOString()}] Fatal error:`, err);
+    process.exit(1);
+  });
+}

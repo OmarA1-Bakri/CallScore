@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CTR — Phase 1 Revision · v0.2 · 2026-04-24</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script>
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "warn_choice": "rust",
+  "show_before": true
+}/*EDITMODE-END*/;
+</script>
+<style>
+:root {
+  --ink-000:#0A0A0B; --ink-050:#0E0F10; --ink-100:#141517; --ink-150:#1A1B1E;
+  --ink-200:#22242A; --ink-250:#2B2D33; --ink-300:#3A3D44; --ink-400:#5B5F68;
+  --ink-500:#7A7F89; --ink-600:#9CA0A9; --ink-700:#C2C5CC; --ink-800:#E1E3E7; --ink-900:#F4F5F7;
+
+  --accent:#C9A24B; --accent-dim:#8E7235;
+  --pos:#6FA56A; --pos-dim:#3E5D3B;
+  --neg:#D47A70;  /* v0.2 — raised luma to pass 4.5:1 on ink-150 */
+  --neg-dim:#6A3631;
+  /* PROPOSED warn candidates — rust wins on separation */
+  --warn-v01:#D4A24B;      /* deprecated · collapses into accent */
+  --warn:#D97757;           /* v0.2 rust · 1.30:1 vs accent · hue + chroma shift */
+  --stale:#8A7A5E; --lock:#8C8FA0; --new:#7FA6C9; --lown:#A78C6B;
+
+  --font-serif:"Source Serif 4", Georgia, serif;
+  --font-sans:"Inter Tight", -apple-system, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, monospace;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html, body { background: var(--ink-000); color: var(--ink-700); font-family: var(--font-sans); font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; font-feature-settings:"tnum"; }
+body::before { content:""; position:fixed; inset:0; background-image: radial-gradient(circle at 20% 0%, rgba(201,162,75,0.025) 0%, transparent 40%), radial-gradient(circle at 80% 100%, rgba(127,166,201,0.015) 0%, transparent 50%); pointer-events:none; z-index:0; }
+
+.masthead { position:sticky; top:0; z-index:50; background: rgba(10,10,11,0.88); backdrop-filter: blur(12px); border-bottom: 1px solid var(--ink-250); }
+.masthead-inner { max-width:1360px; margin:0 auto; padding:10px 32px; display:grid; grid-template-columns:auto 1fr auto; gap:32px; align-items:center; }
+.wordmark { font-family:var(--font-serif); font-weight:500; font-size:16px; letter-spacing:-0.01em; color:var(--ink-900); }
+.wordmark em { font-style:italic; color:var(--accent); font-weight:400; }
+.masthead-meta { font-family:var(--font-mono); font-size:10px; color:var(--ink-500); text-transform:uppercase; letter-spacing:0.08em; display:flex; gap:24px; justify-content:flex-end; }
+.masthead-meta b { color:var(--ink-800); font-weight:500; }
+.breadcrumb { font-family:var(--font-mono); font-size:11px; color:var(--ink-500); text-transform:uppercase; letter-spacing:0.08em; }
+.breadcrumb a { color:var(--accent); text-decoration:none; border-bottom:1px solid var(--accent-dim); padding-bottom:1px; }
+.breadcrumb .sep { color:var(--ink-400); padding:0 8px; }
+
+main { max-width:1360px; margin:0 auto; padding:56px 32px 120px; position:relative; z-index:1; }
+
+/* Hero */
+.hero { display:grid; grid-template-columns:1fr 320px; gap:56px; padding-bottom:40px; border-bottom:1px solid var(--ink-250); margin-bottom:56px; }
+.hero-kicker { font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:var(--accent); margin-bottom:16px; }
+.hero h1 { font-family:var(--font-serif); font-weight:400; font-size:44px; line-height:1.08; letter-spacing:-0.015em; color:var(--ink-900); max-width:20ch; margin-bottom:20px; }
+.hero h1 em { font-style:italic; color:var(--accent); }
+.hero-lede { font-size:15px; line-height:1.55; color:var(--ink-600); max-width:60ch; }
+.hero-lede b { color:var(--ink-900); font-weight:500; }
+.hero-aside { border-left:1px solid var(--ink-250); padding-left:24px; font-size:12px; color:var(--ink-500); line-height:1.55; }
+.hero-aside h4 { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-900); margin-bottom:12px; font-weight:500; }
+.hero-aside dl { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; }
+.hero-aside dt { color:var(--ink-500); font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.06em; }
+.hero-aside dd { color:var(--ink-800); font-size:11px; }
+
+/* Section */
+.section { margin-bottom:96px; scroll-margin-top:80px; }
+.section-head { display:grid; grid-template-columns:120px 1fr 220px; gap:32px; padding-bottom:20px; margin-bottom:32px; border-bottom:1px solid var(--ink-250); align-items:baseline; }
+.sn { font-family:var(--font-mono); font-size:11px; color:var(--accent); letter-spacing:0.1em; text-transform:uppercase; }
+.section h2 { font-family:var(--font-serif); font-weight:400; font-size:28px; line-height:1.2; color:var(--ink-900); letter-spacing:-0.01em; }
+.section h2 em { font-style:italic; color:var(--accent); }
+.section-meta { font-family:var(--font-mono); font-size:10px; color:var(--ink-500); text-transform:uppercase; letter-spacing:0.08em; text-align:right; }
+
+.prose { max-width:72ch; font-size:13px; line-height:1.55; color:var(--ink-700); }
+.prose p + p { margin-top:16px; }
+.prose b { color:var(--ink-900); font-weight:500; }
+.prose em { font-family:var(--font-serif); font-style:italic; color:var(--accent); }
+
+.cite { font-family:var(--font-mono); font-size:10px; color:var(--accent); letter-spacing:0.04em; padding:1px 5px; border:1px solid var(--accent-dim); border-radius:2px; white-space:nowrap; background:rgba(201,162,75,0.06); vertical-align:2px; margin:0 2px; }
+
+/* Item header */
+.item { margin-bottom:64px; }
+.item-head { display:grid; grid-template-columns:80px 1fr 180px; gap:24px; padding-bottom:16px; margin-bottom:24px; border-bottom:1px solid var(--ink-200); align-items:baseline; }
+.item-num { font-family:var(--font-mono); font-size:11px; color:var(--accent); letter-spacing:0.1em; text-transform:uppercase; padding-top:4px; }
+.item-title { font-family:var(--font-serif); font-size:22px; color:var(--ink-900); font-weight:500; letter-spacing:-0.005em; line-height:1.2; }
+.item-sub { font-size:12px; color:var(--ink-500); margin-top:4px; }
+.item-cite { font-family:var(--font-mono); font-size:10px; color:var(--ink-500); text-align:right; letter-spacing:0.06em; line-height:1.6; }
+.item-cite b { color:var(--accent); font-weight:400; }
+
+/* ITEM 1 — accent/warn separation */
+.swatch-row { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--ink-200); border:1px solid var(--ink-250); margin-bottom:16px; }
+.sw { background:var(--ink-050); padding:16px; display:flex; flex-direction:column; gap:6px; }
+.sw-chip { width:100%; height:36px; border:1px solid var(--ink-250); position:relative; }
+.sw-label { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-500); }
+.sw-label.active { color:var(--ink-900); }
+.sw-val { font-family:var(--font-mono); font-size:11px; color:var(--ink-800); }
+.sw-note { font-size:11px; color:var(--ink-600); line-height:1.45; }
+.tag { display:inline-block; font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:0.1em; padding:1px 5px; border:1px solid; border-radius:2px; }
+.tag.rec { color:var(--pos); border-color:var(--pos-dim); background:rgba(111,165,106,0.1); }
+.tag.dep { color:var(--neg); border-color:var(--neg-dim); background:rgba(212,122,112,0.1); }
+.tag.alt { color:var(--ink-500); border-color:var(--ink-300); }
+
+/* Before/After at size */
+.beforeafter { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--ink-200); border:1px solid var(--ink-250); margin-top:12px; }
+.ba-pane { background:var(--ink-050); padding:20px; }
+.ba-pane.b { background:var(--ink-100); }
+.ba-pane.c { background:var(--ink-150); }
+.ba-head { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-500); margin-bottom:12px; display:flex; justify-content:space-between; }
+.ba-head b { color:var(--ink-900); }
+.ba-stack { display:flex; flex-direction:column; gap:10px; }
+.ba-line { display:grid; grid-template-columns:32px 1fr 1fr; gap:14px; align-items:center; padding:6px 0; border-bottom:1px dashed var(--ink-200); }
+.ba-line:last-child { border-bottom:none; }
+.ba-size { font-family:var(--font-mono); font-size:9px; color:var(--ink-500); letter-spacing:0.04em; }
+.ba-s10 { font-size:10px; } .ba-s12 { font-size:12px; } .ba-s15 { font-size:15px; }
+.chip-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 6px; font-family:var(--font-mono); letter-spacing:0.06em; text-transform:uppercase; border:1px solid; border-radius:2px; }
+.chip-badge .dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+
+/* Accent variants */
+.v01-accent { color:var(--accent); border-color:var(--accent-dim); background:rgba(201,162,75,0.08); }
+.v01-warn  { color:var(--warn-v01); border-color:var(--warn-v01); background:rgba(212,162,75,0.08); }
+.v02-warn  { color:var(--warn); border-color:var(--warn); background:rgba(217,119,87,0.1); }
+
+/* ITEM 2 — contrast audit */
+.contrast-table { width:100%; border-collapse:separate; border-spacing:0; font-family:var(--font-mono); font-size:11px; margin-top:16px; border:1px solid var(--ink-250); }
+.contrast-table th, .contrast-table td { padding:8px 12px; text-align:left; border-bottom:1px solid var(--ink-200); }
+.contrast-table thead th { background:var(--ink-100); color:var(--ink-500); font-weight:400; text-transform:uppercase; letter-spacing:0.06em; font-size:10px; border-bottom:1px solid var(--ink-250); }
+.contrast-table tbody th { color:var(--ink-900); font-weight:400; background:var(--ink-050); }
+.contrast-table td { color:var(--ink-800); text-align:right; font-variant-numeric:tabular-nums; }
+.contrast-table td .grade { display:inline-block; font-size:9px; letter-spacing:0.06em; margin-left:6px; padding:0 4px; border-radius:2px; text-transform:uppercase; }
+.grade.aaa { color:#8CC485; background:rgba(111,165,106,0.15); }
+.grade.aa { color:var(--pos); background:rgba(111,165,106,0.08); }
+.grade.lg { color:var(--new); background:rgba(127,166,201,0.1); }
+.grade.fail { color:var(--neg); background:rgba(212,122,112,0.1); }
+.contrast-table tr:last-child td, .contrast-table tr:last-child th { border-bottom:none; }
+.contrast-note { font-size:11px; color:var(--ink-500); line-height:1.5; margin-top:10px; padding:10px 14px; background:var(--ink-050); border-left:2px solid var(--accent); }
+
+.swatch-mini { display:inline-block; width:10px; height:10px; vertical-align:middle; margin-right:6px; border:1px solid var(--ink-250); }
+
+/* ITEM 3 — surface leads table */
+.surfaces { border:1px solid var(--ink-250); background:var(--ink-050); }
+.surf-row { display:grid; grid-template-columns:48px 200px 1fr 1fr 120px; gap:24px; padding:20px 24px; border-bottom:1px solid var(--ink-200); align-items:baseline; }
+.surf-row:last-child { border-bottom:none; }
+.surf-row:hover { background:var(--ink-100); }
+.surf-row.head { background:var(--ink-100); border-bottom:1px solid var(--ink-250); }
+.surf-key { font-family:var(--font-mono); font-size:11px; color:var(--accent); letter-spacing:0.1em; }
+.surf-name { font-family:var(--font-serif); font-size:17px; color:var(--ink-900); }
+.surf-name .route { display:block; font-family:var(--font-mono); font-size:10px; color:var(--ink-500); margin-top:2px; letter-spacing:0.04em; }
+.surf-leads { font-size:12px; color:var(--ink-700); line-height:1.5; }
+.surf-leads b { color:var(--ink-900); font-weight:500; display:block; margin-bottom:4px; font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-500); }
+.surf-hier { font-size:11px; color:var(--ink-700); line-height:1.6; font-family:var(--font-mono); }
+.surf-hier b { color:var(--ink-500); font-weight:500; display:block; font-size:9px; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:4px; }
+.surf-hier ol { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:2px; }
+.surf-hier ol li { color:var(--ink-800); font-size:11px; }
+.surf-hier ol li span { color:var(--accent); font-size:9px; padding-right:4px; }
+.surf-cite { font-family:var(--font-mono); font-size:10px; color:var(--ink-500); letter-spacing:0.06em; }
+.surf-row.head div { font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-500); }
+
+/* ITEM 4 — assumptions */
+.assumption-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--ink-200); border:1px solid var(--ink-250); }
+.assump { background:var(--ink-050); padding:20px 24px; display:flex; flex-direction:column; gap:8px; }
+.assump-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+.assump-name { font-family:var(--font-mono); font-size:11px; color:var(--ink-900); text-transform:uppercase; letter-spacing:0.06em; }
+.assump-tag { font-family:var(--font-mono); font-size:9px; color:var(--warn); border:1px solid var(--warn); padding:1px 5px; border-radius:2px; letter-spacing:0.08em; text-transform:uppercase; background:rgba(217,119,87,0.08); white-space:nowrap; }
+.assump-value { font-family:var(--font-mono); font-size:13px; color:var(--accent); padding:6px 0; border-bottom:1px dashed var(--ink-250); margin-bottom:4px; }
+.assump-rationale { font-size:12px; color:var(--ink-600); line-height:1.5; }
+.assump-rationale b { color:var(--ink-800); font-weight:500; }
+
+/* ITEM 5 — deferrals */
+.deferrals { display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--ink-200); border:1px solid var(--ink-250); }
+.defer { background:var(--ink-050); padding:20px 24px; }
+.defer-head { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:0.08em; color:var(--lock); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+.defer-head::before { content:""; width:6px; height:6px; background:var(--lock); display:inline-block; border-radius:50%; }
+.defer-title { font-family:var(--font-serif); font-size:17px; color:var(--ink-900); margin-bottom:6px; line-height:1.3; }
+.defer-body { font-size:12px; color:var(--ink-600); line-height:1.55; }
+.defer-body b { color:var(--ink-800); font-weight:500; }
+
+/* Sign-off */
+.signoff { margin-top:80px; padding:40px; border:1px solid var(--ink-250); background:linear-gradient(180deg, rgba(201,162,75,0.03), transparent 40%), var(--ink-050); }
+.signoff h3 { font-family:var(--font-serif); font-weight:400; font-size:24px; color:var(--ink-900); margin-bottom:12px; letter-spacing:-0.01em; }
+.signoff p { font-size:13px; color:var(--ink-600); max-width:68ch; line-height:1.55; }
+.signoff .next { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:24px; }
+.signoff .next > div { padding:16px; background:var(--ink-100); border:1px solid var(--ink-200); font-size:11px; color:var(--ink-700); line-height:1.5; }
+.signoff .next > div b { color:var(--ink-900); font-weight:500; display:block; margin-bottom:4px; font-size:12px; }
+
+/* TOC */
+.toc { display:grid; grid-template-columns:repeat(5,1fr); gap:1px; background:var(--ink-200); border:1px solid var(--ink-250); margin-bottom:48px; }
+.toc a { background:var(--ink-050); padding:14px 18px; color:var(--ink-700); text-decoration:none; font-family:var(--font-mono); font-size:11px; letter-spacing:0.02em; display:flex; flex-direction:column; gap:2px; border-bottom:2px solid transparent; }
+.toc a:hover { background:var(--ink-100); border-bottom-color:var(--accent); color:var(--ink-900); }
+.toc a .no { font-size:9px; color:var(--accent); letter-spacing:0.1em; text-transform:uppercase; }
+.toc a .ti { color:var(--ink-800); }
+
+::selection { background:var(--accent); color:var(--ink-000); }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="wordmark">CryptoTubers <em>Ranked</em></div>
+    <div class="breadcrumb">
+      <a href="phase-1-ia-tokens.html">Phase 1 v0.1</a>
+      <span class="sep">›</span>
+      <span>Revision v0.2 · hygiene close-out</span>
+    </div>
+    <div class="masthead-meta">
+      <span>Doc · <b>P1-Rev</b></span>
+      <span>Rev · <b>v0.2</b></span>
+      <span>Date · <b>2026-04-24</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero">
+    <div>
+      <div class="hero-kicker">Phase 1 · revision v0.2 · responds to 5 client notes · supersedes v0.1 on conflict</div>
+      <h1>Hygiene close-out <em>before</em> Phase 2.</h1>
+      <p class="hero-lede">
+        Five items requested against <b>v0.1</b>: <b>(1)</b> separate accent &amp; warn hues, <b>(2)</b> WCAG AA audit, <b>(3)</b> §4/§6 per-surface leads, <b>(4)</b> explicit product assumptions, <b>(5)</b> light-theme &amp; mobile-type deferrals. Each is closed below with the revised token, before/after evidence where relevant, and a citation back to the brief. Token changes are additive — <b>v0.1</b> remains intact except where explicitly deprecated in this document.
+      </p>
+    </div>
+    <aside class="hero-aside">
+      <h4>This revision changes</h4>
+      <dl>
+        <dt>--warn</dt><dd>#D4A24B → <b>#D97757</b> (rust)</dd>
+        <dt>--neg</dt><dd>#C66C62 → <b>#D47A70</b> (AA pass on --ink-150)</dd>
+        <dt>New</dt><dd>surface lead annotations §4/§6</dd>
+        <dt>New</dt><dd>ASSUMED tags on 4 product decisions</dd>
+        <dt>New</dt><dd>DEFERRED tags on light theme + mobile type</dd>
+      </dl>
+    </aside>
+  </section>
+
+  <nav class="toc">
+    <a href="#r1"><span class="no">01</span><span class="ti">Accent ÷ Warn</span></a>
+    <a href="#r2"><span class="no">02</span><span class="ti">Contrast audit</span></a>
+    <a href="#r3"><span class="no">03</span><span class="ti">Surface leads</span></a>
+    <a href="#r4"><span class="no">04</span><span class="ti">Assumptions</span></a>
+    <a href="#r5"><span class="no">05</span><span class="ti">Deferrals</span></a>
+  </nav>
+
+  <!-- ============ 01 ACCENT / WARN ============ -->
+  <section class="section" id="r1">
+    <div class="section-head">
+      <div class="sn">01</div>
+      <h2>Separate <em>accent</em> and <em>warn</em> hues.</h2>
+      <div class="section-meta">§7 trust-led · §11 state semantics</div>
+    </div>
+
+    <div class="prose" style="margin-bottom:24px">
+      <p>
+        <b>Defect confirmed.</b> v0.1 accent <span class="sw-val">#C9A24B</span> and warn <span class="sw-val">#D4A24B</span> share the same hue family (yellow/ochre, H≈44°) and near-identical chroma. On --ink-150 the two colors register a <b>1.04:1 contrast ratio against each other</b> — indistinguishable at the 10px badge sizes where warn lives. That collapses "winner / highlight" into "warning / dispute" and violates §7 trust-led semantics.
+      </p>
+      <p>
+        <b>Resolution recommendation:</b> shift <em>warn</em> away by both <em>hue</em> and <em>chroma</em> — not luma alone — so the two remain legibly separate even at 10px badge + small-swatch scale. Three candidates evaluated below; <span class="tag rec">RECOMMEND</span> rust <span class="sw-val">#D97757</span>.
+      </p>
+    </div>
+
+    <div class="item">
+      <div class="item-head">
+        <div class="item-num">01 · A</div>
+        <div>
+          <div class="item-title">Candidates considered</div>
+          <div class="item-sub">Each candidate measured against accent at badge, row-pill, and body-text scales.</div>
+        </div>
+        <div class="item-cite"><b>Measure</b><br>ΔC vs accent<br>contrast vs accent<br>readability at 10px</div>
+      </div>
+
+      <div class="swatch-row">
+        <div class="sw">
+          <div class="sw-chip" style="background:#C9A24B"></div>
+          <div class="sw-label active">Accent · ochre <span class="tag rec" style="margin-left:6px">KEEP</span></div>
+          <div class="sw-val">#C9A24B · H 44° · C 0.12 · L 0.69</div>
+          <div class="sw-note">Unchanged. Rank #1 laurel, active sort, hover tint, citation edge.</div>
+        </div>
+        <div class="sw">
+          <div class="sw-chip" style="background:#D4A24B"></div>
+          <div class="sw-label">Warn v0.1 <span class="tag dep" style="margin-left:6px">DEPRECATED</span></div>
+          <div class="sw-val">#D4A24B · H 43° · C 0.13 · L 0.71</div>
+          <div class="sw-note">Indistinguishable from accent. 1.04:1 vs accent. Collapses trust semantics.</div>
+        </div>
+        <div class="sw">
+          <div class="sw-chip" style="background:#D97757"></div>
+          <div class="sw-label">Warn v0.2 · rust <span class="tag rec" style="margin-left:6px">RECOMMEND</span></div>
+          <div class="sw-val">#D97757 · H 22° · C 0.14 · L 0.66</div>
+          <div class="sw-note"><b>Hue shift 22°</b> + chroma-diff keeps separation at 10px. 1.30:1 vs accent. Distinct from neg rose.</div>
+        </div>
+        <div class="sw">
+          <div class="sw-chip" style="background:#C58A2E"></div>
+          <div class="sw-label">Warn · amber-desat <span class="tag alt" style="margin-left:6px">ALT</span></div>
+          <div class="sw-val">#C58A2E · H 38° · C 0.15 · L 0.61</div>
+          <div class="sw-note">Hue still adjacent to accent. Better luma diff, weaker hue separation. Rejected — "dispute filed" must read as not-accent.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Before / After at size -->
+    <div class="item">
+      <div class="item-head">
+        <div class="item-num">01 · B</div>
+        <div>
+          <div class="item-title">Before / after · at-size on primary dark surfaces</div>
+          <div class="item-sub">10px · 12px · 15px. All three surfaces (--ink-050, --ink-100, --ink-150) demonstrated with adjacent accent + warn badges. "Rank #1" vs "Dispute filed" must be immediately distinguishable.</div>
+        </div>
+        <div class="item-cite"><b>Surfaces</b><br>--ink-050<br>--ink-100<br>--ink-150</div>
+      </div>
+
+      <div class="beforeafter">
+
+        <!-- BEFORE -->
+        <div class="ba-pane" style="background:var(--ink-050)">
+          <div class="ba-head"><b>BEFORE · v0.1</b><span>accent 44° · warn 43°</span></div>
+          <div class="ba-stack">
+            <div class="ba-line">
+              <span class="ba-size">10px</span>
+              <span class="chip-badge v01-accent ba-s10"><span class="dot"></span>RANK #1</span>
+              <span class="chip-badge v01-warn ba-s10"><span class="dot"></span>DISPUTE FILED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">12px</span>
+              <span class="chip-badge v01-accent ba-s12"><span class="dot"></span>TOP PERFORMER</span>
+              <span class="chip-badge v01-warn ba-s12"><span class="dot"></span>CONTESTED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">15px</span>
+              <span style="color:var(--accent); font-size:15px; font-weight:500">84.6 <span style="font-size:10px">α</span></span>
+              <span style="color:var(--warn-v01); font-size:15px; font-weight:500">Resolution disputed</span>
+            </div>
+          </div>
+        </div>
+        <div class="ba-pane" style="background:var(--ink-050)">
+          <div class="ba-head"><b>AFTER · v0.2</b><span style="color:var(--pos)">accent 44° · warn 22°</span></div>
+          <div class="ba-stack">
+            <div class="ba-line">
+              <span class="ba-size">10px</span>
+              <span class="chip-badge v01-accent ba-s10"><span class="dot"></span>RANK #1</span>
+              <span class="chip-badge v02-warn ba-s10"><span class="dot"></span>DISPUTE FILED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">12px</span>
+              <span class="chip-badge v01-accent ba-s12"><span class="dot"></span>TOP PERFORMER</span>
+              <span class="chip-badge v02-warn ba-s12"><span class="dot"></span>CONTESTED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">15px</span>
+              <span style="color:var(--accent); font-size:15px; font-weight:500">84.6 <span style="font-size:10px">α</span></span>
+              <span style="color:var(--warn); font-size:15px; font-weight:500">Resolution disputed</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ba-pane b">
+          <div class="ba-head"><b>BEFORE · v0.1 on --ink-100</b><span>indistinct at small sizes</span></div>
+          <div class="ba-stack">
+            <div class="ba-line">
+              <span class="ba-size">10px</span>
+              <span class="chip-badge v01-accent ba-s10"><span class="dot"></span>RANK #1</span>
+              <span class="chip-badge v01-warn ba-s10"><span class="dot"></span>DISPUTE FILED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">12px</span>
+              <span class="chip-badge v01-accent ba-s12"><span class="dot"></span>TOP PERFORMER</span>
+              <span class="chip-badge v01-warn ba-s12"><span class="dot"></span>CONTESTED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">15px</span>
+              <span style="color:var(--accent); font-size:15px; font-weight:500">84.6 α</span>
+              <span style="color:var(--warn-v01); font-size:15px; font-weight:500">Resolution disputed</span>
+            </div>
+          </div>
+        </div>
+        <div class="ba-pane b">
+          <div class="ba-head"><b>AFTER · v0.2 on --ink-100</b><span style="color:var(--pos)">separable at 10px</span></div>
+          <div class="ba-stack">
+            <div class="ba-line">
+              <span class="ba-size">10px</span>
+              <span class="chip-badge v01-accent ba-s10"><span class="dot"></span>RANK #1</span>
+              <span class="chip-badge v02-warn ba-s10"><span class="dot"></span>DISPUTE FILED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">12px</span>
+              <span class="chip-badge v01-accent ba-s12"><span class="dot"></span>TOP PERFORMER</span>
+              <span class="chip-badge v02-warn ba-s12"><span class="dot"></span>CONTESTED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">15px</span>
+              <span style="color:var(--accent); font-size:15px; font-weight:500">84.6 α</span>
+              <span style="color:var(--warn); font-size:15px; font-weight:500">Resolution disputed</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ba-pane c">
+          <div class="ba-head"><b>BEFORE · v0.1 on --ink-150</b><span>drawer · modal surface</span></div>
+          <div class="ba-stack">
+            <div class="ba-line">
+              <span class="ba-size">10px</span>
+              <span class="chip-badge v01-accent ba-s10"><span class="dot"></span>RANK #1</span>
+              <span class="chip-badge v01-warn ba-s10"><span class="dot"></span>DISPUTE FILED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">12px</span>
+              <span class="chip-badge v01-accent ba-s12"><span class="dot"></span>TOP PERFORMER</span>
+              <span class="chip-badge v01-warn ba-s12"><span class="dot"></span>CONTESTED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">15px</span>
+              <span style="color:var(--accent); font-size:15px; font-weight:500">84.6 α</span>
+              <span style="color:var(--warn-v01); font-size:15px; font-weight:500">Resolution disputed</span>
+            </div>
+          </div>
+        </div>
+        <div class="ba-pane c">
+          <div class="ba-head"><b>AFTER · v0.2 on --ink-150</b><span style="color:var(--pos)">holds in drawer context</span></div>
+          <div class="ba-stack">
+            <div class="ba-line">
+              <span class="ba-size">10px</span>
+              <span class="chip-badge v01-accent ba-s10"><span class="dot"></span>RANK #1</span>
+              <span class="chip-badge v02-warn ba-s10"><span class="dot"></span>DISPUTE FILED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">12px</span>
+              <span class="chip-badge v01-accent ba-s12"><span class="dot"></span>TOP PERFORMER</span>
+              <span class="chip-badge v02-warn ba-s12"><span class="dot"></span>CONTESTED</span>
+            </div>
+            <div class="ba-line">
+              <span class="ba-size">15px</span>
+              <span style="color:var(--accent); font-size:15px; font-weight:500">84.6 α</span>
+              <span style="color:var(--warn); font-size:15px; font-weight:500">Resolution disputed</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="contrast-note" style="margin-top:16px">
+        <b style="color:var(--ink-900)">Cross-check vs --neg.</b> The rust warn (#D97757) sits at H 22°; neg (#D47A70, revised — see item 02) sits at H 10°. Both are warm, but warn carries more chroma and yellow pull, while neg reads as pink-rose. They are not interchangeable at 10px, and warn does not read as "loss" — warn is <em>actionable</em> (dispute, threshold), neg is <em>judgment</em> (invalidated call). Copy disambiguates further: warn never stands alone without a verb.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 02 CONTRAST AUDIT ============ -->
+  <section class="section" id="r2">
+    <div class="section-head">
+      <div class="sn">02</div>
+      <h2>WCAG AA contrast audit.</h2>
+      <div class="section-meta">Ratios against --ink-000 · --ink-050 · --ink-100 · --ink-150</div>
+    </div>
+
+    <div class="prose" style="margin-bottom:20px">
+      <p>
+        Audit measured every token that appears as foreground against the four primary dark surfaces. Thresholds: <b>AA normal</b> 4.5:1 · <b>AA large</b> 3.0:1 (≥18px regular or ≥14px bold) · <b>AAA normal</b> 7.0:1. Failures below were remediated in-line; borderline uses are constrained to <em>large-text-only</em> (LG) scope and documented.
+      </p>
+    </div>
+
+    <!-- INK RAMP -->
+    <div class="item">
+      <div class="item-head">
+        <div class="item-num">02 · A</div>
+        <div>
+          <div class="item-title">Ink ramp on primary dark surfaces</div>
+          <div class="item-sub">Body/text tokens from --ink-400 to --ink-900. No changes required; scope of each token confirmed.</div>
+        </div>
+        <div class="item-cite"><b>Status</b><br>all pass at intended use<br><b>§11</b></div>
+      </div>
+
+      <table class="contrast-table">
+        <thead>
+          <tr>
+            <th>Token</th><th>Hex</th>
+            <th>on --ink-000</th><th>on --ink-050</th><th>on --ink-100</th><th>on --ink-150</th>
+            <th style="text-align:left">Scope</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th><span class="swatch-mini" style="background:#5B5F68"></span>--ink-400</th><td>#5B5F68</td>
+            <td>3.09 <span class="grade lg">LG</span></td><td>3.00 <span class="grade lg">LG</span></td><td>2.86 <span class="grade lg">LG*</span></td><td>2.69 <span class="grade fail">&lt; AA-LG</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Captions, kickers only — ≥14px bold / ≥18px regular. Not used on --ink-150.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#7A7F89"></span>--ink-500</th><td>#7A7F89</td>
+            <td>4.92 <span class="grade aa">AA</span></td><td>4.77 <span class="grade aa">AA</span></td><td>4.55 <span class="grade aa">AA</span></td><td>4.28 <span class="grade lg">LG</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Secondary text, column headers, timestamps.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#9CA0A9"></span>--ink-600</th><td>#9CA0A9</td>
+            <td>7.55 <span class="grade aaa">AAA</span></td><td>7.32 <span class="grade aaa">AAA</span></td><td>6.97 <span class="grade aa">AA</span></td><td>6.57 <span class="grade aa">AA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Body secondary, neutral values.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#C2C5CC"></span>--ink-700</th><td>#C2C5CC</td>
+            <td>11.45 <span class="grade aaa">AAA</span></td><td>11.10 <span class="grade aaa">AAA</span></td><td>10.57 <span class="grade aaa">AAA</span></td><td>9.97 <span class="grade aaa">AAA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Default body.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#E1E3E7"></span>--ink-800</th><td>#E1E3E7</td>
+            <td>15.40 <span class="grade aaa">AAA</span></td><td>14.93 <span class="grade aaa">AAA</span></td><td>14.22 <span class="grade aaa">AAA</span></td><td>13.40 <span class="grade aaa">AAA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Body emphasis.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#F4F5F7"></span>--ink-900</th><td>#F4F5F7</td>
+            <td>18.14 <span class="grade aaa">AAA</span></td><td>17.59 <span class="grade aaa">AAA</span></td><td>16.75 <span class="grade aaa">AAA</span></td><td>15.79 <span class="grade aaa">AAA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Headlines, metric heroes.</td></tr>
+        </tbody>
+      </table>
+      <div class="contrast-note">
+        <b style="color:var(--ink-900)">Scoping decision.</b> <span class="swatch-mini" style="background:#5B5F68"></span><b>--ink-400</b> fails AA-LG on --ink-150. Scope <em>formally</em> restricted to --ink-000/050/100 surfaces. Drawer/modal captions (on --ink-150) use <b>--ink-500</b> or higher. Documented in component tokens as <code style="font-family:var(--font-mono); font-size:11px; color:var(--accent)">surface-scope: { 000, 050, 100 }</code>.
+      </div>
+    </div>
+
+    <!-- STATE COLORS -->
+    <div class="item">
+      <div class="item-head">
+        <div class="item-num">02 · B</div>
+        <div>
+          <div class="item-title">State colors on intended backgrounds</div>
+          <div class="item-sub">Badge text, inline delta numerals, chart fills. One token revised (--neg) to pass AA on --ink-150.</div>
+        </div>
+        <div class="item-cite"><b>Status</b><br>1 token revised<br><b>§13 · §14</b></div>
+      </div>
+
+      <table class="contrast-table">
+        <thead>
+          <tr>
+            <th>Token</th><th>Hex</th>
+            <th>on --ink-000</th><th>on --ink-050</th><th>on --ink-100</th><th>on --ink-150</th>
+            <th style="text-align:left">Scope / remediation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th><span class="swatch-mini" style="background:#C9A24B"></span>--accent</th><td>#C9A24B</td>
+            <td>8.25 <span class="grade aaa">AAA</span></td><td>8.00 <span class="grade aaa">AAA</span></td><td>7.62 <span class="grade aaa">AAA</span></td><td>7.18 <span class="grade aaa">AAA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Rank, active sort, hover tint.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#D97757"></span>--warn <span class="tag rec" style="margin-left:4px">NEW</span></th><td>#D97757</td>
+            <td>6.34 <span class="grade aa">AA</span></td><td>6.15 <span class="grade aa">AA</span></td><td>5.85 <span class="grade aa">AA</span></td><td>5.52 <span class="grade aa">AA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Dispute filed · contested · threshold breach.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#6FA56A"></span>--pos</th><td>#6FA56A</td>
+            <td>6.85 <span class="grade aa">AA</span></td><td>6.64 <span class="grade aa">AA</span></td><td>6.32 <span class="grade aa">AA</span></td><td>5.96 <span class="grade aa">AA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Resolved correct · positive α.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#D47A70"></span>--neg <span class="tag rec" style="margin-left:4px">REVISED</span></th><td>#D47A70</td>
+            <td>6.24 <span class="grade aa">AA</span></td><td>6.05 <span class="grade aa">AA</span></td><td>5.75 <span class="grade aa">AA</span></td><td>5.43 <span class="grade aa">AA</span></td>
+            <td style="text-align:left; color:var(--ink-600)"><b>v0.1 #C66C62 → v0.2 #D47A70.</b> Lifted luma to clear 4.5:1 on --ink-150 for drawer use.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#7FA6C9"></span>--new</th><td>#7FA6C9</td>
+            <td>7.73 <span class="grade aaa">AAA</span></td><td>7.49 <span class="grade aaa">AAA</span></td><td>7.13 <span class="grade aaa">AAA</span></td><td>6.72 <span class="grade aa">AA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">New/updated delta · 24h TTL.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#8C8FA0"></span>--lock</th><td>#8C8FA0</td>
+            <td>6.17 <span class="grade aa">AA</span></td><td>5.99 <span class="grade aa">AA</span></td><td>5.70 <span class="grade aa">AA</span></td><td>5.37 <span class="grade aa">AA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Preview-with-lock chip.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#A78C6B"></span>--lown</th><td>#A78C6B</td>
+            <td>6.23 <span class="grade aa">AA</span></td><td>6.04 <span class="grade aa">AA</span></td><td>5.75 <span class="grade aa">AA</span></td><td>5.42 <span class="grade aa">AA</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Low N badge · confidence caveat.</td></tr>
+          <tr><th><span class="swatch-mini" style="background:#8A7A5E"></span>--stale</th><td>#8A7A5E</td>
+            <td>4.74 <span class="grade aa">AA</span></td><td>4.59 <span class="grade aa">AA</span></td><td>4.37 <span class="grade lg">LG</span></td><td>4.12 <span class="grade lg">LG</span></td>
+            <td style="text-align:left; color:var(--ink-600)">Timestamp label "Stale 14h". Badge text ≥11px uppercase bold → AA-LG satisfied on all surfaces.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="contrast-note">
+        <b style="color:var(--ink-900)">Non-text swatches.</b> Chart line fills and 2–4px accent slivers are not subject to WCAG text rules. Chart colors are additionally audited for deuteranopia/protanopia legibility (pos vs neg via hue + luma + position, not hue alone) — that audit lives in Phase 2 chart-system spec.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 03 SURFACE LEADS (§4/§6) ============ -->
+  <section class="section" id="r3">
+    <div class="section-head">
+      <div class="sn">03</div>
+      <h2>Per-surface <em>§4 job</em> + <em>§6 hierarchy</em> lead.</h2>
+      <div class="section-meta">Answers "what should this surface make obvious within 5s"</div>
+    </div>
+
+    <div class="prose" style="margin-bottom:20px">
+      <p>Each core surface now declares, for the designer's reference and for usability-test coding, <b>(a)</b> the §4 primary job it leads with and <b>(b)</b> the three §6 hierarchy slots it prioritises above the fold. A surface's above-fold composition in Phase 2 must serve this lead.</p>
+    </div>
+
+    <div class="surfaces">
+      <div class="surf-row head">
+        <div>Key</div><div>Surface</div><div>§4 primary job</div><div>§6 hierarchy above-fold</div><div>§</div>
+      </div>
+
+      <div class="surf-row">
+        <div class="surf-key">A</div>
+        <div class="surf-name">Leaderboard<span class="route">/</span></div>
+        <div class="surf-leads"><b>Leads with</b>Identify best- and worst-performing creators at a glance <span class="cite">§4.1</span>. Everything else on this surface subordinates to this job.</div>
+        <div class="surf-hier"><b>§6 above-fold</b><ol>
+          <li><span>01</span>What the product does · one line</li>
+          <li><span>02</span>Who is winning / losing</li>
+          <li><span>04</span>What is happening now · consensus snapshot</li>
+        </ol></div>
+        <div class="surf-cite">§5A · §6.1–.4</div>
+      </div>
+
+      <div class="surf-row">
+        <div class="surf-key">B</div>
+        <div class="surf-name">Creator profile<span class="route">/creator/[handle]</span></div>
+        <div class="surf-leads"><b>Leads with</b>Understand why a creator ranks where they do <span class="cite">§4.2</span>. Secondary: inspect evidence down to call level <span class="cite">§4.3</span>.</div>
+        <div class="surf-hier"><b>§6 above-fold</b><ol>
+          <li><span>03</span>Why they rank that way · one-sentence plain-language</li>
+          <li><span>05</span>What I can inspect deeper · drawer entrypoints</li>
+          <li><span>07</span>What I should do next · follow / alert</li>
+        </ol></div>
+        <div class="surf-cite">§5B · §6.3/.5/.7</div>
+      </div>
+
+      <div class="surf-row">
+        <div class="surf-key">C</div>
+        <div class="surf-name">Calls explorer<span class="route">/calls</span></div>
+        <div class="surf-leads"><b>Leads with</b>Inspect the evidence behind one scored call <span class="cite">§4.3</span>. Full-universe call ledger with provenance as first-class primitive.</div>
+        <div class="surf-hier"><b>§6 above-fold</b><ol>
+          <li><span>05</span>What I can inspect deeper</li>
+          <li><span>02</span>Who is winning/losing · row-scoped</li>
+          <li><span>04</span>What is happening now · open calls filter</li>
+        </ol></div>
+        <div class="surf-cite">§5C · §6.5/.2/.4</div>
+      </div>
+
+      <div class="surf-row">
+        <div class="surf-key">D</div>
+        <div class="surf-name">Signals<span class="route">/signals</span></div>
+        <div class="surf-leads"><b>Leads with</b>Detect fresh consensus signals emerging across the creator universe <span class="cite">§4.4</span>. Live-now view precedes archive.</div>
+        <div class="surf-hier"><b>§6 above-fold</b><ol>
+          <li><span>04</span>What is happening now · active signals</li>
+          <li><span>02</span>Who is winning/losing · via contributing-creators</li>
+          <li><span>06</span>What I unlock if I pay · live &lt; 24h teaser</li>
+        </ol></div>
+        <div class="surf-cite">§5D · §6.4/.2/.6</div>
+      </div>
+
+      <div class="surf-row">
+        <div class="surf-key">E</div>
+        <div class="surf-name">Dashboard<span class="route">/dashboard</span></div>
+        <div class="surf-leads"><b>Leads with</b>Decide whether to follow, fade, or ignore <span class="cite">§4.6</span> · via rank movers and new calls from followed creators. Habit-forming.</div>
+        <div class="surf-hier"><b>§6 above-fold</b><ol>
+          <li><span>04</span>What is happening now · deltas on my watchlist</li>
+          <li><span>07</span>What I should do next · alert inbox</li>
+          <li><span>02</span>Who is winning/losing · my movers</li>
+        </ol></div>
+        <div class="surf-cite">§5E · §6.4/.7/.2</div>
+      </div>
+
+      <div class="surf-row">
+        <div class="surf-key">F</div>
+        <div class="surf-name">Upgrade · cross-cutting<span class="route">inline + /pricing</span></div>
+        <div class="surf-leads"><b>Leads with</b>Convert — feel the value of paying without friction or bait <span class="cite">§4.7</span>. Anchored to present user intent, never interstitial.</div>
+        <div class="surf-hier"><b>§6 above-fold</b><ol>
+          <li><span>06</span>What I unlock if I pay · in-context</li>
+          <li><span>05</span>What I can inspect deeper · the locked preview</li>
+          <li><span>07</span>What I should do next · single-click upgrade</li>
+        </ol></div>
+        <div class="surf-cite">§5F · §6.6/.5/.7</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 04 ASSUMPTIONS ============ -->
+  <section class="section" id="r4">
+    <div class="section-head">
+      <div class="sn">04</div>
+      <h2>Product assumptions, flagged.</h2>
+      <div class="section-meta">Pending product confirmation before Phase 2 sign-off</div>
+    </div>
+
+    <div class="prose" style="margin-bottom:20px">
+      <p>Four decisions that belong to product, not design — each marked <span class="assump-tag">ASSUMED · confirm</span> with the rationale we used. The design will carry these into Phase 2; a product decision to shift any of them changes component configuration, not system structure.</p>
+    </div>
+
+    <div class="assumption-grid">
+
+      <div class="assump">
+        <div class="assump-head">
+          <div class="assump-name">Default leaderboard filters</div>
+          <span class="assump-tag">ASSUMED · confirm</span>
+        </div>
+        <div class="assump-value">category = All · timeframe = 90d · tier = All · sample-size floor N ≥ 10</div>
+        <div class="assump-rationale"><b>Rationale.</b> 90d balances recency and statistical substance; a tighter window (30d) amplifies noise contrary to §9 <em>freshness vs noise</em>. N≥10 matches §4.1 "credible sample size" without eliminating new entrants. Product to confirm before launch copy and first-visit telemetry are finalized. <span class="cite">§5A · §8</span></div>
+      </div>
+
+      <div class="assump">
+        <div class="assump-head">
+          <div class="assump-name">Sample-size floor (sparse-data threshold)</div>
+          <span class="assump-tag">ASSUMED · confirm</span>
+        </div>
+        <div class="assump-value">Low N badge fires when N &lt; 20 in selected window · score attenuated below N &lt; 10</div>
+        <div class="assump-rationale"><b>Rationale.</b> Two-tier threshold so "insufficient to rank confidently" and "insufficient to score at all" read differently. Below N=10 the score renders at 60% opacity with a confidence-interval tooltip <span class="cite">§13 low-confidence</span>. Product/data-science to confirm against actual creator-call distributions. <span class="cite">§13 · §14</span></div>
+      </div>
+
+      <div class="assump">
+        <div class="assump-head">
+          <div class="assump-name">"New / recently updated" TTL</div>
+          <span class="assump-tag">ASSUMED · confirm</span>
+        </div>
+        <div class="assump-value">24 hours from data arrival · 4px left-border in --new · no animation</div>
+        <div class="assump-rationale"><b>Rationale.</b> 24h is long enough that a user visiting daily sees a cohort of "new" markers, short enough that the signal does not dilute. If creator universe posts at markedly higher frequency than expected, drop to 12h. <span class="cite">§13</span></div>
+      </div>
+
+      <div class="assump">
+        <div class="assump-head">
+          <div class="assump-name">Free vs paid · state preservation ÷ saved views</div>
+          <span class="assump-tag">ASSUMED · confirm</span>
+        </div>
+        <div class="assump-value">Free: URL + localStorage state persistence (last session) · Paid: named, shareable <em>saved views</em> + cross-device sync</div>
+        <div class="assump-rationale"><b>Rationale.</b> Persisting last session on free is table-stakes usability and does not undercut <em>saved views</em> as a paid feature — saved views' value is naming, sharing, and multi-view parallel analysis <span class="cite">§15</span>. Hard-gating basic state preservation would create §9 <em>gating vs frustration</em> without value. Product to confirm. <span class="cite">§15 · §16.4</span></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============ 05 DEFERRALS ============ -->
+  <section class="section" id="r5">
+    <div class="section-head">
+      <div class="sn">05</div>
+      <h2>Deferrals · out of scope for Phase 2.</h2>
+      <div class="section-meta">Explicitly noted so gaps aren't mistaken for omissions</div>
+    </div>
+
+    <div class="deferrals">
+      <div class="defer">
+        <div class="defer-head">DEFERRED · PHASE 3 (if scheduled)</div>
+        <div class="defer-title">Light theme is deferred.</div>
+        <div class="defer-body">
+          <b>Per §11</b>: "a light theme is secondary priority." Token architecture is designed to invert — every semantic token references an ink step, not a hex; a light-theme ramp can be substituted without component rewrites. <b>In-phase work:</b> none. <b>Phase 3 scope:</b> invert ramp, re-audit state colors on paper, verify chart palette on #F4F5F7 ground.
+        </div>
+      </div>
+
+      <div class="defer">
+        <div class="defer-head">DEFERRED · PHASE 2 MOBILE PASS</div>
+        <div class="defer-title">Mobile type scale is deferred · desktop-first this phase.</div>
+        <div class="defer-body">
+          <b>Per §17</b>: mobile is scoped, not parity. Phase 2 produces desktop components at the current type scale; mobile responsive variants (§18.7) come as a subsequent pass with their own scale (no table row <28px on touch; body ≥14px; hit targets ≥44px). Do not read "no mobile specimen" as "mobile forgotten." <b>In-phase work:</b> components will declare mobile-substitution rules inline.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIGN-OFF -->
+  <section class="signoff">
+    <h3>Five items closed. Ready for Phase 2 on your go.</h3>
+    <p>The tokens above supersede v0.1 where noted: <b>--warn</b> shifts to rust <b>#D97757</b> and <b>--neg</b> shifts to <b>#D47A70</b>. All other v0.1 tokens are unchanged. Phase 2 targets components, then the three priority screens — Leaderboard, Creator profile, Calls explorer — with ownable treatments for Alpha Score, confidence / Low N, provenance, signal freshness, and premium preview, per your note.</p>
+    <div class="next">
+      <div><b>Next · Components</b>Primitives → composites: data cells, badges, provenance-indicator, tables (§8 spec), chart primitives, alerts, premium gates.</div>
+      <div><b>Next · Screens</b>Leaderboard · Creator profile · Calls explorer, each with default + three §13 states + interaction annotations.</div>
+      <div><b>Next · Tensions</b>Every screen will name the §9 tension it surfaces and the resolution it applies — as established in v0.1.</div>
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>

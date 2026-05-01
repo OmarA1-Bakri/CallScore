@@ -1,0 +1,1945 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CTR — IA + Tokens · Phase 1 · v0.1 · 2026-04-23</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ---------- EDITMODE tweakable block ---------- */
+</style>
+<script>
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "accent": "#C9A24B",
+  "density": "comfortable",
+  "grid": true,
+  "serif_display": true,
+  "tension_overlay": false
+}/*EDITMODE-END*/;
+</script>
+<style>
+/* =========================================================
+   CRYPTOTUBERS RANKED · TOKENS v0.1
+   Reference class: Bloomberg Terminal, Koyfin, Linear, Ramp research.
+   Anti-reference: consumer crypto apps, SaaS marketing templates.
+   ========================================================= */
+
+:root {
+  /* ---- SURFACE · monochrome warm-neutral (§11) ---- */
+  /* Warm-shifted rather than pure black — premium, not luxurious (§3). */
+  --ink-000: #0A0A0B;   /* page   · deepest */
+  --ink-050: #0E0F10;   /* surface */
+  --ink-100: #141517;   /* card */
+  --ink-150: #1A1B1E;   /* card raised */
+  --ink-200: #22242A;   /* divider strong */
+  --ink-250: #2B2D33;   /* border */
+  --ink-300: #3A3D44;   /* muted line */
+  --ink-400: #5B5F68;   /* muted text · captions */
+  --ink-500: #7A7F89;   /* secondary text */
+  --ink-600: #9CA0A9;   /* body-secondary */
+  --ink-700: #C2C5CC;   /* body */
+  --ink-800: #E1E3E7;   /* body-emphasis */
+  --ink-900: #F4F5F7;   /* paper white — editorial, not cold */
+
+  /* ---- ACCENT · single ochre (§11 constrained accent system) ---- */
+  /* One accent, not a palette — signals editorial confidence, not crypto-bro. */
+  --accent: #C9A24B;        /* ochre · rank #1, active state */
+  --accent-dim: #8E7235;
+  --accent-low: #3A2F17;
+
+  /* ---- STATE-COLOR SEMANTICS (§13, §14) ---- */
+  /* Muted, forensic — not retail-trading-app vivid. */
+  --pos: #6FA56A;           /* gain · resolved correct */
+  --pos-dim: #3E5D3B;
+  --neg: #C66C62;           /* loss · invalidated */
+  --neg-dim: #6A3631;
+  --warn: #D4A24B;          /* warning · stale-adjacent */
+  --stale: #8A7A5E;         /* stale · timestamp-led */
+  --lock: #8C8FA0;           /* locked premium */
+  --new:  #7FA6C9;           /* new / recently updated · quiet blue */
+  --lown: #A78C6B;          /* low-sample caveat */
+  --neutral: #9CA0A9;        /* neutral delta, zero-line */
+
+  /* ---- TYPE · editorial accent + sharp sans body + mono for data ---- */
+  --font-serif: "Source Serif 4", "GT Sectra", Georgia, serif;
+  --font-sans:  "Inter Tight", "Söhne", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:  "JetBrains Mono", "Söhne Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Scale — terminal-dense, readable at 1440. */
+  --t-ref:  10px; /* data caption · badge · Low N */
+  --t-xs:   11px; /* table row · timestamp · provenance */
+  --t-sm:   12px; /* table row default · body-secondary */
+  --t-md:   13px; /* body */
+  --t-lg:   15px; /* subheads */
+  --t-xl:   18px; /* section label */
+  --t-2xl:  22px; /* card metric figure */
+  --t-3xl:  28px; /* H2 · metric hero */
+  --t-4xl:  40px; /* H1 · editorial */
+  --t-5xl:  56px; /* product thesis · homepage only */
+
+  --lh-tight: 1.05;
+  --lh-snug:  1.2;
+  --lh-body:  1.45;
+  --lh-read:  1.55;
+
+  /* ---- SPACING (4px base, density-aware) ---- */
+  --s-0: 0;
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 6px;
+  --s-4: 8px;
+  --s-5: 10px;
+  --s-6: 12px;
+  --s-7: 16px;
+  --s-8: 20px;
+  --s-9: 24px;
+  --s-10:32px;
+  --s-11:40px;
+  --s-12:56px;
+  --s-13:80px;
+  --s-14:120px;
+
+  /* Density modes — data-table (§8) specifically. */
+  --row-compact:      28px;
+  --row-comfortable:  36px;
+  --row-relaxed:      44px;
+
+  /* ---- ELEVATION · flat, border-led (§11 no glow, no gradient) ---- */
+  --hair: 1px solid var(--ink-200);
+  --hair-strong: 1px solid var(--ink-250);
+  --hair-soft: 1px solid var(--ink-150);
+  --elev-card: 0 0 0 1px var(--ink-200);
+  --elev-raised: 0 0 0 1px var(--ink-250), 0 1px 0 0 rgba(0,0,0,0.4);
+  --elev-drawer: -1px 0 0 0 var(--ink-250), -24px 0 40px -20px rgba(0,0,0,0.6);
+
+  /* ---- MOTION · only functional (§11) ---- */
+  --dur-fast: 80ms;     /* hover tint */
+  --dur-base: 140ms;    /* state change */
+  --dur-slow: 220ms;    /* drawer · modal */
+  --ease: cubic-bezier(0.2, 0.0, 0.0, 1.0); /* material-sharp */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--ink-000);
+  color: var(--ink-700);
+  font-family: var(--font-sans);
+  font-size: var(--t-md);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11", "tnum";
+}
+
+/* ---- Document grain — editorial atmosphere, not decoration (§11) ---- */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(201,162,75,0.025) 0%, transparent 40%),
+    radial-gradient(circle at 80% 100%, rgba(127,166,201,0.015) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ---- Masthead · document, not marketing ---- */
+.masthead {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10,10,11,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: var(--hair-strong);
+}
+.masthead-inner {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: var(--s-5) var(--s-10);
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: var(--s-10);
+  align-items: center;
+}
+.wordmark {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--ink-900);
+}
+.wordmark em {
+  font-style: italic;
+  color: var(--accent);
+  font-weight: 400;
+}
+.masthead-meta {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex; gap: var(--s-9);
+}
+.masthead-meta span b {
+  color: var(--ink-800);
+  font-weight: 500;
+}
+.masthead-nav {
+  display: flex; gap: var(--s-8);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.masthead-nav a {
+  color: var(--ink-500);
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 1px solid transparent;
+}
+.masthead-nav a.active {
+  color: var(--ink-900);
+  border-bottom-color: var(--accent);
+}
+.masthead-nav a:hover { color: var(--ink-800); }
+
+/* ---- Main grid ---- */
+main {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: var(--s-12) var(--s-10) var(--s-14);
+  position: relative;
+  z-index: 1;
+}
+
+/* ---- Hero title block — editorial, one-time (§6) ---- */
+.hero {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: var(--s-11);
+  padding-bottom: var(--s-11);
+  border-bottom: var(--hair-strong);
+  margin-bottom: var(--s-12);
+}
+.hero-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-bottom: var(--s-7);
+}
+.hero h1 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 44px;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--ink-900);
+  max-width: 18ch;
+  margin-bottom: var(--s-8);
+}
+.hero h1 em {
+  font-style: italic;
+  color: var(--accent);
+}
+.hero-lede {
+  font-size: var(--t-lg);
+  line-height: var(--lh-read);
+  color: var(--ink-600);
+  max-width: 58ch;
+}
+.hero-lede b { color: var(--ink-900); font-weight: 500; }
+
+.hero-aside {
+  border-left: var(--hair-strong);
+  padding-left: var(--s-9);
+  font-size: var(--t-sm);
+  color: var(--ink-500);
+  line-height: var(--lh-read);
+}
+.hero-aside h4 {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-900);
+  margin-bottom: var(--s-6);
+  font-weight: 500;
+}
+.hero-aside dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; }
+.hero-aside dt { color: var(--ink-500); font-family: var(--font-mono); font-size: var(--t-ref); text-transform: uppercase; letter-spacing: 0.06em; }
+.hero-aside dd { color: var(--ink-800); font-size: var(--t-xs); }
+
+/* ---- Section framing ---- */
+.section {
+  margin-bottom: var(--s-14);
+  scroll-margin-top: 80px;
+}
+.section-head {
+  display: grid;
+  grid-template-columns: 120px 1fr 180px;
+  gap: var(--s-10);
+  padding-bottom: var(--s-8);
+  margin-bottom: var(--s-10);
+  border-bottom: var(--hair-strong);
+  align-items: baseline;
+}
+.sn {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.section h2 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: var(--t-3xl);
+  line-height: var(--lh-snug);
+  color: var(--ink-900);
+  letter-spacing: -0.01em;
+}
+.section h2 em { font-style: italic; color: var(--accent); }
+.section-meta {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: right;
+}
+
+.prose {
+  max-width: 72ch;
+  font-size: var(--t-md);
+  line-height: var(--lh-read);
+  color: var(--ink-700);
+}
+.prose p + p { margin-top: var(--s-7); }
+.prose b { color: var(--ink-900); font-weight: 500; }
+.prose em { font-family: var(--font-serif); font-style: italic; color: var(--accent); }
+
+.cite {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border: 1px solid var(--accent-dim);
+  border-radius: 2px;
+  white-space: nowrap;
+  text-transform: none;
+  background: rgba(201,162,75,0.06);
+  vertical-align: 2px;
+  margin: 0 2px;
+}
+
+/* ---- SITEMAP · tree diagram, monospace ---- */
+.sitemap-wrap {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: var(--s-10);
+  border: var(--hair-strong);
+  background: var(--ink-050);
+}
+.sitemap-rail {
+  padding: var(--s-9);
+  border-right: var(--hair-strong);
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+}
+.sitemap-rail h5 {
+  font-size: var(--t-ref);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-500);
+  margin-bottom: var(--s-6);
+  font-weight: 500;
+}
+.sitemap-rail ul { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+.sitemap-rail li {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: var(--s-4);
+  padding: 4px 6px;
+  color: var(--ink-700);
+  cursor: default;
+}
+.sitemap-rail li:hover { background: var(--ink-100); color: var(--ink-900); }
+.sitemap-rail li .key { color: var(--accent); }
+.sitemap-rail li .tag { font-size: var(--t-ref); color: var(--ink-500); }
+
+.sitemap-canvas {
+  padding: var(--s-10);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  line-height: 1.75;
+  color: var(--ink-700);
+  overflow-x: auto;
+}
+.tree { white-space: pre; }
+.tree .dim { color: var(--ink-500); }
+.tree .label { color: var(--ink-900); font-weight: 500; }
+.tree .state { color: var(--stale); }
+.tree .gate { color: var(--lock); }
+.tree .new { color: var(--new); }
+.tree .ref { color: var(--accent); }
+
+/* ---- FLOWS — Appendix A tasks as paths ---- */
+.flows {
+  margin-top: var(--s-10);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--s-1);
+  border: var(--hair-strong);
+  background: var(--ink-200);
+}
+.flow {
+  background: var(--ink-050);
+  padding: var(--s-9);
+  display: flex; flex-direction: column; gap: var(--s-6);
+}
+.flow-num {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.flow-task {
+  font-family: var(--font-serif);
+  font-size: var(--t-lg);
+  color: var(--ink-900);
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+}
+.flow-path {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-600);
+  line-height: 1.8;
+}
+.flow-path .step {
+  padding: 2px 6px;
+  background: var(--ink-100);
+  border: 1px solid var(--ink-200);
+  border-radius: 2px;
+  color: var(--ink-800);
+  white-space: nowrap;
+  display: inline-block;
+  margin: 1px 0;
+}
+.flow-path .step.gate { border-color: var(--accent-dim); color: var(--accent); }
+.flow-path .arrow { color: var(--ink-400); padding: 0 4px; }
+
+/* ---- NAV hierarchy table ---- */
+.nav-hier {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-9);
+  margin-top: var(--s-10);
+}
+.nav-col h5 {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-500);
+  margin-bottom: var(--s-5);
+  padding-bottom: var(--s-4);
+  border-bottom: var(--hair);
+  font-weight: 500;
+}
+.nav-col ol { list-style: none; counter-reset: nav; font-family: var(--font-mono); font-size: var(--t-sm); }
+.nav-col ol li {
+  counter-increment: nav;
+  padding: var(--s-5) 0;
+  border-bottom: var(--hair-soft);
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: baseline;
+  gap: var(--s-6);
+}
+.nav-col ol li::before {
+  content: counter(nav, decimal-leading-zero);
+  color: var(--ink-400);
+  font-size: var(--t-ref);
+}
+.nav-col ol li b { color: var(--ink-900); font-weight: 500; }
+.nav-col ol li span { color: var(--ink-500); font-size: var(--t-xs); }
+
+/* ---- TOKEN SECTIONS ---- */
+.token-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-1);
+  background: var(--ink-200);
+  border: var(--hair-strong);
+  margin-bottom: var(--s-9);
+}
+.token-grid > * { background: var(--ink-050); padding: var(--s-9); }
+
+.token-head {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: var(--s-7);
+  margin-bottom: var(--s-8);
+  padding-bottom: var(--s-6);
+  border-bottom: var(--hair);
+}
+.token-num {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding-top: 5px;
+}
+.token-title {
+  font-family: var(--font-serif);
+  font-size: var(--t-xl);
+  color: var(--ink-900);
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.token-sub {
+  font-size: var(--t-xs);
+  color: var(--ink-500);
+  line-height: var(--lh-body);
+}
+
+/* ---- Color ramp ---- */
+.ramp {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  gap: 0;
+  margin-bottom: var(--s-5);
+}
+.ramp .chip { height: 56px; position: relative; }
+.ramp .chip span {
+  position: absolute; bottom: 4px; left: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.04em;
+}
+.ramp .chip.light span { color: rgba(0,0,0,0.5); }
+
+.ramp-table {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  border-collapse: collapse;
+  margin-top: var(--s-6);
+}
+.ramp-table td, .ramp-table th {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: var(--hair-soft);
+  color: var(--ink-600);
+}
+.ramp-table th {
+  color: var(--ink-500);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 9px;
+}
+.ramp-table td.tok { color: var(--ink-900); }
+.ramp-table td.swatch { width: 18px; padding: 0; }
+.ramp-table td.swatch > div { width: 14px; height: 14px; border: 1px solid var(--ink-200); margin: 0 auto; }
+.ramp-table td.use { color: var(--ink-700); font-family: var(--font-sans); font-size: var(--t-xs); }
+
+/* ---- Accent + state semantic grid ---- */
+.sem-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s-1);
+  background: var(--ink-200);
+  margin-top: var(--s-6);
+}
+.sem {
+  background: var(--ink-100);
+  padding: var(--s-7);
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.sem-swatch {
+  width: 100%; height: 32px;
+  border: 1px solid var(--ink-250);
+}
+.sem-label {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-500);
+}
+.sem-value {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-900);
+}
+.sem-use {
+  font-size: var(--t-xs);
+  color: var(--ink-600);
+  line-height: 1.4;
+}
+
+/* ---- TYPE SPECIMEN ---- */
+.type-stack {
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  gap: var(--s-9);
+  padding: var(--s-7) 0;
+  border-bottom: var(--hair);
+  align-items: baseline;
+}
+.type-stack:last-child { border-bottom: none; }
+.type-meta {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+}
+.type-meta b { display:block; color: var(--ink-900); font-weight: 500; text-transform: none; letter-spacing: 0; font-size: var(--t-xs); margin-bottom: 4px; font-family: var(--font-sans); }
+.type-sample { color: var(--ink-900); }
+.type-spec {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--ink-400);
+  text-align: right;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+.ts-5xl { font-family: var(--font-serif); font-size: 56px; line-height: 1.02; letter-spacing: -0.02em; font-weight: 400; }
+.ts-4xl { font-family: var(--font-serif); font-size: 40px; line-height: 1.08; letter-spacing: -0.015em; font-weight: 400; }
+.ts-3xl { font-family: var(--font-serif); font-size: 28px; line-height: 1.15; letter-spacing: -0.01em; font-weight: 500; }
+.ts-xl  { font-family: var(--font-sans); font-size: 18px; line-height: 1.3; font-weight: 500; }
+.ts-lg  { font-family: var(--font-sans); font-size: 15px; line-height: 1.4; font-weight: 400; }
+.ts-md  { font-family: var(--font-sans); font-size: 13px; line-height: 1.5; }
+.ts-sm  { font-family: var(--font-sans); font-size: 12px; line-height: 1.5; }
+.ts-xs  { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.02em; }
+.ts-ref { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-500); }
+.ts-hero em { font-style: italic; color: var(--accent); }
+
+/* ---- SPACING ruler ---- */
+.space-ruler {
+  display: grid;
+  grid-template-columns: 80px 1fr 100px 1fr;
+  gap: var(--s-5);
+  align-items: center;
+  padding: var(--s-4) 0;
+  border-bottom: var(--hair-soft);
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+}
+.space-ruler .tok { color: var(--ink-900); }
+.space-ruler .val { color: var(--ink-500); text-align: right; }
+.space-ruler .bar { height: 6px; background: var(--accent); opacity: 0.8; }
+.space-ruler .use { color: var(--ink-600); font-size: var(--t-xs); font-family: var(--font-sans); }
+
+/* ---- ELEVATION surfaces demo ---- */
+.elev-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s-7);
+  margin-top: var(--s-6);
+}
+.elev-demo {
+  height: 120px;
+  padding: var(--s-7);
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.elev-demo b { color: var(--ink-900); font-family: var(--font-serif); font-size: var(--t-lg); text-transform: none; letter-spacing: 0; font-weight: 400; }
+.elev-page { background: var(--ink-000); border: 1px dashed var(--ink-250); }
+.elev-surface { background: var(--ink-050); }
+.elev-card { background: var(--ink-100); box-shadow: var(--elev-card); }
+.elev-raised { background: var(--ink-150); box-shadow: var(--elev-raised); }
+
+/* ---- MOTION tokens ---- */
+.motion-row {
+  display: grid;
+  grid-template-columns: 120px 80px 1fr 1fr;
+  gap: var(--s-7);
+  padding: var(--s-5) 0;
+  border-bottom: var(--hair-soft);
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+}
+.motion-row .tok { color: var(--ink-900); }
+.motion-row .val { color: var(--ink-500); }
+.motion-row .use { color: var(--ink-700); font-family: var(--font-sans); font-size: var(--t-xs); }
+.motion-viz {
+  height: 6px;
+  background: var(--ink-200);
+  position: relative;
+  overflow: hidden;
+}
+.motion-viz::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0; width: 30%;
+  background: var(--accent);
+  animation: motion-loop 3s infinite;
+}
+.motion-fast::before { animation-duration: 1.5s; animation-timing-function: cubic-bezier(0.2, 0.0, 0.0, 1.0); }
+.motion-base::before { animation-duration: 2.2s; animation-timing-function: cubic-bezier(0.2, 0.0, 0.0, 1.0); }
+.motion-slow::before { animation-duration: 3.2s; animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1); }
+@keyframes motion-loop {
+  0%   { left: -30%; }
+  100% { left: 130%; }
+}
+
+/* ---- NINE STATES table ---- */
+.states {
+  margin-top: var(--s-6);
+  border: var(--hair-strong);
+  background: var(--ink-050);
+}
+.state-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 200px 120px;
+  gap: var(--s-9);
+  padding: var(--s-7) var(--s-9);
+  border-bottom: var(--hair-soft);
+  align-items: center;
+}
+.state-row:last-child { border-bottom: none; }
+.state-row:hover { background: var(--ink-100); }
+.state-name {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  color: var(--ink-900);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: var(--s-4);
+}
+.state-dot { width: 8px; height: 8px; border-radius: 50%; }
+.state-copy { font-size: var(--t-sm); color: var(--ink-600); line-height: 1.5; }
+.state-copy b { color: var(--ink-900); font-weight: 500; display: block; margin-bottom: 2px; }
+.state-pattern {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--ink-500);
+}
+.state-pattern b { color: var(--accent); display: block; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.08em; }
+.state-cite { font-family: var(--font-mono); font-size: 10px; color: var(--accent); text-align: right; }
+
+/* Badge previews inside state rows */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--ink-250);
+  border-radius: 2px;
+  color: var(--ink-800);
+  background: var(--ink-100);
+}
+.badge.lown { color: var(--lown); border-color: var(--lown); background: rgba(167,140,107,0.08); }
+.badge.lock { color: var(--lock); border-color: var(--ink-300); background: var(--ink-100); }
+.badge.stale { color: var(--stale); border-color: var(--stale); background: rgba(138,122,94,0.08); }
+.badge.new { color: var(--new); border-color: var(--new); background: rgba(127,166,201,0.08); }
+.badge.pos { color: var(--pos); border-color: var(--pos-dim); background: rgba(111,165,106,0.08); }
+.badge.neg { color: var(--neg); border-color: var(--neg-dim); background: rgba(198,108,98,0.08); }
+.badge.warn { color: var(--warn); border-color: var(--warn); background: rgba(212,162,75,0.08); }
+.badge .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ---- TENSIONS section (§9) ---- */
+.tensions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-1);
+  background: var(--ink-200);
+  border: var(--hair-strong);
+  margin-top: var(--s-6);
+}
+.tension {
+  background: var(--ink-050);
+  padding: var(--s-9);
+  display: flex; flex-direction: column; gap: var(--s-5);
+}
+.tension-pair {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-500);
+}
+.tension-pair b { color: var(--ink-900); }
+.tension-pair .vs { color: var(--accent); padding: 0 6px; }
+.tension-resolution {
+  font-family: var(--font-serif);
+  font-size: var(--t-md);
+  color: var(--ink-800);
+  font-style: italic;
+  line-height: 1.45;
+  padding-left: var(--s-5);
+  border-left: 2px solid var(--accent);
+}
+.tension-how {
+  font-size: var(--t-xs);
+  color: var(--ink-500);
+  line-height: 1.5;
+}
+
+/* ---- GATE-to-PROCEED panel ---- */
+.proceed {
+  margin-top: var(--s-13);
+  padding: var(--s-11);
+  border: var(--hair-strong);
+  background:
+    linear-gradient(180deg, rgba(201,162,75,0.03), transparent 40%),
+    var(--ink-050);
+}
+.proceed h3 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: var(--t-3xl);
+  color: var(--ink-900);
+  margin-bottom: var(--s-6);
+  letter-spacing: -0.01em;
+}
+.proceed p {
+  font-size: var(--t-md);
+  color: var(--ink-600);
+  max-width: 68ch;
+  line-height: var(--lh-read);
+  margin-bottom: var(--s-9);
+}
+.proceed ol {
+  list-style: none;
+  counter-reset: p;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-6);
+  margin-bottom: var(--s-9);
+}
+.proceed ol li {
+  counter-increment: p;
+  padding: var(--s-7);
+  background: var(--ink-100);
+  border: var(--hair);
+  font-size: var(--t-xs);
+  color: var(--ink-700);
+  line-height: 1.5;
+  position: relative;
+}
+.proceed ol li::before {
+  content: counter(p, decimal-leading-zero);
+  position: absolute;
+  top: var(--s-5); right: var(--s-6);
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+.proceed ol li b { color: var(--ink-900); font-weight: 500; display: block; margin-bottom: 4px; font-size: var(--t-sm); }
+
+.proceed-actions {
+  display: flex; gap: var(--s-6); flex-wrap: wrap;
+  padding-top: var(--s-7);
+  border-top: var(--hair);
+}
+.btn {
+  font-family: var(--font-mono);
+  font-size: var(--t-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 10px 18px;
+  border: 1px solid var(--ink-250);
+  background: transparent;
+  color: var(--ink-700);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+.btn:hover { border-color: var(--ink-400); color: var(--ink-900); background: var(--ink-100); }
+.btn-primary {
+  border-color: var(--accent);
+  background: rgba(201,162,75,0.08);
+  color: var(--accent);
+}
+.btn-primary:hover { background: var(--accent); color: var(--ink-000); }
+
+/* ---- TWEAKS PANEL ---- */
+#tweaks-panel {
+  position: fixed;
+  bottom: var(--s-8);
+  right: var(--s-8);
+  z-index: 100;
+  width: 280px;
+  background: var(--ink-050);
+  border: var(--hair-strong);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none;
+  font-family: var(--font-sans);
+}
+#tweaks-panel.open { display: block; }
+.tweaks-head {
+  padding: var(--s-6);
+  border-bottom: var(--hair);
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-500);
+}
+.tweaks-head b { color: var(--ink-900); font-weight: 500; }
+.tweaks-head button {
+  background: none; border: none; color: var(--ink-500); cursor: pointer;
+  font-family: var(--font-mono); font-size: 14px;
+}
+.tweak {
+  padding: var(--s-6);
+  border-bottom: var(--hair-soft);
+  display: flex; flex-direction: column; gap: var(--s-4);
+}
+.tweak label {
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-500);
+}
+.tweak-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.tweak-swatches button {
+  height: 24px; border: 1px solid var(--ink-250); cursor: pointer; padding: 0;
+  transition: transform var(--dur-fast) var(--ease);
+}
+.tweak-swatches button.active { outline: 2px solid var(--ink-900); outline-offset: 1px; }
+.tweak-segmented {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+  border: 1px solid var(--ink-250);
+}
+.tweak-segmented button {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-500);
+  cursor: pointer;
+  border-right: 1px solid var(--ink-250);
+}
+.tweak-segmented button:last-child { border-right: none; }
+.tweak-segmented button.active { background: var(--accent); color: var(--ink-000); }
+
+.tweak-toggle {
+  display: flex; justify-content: space-between; align-items: center; padding: var(--s-6);
+  cursor: pointer;
+  border-bottom: var(--hair-soft);
+}
+.tweak-toggle:last-child { border-bottom: none; }
+.tweak-toggle label { font-family: var(--font-mono); font-size: var(--t-ref); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-500); cursor: pointer; }
+.tweak-toggle .switch { width: 28px; height: 16px; background: var(--ink-250); border-radius: 8px; position: relative; transition: background var(--dur-base); }
+.tweak-toggle .switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: var(--ink-900); border-radius: 50%; transition: left var(--dur-base); }
+.tweak-toggle.on .switch { background: var(--accent); }
+.tweak-toggle.on .switch::before { left: 14px; }
+
+/* grid overlay (tension mode) */
+body.tension-on .tension-resolution { outline: 1px dashed var(--accent); outline-offset: 4px; }
+
+body.show-grid main {
+  background-image: linear-gradient(to right, rgba(201,162,75,0.04) 1px, transparent 1px);
+  background-size: calc((100% - 80px) / 12) 100%;
+  background-position: 40px 0;
+}
+
+/* Footer */
+.doc-foot {
+  margin-top: var(--s-13);
+  padding: var(--s-9) 0;
+  border-top: var(--hair-strong);
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--s-9);
+  font-family: var(--font-mono);
+  font-size: var(--t-ref);
+  color: var(--ink-500);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.doc-foot b { color: var(--ink-900); font-weight: 500; }
+
+/* In-text mini-badge set (embedded preview samples) */
+.preview-row {
+  display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: center;
+  margin-top: var(--s-5);
+}
+
+/* Condensed leaderboard preview for token section */
+.preview-row .num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-900);
+  font-size: var(--t-lg);
+}
+.preview-row .num.pos { color: var(--pos); }
+.preview-row .num.neg { color: var(--neg); }
+
+/* Keyboard legend chips */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border: 1px solid var(--ink-300);
+  border-radius: 2px;
+  color: var(--ink-700);
+  background: var(--ink-100);
+}
+
+/* Embedded ASCII connectors don't need selection styling */
+::selection { background: var(--accent); color: var(--ink-000); }
+</style>
+</head>
+<body>
+
+<!-- ========== MASTHEAD ========== -->
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="wordmark">CryptoTubers <em>Ranked</em></div>
+    <nav class="masthead-nav">
+      <a href="#ia" class="active">I · IA</a>
+      <a href="#tokens">II · Tokens</a>
+      <a href="#states">§13 States</a>
+      <a href="#tensions">§9 Tensions</a>
+      <a href="#proceed">Proceed</a>
+    </nav>
+    <div class="masthead-meta">
+      <span>Doc · <b>Design-Phase-1</b></span>
+      <span>Rev · <b>v0.1</b></span>
+      <span>Date · <b>2026-04-23</b></span>
+    </div>
+    <button class="btn" id="tweaks-toggle" style="display:none">Tweaks</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ========== HERO / DOCUMENT TITLE ========== -->
+  <section class="hero">
+    <div>
+      <div class="hero-kicker">Design engagement · Phase 1 deliverable · Sections 1–2 of 14</div>
+      <h1>Site map, product IA, and design <em>tokens</em>.</h1>
+      <p class="hero-lede">
+        This document delivers the two foundations requested before component and screen work proceeds:
+        <b>(I) the information architecture</b> covering all six surfaces, states, and Appendix&nbsp;A task flows,
+        and <b>(II) the full design-token system</b> — color, type, spacing, elevation, motion, and state semantics.
+        Every decision cites the brief. Direction confirmation is required before Phase&nbsp;2. <span class="cite">§18</span> <span class="cite">§19</span>
+      </p>
+    </div>
+    <aside class="hero-aside">
+      <h4>Reference class</h4>
+      <dl>
+        <dt>Tier</dt><dd>Institutional intelligence terminal</dd>
+        <dt>Is</dt><dd>Bloomberg · Koyfin · Sentieo · Linear · Ramp research</dd>
+        <dt>Is not</dt><dd>Consumer crypto apps · SaaS marketing · Web3 landing pages</dd>
+        <dt>Posture</dt><dd>Forensic, editorial, confident, severe with bad performers, fair with evidence <span class="cite">§3</span></dd>
+        <dt>Thesis</dt><dd>Trust is the core product mechanic <span class="cite">§7</span></dd>
+      </dl>
+    </aside>
+  </section>
+
+  <!-- ========================================================
+       SECTION I · INFORMATION ARCHITECTURE
+       ======================================================== -->
+  <section class="section" id="ia">
+    <div class="section-head">
+      <div class="sn">I</div>
+      <h2>Site map &amp; product <em>information architecture</em></h2>
+      <div class="section-meta">Covers §5 · §6 · §7 · §12 · §15 · §16 · App.&nbsp;A</div>
+    </div>
+
+    <div class="prose" style="margin-bottom: var(--s-10)">
+      <p>
+        Six surfaces, one hierarchy. The IA is organized around the §6 information hierarchy — <b>what the product does → who is winning → why → what is happening now → what I can inspect deeper → what I unlock if I pay → what I should do next</b> — so that each surface answers a specific question and methodology supports trust without dominating navigation <span class="cite">§12</span>.
+      </p>
+      <p>
+        <b>Editorial decision:</b> Methodology is <em>reachable</em>, not <em>promoted</em>. It sits in the masthead utility rail with About, never in the primary nav — because the brief explicitly states methodology must not compete with the product surface for attention <span class="cite">§12</span>. Trust is earned inside the table, not on a separate page <span class="cite">§14 self-decoding</span>.
+      </p>
+    </div>
+
+    <!-- ------ SITE MAP TREE ------ -->
+    <div class="sitemap-wrap">
+
+      <aside class="sitemap-rail">
+        <h5>Surfaces · §5</h5>
+        <ul>
+          <li><span class="key">A</span><span>Leaderboard</span><span class="tag">home</span></li>
+          <li><span class="key">B</span><span>Creator profile</span><span class="tag">drill</span></li>
+          <li><span class="key">C</span><span>Calls explorer</span><span class="tag">terminal</span></li>
+          <li><span class="key">D</span><span>Signals</span><span class="tag">live</span></li>
+          <li><span class="key">E</span><span>Dashboard</span><span class="tag">signed-in</span></li>
+          <li><span class="key">F</span><span>Upgrade</span><span class="tag">cross-cut</span></li>
+        </ul>
+
+        <h5 style="margin-top: var(--s-10)">Legend</h5>
+        <ul>
+          <li><span class="key" style="color:var(--stale)">·</span><span class="state">state variant</span><span class="tag">§13</span></li>
+          <li><span class="key" style="color:var(--lock)">·</span><span class="gate">gated</span><span class="tag">§16</span></li>
+          <li><span class="key" style="color:var(--new)">·</span><span class="new">retention</span><span class="tag">§15</span></li>
+          <li><span class="key">·</span><span class="ref">→ reference</span><span class="tag">flow</span></li>
+        </ul>
+      </aside>
+
+      <div class="sitemap-canvas"><pre class="tree">
+<span class="dim">┌─</span> <span class="label">CRYPTOTUBERS RANKED</span>  <span class="dim">│  public surface</span>  <span class="ref">§5 · §12</span>
+<span class="dim">│</span>
+<span class="dim">├─</span> <span class="label">A · LEADERBOARD</span>  <span class="dim">/  (home)</span>   <span class="ref">§5A · §6 · §8</span>
+<span class="dim">│  ├─</span> Thesis line <span class="dim">· one sentence, product-wide, never repeated</span>     <span class="ref">§6.1</span>
+<span class="dim">│  ├─</span> Primary table <span class="dim">· rank · creator · Alpha · Win · N · Trend · Last</span>
+<span class="dim">│  │   ├─</span> Sort: column headers <span class="dim">· multi-column shift-click</span>           <span class="ref">§8 · §19</span>
+<span class="dim">│  │   ├─</span> Filter: category · tier · timeframe · sample-size floor       <span class="ref">§5A</span>
+<span class="dim">│  │   ├─</span> Free-text search <span class="dim">· instant · creator · handle · asset</span>        <span class="ref">§8</span>
+<span class="dim">│  │   ├─</span> <span class="gate">Compare select</span> <span class="dim">· 2–4 rows · free: 2 · paid: 4</span>           <span class="ref">§8 · §16.3</span>
+<span class="dim">│  │   ├─</span> Density · compact · comfortable · relaxed                     <span class="ref">§9</span>
+<span class="dim">│  │   └─</span> Saved view <span class="gate">[LOCKED · paid]</span>                               <span class="ref">§15 · §16.4</span>
+<span class="dim">│  ├─</span> Timeframe switcher <span class="dim">· 7d · 30d · 90d · YTD · all</span>              <span class="ref">§5A</span>
+<span class="dim">│  ├─</span> Consensus snapshot <span class="dim">· top 3 bullish · top 3 bearish · live</span>      <span class="ref">§5A · §5D</span>
+<span class="dim">│  └─</span> States: <span class="state">loading</span>·<span class="state">empty</span>·<span class="state">sparse</span>·<span class="state">no-results</span>·<span class="state">stale</span>·<span class="state">error</span>  <span class="ref">§13</span>
+<span class="dim">│</span>
+<span class="dim">├─</span> <span class="label">B · CREATOR PROFILE</span>  <span class="dim">/creator/[handle]</span>     <span class="ref">§5B · §6 · §8</span>
+<span class="dim">│  ├─</span> Header <span class="dim">· avatar · handle · platform · tier · follower context · FOLLOW</span>
+<span class="dim">│  ├─</span> Above-fold metrics · Alpha · Win · Self-correction · N · confidence <span class="ref">§14</span>
+<span class="dim">│  ├─</span> "Why they rank here" <span class="dim">· plain-language drawn from scoring model</span>    <span class="ref">§5B · §7</span>
+<span class="dim">│  │   └─</span> → Drawer: <span class="label">Score explanation</span>                                <span class="ref">§7 drawer</span>
+<span class="dim">│  ├─</span> Performance-over-time <span class="dim">· chart · default 90d</span>                     <span class="ref">§5B · §14</span>
+<span class="dim">│  ├─</span> Recent calls <span class="dim">· reverse-chron · resolution state</span>
+<span class="dim">│  │   └─</span> → <span class="ref">C · Call detail drawer</span>
+<span class="dim">│  ├─</span> Best / worst calls <span class="dim">· curated · expandable</span>                      <span class="ref">§5B · §3 severe-fair</span>
+<span class="dim">│  ├─</span> Breakdown · asset · category · timeframe · direction              <span class="ref">§5B</span>
+<span class="dim">│  ├─</span> Self-correction analysis <span class="dim">· directional change timeline</span>            <span class="ref">§14</span>
+<span class="dim">│  ├─</span> Benchmark vs peer tier <span class="dim">· market baseline overlay</span>                 <span class="ref">§8</span>
+<span class="dim">│  ├─</span> Evidence / source trail · external links · archive indicator     <span class="ref">§5B · §7</span>
+<span class="dim">│  ├─</span> <span class="gate">Alerts configure</span> <span class="dim">· rank · new-call · consensus-flip · threshold</span>  <span class="ref">§15 · §16.2</span>
+<span class="dim">│  ├─</span> <span class="gate">Full call history</span> <span class="dim">[free: 30-day window · paid: all-time]</span>      <span class="ref">§15 · §16.1</span>
+<span class="dim">│  └─</span> States: all §13 <span class="dim">· specifically sparse + low-confidence + stale</span>
+<span class="dim">│</span>
+<span class="dim">├─</span> <span class="label">C · CALLS EXPLORER</span>  <span class="dim">/calls</span>              <span class="ref">§5C · §8 calls-layer</span>
+<span class="dim">│  ├─</span> Table · creator · asset · date · direction · result · horizon · α · score
+<span class="dim">│  ├─</span> Filters · asset · creator · direction · timeframe · resolution state
+<span class="dim">│  ├─</span> Call row → <span class="label">Call detail drawer</span> <span class="dim">(right side, 540px)</span>
+<span class="dim">│  │   ├─</span> Full provenance · called-at · resolved-at · horizon-end
+<span class="dim">│  │   ├─</span> External source link · archive indicator                    <span class="ref">§7</span>
+<span class="dim">│  │   ├─</span> Resolution logic · auditable · formula visible              <span class="ref">§8 calls-layer</span>
+<span class="dim">│  │   ├─</span> Price trace · entry · horizon · resolution                   <span class="ref">§14</span>
+<span class="dim">│  │   └─</span> Shareable deeplink <span class="dim">· /call/[id]</span>                          <span class="ref">§8 calls-layer</span>
+<span class="dim">│  ├─</span> States: <span class="state">open</span>·<span class="state">resolved</span>·<span class="state">partial</span>·<span class="state">invalidated</span>                  <span class="ref">§5C · §3 severe</span>
+<span class="dim">│  └─</span> <span class="gate">Export · CSV · JSON</span> [LOCKED · paid]                              <span class="ref">§15 · §16.4</span>
+<span class="dim">│</span>
+<span class="dim">├─</span> <span class="label">D · SIGNALS</span>  <span class="dim">/signals</span>                   <span class="ref">§5D · §8 signals</span>
+<span class="dim">│  ├─</span> Active · bullish | bearish <span class="dim">· cards · confidence · freshness</span>
+<span class="dim">│  │   ├─</span> Contributing-creators avatar stack → profile
+<span class="dim">│  │   └─</span> Signal performance-since-inception sparkline
+<span class="dim">│  ├─</span> Resolved archive <span class="dim">· realized performance · outcome label</span>
+<span class="dim">│  ├─</span> Signal detail <span class="dim">· /signals/[id] · constituent calls table</span>          <span class="ref">§5D</span>
+<span class="dim">│  ├─</span> <span class="gate">Live detected < 24h</span> [LOCKED · paid teaser]                       <span class="ref">§15 · §16.5</span>
+<span class="dim">│  └─</span> States: <span class="state">forming</span>·<span class="state">consensus</span>·<span class="state">fading</span>·<span class="state">invalidated</span>·<span class="state">stale</span>
+<span class="dim">│</span>
+<span class="dim">├─</span> <span class="label">E · DASHBOARD</span>  <span class="dim">/dashboard  (auth-gated)</span>   <span class="ref">§5E</span>
+<span class="dim">│  ├─</span> Watched creators <span class="dim">· customizable ordering · drag</span>                <span class="new">retention</span>
+<span class="dim">│  ├─</span> Watched assets
+<span class="dim">│  ├─</span> Recent signal changes <span class="dim">· delta view</span>
+<span class="dim">│  ├─</span> Rank movers <span class="dim">· ± over selected window</span>
+<span class="dim">│  ├─</span> New calls from followed creators
+<span class="dim">│  ├─</span> Alert inbox + settings
+<span class="dim">│  └─</span> <span class="gate">Saved views</span> [paid · named · shareable]                       <span class="ref">§15</span>
+<span class="dim">│</span>
+<span class="dim">├─</span> <span class="label">F · UPGRADE (cross-cutting)</span>  <span class="dim">/pricing + in-context</span>   <span class="ref">§5F · §16</span>
+<span class="dim">│  ├─</span> Pricing page <span class="dim">· feature matrix · tier split</span>                      <span class="ref">§15</span>
+<span class="dim">│  ├─</span> 1 · Full history <span class="dim">· in-context lock on profile calls tail</span>         <span class="ref">§16.1</span>
+<span class="dim">│  ├─</span> 2 · Alerts <span class="dim">· teaser on creator header CTA</span>                       <span class="ref">§16.2</span>
+<span class="dim">│  ├─</span> 3 · Compare <span class="dim">· unlock at 3rd-row compare select</span>                    <span class="ref">§16.3</span>
+<span class="dim">│  ├─</span> 4 · Export · advanced filters <span class="dim">· inline on filter panel</span>           <span class="ref">§16.4</span>
+<span class="dim">│  ├─</span> 5 · Live signals <span class="dim">· blurred-row pattern on Signals page</span>           <span class="ref">§16.5</span>
+<span class="dim">│  └─</span> 6 · Curated premium lists <span class="dim">· dashboard module</span>                    <span class="ref">§16.6</span>
+<span class="dim">│</span>
+<span class="dim">└─</span> <span class="label">Utility rail</span>  <span class="dim">· methodology · about · settings · sign-in</span>       <span class="ref">§12 secondary</span>
+   <span class="dim">├─</span> /methodology <span class="dim">· reachable · not promoted</span>                        <span class="ref">§12</span>
+   <span class="dim">└─</span> /about
+</pre></div>
+    </div>
+
+    <!-- ------ NAV HIERARCHY ------ -->
+    <div class="nav-hier">
+      <div class="nav-col">
+        <h5>Primary navigation <span class="cite">§12</span></h5>
+        <ol>
+          <li><b>Leaderboard</b><span>/ · default landing · §5A</span></li>
+          <li><b>Creators</b><span>/creators · index of profiles · §5B</span></li>
+          <li><b>Calls</b><span>/calls · raw scored calls · §5C</span></li>
+          <li><b>Signals</b><span>/signals · live consensus · §5D</span></li>
+          <li><b>Pricing</b><span>/pricing · tier split · §15</span></li>
+          <li><b>Sign in / Dashboard</b><span>context-dependent · §5E</span></li>
+        </ol>
+      </div>
+      <div class="nav-col">
+        <h5>Secondary · utility rail <span class="cite">§12</span></h5>
+        <ol>
+          <li><b>Methodology</b><span>reachable · not promoted · inline deep-links from scores</span></li>
+          <li><b>About</b><span>editorial masthead · who builds this · not required for trust</span></li>
+          <li><b>Settings</b><span>auth-gated · alerts · profile · billing</span></li>
+          <li><b>Search (⌘K)</b><span>global palette · creator · asset · signal · call-id</span></li>
+          <li><b>Help / report</b><span>data dispute · linked from every provenance indicator · §7</span></li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- ------ APPENDIX A FLOWS ------ -->
+    <div style="margin-top: var(--s-12); margin-bottom: var(--s-6)">
+      <div class="sn" style="margin-bottom: var(--s-3)">Appendix A · binding acceptance flows</div>
+      <h3 style="font-family: var(--font-serif); font-weight: 400; font-size: var(--t-3xl); color: var(--ink-900); letter-spacing: -0.01em">Seven unassisted-user tasks mapped to surface paths.</h3>
+      <p style="font-size: var(--t-sm); color: var(--ink-500); margin-top: var(--s-5); max-width: 72ch">Each task below is a binding acceptance flow <span class="cite">App. A</span>. The path shows the exact surface transitions an unassisted user takes. Gated steps are marked <span style="color: var(--accent)">[gate]</span>; no task requires a gated step to complete on free tier.</p>
+    </div>
+
+    <div class="flows">
+
+      <div class="flow">
+        <div class="flow-num">Task 01 · <span style="color:var(--ink-500)">top 90d performer, credible N</span></div>
+        <div class="flow-task">Find the top-performing creator in the last 90 days with a credible sample size.</div>
+        <div class="flow-path">
+          <span class="step">Leaderboard /</span><span class="arrow">→</span><span class="step">Timeframe = 90d</span><span class="arrow">→</span><span class="step">Filter: Sample-size ≥ 30</span><span class="arrow">→</span><span class="step">Sort by Alpha ↓</span><span class="arrow">→</span><span class="step">Row #1 · creator profile</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-500); margin-top: 2px; letter-spacing: 0.04em">Unassisted because: filter chip says "Min sample N" with explainer hover; default timeframe switcher is visible above table. <span class="cite">§8 · §14</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-num">Task 02 · <span style="color:var(--ink-500)">explain ranking</span></div>
+        <div class="flow-task">Explain why a creator ranks highly.</div>
+        <div class="flow-path">
+          <span class="step">Profile header</span><span class="arrow">→</span><span class="step">"Why they rank here" panel</span><span class="arrow">→</span><span class="step">Score explanation drawer</span><span class="arrow">→</span><span class="step">Factor weights · inputs · evidence</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-500); margin-top: 2px; letter-spacing: 0.04em">Unassisted because: plain-language sentence above the fold; drawer opens from every Alpha Score. <span class="cite">§5B · §7</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-num">Task 03 · <span style="color:var(--ink-500)">verify one call</span></div>
+        <div class="flow-task">Verify the evidence behind one scored call.</div>
+        <div class="flow-path">
+          <span class="step">Profile recent-calls</span><span class="arrow">→</span><span class="step">Row click</span><span class="arrow">→</span><span class="step">Call detail drawer</span><span class="arrow">→</span><span class="step">Source link + archive</span><span class="arrow">→</span><span class="step">Resolution logic visible</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-500); margin-top: 2px; letter-spacing: 0.04em">Provenance-indicator is a first-class UI primitive, present on every call row. <span class="cite">§7 · §8 calls-layer</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-num">Task 04 · <span style="color:var(--ink-500)">active bullish consensus</span></div>
+        <div class="flow-task">Find an active bullish consensus signal.</div>
+        <div class="flow-path">
+          <span class="step">Nav · Signals</span><span class="arrow">→</span><span class="step">Active / Bullish column</span><span class="arrow">→</span><span class="step">Sort by confidence ↓</span><span class="arrow">→</span><span class="step">Signal card</span><span class="arrow">→</span><span class="step">Constituent calls</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-500); margin-top: 2px; letter-spacing: 0.04em">Consensus snapshot on leaderboard also exposes top 3 live without navigation. <span class="cite">§5A · §5D</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-num">Task 05 · <span style="color:var(--ink-500)">compare two creators</span></div>
+        <div class="flow-task">Compare two creators.</div>
+        <div class="flow-path">
+          <span class="step">Leaderboard</span><span class="arrow">→</span><span class="step">Row checkbox × 2</span><span class="arrow">→</span><span class="step">Compare bar appears</span><span class="arrow">→</span><span class="step">Open comparison</span><span class="arrow">→</span><span class="step">Side-by-side metrics + chart overlay</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-500); margin-top: 2px; letter-spacing: 0.04em">Free tier allows 2-way compare. 3rd selection triggers §16.3 upgrade. <span class="cite">§8 · §15 · §16.3</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-num">Task 06 · <span style="color:var(--ink-500)">set an alert</span></div>
+        <div class="flow-task">Set or attempt to set an alert.</div>
+        <div class="flow-path">
+          <span class="step">Profile header · Alert CTA</span><span class="arrow">→</span><span class="step">Free: Follow = basic account notif</span><span class="arrow">→</span><span class="step gate">Configurable types [gate]</span><span class="arrow">→</span><span class="step">§16.2 upgrade prompt · in-context</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-500); margin-top: 2px; letter-spacing: 0.04em">"Attempt to set" succeeds on free at the follow level; configurable types are the paid moment — value demonstrated before gate. <span class="cite">§15 · §16.2 · §5F</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-num">Task 07 · <span style="color:var(--ink-500)">understand premium</span></div>
+        <div class="flow-task">Understand what premium unlocks.</div>
+        <div class="flow-path">
+          <span class="step">Any in-context gate</span><span class="arrow">→</span><span class="step">Teaser shows locked value</span><span class="arrow">→</span><span class="step">"See everything premium" link</span><span class="arrow">→</span><span class="step">Pricing / feature matrix</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 10px; color: var(--ink-500); margin-top: 2px; letter-spacing: 0.04em">Preview-with-lock, never a wall; every gate anchors to the user's present intent. <span class="cite">§13 · §15 · §16</span></div>
+      </div>
+
+    </div>
+
+    <!-- ------ ENTRY / EXIT / GATE RULES ------ -->
+    <div style="margin-top: var(--s-12); margin-bottom: var(--s-6)">
+      <div class="sn" style="margin-bottom: var(--s-3)">Surface governance</div>
+      <h3 style="font-family: var(--font-serif); font-weight: 400; font-size: var(--t-3xl); color: var(--ink-900); letter-spacing: -0.01em">Entry points, exits, and gate rules.</h3>
+    </div>
+
+    <div class="states">
+      <div class="state-row" style="grid-template-columns: 140px 1fr 1fr; background: var(--ink-100);">
+        <div class="state-name" style="color:var(--accent); font-weight: 500">Rule</div>
+        <div class="state-copy" style="color:var(--ink-900)"><b>Definition</b></div>
+        <div class="state-copy" style="color:var(--ink-900)"><b>Applies to</b></div>
+      </div>
+      <div class="state-row" style="grid-template-columns: 140px 1fr 1fr">
+        <div class="state-name">Default entry</div>
+        <div class="state-copy">Root URL lands on Leaderboard with default filters: all categories, 90d timeframe, sample-size floor N≥10. Thesis line visible above fold.</div>
+        <div class="state-copy">§5A · §6.1 · §6.2</div>
+      </div>
+      <div class="state-row" style="grid-template-columns: 140px 1fr 1fr">
+        <div class="state-name">Auth gate</div>
+        <div class="state-copy">Dashboard, alerts, saved views require sign-in. Sign-in is never blocking for leaderboard consumption — it unlocks persistence, not access.</div>
+        <div class="state-copy">§5E · §15</div>
+      </div>
+      <div class="state-row" style="grid-template-columns: 140px 1fr 1fr">
+        <div class="state-name">Premium gate</div>
+        <div class="state-copy">Preview-with-lock only. Never a hard wall. Each gate displays the value it holds and a single-click upgrade anchored to current context.</div>
+        <div class="state-copy">§13 locked · §15 · §16</div>
+      </div>
+      <div class="state-row" style="grid-template-columns: 140px 1fr 1fr">
+        <div class="state-name">Methodology access</div>
+        <div class="state-copy">Reachable via (a) utility rail, (b) every metric's explanation pattern, (c) every score drawer deep-link. Never as a modal, never as an interstitial.</div>
+        <div class="state-copy">§12 · §14 · §7</div>
+      </div>
+      <div class="state-row" style="grid-template-columns: 140px 1fr 1fr">
+        <div class="state-name">State preservation</div>
+        <div class="state-copy">Filters, timeframe, sort, density, selected rows persist in URL and localStorage. Back-nav restores exact state. Saved views are the paid persistence layer.</div>
+        <div class="state-copy">§15 · §19 interaction</div>
+      </div>
+      <div class="state-row" style="grid-template-columns: 140px 1fr 1fr">
+        <div class="state-name">Drawer vs page</div>
+        <div class="state-copy">Drawer (540px right) for single-object inspection preserving list context — call detail, score explanation. Full page for cross-object navigation — creator profile, signal detail.</div>
+        <div class="state-copy">§5C · §5B · §19</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ========================================================
+       SECTION II · DESIGN TOKENS
+       ======================================================== -->
+  <section class="section" id="tokens">
+    <div class="section-head">
+      <div class="sn">II</div>
+      <h2>Design <em>tokens</em></h2>
+      <div class="section-meta">Covers §11 · §13 · §14 · §9</div>
+    </div>
+
+    <div class="prose" style="margin-bottom: var(--s-10)">
+      <p>
+        <b>Direction committed:</b> monochrome warm-neutral base with a single ochre accent. Editorial serif for titles and metric heroes; sharp sans for body; mono for every datum. Flat card system, border-led elevation, motion only where it signals state change <span class="cite">§11</span>.
+      </p>
+      <p>
+        <b>Tension resolved up-front:</b> <em>editorial sharpness vs perceived bias</em> <span class="cite">§9</span> — confidence comes from typography and restraint, not color. One accent ≠ hype; severity comes from copy, not red flashing. <em>Density vs readability</em> <span class="cite">§9</span> — density is a user-chosen mode (compact / comfortable / relaxed), not a default imposed. Default is comfortable.
+      </p>
+    </div>
+
+    <!-- ---------- COLOR ---------- -->
+    <div class="token-head">
+      <div class="token-num">II · A</div>
+      <div>
+        <div class="token-title">Color system</div>
+        <div class="token-sub">Monochrome warm-neutral base. Single-hue accent. Six state semantics mapped to UI meaning — not decoration. <span class="cite">§11 · §13 · §14</span></div>
+      </div>
+    </div>
+
+    <!-- Ramp -->
+    <div style="margin-bottom: var(--s-9)">
+      <div class="ts-ref" style="margin-bottom: var(--s-4)">Ink ramp · 11 steps · warm-neutral (oklch chroma ≤ 0.005)</div>
+      <div class="ramp">
+        <div class="chip" style="background:#0A0A0B"><span>000</span></div>
+        <div class="chip" style="background:#0E0F10"><span>050</span></div>
+        <div class="chip" style="background:#141517"><span>100</span></div>
+        <div class="chip" style="background:#1A1B1E"><span>150</span></div>
+        <div class="chip" style="background:#22242A"><span>200</span></div>
+        <div class="chip" style="background:#2B2D33"><span>250</span></div>
+        <div class="chip" style="background:#3A3D44"><span>300</span></div>
+        <div class="chip" style="background:#5B5F68"><span>400</span></div>
+        <div class="chip light" style="background:#9CA0A9"><span>600</span></div>
+        <div class="chip light" style="background:#C2C5CC"><span>700</span></div>
+        <div class="chip light" style="background:#F4F5F7"><span>900</span></div>
+      </div>
+      <table class="ramp-table">
+        <tr><th>Token</th><th>Hex</th><th>Role</th></tr>
+        <tr><td class="tok">--ink-000</td><td>#0A0A0B</td><td class="use">Page · deepest surface · masthead under scroll</td></tr>
+        <tr><td class="tok">--ink-050</td><td>#0E0F10</td><td class="use">Default app surface · sitemap canvas · document bg</td></tr>
+        <tr><td class="tok">--ink-100</td><td>#141517</td><td class="use">Card surface · table row hover · filter-panel bg</td></tr>
+        <tr><td class="tok">--ink-150</td><td>#1A1B1E</td><td class="use">Raised card · drawer interior · modal surface</td></tr>
+        <tr><td class="tok">--ink-200</td><td>#22242A</td><td class="use">Strong divider · section border · tabletop gridline</td></tr>
+        <tr><td class="tok">--ink-250</td><td>#2B2D33</td><td class="use">Border · input border · card hairline</td></tr>
+        <tr><td class="tok">--ink-300</td><td>#3A3D44</td><td class="use">Muted line · chart gridline · disabled control</td></tr>
+        <tr><td class="tok">--ink-400</td><td>#5B5F68</td><td class="use">Caption · kicker · chart axis label · row meta</td></tr>
+        <tr><td class="tok">--ink-500</td><td>#7A7F89</td><td class="use">Secondary text · column header · timestamp</td></tr>
+        <tr><td class="tok">--ink-600</td><td>#9CA0A9</td><td class="use">Body secondary · cell neutral-value · paragraph body</td></tr>
+        <tr><td class="tok">--ink-700</td><td>#C2C5CC</td><td class="use">Body · default text color · live data</td></tr>
+        <tr><td class="tok">--ink-800</td><td>#E1E3E7</td><td class="use">Body emphasis · metric values at hover</td></tr>
+        <tr><td class="tok">--ink-900</td><td>#F4F5F7</td><td class="use">Headline · metric hero · rank #1 numerals · paper white</td></tr>
+      </table>
+    </div>
+
+    <!-- Semantic grid -->
+    <div class="ts-ref" style="margin-bottom: var(--s-4); margin-top: var(--s-10)">State-color semantics · mapped to UI meaning <span class="cite">§13 · §14</span></div>
+    <div class="sem-grid">
+      <div class="sem">
+        <div class="sem-swatch" style="background:#C9A24B"></div>
+        <div class="sem-label">Accent · editorial</div>
+        <div class="sem-value">--accent · #C9A24B</div>
+        <div class="sem-use">Rank #1 laurel · active sort indicator · hover tint on primary action · citation highlight. Never for gain/loss.</div>
+      </div>
+      <div class="sem">
+        <div class="sem-swatch" style="background:#6FA56A"></div>
+        <div class="sem-label">Gain · positive</div>
+        <div class="sem-value">--pos · #6FA56A</div>
+        <div class="sem-use">Resolved-correct calls · positive α · rank-mover up. Muted green — forensic, not retail-trading bright.</div>
+      </div>
+      <div class="sem">
+        <div class="sem-swatch" style="background:#C66C62"></div>
+        <div class="sem-label">Loss · negative</div>
+        <div class="sem-value">--neg · #C66C62</div>
+        <div class="sem-use">Invalidated calls · negative α · rank drop · bottom-of-leaderboard row accent. "Severe with bad performers." <span class="cite">§3</span></div>
+      </div>
+      <div class="sem">
+        <div class="sem-swatch" style="background:#9CA0A9"></div>
+        <div class="sem-label">Neutral · zero-line</div>
+        <div class="sem-value">--neutral · #9CA0A9</div>
+        <div class="sem-use">Partial resolutions · zero-line on α charts · peer benchmark. Default where color would overclaim.</div>
+      </div>
+      <div class="sem">
+        <div class="sem-swatch" style="background:#D4A24B"></div>
+        <div class="sem-label">Warning</div>
+        <div class="sem-value">--warn · #D4A24B</div>
+        <div class="sem-use">Data-dispute filed · contested resolution · threshold-breach alert. Shares hue with accent — reserved for actionable warnings.</div>
+      </div>
+      <div class="sem">
+        <div class="sem-swatch" style="background:#8A7A5E"></div>
+        <div class="sem-label">Stale</div>
+        <div class="sem-value">--stale · #8A7A5E</div>
+        <div class="sem-use">Timestamp-led desaturation · creator has not posted · data &gt; N hours old. Never hidden — surfaced with refresh affordance.</div>
+      </div>
+      <div class="sem">
+        <div class="sem-swatch" style="background:#8C8FA0"></div>
+        <div class="sem-label">Locked · premium</div>
+        <div class="sem-value">--lock · #8C8FA0</div>
+        <div class="sem-use">Preview-with-lock value; not a wall. Cool neutral — distinct from accent and stale.</div>
+      </div>
+      <div class="sem">
+        <div class="sem-swatch" style="background:#7FA6C9"></div>
+        <div class="sem-label">New / updated</div>
+        <div class="sem-value">--new · #7FA6C9</div>
+        <div class="sem-use">Subtle delta indicator on recently updated rows. Quiet blue — never distracting badge. <span class="cite">§13</span></div>
+      </div>
+    </div>
+
+    <!-- Why no extra palette -->
+    <div class="prose" style="margin-top: var(--s-8)">
+      <p>
+        <b>Decision recommendation · one accent, not a palette.</b> Three options considered:
+        <em>(a)</em> accent-only — the recommendation — single ochre signals editorial confidence without inviting a flashy reading <span class="cite">§10 anti-pattern neon</span>;
+        <em>(b)</em> dual accent (ochre + ink-blue) — rejected for muddying the editorial severity of §3;
+        <em>(c)</em> tier-mapped palette — rejected for conflicting with §14 "tier labels color-mapped, hover-explained," which means a small discrete mapping <em>inside</em> tier chips, not a sitewide gradient. Tiers get chip color variation; the rest of the UI does not.
+      </p>
+    </div>
+
+    <!-- Preview: live table row demonstrating colors in context -->
+    <div class="preview-row" style="margin-top: var(--s-10); padding: var(--s-7); background: var(--ink-100); border: var(--hair-strong); gap: var(--s-8);">
+      <div style="display:flex; align-items: baseline; gap: var(--s-4);">
+        <span class="ts-ref" style="color: var(--accent)">01</span>
+        <span class="num" style="color: var(--ink-900); font-size: var(--t-2xl); font-family: var(--font-serif); font-weight: 500">84.6</span>
+        <span class="ts-ref">Alpha</span>
+      </div>
+      <div style="display:flex; align-items: baseline; gap: var(--s-4);">
+        <span class="num pos">+12.4</span>
+        <span class="ts-ref">30d Δ</span>
+      </div>
+      <div style="display:flex; align-items: baseline; gap: var(--s-4);">
+        <span class="num neg">−08.1</span>
+        <span class="ts-ref">worst call α</span>
+      </div>
+      <span class="badge pos"><span class="dot"></span>Resolved · correct</span>
+      <span class="badge neg"><span class="dot"></span>Invalidated</span>
+      <span class="badge warn"><span class="dot"></span>Dispute filed</span>
+      <span class="badge stale"><span class="dot"></span>Stale · 14h</span>
+      <span class="badge lown"><span class="dot"></span>Low N · 8 calls</span>
+      <span class="badge new"><span class="dot"></span>New</span>
+      <span class="badge lock"><span class="dot"></span>Locked</span>
+    </div>
+
+    <!-- ---------- TYPE ---------- -->
+    <div class="token-head" style="margin-top: var(--s-12)">
+      <div class="token-num">II · B</div>
+      <div>
+        <div class="token-title">Typography</div>
+        <div class="token-sub">Editorial serif accent · sharp sans body · mono for every datum. Three families, nothing else. <span class="cite">§11 · §3 editorial</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="type-stack">
+        <div class="type-meta"><b>Source Serif 4</b>Display · editorial accent · 400 regular · 400 italic · 500</div>
+        <div class="type-sample ts-5xl ts-hero">Who's <em>actually</em> worth listening to.</div>
+        <div class="type-spec">56 / 57 · −0.02em<br>display</div>
+      </div>
+      <div class="type-stack">
+        <div class="type-meta"><b>Source Serif 4</b>H1 · page title · product thesis</div>
+        <div class="type-sample ts-4xl">Ranked by <em>realized alpha</em>, audited by you.</div>
+        <div class="type-spec">40 / 43 · −0.015em<br>400</div>
+      </div>
+      <div class="type-stack">
+        <div class="type-meta"><b>Source Serif 4</b>H2 · metric hero · section title</div>
+        <div class="type-sample ts-3xl">84.6 Alpha · 72% Win</div>
+        <div class="type-spec">28 / 32 · −0.01em<br>500</div>
+      </div>
+      <div class="type-stack">
+        <div class="type-meta"><b>Inter Tight</b>Subhead · card title · 500</div>
+        <div class="type-sample ts-xl">Consensus forming · BTC bullish</div>
+        <div class="type-spec">18 / 23 · 500</div>
+      </div>
+      <div class="type-stack">
+        <div class="type-meta"><b>Inter Tight</b>Lede · explanatory body · 400</div>
+        <div class="type-sample ts-lg">Severe with bad performers, fair with evidence. Every score has a one-click path to its provenance.</div>
+        <div class="type-spec">15 / 21 · 400</div>
+      </div>
+      <div class="type-stack">
+        <div class="type-meta"><b>Inter Tight</b>Body · default reading · 400</div>
+        <div class="type-sample ts-md">The product thesis is verifiable: click any Alpha figure to see its constituent calls, weights, and resolution logic. <span class="cite">§7</span></div>
+        <div class="type-spec">13 / 19 · 400</div>
+      </div>
+      <div class="type-stack">
+        <div class="type-meta"><b>JetBrains Mono</b>Table row · datum · 400 tabular</div>
+        <div class="type-sample ts-sm" style="font-family: var(--font-mono); font-variant-numeric: tabular-nums">84.6 · +12.4 · N=147 · 2026-04-21 14:03 UTC</div>
+        <div class="type-spec">12 / 18 · tnum</div>
+      </div>
+      <div class="type-stack">
+        <div class="type-meta"><b>JetBrains Mono</b>Column header · kicker · caption</div>
+        <div class="type-sample ts-xs" style="text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-500)">Rank · Creator · Alpha · 30d Δ · N · Last Call</div>
+        <div class="type-spec">11 · uppercase · 0.08em</div>
+      </div>
+      <div class="type-stack">
+        <div class="type-meta"><b>JetBrains Mono</b>Badge · provenance indicator</div>
+        <div class="type-sample ts-ref">LOW N · 8 CALLS · 90D</div>
+        <div class="type-spec">10 · uppercase · 0.1em</div>
+      </div>
+    </div>
+
+    <div class="prose" style="margin-top: var(--s-8)">
+      <p>
+        <b>Why this pairing.</b> Source Serif 4 carries editorial weight without the luxury-magazine gloss that §3 forbids ("premium, not luxurious"). Inter Tight is sharp at table-subhead sizes; it reads like a terminal UI, not a marketing site <span class="cite">§10</span>. JetBrains Mono — tabular-num enabled — means every datum aligns vertically across density modes, which is non-negotiable for the §8 leaderboard and §8 calls layer.
+      </p>
+      <p>
+        <b>Italic is semantic.</b> Serif italic = editorial emphasis (thesis, verbs of judgment). It is <em>never</em> applied to data. Mono italic does not exist in this product.
+      </p>
+    </div>
+
+    <!-- ---------- SPACING ---------- -->
+    <div class="token-head" style="margin-top: var(--s-12)">
+      <div class="token-num">II · C</div>
+      <div>
+        <div class="token-title">Spacing &amp; density</div>
+        <div class="token-sub">4px base scale. Three density modes for §8 data tables. Density is user-selectable; default is comfortable. <span class="cite">§9 density vs readability</span></div>
+      </div>
+    </div>
+
+    <div style="border: var(--hair-strong); padding: var(--s-7) var(--s-9);">
+      <div class="space-ruler"><span class="tok">--s-1</span><span class="bar" style="width:2px"></span><span class="val">2px</span><span class="use">hairline nudges · keyboard-focus inset</span></div>
+      <div class="space-ruler"><span class="tok">--s-2</span><span class="bar" style="width:4px"></span><span class="val">4px</span><span class="use">badge internal · chip gap</span></div>
+      <div class="space-ruler"><span class="tok">--s-3</span><span class="bar" style="width:6px"></span><span class="val">6px</span><span class="use">pill padding horizontal · small icon gap</span></div>
+      <div class="space-ruler"><span class="tok">--s-4</span><span class="bar" style="width:8px"></span><span class="val">8px</span><span class="use">row-internal padding compact · badge cluster gap</span></div>
+      <div class="space-ruler"><span class="tok">--s-5</span><span class="bar" style="width:10px"></span><span class="val">10px</span><span class="use">field padding · caption-to-value</span></div>
+      <div class="space-ruler"><span class="tok">--s-6</span><span class="bar" style="width:12px"></span><span class="val">12px</span><span class="use">card internal vertical rhythm · row-internal comfortable</span></div>
+      <div class="space-ruler"><span class="tok">--s-7</span><span class="bar" style="width:16px"></span><span class="val">16px</span><span class="use">card padding · section-internal</span></div>
+      <div class="space-ruler"><span class="tok">--s-8</span><span class="bar" style="width:20px"></span><span class="val">20px</span><span class="use">column-gap tables · section-internal dense</span></div>
+      <div class="space-ruler"><span class="tok">--s-9</span><span class="bar" style="width:24px"></span><span class="val">24px</span><span class="use">card padding default · subsection spacing</span></div>
+      <div class="space-ruler"><span class="tok">--s-10</span><span class="bar" style="width:32px"></span><span class="val">32px</span><span class="use">page gutter · hero side padding</span></div>
+      <div class="space-ruler"><span class="tok">--s-11</span><span class="bar" style="width:40px"></span><span class="val">40px</span><span class="use">major section break</span></div>
+      <div class="space-ruler"><span class="tok">--s-12</span><span class="bar" style="width:56px"></span><span class="val">56px</span><span class="use">hero padding · chapter break</span></div>
+      <div class="space-ruler"><span class="tok">--s-13</span><span class="bar" style="width:80px"></span><span class="val">80px</span><span class="use">page-level break · end-of-doc</span></div>
+    </div>
+
+    <!-- Density modes -->
+    <div class="ts-ref" style="margin-top: var(--s-10); margin-bottom: var(--s-5)">Data-table density modes · §8 spec</div>
+    <div class="token-grid" style="grid-template-columns: repeat(3, 1fr)">
+      <div>
+        <div class="ts-xs" style="color: var(--ink-900); margin-bottom: 6px">COMPACT · 28px row</div>
+        <div class="ts-ref" style="margin-bottom: var(--s-5)">analysts · multi-hundred-row scans · desktop only</div>
+        <div style="border: var(--hair); background: var(--ink-000)">
+          <div style="height:28px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:11px; color:var(--ink-700); border-bottom:var(--hair-soft)">01<span style="color:var(--ink-900)">@CryptoInsights</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">84.6</span></div>
+          <div style="height:28px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:11px; color:var(--ink-700); border-bottom:var(--hair-soft)">02<span style="color:var(--ink-900)">@altmaxxer</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">82.1</span></div>
+          <div style="height:28px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:11px; color:var(--ink-700)">03<span style="color:var(--ink-900)">@lowfloat.research</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">79.8</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="ts-xs" style="color: var(--ink-900); margin-bottom: 6px">COMFORTABLE · 36px row · default</div>
+        <div class="ts-ref" style="margin-bottom: var(--s-5)">general use · balances density + scannability</div>
+        <div style="border: var(--hair); background: var(--ink-000)">
+          <div style="height:36px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:12px; color:var(--ink-700); border-bottom:var(--hair-soft)">01<span style="color:var(--ink-900)">@CryptoInsights</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">84.6</span></div>
+          <div style="height:36px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:12px; color:var(--ink-700); border-bottom:var(--hair-soft)">02<span style="color:var(--ink-900)">@altmaxxer</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">82.1</span></div>
+          <div style="height:36px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:12px; color:var(--ink-700)">03<span style="color:var(--ink-900)">@lowfloat.research</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">79.8</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="ts-xs" style="color: var(--ink-900); margin-bottom: 6px">RELAXED · 44px row</div>
+        <div class="ts-ref" style="margin-bottom: var(--s-5)">mobile-adjacent · tablet landscape · first-time users</div>
+        <div style="border: var(--hair); background: var(--ink-000)">
+          <div style="height:44px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:13px; color:var(--ink-700); border-bottom:var(--hair-soft)">01<span style="color:var(--ink-900)">@CryptoInsights</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">84.6</span></div>
+          <div style="height:44px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:13px; color:var(--ink-700); border-bottom:var(--hair-soft)">02<span style="color:var(--ink-900)">@altmaxxer</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">82.1</span></div>
+          <div style="height:44px; padding:0 var(--s-6); display:flex; align-items:center; gap:var(--s-7); font-family:var(--font-mono); font-size:13px; color:var(--ink-700)">03<span style="color:var(--ink-900)">@lowfloat.research</span><span style="margin-left:auto; font-variant-numeric:tabular-nums">79.8</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- ELEVATION ---------- -->
+    <div class="token-head" style="margin-top: var(--s-12)">
+      <div class="token-num">II · D</div>
+      <div>
+        <div class="token-title">Elevation &amp; surface layering</div>
+        <div class="token-sub">Flat, border-led. No drop shadows as primary affordance. Four layers only. <span class="cite">§11 clean card system</span></div>
+      </div>
+    </div>
+
+    <div class="elev-row">
+      <div class="elev-demo elev-page">
+        <b>Page</b>
+        <div>--ink-000<br>Root bg</div>
+      </div>
+      <div class="elev-demo elev-surface">
+        <b>Surface</b>
+        <div>--ink-050<br>App canvas</div>
+      </div>
+      <div class="elev-demo elev-card">
+        <b>Card</b>
+        <div>--ink-100 + hairline<br>--elev-card</div>
+      </div>
+      <div class="elev-demo elev-raised">
+        <b>Raised</b>
+        <div>--ink-150 + 1px<br>--elev-raised · drawer · modal</div>
+      </div>
+    </div>
+
+    <div class="prose" style="margin-top: var(--s-7)">
+      <p>
+        <b>No ambient shadows.</b> Glow and soft-shadow depth evoke consumer SaaS <span class="cite">§10 anti-pattern</span>. Layering is expressed through background shift + 1px hairline. The only shadow in the system is the drawer's inset-left-border (<span style="font-family:var(--font-mono); font-size:var(--t-xs); color:var(--ink-800)">--elev-drawer</span>) which communicates "came in from the edge" and is functional, not decorative.
+      </p>
+    </div>
+
+    <!-- ---------- MOTION ---------- -->
+    <div class="token-head" style="margin-top: var(--s-12)">
+      <div class="token-num">II · E</div>
+      <div>
+        <div class="token-title">Motion</div>
+        <div class="token-sub">Three durations. One easing for state-change, one for drawer. Motion signals change — never attracts attention. <span class="cite">§11</span></div>
+      </div>
+    </div>
+
+    <div style="border: var(--hair-strong); padding: var(--s-7) var(--s-9)">
+      <div class="motion-row"><span class="tok">--dur-fast</span><span class="val">80ms</span><div class="motion-viz motion-fast"></div><span class="use">Hover tint · focus ring · button pressdown</span></div>
+      <div class="motion-row"><span class="tok">--dur-base</span><span class="val">140ms</span><div class="motion-viz motion-base"></div><span class="use">Sort column switch · tweak toggle · delta flip</span></div>
+      <div class="motion-row"><span class="tok">--dur-slow</span><span class="val">220ms</span><div class="motion-viz motion-slow"></div><span class="use">Drawer open/close · modal reveal · tab underline slide</span></div>
+      <div class="motion-row"><span class="tok">--ease</span><span class="val">material-sharp</span><span style="font-family:var(--font-mono); font-size:10px; color:var(--ink-500)">cubic-bezier(.2,0,0,1)</span><span class="use">State change default · feels decisive</span></div>
+      <div class="motion-row"><span class="tok">--ease-drawer</span><span class="val">entrance</span><span style="font-family:var(--font-mono); font-size:10px; color:var(--ink-500)">cubic-bezier(.32,.72,0,1)</span><span class="use">Drawer + modal · pulls with slight overshoot resolve</span></div>
+    </div>
+
+    <div class="prose" style="margin-top: var(--s-7)">
+      <p>
+        <b>What motion is <em>not</em> for:</b> loading (we use skeletons, never spinners <span class="cite">§13</span>), decorative page entrance, attention-grabbing tickers <span class="cite">§10 anti-pattern</span>. If a motion does not confirm a user action or state change, it is deleted.
+      </p>
+    </div>
+
+    <!-- ---------- NINE STATES ---------- -->
+    <div class="token-head" id="states" style="margin-top: var(--s-12)">
+      <div class="token-num">II · F</div>
+      <div>
+        <div class="token-title">The nine states · state-color semantics as patterns</div>
+        <div class="token-sub">Every state mapped to a color token, a pattern name, a copy directive, and reusability scope. Lack of state coverage is the competitive gap this product closes. <span class="cite">§13 · App. B</span></div>
+      </div>
+    </div>
+
+    <div class="states">
+      <div class="state-row" style="background: var(--ink-100);">
+        <div class="state-name" style="color: var(--accent)">State</div>
+        <div class="state-copy" style="color: var(--ink-900)"><b>Pattern &amp; copy directive</b></div>
+        <div class="state-pattern"><b>Visual token</b></div>
+        <div class="state-cite">§</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--ink-300)"></span>Loading</div>
+        <div class="state-copy"><b>Skeleton rows, never spinners over data.</b> Rows match final layout — height, gridlines, column widths — so page does not reflow on arrival.</div>
+        <div class="state-pattern"><b>--ink-200 shimmer</b>280ms · 6% luma pulse</div>
+        <div class="state-cite">§13</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--ink-500)"></span>Empty</div>
+        <div class="state-copy"><b>Explains why + offers next action.</b> Copy: <em>"No creators match category=<b>DeFi</b> with sample N≥50. Lower the sample floor, or widen the category."</em> Never a generic "nothing here yet."</div>
+        <div class="state-pattern"><b>inline panel</b>caption + single button</div>
+        <div class="state-cite">§13</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--lown)"></span>Sparse data</div>
+        <div class="state-copy"><b>Low N badge + confidence caveat.</b> Copy: <em>"Low N · 8 calls · 90d"</em>. Ranking still shown; score is attenuated visually, not hidden. Severe-with-bad-performers ≠ hide-the-evidence.</div>
+        <div class="state-pattern"><span class="badge lown"><span class="dot"></span>LOW N</span></div>
+        <div class="state-cite">§13 · §14</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--lown)"></span>Low confidence</div>
+        <div class="state-copy"><b>Visible score attenuation, not hidden.</b> Score numeral rendered at 60% opacity with dotted underline; tooltip reveals confidence interval. Accompanied by sample-size badge.</div>
+        <div class="state-pattern"><b>opacity 0.6</b>dotted border-bottom</div>
+        <div class="state-cite">§13 · §14</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--lock)"></span>Locked premium</div>
+        <div class="state-copy"><b>Preview-with-lock. Not a wall.</b> Real data rendered, gently blurred (6px); lock badge + value statement overlay; single CTA anchored to the user's current intent. Every gate answers "what would I get?"</div>
+        <div class="state-pattern"><span class="badge lock"><span class="dot"></span>LOCKED</span><br>blur(6px) + value chip</div>
+        <div class="state-cite">§13 · §15 · §16</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--ink-400)"></span>No results</div>
+        <div class="state-copy"><b>Suggests filter relaxation, not a dead end.</b> Copy: <em>"No calls match. Remove Asset=<b>SOL</b> to see 47 results, or switch timeframe to 90d."</em> Always proposes a specific relaxation with projected count.</div>
+        <div class="state-pattern"><b>inline suggestion row</b>filter-chip-diff</div>
+        <div class="state-cite">§13</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--neg)"></span>Error</div>
+        <div class="state-copy"><b>Specific, actionable, state-preserving.</b> Copy: <em>"Couldn't load signals. <u>Retry</u> · <u>Report</u>. Your filters are saved."</em> Never "Something went wrong."</div>
+        <div class="state-pattern"><b>--neg 1px border</b>inline panel · filter state retained</div>
+        <div class="state-cite">§13 · §3</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--stale)"></span>Stale data</div>
+        <div class="state-copy"><b>Timestamp-led, with refresh affordance.</b> Copy: <em>"Updated 14h ago · <u>Refresh</u>."</em> Never hides the data. Score color desaturates by 15%; row meta reads in --stale.</div>
+        <div class="state-pattern"><span class="badge stale"><span class="dot"></span>STALE 14h</span></div>
+        <div class="state-cite">§13 · §14</div>
+      </div>
+
+      <div class="state-row">
+        <div class="state-name"><span class="state-dot" style="background:var(--new)"></span>New / updated</div>
+        <div class="state-copy"><b>Subtle delta, never distracting.</b> 4px left-border accent in --new for 24h from update; no animation, no blink. Tier of delta reflected in sort — recency ties break by magnitude.</div>
+        <div class="state-pattern"><b>border-left 4px --new</b>24h TTL</div>
+        <div class="state-cite">§13</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ========================================================
+       TENSIONS (§9) — explicit resolutions
+       ======================================================== -->
+  <section class="section" id="tensions">
+    <div class="section-head">
+      <div class="sn">§9</div>
+      <h2>Six UX <em>tensions</em>, resolved up-front.</h2>
+      <div class="section-meta">Every surface inherits these resolutions</div>
+    </div>
+
+    <div class="prose" style="margin-bottom: var(--s-8)">
+      <p>The brief requires each tension to be named and resolved rather than drifted past. Phase 1 records the resolution at the token level so every component in Phase 2 inherits the decision <span class="cite">§9</span>.</p>
+    </div>
+
+    <div class="tensions">
+      <div class="tension">
+        <div class="tension-pair"><b>Density</b> <span class="vs">vs</span> <b>Readability</b></div>
+        <div class="tension-resolution">Density is a user-chosen mode, not an imposed default. Three row heights; comfortable default.</div>
+        <div class="tension-how">Tokens: --row-compact/comfortable/relaxed. Saved in localStorage; restored on return. <span class="cite">§8 · §9</span></div>
+      </div>
+      <div class="tension">
+        <div class="tension-pair"><b>Confidence</b> <span class="vs">vs</span> <b>Overclaiming</b></div>
+        <div class="tension-resolution">Confidence is typographic — serif italic, tabular-num, restraint. Not chromatic.</div>
+        <div class="tension-how">Score at low-N rendered at 60% opacity + Low N badge. Never hidden. <span class="cite">§13 · §14</span></div>
+      </div>
+      <div class="tension">
+        <div class="tension-pair"><b>Gating</b> <span class="vs">vs</span> <b>Frustration</b></div>
+        <div class="tension-resolution">Preview-with-lock. Every gate shows value and anchors to intent. No walls, no interstitials.</div>
+        <div class="tension-how">--lock token; blur(6px) + value-prop chip pattern; six §16 moments mapped. <span class="cite">§15 · §16</span></div>
+      </div>
+      <div class="tension">
+        <div class="tension-pair"><b>Explainability</b> <span class="vs">vs</span> <b>Clutter</b></div>
+        <div class="tension-resolution">Metrics self-decode on the surface; methodology page is reference, not a prerequisite.</div>
+        <div class="tension-how">Every §14 metric has an inline explanation pattern (hover reveal). Specified in Phase 2. <span class="cite">§14</span></div>
+      </div>
+      <div class="tension">
+        <div class="tension-pair"><b>Freshness</b> <span class="vs">vs</span> <b>Noise</b></div>
+        <div class="tension-resolution">Subtle delta indicators (4px left-border, --new). No badges that pulse or animate.</div>
+        <div class="tension-how">24h TTL on "new"; stale data kept visible and labeled, not hidden. <span class="cite">§13</span></div>
+      </div>
+      <div class="tension">
+        <div class="tension-pair"><b>Editorial sharpness</b> <span class="vs">vs</span> <b>Perceived bias</b></div>
+        <div class="tension-resolution">Sharpness comes from copy and typography; evidence path is one interaction from every judgment.</div>
+        <div class="tension-how">§7 provenance is a first-class primitive. "Severe with bad performers, fair with evidence." <span class="cite">§3 · §7</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================
+       PROCEED GATE
+       ======================================================== -->
+  <section class="section" id="proceed">
+    <div class="section-head">
+      <div class="sn">Δ</div>
+      <h2>Direction confirmation before <em>Phase 2</em>.</h2>
+      <div class="section-meta">Per engagement working method</div>
+    </div>
+
+    <div class="proceed">
+      <h3>Confirm the direction, or name what to re-draft.</h3>
+      <p>
+        Phase 1 presents the IA and the token system together because decisions in one constrain the other — for example, the provenance pattern (<span class="cite">§7</span>) must be renderable inside every nine-state row, and the three density modes must be legible in the same mono at the same tabular-num settings. The three open directional choices are:
+      </p>
+      <ol>
+        <li><b>Accent hue — ochre (#C9A24B)</b>Editorial gold that reads as judgment, not retail-trading gold. Alternatives staged: slate-blue (reads as analytical, loses severity), desaturated amber (reads as warning, bleeds state-color). Recommend proceeding with ochre.</li>
+        <li><b>Editorial serif — Source Serif 4</b>Pairs with Inter Tight without magazine-luxury drift. Alternative: GT Sectra (stronger contrast, riskier licensing). Recommend Source Serif 4 for free-tier and licensing clarity.</li>
+        <li><b>Default density — comfortable (36px)</b>Balances §9 tension without forcing terminal density on first-time visitors. Alternatives: compact (alienates new users), relaxed (undersells the §0 density thesis). Recommend comfortable with compact available under Tweaks / preferences.</li>
+      </ol>
+      <div class="proceed-actions">
+        <button class="btn btn-primary" onclick="alert('Confirmed. Ready to proceed to Phase 2 — components, then screens per §18 priority order.')">Confirm direction · proceed to Phase 2</button>
+        <button class="btn" onclick="alert('Flag the tokens to re-draft, or the IA decisions to revisit, before Phase 2 begins.')">Request changes</button>
+        <button class="btn" onclick="document.getElementById('tweaks-panel').classList.add('open')">Preview alternative tokens (Tweaks)</button>
+      </div>
+    </div>
+
+    <div class="doc-foot">
+      <div>CTR · Design engagement phase 1 · <b>v0.1</b></div>
+      <div>Lead product designer → <b>Client</b> · 2026-04-23</div>
+      <div>Next: Phase 2 · Components · <b>§8, §13, §19</b></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ========== TWEAKS PANEL ========== -->
+<div id="tweaks-panel">
+  <div class="tweaks-head">
+    <b>Tweaks</b> · preview
+    <button onclick="document.getElementById('tweaks-panel').classList.remove('open')">✕</button>
+  </div>
+  <div class="tweak">
+    <label>Accent hue</label>
+    <div class="tweak-swatches" id="sw-accent">
+      <button data-val="#C9A24B" style="background:#C9A24B" title="ochre (default)"></button>
+      <button data-val="#B8925A" style="background:#B8925A" title="bronze"></button>
+      <button data-val="#7FA6C9" style="background:#7FA6C9" title="slate-blue"></button>
+      <button data-val="#C47B5E" style="background:#C47B5E" title="rust"></button>
+      <button data-val="#E1E3E7" style="background:#E1E3E7" title="monochrome"></button>
+    </div>
+  </div>
+  <div class="tweak">
+    <label>Density</label>
+    <div class="tweak-segmented" id="sw-density">
+      <button data-val="compact">Compact</button>
+      <button data-val="comfortable">Comfortable</button>
+      <button data-val="relaxed">Relaxed</button>
+    </div>
+  </div>
+  <div class="tweak-toggle" id="tg-serif">
+    <label>Editorial serif titles</label>
+    <div class="switch"></div>
+  </div>
+  <div class="tweak-toggle" id="tg-grid">
+    <label>12-col grid overlay</label>
+    <div class="switch"></div>
+  </div>
+  <div class="tweak-toggle" id="tg-tension">
+    <label>Highlight §9 resolutions</label>
+    <div class="switch"></div>
+  </div>
+</div>
+
+<script>
+/* ---------- TWEAKS plumbing ---------- */
+(function () {
+  let editMode = false;
+  const panel = document.getElementById('tweaks-panel');
+  const toggleBtn = document.getElementById('tweaks-toggle');
+
+  function applyAccent(hex) {
+    document.documentElement.style.setProperty('--accent', hex);
+    // recompute dim + low via rgba mixing stays in CSS; this is a preview only.
+    document.querySelectorAll('#sw-accent button').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === hex);
+    });
+    TWEAKS.accent = hex;
+    persist();
+  }
+  function applyDensity(mode) {
+    const map = { compact: 28, comfortable: 36, relaxed: 44 };
+    document.documentElement.style.setProperty('--row-comfortable', map[mode] + 'px');
+    document.querySelectorAll('#sw-density button').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === mode);
+    });
+    TWEAKS.density = mode;
+    persist();
+  }
+  function applyToggle(key, on) {
+    const el = document.getElementById(
+      key === 'serif_display' ? 'tg-serif' :
+      key === 'grid' ? 'tg-grid' : 'tg-tension'
+    );
+    el.classList.toggle('on', !!on);
+    if (key === 'grid') document.body.classList.toggle('show-grid', !!on);
+    if (key === 'tension_overlay') document.body.classList.toggle('tension-on', !!on);
+    if (key === 'serif_display') {
+      document.documentElement.style.setProperty(
+        '--font-serif', on ? '"Source Serif 4", Georgia, serif' : 'var(--font-sans)'
+      );
+    }
+    TWEAKS[key] = !!on;
+    persist();
+  }
+  function persist() {
+    if (!editMode) return;
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { ...TWEAKS } }, '*');
+  }
+
+  // listeners for host
+  window.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type === '__activate_edit_mode') {
+      editMode = true;
+      panel.classList.add('open');
+      toggleBtn.style.display = 'inline-block';
+    } else if (d.type === '__deactivate_edit_mode') {
+      editMode = false;
+      panel.classList.remove('open');
+      toggleBtn.style.display = 'none';
+    }
+  });
+  // announce availability after listener is live
+  try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch (e) {}
+
+  // Manual toggle (for direct open)
+  toggleBtn.addEventListener('click', () => panel.classList.toggle('open'));
+
+  // Bind controls
+  document.querySelectorAll('#sw-accent button').forEach(b => {
+    b.addEventListener('click', () => applyAccent(b.dataset.val));
+  });
+  document.querySelectorAll('#sw-density button').forEach(b => {
+    b.addEventListener('click', () => applyDensity(b.dataset.val));
+  });
+  document.getElementById('tg-serif').addEventListener('click', () => applyToggle('serif_display', !TWEAKS.serif_display));
+  document.getElementById('tg-grid').addEventListener('click', () => applyToggle('grid', !TWEAKS.grid));
+  document.getElementById('tg-tension').addEventListener('click', () => applyToggle('tension_overlay', !TWEAKS.tension_overlay));
+
+  // initial state reflected
+  applyAccent(TWEAKS.accent);
+  applyDensity(TWEAKS.density);
+  applyToggle('serif_display', TWEAKS.serif_display);
+  applyToggle('grid', TWEAKS.grid);
+  applyToggle('tension_overlay', TWEAKS.tension_overlay);
+})();
+</script>
+
+</body>
+</html>

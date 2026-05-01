@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import AlphaScoreBadge from "./AlphaScoreBadge";
 import type { Creator, CreatorStats } from "@/lib/types";
 
@@ -20,45 +20,59 @@ function getInitials(name: string): string {
 
 function getAvatarColor(name: string): string {
   const colors = [
-    "bg-brand-gold/20 text-brand-gold",
-    "bg-brand-accent/20 text-brand-accent",
-    "bg-brand-green/20 text-brand-green",
-    "bg-blue-500/20 text-blue-400",
-    "bg-pink-500/20 text-pink-400",
-    "bg-cyan-500/20 text-cyan-400",
+    "bg-accent/20 text-accent",
+    "bg-accent/20 text-accent",
+    "bg-pos/20 text-pos",
+    "bg-new/20 text-new",
+    "bg-accent-low/20 text-accent",
+    "bg-new/20 text-new",
   ];
   const index = name.charCodeAt(0) % colors.length;
   return colors[index];
 }
 
 function TrendIcon({ trend }: { readonly trend: "up" | "down" | "stable" }) {
-  if (trend === "up") return <TrendingUp className="w-4 h-4 text-brand-green" />;
-  if (trend === "down") return <TrendingDown className="w-4 h-4 text-brand-red" />;
-  return <Minus className="w-4 h-4 text-gray-500" />;
+  if (trend === "up")
+    return (
+      <span aria-hidden="true" className="text-pos text-sm">
+        ↑
+      </span>
+    );
+  if (trend === "down")
+    return (
+      <span aria-hidden="true" className="text-neg text-sm">
+        ↓
+      </span>
+    );
+  return (
+    <span aria-hidden="true" className="text-ink-500 text-sm">
+      —
+    </span>
+  );
 }
 
 export default function CreatorCard({ creator, stats, trend }: CreatorCardProps) {
   return (
     <Link
       href={`/creator/${creator.youtube_handle}`}
-      className="glass-card-hover p-5 block"
+      className="border border-ink-200 hover:border-ink-300 hover:bg-ink-100 transition-colors duration-200 p-5 block"
     >
       <div className="flex items-start gap-4 mb-4">
         {/* Avatar */}
         <div
-          className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ${getAvatarColor(creator.name)}`}
+          className={`w-12 h-12 flex items-center justify-center font-bold text-sm ${getAvatarColor(creator.name)}`}
         >
           {getInitials(creator.name)}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="text-white font-semibold text-sm truncate">
+            <h3 className="text-ink-900 font-semibold text-sm truncate">
               {creator.name}
             </h3>
             <TrendIcon trend={trend} />
           </div>
-          <p className="text-gray-500 text-xs truncate flex items-center gap-1">
+          <p className="text-ink-500 text-xs truncate flex items-center gap-1">
             {creator.youtube_handle}
             <ExternalLink className="w-3 h-3" />
           </p>
@@ -91,14 +105,14 @@ interface StatItemProps {
 function StatItem({ label, value, positive }: StatItemProps) {
   const valueColor =
     positive === undefined
-      ? "text-white"
+      ? "text-ink-900"
       : positive
-        ? "text-brand-green"
-        : "text-brand-red";
+        ? "text-pos"
+        : "text-neg";
 
   return (
     <div>
-      <p className="text-gray-500 text-[10px] uppercase tracking-wider mb-0.5">
+      <p className="text-ink-500 text-[10px] uppercase tracking-wider mb-0.5">
         {label}
       </p>
       <p className={`text-sm font-semibold tabular-nums ${valueColor}`}>{value}</p>

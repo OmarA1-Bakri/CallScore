@@ -57,8 +57,8 @@ function buildCall(overrides: Partial<Call> = {}): Call {
   };
 }
 
-test("tracked creator source of truth stays at 20", () => {
-  assert.equal(TRACKED_CREATOR_COUNT, 20);
+test("tracked creator source of truth supports the expanded index universe", () => {
+  assert.equal(TRACKED_CREATOR_COUNT, 123);
 });
 
 test("public Alpha Score equals the documented component sum", () => {
@@ -102,6 +102,24 @@ test("low-confidence calls are excluded instead of scored", () => {
   );
 
   assert.equal(status, "excluded_confidence");
+});
+
+test("calls without entry price state stay unscored", () => {
+  const status = getCallScoreStatus(
+    {
+      extraction_confidence: EXTRACTION_CONFIDENCE_THRESHOLD,
+      call_date: "2025-10-11T10:43:22.000Z",
+      price_at_call: null,
+      target_price: null,
+      price_30d: 110,
+      price_90d: 120,
+      return_30d: 10,
+      hit_target: true,
+    },
+    new Date("2026-04-12T00:00:00.000Z"),
+  );
+
+  assert.equal(status, "pending_horizon");
 });
 
 test("future horizons remain pending until they elapse", () => {

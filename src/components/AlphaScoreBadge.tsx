@@ -1,99 +1,62 @@
+import type { ReactElement } from "react";
+
 interface AlphaScoreBadgeProps {
   readonly score: number;
   readonly size?: "sm" | "md" | "lg";
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 70) return "text-brand-green";
-  if (score >= 50) return "text-yellow-400";
-  if (score >= 30) return "text-orange-400";
-  return "text-brand-red";
+function tone(score: number): { fg: string; bar: string } {
+  if (score >= 70) return { fg: "text-pos", bar: "bg-pos" };
+  if (score >= 50) return { fg: "text-accent", bar: "bg-accent" };
+  if (score >= 30) return { fg: "text-warn", bar: "bg-warn" };
+  return { fg: "text-neg", bar: "bg-neg" };
 }
 
-function getBarColor(score: number): string {
-  if (score >= 70) return "bg-brand-green";
-  if (score >= 50) return "bg-yellow-400";
-  if (score >= 30) return "bg-orange-400";
-  return "bg-brand-red";
-}
-
-function getGlowColor(score: number): string {
-  if (score >= 70) return "shadow-brand-green/20";
-  if (score >= 50) return "shadow-yellow-400/20";
-  if (score >= 30) return "shadow-orange-400/20";
-  return "shadow-brand-red/20";
-}
-
-const SIZE_MAP = {
-  sm: { container: "w-14 h-14", text: "text-sm", label: "text-[8px]" },
-  md: { container: "w-18 h-18", text: "text-lg", label: "text-[9px]" },
-  lg: { container: "w-24 h-24", text: "text-2xl", label: "text-xs" },
+const SIZES = {
+  sm: { num: "text-[20px]", unit: "text-[10px]" },
+  md: { num: "text-[28px]", unit: "text-[11px]" },
+  lg: { num: "text-[40px]", unit: "text-[13px]" },
 } as const;
 
 export default function AlphaScoreBadge({
   score,
   size = "md",
-}: AlphaScoreBadgeProps) {
-  const roundedScore = Math.round(score);
-  const sizeStyles = SIZE_MAP[size];
-  const percentage = Math.min(100, Math.max(0, roundedScore));
+}: AlphaScoreBadgeProps): ReactElement {
+  const rounded = Math.round(score);
+  const t = tone(rounded);
+  const s = SIZES[size];
 
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div
-        className={`relative ${sizeStyles.container} flex items-center justify-center`}
-      >
-        {/* Background ring */}
-        <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle
-            cx="50"
-            cy="50"
-            r="42"
-            fill="none"
-            stroke="#1e1e2e"
-            strokeWidth="6"
-          />
-          <circle
-            cx="50"
-            cy="50"
-            r="42"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="6"
-            strokeLinecap="round"
-            strokeDasharray={`${percentage * 2.64} ${264 - percentage * 2.64}`}
-            className={`${getScoreColor(roundedScore)} transition-all duration-700`}
-          />
-        </svg>
-
-        {/* Score number */}
-        <span
-          className={`${sizeStyles.text} font-bold tabular-nums ${getScoreColor(roundedScore)}`}
-        >
-          {roundedScore}
+    <div
+      className="inline-flex flex-col items-start gap-1.5 border border-ink-200 bg-ink-50 px-3 py-2.5"
+      style={{ borderRadius: 2 }}
+    >
+      <div className="flex items-baseline gap-1">
+        <span className={`font-serif ${s.num} font-medium tabular-nums tracking-tight ${t.fg}`}>
+          {rounded}
         </span>
+        <span className={`font-mono ${s.unit} text-ink-500 tracking-wide`}>α</span>
       </div>
-      <span className={`${sizeStyles.label} text-gray-500 uppercase tracking-wider font-medium`}>
+      <div className="font-mono text-[9px] text-ink-500 tracking-caps uppercase">
         Alpha Score
-      </span>
+      </div>
     </div>
   );
 }
 
-/** Inline horizontal bar variant used in table rows */
-export function AlphaScoreBar({ score }: { readonly score: number }) {
-  const roundedScore = Math.round(score);
-  const percentage = Math.min(100, Math.max(0, roundedScore));
-
+export function AlphaScoreBar({ score }: { readonly score: number }): ReactElement {
+  const rounded = Math.round(score);
+  const pct = Math.min(100, Math.max(0, rounded));
+  const t = tone(rounded);
   return (
-    <div className="flex items-center gap-2 min-w-[120px]">
-      <span className={`text-sm font-bold tabular-nums w-8 ${getScoreColor(roundedScore)}`}>
-        {roundedScore}
+    <div className="flex items-center gap-2 min-w-[140px]">
+      <span className={`font-mono text-[12px] tabular-nums w-9 text-right ${t.fg}`}>
+        {rounded}
       </span>
-      <div className="flex-1 h-1.5 bg-brand-border rounded-full overflow-hidden">
+      <div className="flex-1 h-px relative bg-ink-200">
         <div
-          className={`h-full rounded-full ${getBarColor(roundedScore)} transition-all duration-500`}
-          style={{ width: `${percentage}%` }}
+          className={`absolute inset-y-0 left-0 ${t.bar} transition-[width] duration-500`}
+          style={{ width: `${pct}%`, height: 2, top: -0.5 }}
         />
       </div>
     </div>

@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Terms of Service - CryptoTubers Ranked",
+  title: "Terms of Service - CallScore",
   description:
-    "Terms of service for CryptoTubers Ranked. Important disclaimers about financial information, data accuracy, and use of this platform.",
+    "Terms of service for CallScore. Important disclaimers about financial information, data accuracy, and use of this platform.",
 };
 
 /* ------------------------------------------------------------------ */
@@ -21,7 +21,7 @@ const TERMS_SECTIONS: readonly TermsSection[] = [
   {
     title: "Service Description",
     content: [
-      "CryptoTubers Ranked is an informational analytics platform that tracks and scores the accuracy of crypto YouTube influencers' altcoin predictions against real market data.",
+      "CallScore is an informational analytics platform that tracks and scores market calls against real price data.",
       "We provide creator rankings, accuracy scores, and analytical data derived from publicly available YouTube content and cryptocurrency market data. The platform is offered on a free tier with optional paid subscriptions for deeper analytics.",
     ],
   },
@@ -29,7 +29,7 @@ const TERMS_SECTIONS: readonly TermsSection[] = [
     title: "NOT Financial Advice",
     content: [
       "IMPORTANT: Nothing on this website constitutes financial advice, investment recommendations, or endorsements of any kind.",
-      "CryptoTubers Ranked is strictly an informational analytics platform. The scores, rankings, and data presented are statistical analyses of historical predictions and should not be interpreted as recommendations to buy, sell, or hold any cryptocurrency.",
+      "CallScore is strictly an informational analytics platform. The scores, rankings, and data presented are statistical analyses of historical predictions and should not be interpreted as recommendations to buy, sell, or hold any cryptocurrency.",
       "Cryptocurrency investments are highly volatile and carry substantial risk of loss, including the potential loss of your entire investment. Past performance of any creator, as measured by our scoring system, does not guarantee future results.",
       "You should always do your own research (DYOR) and consult a licensed financial advisor before making any investment decisions. We are not registered as a financial advisor, broker-dealer, or investment advisor with any regulatory authority.",
     ],
@@ -56,7 +56,7 @@ const TERMS_SECTIONS: readonly TermsSection[] = [
   {
     title: "Intellectual Property",
     content: [
-      "The scoring methodology, algorithms, website design, and original content on CryptoTubers Ranked are our intellectual property.",
+      "The scoring methodology, algorithms, website design, and original content on CallScore are our intellectual property.",
       "Creator names, channel names, and YouTube content referenced on this platform remain the property of their respective owners. Our use of this information is for analytical and informational purposes under fair use.",
       "You may reference or link to our public data with attribution. You may not reproduce substantial portions of our content without permission.",
     ],
@@ -71,7 +71,7 @@ const TERMS_SECTIONS: readonly TermsSection[] = [
   {
     title: "Limitation of Liability",
     content: [
-      "To the maximum extent permitted by law, CryptoTubers Ranked, its operators, and affiliates shall not be liable for any direct, indirect, incidental, special, or consequential damages arising from:",
+      "To the maximum extent permitted by law, CallScore, its operators, and affiliates shall not be liable for any direct, indirect, incidental, special, or consequential damages arising from:",
       "Your use of or reliance on any information provided on this platform.",
       "Any investment decisions made based on data, scores, or rankings from this platform.",
       "Errors, inaccuracies, or omissions in the data or scores.",
@@ -89,7 +89,7 @@ const TERMS_SECTIONS: readonly TermsSection[] = [
   {
     title: "Contact",
     content: [
-      "For questions about these terms, contact us through our feedback page or email us at legal@cryptotuberranked.com.",
+      "For questions about these terms, contact us through our feedback page or email us at legal@call-score.com.",
     ],
   },
 ] as const;
@@ -104,7 +104,7 @@ export default function TermsPage() {
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-8 transition-colors"
+        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-8 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Leaderboard
@@ -112,14 +112,14 @@ export default function TermsPage() {
 
       {/* Page header */}
       <section className="mb-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+        <h1 className="text-3xl sm:text-4xl font-bold text-ink-900 mb-3">
           Terms of Service
         </h1>
-        <p className="text-gray-500 text-sm">
+        <p className="text-ink-500 text-sm">
           Last updated: April 11, 2026
         </p>
-        <p className="text-gray-400 text-sm mt-4 leading-relaxed">
-          By accessing or using CryptoTubers Ranked (cryptotuberranked.com), you
+        <p className="text-ink-600 text-sm mt-4 leading-relaxed">
+          By accessing or using CallScore, you
           agree to be bound by these terms. If you do not agree to these terms,
           do not use the platform.
         </p>
@@ -127,12 +127,12 @@ export default function TermsPage() {
 
       {/* Financial disclaimer banner */}
       <section className="mb-8">
-        <div className="glass-card p-5 border-l-2 border-brand-gold">
-          <p className="text-brand-gold font-semibold text-sm mb-2">
+        <div className="border border-ink-200 p-5 border-l-2 border-l-accent">
+          <p className="text-accent font-semibold text-sm mb-2">
             Financial Disclaimer
           </p>
-          <p className="text-gray-400 text-xs leading-relaxed">
-            CryptoTubers Ranked is an informational analytics platform only.
+          <p className="text-ink-600 text-xs leading-relaxed">
+            CallScore is an informational analytics platform only.
             Nothing on this site constitutes financial advice, investment
             recommendations, or endorsements. Cryptocurrency investments are
             highly volatile and carry substantial risk of loss. Always do your
@@ -144,15 +144,15 @@ export default function TermsPage() {
       {/* Terms sections */}
       <div className="space-y-8">
         {TERMS_SECTIONS.map((section, index) => (
-          <section key={section.title} className="glass-card p-6">
-            <h2 className="text-white font-semibold text-base mb-4">
+          <section key={section.title} className="border border-ink-200 p-6">
+            <h2 className="text-ink-900 font-semibold text-base mb-4">
               {index + 1}. {section.title}
             </h2>
             <div className="space-y-3">
               {section.content.map((paragraph) => (
                 <p
                   key={paragraph.slice(0, 40)}
-                  className="text-gray-400 text-sm leading-relaxed"
+                  className="text-ink-600 text-sm leading-relaxed"
                 >
                   {paragraph}
                 </p>

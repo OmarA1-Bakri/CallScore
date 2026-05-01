@@ -1,61 +1,63 @@
 import Link from "next/link";
 import { Lock, Crown } from "lucide-react";
+import type { ReactElement, ReactNode } from "react";
 
 interface TierGateProps {
-  readonly tier: "pro" | "elite";
-  readonly children: React.ReactNode;
+  readonly tier: "pro" | "alpha";
+  readonly children: ReactNode;
 }
 
-const TIER_CONFIG = {
+const TIERS = {
   pro: {
     label: "Pro",
     price: "$19/mo",
     description: "Deep analytics on every creator",
-    gradient: "from-brand-accent to-purple-400",
-    borderColor: "border-brand-accent/30",
-    bgColor: "bg-brand-accent/10",
-    buttonBg: "bg-brand-accent hover:bg-brand-accent/80",
-    icon: Lock,
-    glowClass: "glow-purple",
+    Icon: Lock,
   },
-  elite: {
+  alpha: {
     label: "Alpha",
     price: "$49/mo",
     description: "Actionable signals, not just rankings",
-    gradient: "from-brand-gold to-yellow-400",
-    borderColor: "border-brand-gold/30",
-    bgColor: "bg-brand-gold/10",
-    buttonBg: "bg-brand-gold hover:bg-brand-gold-dim",
-    icon: Crown,
-    glowClass: "glow-gold",
+    Icon: Crown,
   },
 } as const;
 
-export default function TierGate({ tier, children }: TierGateProps) {
-  const config = TIER_CONFIG[tier];
-  const Icon = config.icon;
+export default function TierGate({
+  tier,
+  children,
+}: TierGateProps): ReactElement {
+  const t = TIERS[tier];
+  const Icon = t.Icon;
 
   return (
     <div className="relative">
-      {/* Blurred content */}
-      <div className="blur-[6px] select-none pointer-events-none" aria-hidden="true">
+      <div
+        className="blur-[6px] select-none pointer-events-none"
+        aria-hidden="true"
+        // @ts-expect-error -- `inert` is valid HTML5 but not yet in React 18 types
+        inert=""
+      >
         {children}
       </div>
-
-      {/* Overlay */}
-      <div className="absolute inset-0 flex items-center justify-center bg-brand-dark/60 backdrop-blur-sm">
+      <div className="absolute inset-0 flex items-center justify-center bg-ink-0/60 backdrop-blur-sm">
         <div
-          className={`text-center p-6 rounded-xl border ${config.borderColor} ${config.bgColor} ${config.glowClass}`}
+          className="text-center px-6 py-5 border border-accent-dim bg-accent-low max-w-[320px]"
+          style={{ borderRadius: 2 }}
         >
-          <Icon className="w-8 h-8 mx-auto mb-3 text-gray-400" />
-          <p className={`text-sm font-bold bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent mb-1`}>
-            Upgrade to {config.label}
+          <Icon className="w-5 h-5 mx-auto mb-2 text-accent" aria-hidden="true" />
+          <p className="font-serif text-[18px] text-ink-900 font-medium leading-tight mb-1">
+            Upgrade to <em className="italic text-accent">{t.label}</em>
           </p>
-          <p className="text-gray-500 text-xs mb-1">{config.description}</p>
-          <p className="text-white font-bold text-lg mb-3">{config.price}</p>
+          <p className="font-mono text-[11px] text-ink-500 tracking-wide mb-3">
+            {t.description}
+          </p>
+          <p className="font-serif text-[20px] text-ink-900 mb-4 tabular-nums">
+            {t.price}
+          </p>
           <Link
             href="/pricing"
-            className={`inline-block ${config.buttonBg} text-brand-dark font-semibold text-sm px-6 py-2 rounded-lg transition-colors`}
+            className="inline-block bg-accent hover:bg-accent-dim text-ink-0 font-mono text-[11px] tracking-caps uppercase px-4 py-2 transition-colors"
+            style={{ borderRadius: 2 }}
           >
             Unlock
           </Link>

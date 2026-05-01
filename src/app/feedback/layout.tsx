@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Feedback — CryptoTubers Ranked",
+  title: "Feedback — CallScore",
   description:
-    "Share your feedback on CryptoTubers Ranked. Suggest creators, report issues, or request features.",
+    "Share your feedback on CallScore. Suggest creators, report issues, or request features.",
   alternates: { canonical: "/feedback" },
 };
 

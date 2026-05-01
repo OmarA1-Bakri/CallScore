@@ -7,11 +7,11 @@ interface ScoreBreakdownProps {
 }
 
 const COMPONENTS = [
-  { key: "direction", label: "Direction Correct", max: 40, color: "bg-brand-green" },
-  { key: "alpha", label: "Alpha Over BTC", max: 25, color: "bg-blue-400" },
-  { key: "specificity", label: "Specificity", max: 15, color: "bg-brand-accent" },
-  { key: "regime", label: "Regime Difficulty", max: 10, color: "bg-orange-400" },
-  { key: "target", label: "Target Hit", max: 10, color: "bg-brand-gold" },
+  { key: "direction", label: "Direction Correct", max: 40, color: "bg-pos" },
+  { key: "alpha", label: "Alpha Over BTC", max: 25, color: "bg-new" },
+  { key: "specificity", label: "Specificity", max: 15, color: "bg-accent" },
+  { key: "regime", label: "Regime Difficulty", max: 10, color: "bg-warn" },
+  { key: "target", label: "Target Hit", max: 10, color: "bg-accent" },
 ] as const;
 
 export default function ScoreBreakdown({
@@ -32,10 +32,10 @@ export default function ScoreBreakdown({
   const total = direction + alpha + specificity + regime + target;
 
   return (
-    <div className="glass-card p-5">
+    <div className="border border-ink-200 p-5">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-white font-semibold text-sm">Score Breakdown</h2>
-        <span className="text-brand-green font-bold text-lg tabular-nums">
+        <h2 className="text-ink-900 font-semibold text-sm">Score Breakdown</h2>
+        <span className="text-pos font-bold text-lg tabular-nums">
           {total.toFixed(1)}
         </span>
       </div>
@@ -48,14 +48,14 @@ export default function ScoreBreakdown({
           return (
             <div key={comp.key}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-gray-400 text-xs">{comp.label}</span>
-                <span className="text-gray-300 text-xs tabular-nums">
+                <span className="text-ink-600 text-xs">{comp.label}</span>
+                <span className="text-ink-700 text-xs tabular-nums">
                   {value.toFixed(1)} / {comp.max}
                 </span>
               </div>
-              <div className="h-2 bg-brand-border rounded-full overflow-hidden">
+              <div className="h-2 bg-ink-200 overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${comp.color} transition-all duration-500`}
+                  className={`h-full ${comp.color} transition-all duration-500`}
                   style={{ width: `${Math.min(100, percentage)}%` }}
                 />
               </div>

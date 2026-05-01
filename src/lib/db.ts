@@ -10,8 +10,10 @@ export const DATABASE_URL_ENV_KEYS = [
   "POSTGRES_PRISMA_URL",
 ] as const;
 
+type DatabaseEnv = Record<string, string | undefined>;
+
 export function resolveDatabaseUrl(
-  env: NodeJS.ProcessEnv = process.env,
+  env: DatabaseEnv = process.env,
 ): string {
   for (const key of DATABASE_URL_ENV_KEYS) {
     const value = env[key];

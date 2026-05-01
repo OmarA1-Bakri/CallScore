@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://cryptotuberranked.com";
+  const baseUrl = "https://call-score.com";
 
   const staticPages = ["", "/pricing", "/methodology", "/feedback"].map(
     (path) => ({

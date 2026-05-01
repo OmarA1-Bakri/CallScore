@@ -1,0 +1,850 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CTR — Phase 3 · D4 · Pricing &amp; Upgrade · v0.1 · 2026-04-24</title>
+<meta name="viewport" content="width=1440" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink-000:#0A0A0B; --ink-050:#0E0F10; --ink-100:#141517; --ink-150:#1A1B1E;
+  --ink-200:#22242A; --ink-250:#2B2D33; --ink-300:#3A3D44;
+  --ink-400:#5B5F68; --ink-500:#7A7F89; --ink-600:#9CA0A9; --ink-700:#C2C5CC; --ink-800:#E1E3E7; --ink-900:#F4F5F7;
+  --accent:#C9A24B; --accent-dim:#8E7235; --accent-low:#3A2F17;
+  --pos:#6FA56A; --pos-dim:#3E5D3B;
+  --neg:#D47A70; --neg-dim:#6A3631;
+  --warn:#D97757;
+  --stale:#8A7A5E; --new:#7FA6C9;
+  --font-serif:"Source Serif 4", Georgia, serif;
+  --font-sans:"Inter Tight", -apple-system, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, monospace;
+  --hair:1px solid var(--ink-200);
+  --hair-strong:1px solid var(--ink-250);
+  --hair-soft:1px solid var(--ink-150);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--ink-000);color:var(--ink-700);font-family:var(--font-sans);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum","ss01"}
+a{color:inherit;text-decoration:none}
+button{background:none;border:none;color:inherit;font:inherit;cursor:pointer}
+
+/* masthead */
+.mast{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.92);backdrop-filter:blur(12px);border-bottom:var(--hair-strong)}
+.mast-in{max-width:1360px;margin:0 auto;padding:12px 32px;display:grid;grid-template-columns:auto 1fr auto;gap:32px;align-items:center}
+.wm{font-family:var(--font-serif);font-weight:500;font-size:16px;letter-spacing:-.01em;color:var(--ink-900)}
+.wm em{font-style:italic;color:var(--accent);font-weight:400}
+.bc{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);text-transform:uppercase;letter-spacing:.08em}
+.bc a{color:var(--accent);border-bottom:1px solid var(--accent-dim);padding-bottom:1px}
+.bc .sep{padding:0 8px;color:var(--ink-400)}
+.meta{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);display:flex;gap:16px;letter-spacing:.04em}
+.meta b{color:var(--ink-900);font-weight:500}
+
+main{max-width:1360px;margin:0 auto;padding:48px 32px 120px;position:relative;z-index:1}
+
+/* section chrome */
+.section{padding:40px 0;border-top:var(--hair-strong)}
+.section:first-of-type{border-top:none}
+.sh{display:grid;grid-template-columns:72px 1fr 260px;gap:32px;align-items:baseline;margin-bottom:28px}
+.sn{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);letter-spacing:.1em;text-transform:uppercase}
+.sh h2{font-family:var(--font-serif);font-size:30px;color:var(--ink-900);font-weight:500;letter-spacing:-.015em;line-height:1.15}
+.sh h2 em{font-style:italic;color:var(--accent);font-weight:400}
+.sm{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em;line-height:1.7;text-align:right}
+.sm b{color:var(--ink-800);font-weight:500}
+.prose{font-family:var(--font-serif);font-size:15px;line-height:1.65;color:var(--ink-700);max-width:68ch;margin-bottom:20px}
+.prose p{margin-bottom:14px}
+.prose em{font-style:italic;color:var(--accent)}
+.prose b{color:var(--ink-900);font-weight:500}
+.prose code{font-family:var(--font-mono);font-size:12px;color:var(--accent);background:var(--ink-100);padding:1px 5px;border-radius:2px}
+
+/* plan token */
+.tok{display:inline-flex;align-items:center;padding:0 5px;font-family:var(--font-mono);font-size:10px;letter-spacing:.02em;color:var(--new);border:1px dashed var(--new);background:rgba(127,166,201,.06);border-radius:2px;vertical-align:1px}
+.tok::before{content:"{";color:var(--new);opacity:.6;padding-right:1px}
+.tok::after{content:"}";color:var(--new);opacity:.6;padding-left:1px}
+
+/* canon chrome */
+.canon{border:var(--hair-strong);background:var(--ink-000);margin-bottom:40px}
+.canon-tab{display:flex;background:var(--ink-100);border-bottom:var(--hair-strong);padding:10px 24px;gap:16px;align-items:baseline}
+.canon-tab .l{font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;font-weight:500}
+.canon-tab .n{font-family:var(--font-serif);font-size:18px;color:var(--ink-900);font-weight:500;letter-spacing:-.005em}
+.canon-tab .n em{font-style:italic;color:var(--accent)}
+.canon-tab .m{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em}
+.canon-tab .m b{color:var(--ink-800);font-weight:500}
+
+/* === PRICING PAGE === */
+.pricing-hero{padding:56px 48px 36px;display:grid;grid-template-columns:1fr 400px;gap:48px;align-items:end;border-bottom:var(--hair-strong)}
+.ph-l .kick{font-family:var(--font-mono);font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px}
+.ph-l h1{font-family:var(--font-serif);font-size:44px;color:var(--ink-900);font-weight:400;letter-spacing:-.02em;line-height:1.08;max-width:18ch}
+.ph-l h1 em{font-style:italic;color:var(--accent)}
+.ph-l h1 b{font-weight:500;color:var(--ink-900)}
+.ph-l .sub{font-family:var(--font-serif);font-size:16px;color:var(--ink-700);font-style:italic;line-height:1.55;margin-top:18px;max-width:52ch}
+.ph-r{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);letter-spacing:.04em;line-height:1.8;border-left:var(--hair-soft);padding-left:28px}
+.ph-r .kn{color:var(--ink-800);font-weight:500;text-transform:uppercase;letter-spacing:.08em;font-size:10px;display:block;margin-bottom:4px}
+.ph-r p{margin-bottom:14px}
+.ph-r b{color:var(--ink-900);font-weight:500}
+
+/* billing toggle */
+.bill{display:flex;align-items:center;gap:10px;margin-top:28px}
+.bill .seg{display:inline-flex;border:1px solid var(--ink-300);border-radius:2px;background:var(--ink-100);font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.bill .seg button{padding:8px 16px;color:var(--ink-500)}
+.bill .seg button.on{background:var(--accent);color:var(--ink-000);font-weight:500}
+.bill .save{font-family:var(--font-mono);font-size:10px;color:var(--pos);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--pos-dim);background:rgba(111,165,106,.08);border-radius:2px}
+
+/* tier cards */
+.tiers{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0}
+.tier{padding:32px 32px 28px;border-right:var(--hair-strong);display:flex;flex-direction:column;min-height:720px;position:relative}
+.tier:last-child{border-right:none}
+.tier.rec{background:linear-gradient(180deg,rgba(201,162,75,.05),transparent 30%)}
+.tier.rec::before{content:"recommended";position:absolute;top:0;left:0;right:0;padding:6px 32px;font-family:var(--font-mono);font-size:9px;color:var(--ink-000);background:var(--accent);letter-spacing:.1em;text-transform:uppercase;font-weight:500}
+.tier.rec{padding-top:56px}
+.tier .tname{font-family:var(--font-serif);font-size:22px;color:var(--ink-900);font-weight:500;letter-spacing:-.01em;margin-bottom:4px}
+.tier .tname em{font-style:italic;color:var(--accent)}
+.tier .taud{font-family:var(--font-serif);font-size:14px;color:var(--ink-600);font-style:italic;line-height:1.45;margin-bottom:22px;max-width:28ch}
+.tier .price-row{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+.tier .price{font-family:var(--font-serif);font-size:42px;color:var(--ink-900);font-weight:400;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.tier .price-u{font-family:var(--font-mono);font-size:11px;color:var(--ink-500);letter-spacing:.06em}
+.tier .annual-note{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em;margin-bottom:24px;min-height:14px}
+.tier .annual-note b{color:var(--pos);font-weight:500}
+.tier .trial{font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--accent-dim);background:rgba(201,162,75,.08);border-radius:2px;align-self:flex-start;margin-bottom:24px}
+.tier .cta{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:12px 16px;text-align:center;border:1px solid var(--ink-300);background:var(--ink-100);color:var(--ink-800);font-weight:500;cursor:pointer;margin-bottom:24px}
+.tier .cta.primary{background:var(--accent);color:var(--ink-000);border-color:var(--accent)}
+.tier .cta.ghost{background:transparent;color:var(--ink-700)}
+.tier .flist{font-family:var(--font-mono);font-size:11px;color:var(--ink-700);line-height:1.9;letter-spacing:.02em}
+.tier .flist .fh{font-size:9px;color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase;padding:10px 0 4px;border-bottom:var(--hair-soft);margin-bottom:8px;font-weight:500}
+.tier .flist li{list-style:none;padding:3px 0 3px 18px;position:relative}
+.tier .flist li::before{content:"";position:absolute;left:2px;top:10px;width:6px;height:6px;border:1px solid var(--ink-400);background:transparent}
+.tier .flist li.fh{padding-left:0}
+.tier .flist li.fh::before{content:none;display:none}
+.tier .flist li.on::before{background:var(--accent);border-color:var(--accent)}
+.tier .flist li.on{color:var(--ink-900)}
+.tier .flist li b{color:var(--ink-900);font-weight:500}
+.tier .flist li .hl{color:var(--accent)}
+
+/* comparison grid */
+.cmp-grid{border-top:var(--hair-strong);margin-top:0}
+.cmp-grid .row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;border-bottom:var(--hair-soft)}
+.cmp-grid .row:last-child{border-bottom:none}
+.cmp-grid .cat{grid-column:1 / -1;background:var(--ink-050);padding:10px 32px;font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-top:var(--hair-strong);border-bottom:var(--hair-strong)}
+.cmp-grid .cell{padding:13px 20px;font-family:var(--font-mono);font-size:11px;color:var(--ink-700);line-height:1.5;border-left:var(--hair-soft);display:flex;align-items:center}
+.cmp-grid .cell:first-child{border-left:none;color:var(--ink-800);font-weight:500;font-family:var(--font-sans);font-size:13px}
+.cmp-grid .cell b{color:var(--ink-900);font-weight:500}
+.cmp-grid .cell.yes::before{content:"●";color:var(--pos);padding-right:6px;font-size:10px}
+.cmp-grid .cell.no{color:var(--ink-500)}
+.cmp-grid .cell.no::before{content:"—";color:var(--ink-400);padding-right:6px}
+.cmp-grid .cell.rec-col{background:rgba(201,162,75,.03)}
+
+/* FAQ */
+.faq{padding:40px 48px;border-top:var(--hair-strong)}
+.faq h3{font-family:var(--font-serif);font-size:22px;color:var(--ink-900);font-weight:400;letter-spacing:-.01em;margin-bottom:20px}
+.faq h3 em{font-style:italic;color:var(--accent)}
+.faq-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-200);border:var(--hair)}
+.faq-q{background:var(--ink-050);padding:18px 22px;font-family:var(--font-serif);font-size:14px;color:var(--ink-900);font-weight:500;line-height:1.4}
+.faq-q em{font-style:italic;color:var(--accent);font-weight:400}
+.faq-a{background:var(--ink-000);padding:18px 22px;font-family:var(--font-serif);font-size:13px;color:var(--ink-700);line-height:1.6}
+.faq-a b{color:var(--ink-900);font-weight:500}
+.faq-a em{font-style:italic;color:var(--accent)}
+
+/* === in-context modals === */
+.ctx{margin-top:40px}
+.ctx-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.ctx-head h3{font-family:var(--font-serif);font-size:22px;color:var(--ink-900);font-weight:400;letter-spacing:-.01em}
+.ctx-head h3 em{font-style:italic;color:var(--accent)}
+.ctx-head .tr{font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.06em;text-transform:uppercase}
+
+/* modal overlay within canvas */
+.host{position:relative;min-height:520px;background:var(--ink-100);padding:28px;overflow:hidden}
+.host::before{content:"";position:absolute;inset:0;background:
+  repeating-linear-gradient(0deg,transparent 0 60px,rgba(255,255,255,.01) 60px 61px),
+  repeating-linear-gradient(90deg,transparent 0 60px,rgba(255,255,255,.01) 60px 61px);
+  pointer-events:none}
+.host .stage-lbl{position:absolute;top:8px;left:12px;font-family:var(--font-mono);font-size:9px;color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase}
+
+/* ghost content (shows context of where modal appears) */
+.ghost{position:absolute;inset:28px;opacity:.42;filter:blur(.3px);pointer-events:none;display:flex;flex-direction:column;gap:10px}
+.ghost .line{height:10px;background:var(--ink-250);border-radius:1px}
+.ghost .line.w80{width:80%}.ghost .line.w60{width:60%}.ghost .line.w90{width:90%}.ghost .line.w40{width:40%}
+.ghost .block{height:60px;background:var(--ink-200);border:var(--hair);border-radius:2px;margin-bottom:8px}
+.ghost-dim{position:absolute;inset:28px;background:rgba(10,10,11,.72);backdrop-filter:blur(2px)}
+
+/* modal chrome */
+.modal{position:absolute;background:var(--ink-000);border:1px solid var(--accent-dim);box-shadow:0 24px 64px rgba(0,0,0,.6),0 0 0 1px rgba(201,162,75,.15);z-index:10}
+.modal.m1{top:60px;left:50%;transform:translateX(-50%);width:480px;padding:28px 30px}
+.modal.m2{top:60px;left:50%;transform:translateX(-50%);width:560px;padding:0}
+.modal.m3{top:40px;left:50%;transform:translateX(-50%);width:640px;padding:0}
+
+.modal .close{position:absolute;top:14px;right:16px;font-family:var(--font-mono);font-size:14px;color:var(--ink-500);line-height:1}
+.modal .m-kick{font-family:var(--font-mono);font-size:10px;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.modal .m-title{font-family:var(--font-serif);font-size:22px;color:var(--ink-900);font-weight:500;letter-spacing:-.01em;line-height:1.25;margin-bottom:12px}
+.modal .m-title em{font-style:italic;color:var(--accent)}
+.modal .m-sub{font-family:var(--font-serif);font-size:14px;color:var(--ink-700);font-style:italic;line-height:1.55;margin-bottom:20px}
+
+/* evidence-of-value block (shared) */
+.eov{background:var(--ink-100);border:var(--hair);padding:14px 16px;margin-bottom:18px;display:flex;flex-direction:column;gap:8px}
+.eov .h{font-family:var(--font-mono);font-size:9px;color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase}
+.eov .row{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:11px;color:var(--ink-700)}
+.eov .row b{color:var(--ink-900);font-weight:500}
+.eov .row .hl{color:var(--accent)}
+.eov .row .pos{color:var(--pos)}
+
+/* modal cta */
+.m-cta{display:flex;gap:10px;margin-top:6px}
+.m-cta button{padding:11px 18px;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--ink-300);font-weight:500}
+.m-cta button.primary{background:var(--accent);color:var(--ink-000);border-color:var(--accent)}
+.m-cta button.primary:hover{background:#D4AD55}
+.m-cta button.ghost{background:transparent;color:var(--ink-700)}
+.m-cta .fp{font-family:var(--font-mono);font-size:9px;color:var(--ink-500);letter-spacing:.04em;padding:10px 0;margin-left:auto;align-self:center}
+
+/* m2 / m3 specifics */
+.m2 .m-head{padding:24px 28px 18px;border-bottom:var(--hair)}
+.m2 .m-body{padding:20px 28px 24px}
+.m2 .plan-snap{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink-200);border:var(--hair);margin-bottom:18px}
+.m2 .plan-snap .c{background:var(--ink-050);padding:14px 16px;font-family:var(--font-mono);font-size:10px;color:var(--ink-500);letter-spacing:.04em;line-height:1.6}
+.m2 .plan-snap .c .hd{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.m2 .plan-snap .c .v{font-family:var(--font-serif);font-size:15px;color:var(--ink-900);font-weight:500;line-height:1.3}
+.m2 .plan-snap .c .v b{color:var(--accent)}
+.m2 .plan-snap .c.gain{background:rgba(201,162,75,.05)}
+
+.m3 .m-head{padding:20px 28px;border-bottom:var(--hair);display:flex;align-items:baseline;gap:10px}
+.m3 .m-head .m-kick{margin:0}
+.m3 .m-head .t{font-family:var(--font-serif);font-size:17px;color:var(--ink-900);font-weight:500;margin-left:6px}
+.m3 .m-head .t em{font-style:italic;color:var(--accent)}
+.m3 .m-body{padding:24px 28px}
+.m3 .side-by{display:grid;grid-template-columns:1fr 1fr 44px 1fr;gap:10px;margin-bottom:18px;align-items:stretch}
+.m3 .sb-cell{border:var(--hair);background:var(--ink-050);padding:14px;display:flex;flex-direction:column;gap:8px;min-height:140px}
+.m3 .sb-cell.locked{border:1px dashed var(--new);background:rgba(127,166,201,.04);position:relative}
+.m3 .sb-cell .sb-av{width:32px;height:32px;border-radius:50%;background:var(--ink-250);border:2px solid var(--accent);font-family:var(--font-serif);font-size:12px;text-align:center;line-height:28px;color:var(--ink-900);font-weight:500}
+.m3 .sb-cell .sb-name{font-family:var(--font-serif);font-size:13px;color:var(--ink-900);font-weight:500}
+.m3 .sb-cell .sb-meta{font-family:var(--font-mono);font-size:9px;color:var(--ink-500);letter-spacing:.04em;line-height:1.5}
+.m3 .sb-cell .sb-meta b{color:var(--ink-800);font-weight:500}
+.m3 .sb-plus{display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:22px;color:var(--accent);font-style:italic}
+.m3 .sb-cell.locked .lk-icon{width:20px;height:20px;border:1px solid var(--new);border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:10px;color:var(--new);margin-bottom:2px}
+.m3 .sb-cell.locked .lk-t{font-family:var(--font-serif);font-size:13px;color:var(--ink-900);font-weight:500;line-height:1.3}
+.m3 .sb-cell.locked .lk-s{font-family:var(--font-mono);font-size:9px;color:var(--new);letter-spacing:.04em;line-height:1.5}
+
+/* example body on modal 3: three-up synthesis preview */
+.m3 .synth-pre{border:var(--hair);background:var(--ink-050);padding:14px;margin-bottom:14px}
+.m3 .synth-pre .h{font-family:var(--font-mono);font-size:9px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.m3 .synth-pre .t{font-family:var(--font-serif);font-size:14px;color:var(--ink-900);font-style:italic;line-height:1.5;font-weight:400}
+.m3 .synth-pre .t em{color:var(--accent)}
+.m3 .synth-pre .t b{font-weight:500;color:var(--ink-900)}
+
+/* token application table */
+.tok-apply{border:var(--hair-strong);margin-top:28px}
+.tok-apply table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px}
+.tok-apply th{text-align:left;padding:10px 14px;background:var(--ink-050);border-bottom:var(--hair-strong);border-right:var(--hair-soft);color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase;font-size:10px;font-weight:500}
+.tok-apply th:last-child{border-right:none}
+.tok-apply td{padding:11px 14px;border-bottom:var(--hair-soft);border-right:var(--hair-soft);color:var(--ink-700);vertical-align:top;line-height:1.5}
+.tok-apply td:last-child{border-right:none}
+.tok-apply td b{color:var(--ink-900);font-weight:500}
+
+/* audit table */
+.audit{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11px}
+.audit th{text-align:left;padding:10px 14px;border-bottom:var(--hair-strong);color:var(--ink-500);letter-spacing:.08em;text-transform:uppercase;font-size:10px;font-weight:500}
+.audit td{padding:10px 14px;border-bottom:var(--hair-soft);color:var(--ink-700)}
+.audit td.tid{color:var(--accent);letter-spacing:.04em;font-weight:500}
+.audit td.tn{color:var(--ink-800)}
+.audit td.tn em{font-family:var(--font-serif);font-style:italic;color:var(--accent);font-weight:400}
+.audit td.st .tag{display:inline-block;padding:1px 6px;font-size:9px;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--pos-dim);color:var(--pos);background:rgba(111,165,106,.08);border-radius:2px;font-weight:500}
+.audit td.loc{color:var(--ink-500);font-size:10px}
+
+/* notes blob */
+.note{padding:18px 22px;border:var(--hair-strong);background:var(--ink-050);font-family:var(--font-mono);font-size:11px;color:var(--ink-500);letter-spacing:.04em;line-height:1.7}
+.note b{color:var(--ink-900);font-weight:500}
+.note em{color:var(--accent);font-style:italic;font-family:var(--font-serif)}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="mast-in">
+    <div class="wm">CryptoTubers <em>Ranked</em></div>
+    <div class="bc">
+      <a>Phase 1</a><span class="sep">/</span>
+      <a>Phase 2 v0.2</a><span class="sep">/</span>
+      <a>Phase 3 v0.3</a><span class="sep">/</span>
+      D4 · Pricing &amp; Upgrade · v0.1
+    </div>
+    <div class="meta">
+      <span>rev · <b>D4 · v0.1</b></span>
+      <span>date · <b>2026-04-24</b></span>
+      <span>modals · <b>3 / 3</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ 00 · PREAMBLE ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">00 · preamble</div>
+    <h2>D4 · <em>Pricing destination</em> + three in-context upgrade modals.</h2>
+    <div class="sm">
+      pricing · <b>1 page</b><br>
+      modals · <b>3 entry points</b><br>
+      tokens · <b>14 · all driven</b>
+    </div>
+  </div>
+  <div class="prose">
+    <p>D4 has two halves. <b>(a) Pricing destination</b> — the page users land on from the settings menu or from any "see all plans" link in a modal. It is the single source of truth for plan tiers, and it renders entirely through the v0.3 plan tokens (<code>plan.pro.name</code>, <code>plan.pro.price.monthly</code>, <code>gate.*</code>) so the moment product signs off the values swap here first and propagate. <b>(b) Three in-context upgrade modals</b> — one per teaser surfaced in v0.3's canonical screens: <em>Signals live feed</em>, <em>Saved views 4th slot</em>, <em>Compare +column</em>. Each modal proves its value <em>from what the user was just looking at</em>, not from a generic feature list.</p>
+    <p>Carry-forward discipline: Compare synthesis stays the hero when the modal appears, originator stays first-class in the ROI arithmetic, and every plan value is still a token.</p>
+  </div>
+</section>
+
+<!-- ============ 01 · PRICING PAGE ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">01 · destination</div>
+    <h2>Pricing page — the <em>source of truth</em>, driven entirely by plan tokens.</h2>
+    <div class="sm">
+      three tiers · <b>Watch · Pro · Team</b><br>
+      annual save · <b>~17%</b><br>
+      trial · <span class="tok">plan.pro.trial</span>
+    </div>
+  </div>
+
+  <div class="canon">
+    <div class="canon-tab">
+      <div class="l">canonical</div>
+      <div class="n">Pricing · <em>three tiers, one argument per tier</em></div>
+      <div class="m">composition · <b>hero → tiers → comparison grid → FAQ</b> · every value is a <code>.tok</code></div>
+    </div>
+
+    <!-- hero -->
+    <div class="pricing-hero">
+      <div class="ph-l">
+        <div class="kick">Pricing · transparent · cancel anytime</div>
+        <h1>A clear lens on <em>which crypto voices</em> actually move your money.</h1>
+        <p class="sub">Free shows the evidence after the fact. <b>Pro</b> shows it while there's still a trade to take. Team adds shared watchlists and weekly memos for desks. <span class="tok">plan.pro.trial</span> trial on Pro — no card required.</p>
+        <div class="bill">
+          <div class="seg">
+            <button>Monthly</button>
+            <button class="on">Annual</button>
+          </div>
+          <span class="save">save ~17%</span>
+        </div>
+      </div>
+      <div class="ph-r">
+        <span class="kn">What you pay for</span>
+        <p><b>Speed.</b> See theses while they're forming — the <span class="tok">gate.signals.live.window</span> window that free tier doesn't see.</p>
+        <p><b>Density.</b> Compare up to <span class="tok">gate.compare.pro</span> creators side-by-side with synthesis; free is <span class="tok">gate.compare.free</span>.</p>
+        <p><b>Alerts.</b> Push notifications for watched creators, thesis crossings, retractions. Free is in-app only.</p>
+        <p><b>Evidence.</b> β-α column and full provenance trails on resolved calls.</p>
+      </div>
+    </div>
+
+    <!-- tier cards -->
+    <div class="tiers">
+
+      <div class="tier">
+        <div class="tname">Watch</div>
+        <div class="taud">Read the leaderboard, skim resolved calls, follow creators.</div>
+        <div class="price-row">
+          <div class="price">$0</div>
+          <div class="price-u">/ forever</div>
+        </div>
+        <div class="annual-note">&nbsp;</div>
+        <button class="cta ghost">Continue free</button>
+        <ul class="flist">
+          <li class="fh">Included</li>
+          <li class="on">Full leaderboard &amp; creator profiles</li>
+          <li class="on">Resolved Signals · <b>&gt;<span class="tok">gate.signals.free.window</span></b> old</li>
+          <li class="on">Watched creators · <b><span class="tok">gate.watched.free</span></b></li>
+          <li class="on">Saved views · <b><span class="tok">gate.saved.free</span></b></li>
+          <li class="on">Compare · <b><span class="tok">gate.compare.free</span></b></li>
+          <li class="on">In-app alerts (no push)</li>
+          <li class="on">α + win rate + first-mover % on profile</li>
+          <li class="fh">Not included</li>
+          <li>Forming Signals <span class="tok">gate.signals.live.window</span></li>
+          <li>β-α column</li>
+          <li>Push alerts</li>
+        </ul>
+      </div>
+
+      <div class="tier rec">
+        <div class="tname"><span class="tok">plan.pro.name</span> <em>·</em> Individual</div>
+        <div class="taud">See theses as they form · compare more creators · act before consensus.</div>
+        <div class="price-row">
+          <div class="price"><span class="tok">plan.pro.price.monthly</span></div>
+          <div class="price-u">/ mo · billed annually</div>
+        </div>
+        <div class="annual-note">annual · <b><span class="tok">plan.pro.price.annual</span>/yr</b> · save ~17%</div>
+        <span class="trial"><span class="tok">plan.pro.trial</span> trial · no card</span>
+        <button class="cta primary">Start <span class="tok">plan.pro.trial</span> trial</button>
+        <ul class="flist">
+          <li class="fh">Everything in Watch, plus</li>
+          <li class="on"><span class="hl">Forming Signals</span> · <b><span class="tok">gate.signals.live.window</span></b></li>
+          <li class="on">Watched creators · <b><span class="tok">gate.watched.pro</span></b></li>
+          <li class="on">Saved views · <b><span class="tok">gate.saved.pro</span></b></li>
+          <li class="on">Compare · <b><span class="tok">gate.compare.pro</span></b> with synthesis</li>
+          <li class="on">Push alerts · <span class="tok">gate.alerts.pro</span></li>
+          <li class="on"><b>β-α column</b> · <span class="tok">gate.beta.column</span></li>
+          <li class="on">Originator glyph on your watchlist</li>
+          <li class="on">Full provenance on resolved calls</li>
+          <li class="on">Custom alert rules</li>
+        </ul>
+      </div>
+
+      <div class="tier">
+        <div class="tname">Team</div>
+        <div class="taud">Shared watchlists, weekly memos, seats. For desks &amp; research pods.</div>
+        <div class="price-row">
+          <div class="price">$79</div>
+          <div class="price-u">/ seat / mo</div>
+        </div>
+        <div class="annual-note">min 3 seats · annual only · volume from 10+</div>
+        <button class="cta">Talk to us</button>
+        <ul class="flist">
+          <li class="fh">Everything in Pro, plus</li>
+          <li class="on">Shared watchlists &amp; saved views</li>
+          <li class="on">Weekly consensus memo (auto)</li>
+          <li class="on">Retraction digest</li>
+          <li class="on">SSO · audit log</li>
+          <li class="on">CSV / API export</li>
+          <li class="on">Slack + email delivery</li>
+          <li class="on">Dedicated onboarding</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- comparison grid -->
+    <div class="cmp-grid">
+      <div class="row"><div class="cat">Capacity</div></div>
+      <div class="row">
+        <div class="cell">Watched creators</div>
+        <div class="cell"><span class="tok">gate.watched.free</span></div>
+        <div class="cell rec-col"><span class="tok">gate.watched.pro</span></div>
+        <div class="cell">Unlimited · shared</div>
+      </div>
+      <div class="row">
+        <div class="cell">Saved views</div>
+        <div class="cell"><span class="tok">gate.saved.free</span></div>
+        <div class="cell rec-col"><span class="tok">gate.saved.pro</span></div>
+        <div class="cell">Unlimited · shared</div>
+      </div>
+      <div class="row">
+        <div class="cell">Compare width</div>
+        <div class="cell"><span class="tok">gate.compare.free</span></div>
+        <div class="cell rec-col"><span class="tok">gate.compare.pro</span> + synthesis</div>
+        <div class="cell"><span class="tok">gate.compare.pro</span> + synthesis</div>
+      </div>
+
+      <div class="row"><div class="cat">Signals</div></div>
+      <div class="row">
+        <div class="cell">Forming theses</div>
+        <div class="cell no">&gt;<span class="tok">gate.signals.free.window</span> only</div>
+        <div class="cell rec-col yes">Live · <span class="tok">gate.signals.live.window</span></div>
+        <div class="cell yes">Live · <span class="tok">gate.signals.live.window</span></div>
+      </div>
+      <div class="row">
+        <div class="cell">Originator glyph</div>
+        <div class="cell yes">Everywhere</div>
+        <div class="cell rec-col yes">+ on your watchlist</div>
+        <div class="cell yes">+ on shared watchlist</div>
+      </div>
+
+      <div class="row"><div class="cat">Alerts</div></div>
+      <div class="row">
+        <div class="cell">In-app</div>
+        <div class="cell yes">Yes</div>
+        <div class="cell rec-col yes">Yes</div>
+        <div class="cell yes">Yes</div>
+      </div>
+      <div class="row">
+        <div class="cell">Push</div>
+        <div class="cell no">—</div>
+        <div class="cell rec-col yes"><span class="tok">gate.alerts.pro</span></div>
+        <div class="cell yes">Push + email + Slack</div>
+      </div>
+      <div class="row">
+        <div class="cell">Custom rules</div>
+        <div class="cell no">—</div>
+        <div class="cell rec-col yes">Yes</div>
+        <div class="cell yes">Yes · shared</div>
+      </div>
+
+      <div class="row"><div class="cat">Evidence</div></div>
+      <div class="row">
+        <div class="cell">β-α column</div>
+        <div class="cell no">—</div>
+        <div class="cell rec-col yes"><span class="tok">gate.beta.column</span></div>
+        <div class="cell yes">+ export</div>
+      </div>
+      <div class="row">
+        <div class="cell">Full provenance</div>
+        <div class="cell no">Summary only</div>
+        <div class="cell rec-col yes">Full trail</div>
+        <div class="cell yes">Full trail</div>
+      </div>
+
+      <div class="row"><div class="cat">Team</div></div>
+      <div class="row">
+        <div class="cell">Seats &amp; SSO</div>
+        <div class="cell no">—</div>
+        <div class="cell no">—</div>
+        <div class="cell yes">SSO · audit · 3+ seats</div>
+      </div>
+      <div class="row">
+        <div class="cell">CSV / API export</div>
+        <div class="cell no">—</div>
+        <div class="cell no">—</div>
+        <div class="cell yes">Yes</div>
+      </div>
+    </div>
+
+    <!-- FAQ -->
+    <div class="faq">
+      <h3>Questions <em>before you pay us</em>.</h3>
+      <div class="faq-grid">
+        <div class="faq-q">Is the <span class="tok">plan.pro.trial</span> trial actually free?</div>
+        <div class="faq-a">Yes — no card required. You get everything in <span class="tok">plan.pro.name</span> for <span class="tok">plan.pro.trial</span>. At the end you pick a plan or fall back to Watch. No auto-charge.</div>
+
+        <div class="faq-q">What if I cancel mid-month?</div>
+        <div class="faq-a">You keep <span class="tok">plan.pro.name</span> through the end of the billing period, then drop to Watch. No prorated refunds, no surprises — cancel from settings.</div>
+
+        <div class="faq-q">Do you give financial advice?</div>
+        <div class="faq-a"><b>No.</b> We score creators on their published directional calls and show you the evidence. <em>You</em> decide what to do with it. Nothing on CTR is a recommendation.</div>
+
+        <div class="faq-q">How is the <em>score</em> calculated?</div>
+        <div class="faq-a">Log-return α on resolved calls · tier-weighted by creator · windowed to last 90d with a freshness decay. Full methodology in <a style="color:var(--accent);border-bottom:1px dotted var(--accent-dim)">Score Explanation</a> — nothing hidden.</div>
+
+        <div class="faq-q">Can I <em>pay in crypto</em>?</div>
+        <div class="faq-a">Not at launch. Card + Apple/Google Pay only. Stablecoin payments on the Team plan are on the roadmap.</div>
+
+        <div class="faq-q">What's in Team that's not in Pro?</div>
+        <div class="faq-a">Shared watchlists/saved views, SSO + audit log, CSV/API export, auto-generated weekly memo + retraction digest. Designed for 3-10 seat research desks.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 · IN-CONTEXT MODAL · SIGNALS LIVE ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">02 · modal A</div>
+    <h2>Modal A · <em>Signals live feed</em> — fires from the blurred live-band row.</h2>
+    <div class="sm">
+      trigger · <b>click blurred row</b><br>
+      argument · <em>speed-to-thesis</em><br>
+      token · <span class="tok">gate.signals.live.window</span>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p><b>Argument.</b> You are one click away from a real forming thesis. The modal shows the <em>exact</em> thesis you would have seen, the <em>exact</em> α it has generated in the time since, and the <em>originators</em> who called it first — all using primitives the user already knows from Signals. ROI arithmetic is concrete, not aspirational.</p>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-head">
+      <h3>Modal A · <em>in context</em></h3>
+      <span class="tr">triggered from · Signals page · blurred live row</span>
+    </div>
+    <div class="host">
+      <span class="stage-lbl">Signals page (background)</span>
+      <div class="ghost">
+        <div class="line w40"></div>
+        <div class="line w80"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block" style="background:rgba(127,166,201,.1);border-color:rgba(127,166,201,.3)"></div>
+        <div class="line w60"></div>
+      </div>
+      <div class="ghost-dim"></div>
+
+      <!-- modal A -->
+      <div class="modal m1">
+        <button class="close">×</button>
+        <div class="m-kick">Unlock live signals</div>
+        <div class="m-title"><em>See theses forming</em> — not after the fact.</div>
+        <p class="m-sub">The row you just clicked is real. <b>@CryptoInsights</b> + <b>@MacroMaxi</b> called <em>TIA long</em> 4h ago. Consensus is crossing now.</p>
+
+        <div class="eov">
+          <div class="h">What you'd see right now</div>
+          <div class="row"><span>thesis · TIA long</span><b class="hl">forming · 68%</b></div>
+          <div class="row"><span>first-mover</span><b>@CryptoInsights · −4h</b></div>
+          <div class="row"><span>α since first call</span><b class="pos">+2.60</b></div>
+          <div class="row"><span>free-tier unlock</span><b>in ~20h</b></div>
+        </div>
+
+        <div class="note" style="font-size:10px;padding:10px 12px;margin-bottom:18px;border:1px dashed var(--accent-dim);background:rgba(201,162,75,.04)">
+          <b>Pro</b> · <span class="tok">plan.pro.price.monthly</span>/mo · annual <span class="tok">plan.pro.price.annual</span>/yr · <em><span class="tok">plan.pro.trial</span> trial · no card</em>
+        </div>
+
+        <div class="m-cta">
+          <button class="primary">Start <span class="tok">plan.pro.trial</span> trial</button>
+          <button class="ghost">See all plans</button>
+          <span class="fp">cancel anytime</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 · MODAL · SAVED VIEWS ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">03 · modal B</div>
+    <h2>Modal B · <em>Saved views 4th slot</em> — fires from the locked card on Dashboard.</h2>
+    <div class="sm">
+      trigger · <b>click 4th saved-view slot</b><br>
+      argument · <em>view you already built</em><br>
+      token · <span class="tok">gate.saved.pro</span>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p><b>Argument.</b> You built three saved views. The one you wanted to save next is right there on screen — we show the exact filter preview. Upgrade is not "get more slots," it's "save the view you just built."</p>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-head">
+      <h3>Modal B · <em>in context</em></h3>
+      <span class="tr">triggered from · Dashboard · 4th saved-view slot</span>
+    </div>
+    <div class="host" style="min-height:560px">
+      <span class="stage-lbl">Dashboard (background)</span>
+      <div class="ghost">
+        <div class="line w40"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+          <div class="block" style="height:140px"></div>
+          <div class="block" style="height:140px"></div>
+          <div class="block" style="height:140px;border:1px dashed rgba(127,166,201,.4);background:rgba(127,166,201,.08)"></div>
+        </div>
+        <div class="line w80" style="margin-top:10px"></div>
+      </div>
+      <div class="ghost-dim"></div>
+
+      <!-- modal B -->
+      <div class="modal m2">
+        <button class="close">×</button>
+        <div class="m-head">
+          <div class="m-kick">Save this view</div>
+          <div class="m-title">The view you just built wants a <em>home</em>.</div>
+          <p class="m-sub">You have 3 saved. This would be your 4th — and <span class="tok">plan.pro.name</span> removes the cap.</p>
+        </div>
+        <div class="m-body">
+          <div class="plan-snap">
+            <div class="c">
+              <div class="hd">The filter you're on</div>
+              <div class="v">Tier S only<br>+ Watched creators<br>+ L1s · last 14d</div>
+            </div>
+            <div class="c gain">
+              <div class="hd">What this view would surface now</div>
+              <div class="v"><b>11 active theses</b><br>2 <b class="v" style="color:var(--accent);display:inline">orig</b> in the mix<br>avg α +4.3</div>
+            </div>
+          </div>
+
+          <div class="eov">
+            <div class="h">Today's 3 saved views · what Pro unlocks</div>
+            <div class="row"><span>"Tier S · L1s · 30d"</span><b class="pos">+2 new</b></div>
+            <div class="row"><span>"My watchlist · α &gt; +3"</span><b class="pos">+1 new</b></div>
+            <div class="row"><span>"Retracted last 30d"</span><b>stable</b></div>
+            <div class="row"><span>free cap · today</span><b><span class="tok">gate.saved.free</span></b></div>
+            <div class="row"><span>pro cap</span><b class="hl"><span class="tok">gate.saved.pro</span></b></div>
+          </div>
+
+          <div class="note" style="font-size:10px;padding:10px 12px;margin-bottom:18px;border:1px dashed var(--accent-dim);background:rgba(201,162,75,.04)">
+            <b><span class="tok">plan.pro.name</span></b> · <span class="tok">plan.pro.price.monthly</span>/mo · <span class="tok">plan.pro.trial</span> trial · <em>your 3 existing views stay</em> either way
+          </div>
+
+          <div class="m-cta">
+            <button class="primary">Save view + start trial</button>
+            <button class="ghost">Replace an existing view</button>
+            <span class="fp">or · compare plans</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 · MODAL · COMPARE +COL ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">04 · modal C</div>
+    <h2>Modal C · <em>Compare +column</em> — fires from the locked 3rd column.</h2>
+    <div class="sm">
+      trigger · <b>click "+ add creator" on 3rd col</b><br>
+      argument · <em>synthesis gets sharper with width</em><br>
+      tokens · <span class="tok">gate.compare.free</span> · <span class="tok">gate.compare.pro</span>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p><b>Argument.</b> Compare's value is <em>synthesis</em>, not columns. A 3rd or 4th column doesn't add density — it sharpens the synthesis headline because the algorithm has more votes. The modal shows the <em>preview synthesis that would appear</em> if they added the third creator, keeping v0.3's carry-forward rule intact: <em>Compare stays synthesis-first even in the upgrade pitch</em>.</p>
+  </div>
+
+  <div class="ctx">
+    <div class="ctx-head">
+      <h3>Modal C · <em>in context</em></h3>
+      <span class="tr">triggered from · Compare 2-way · "+ add creator" tap</span>
+    </div>
+    <div class="host" style="min-height:680px">
+      <span class="stage-lbl">Compare 2-way (background)</span>
+      <div class="ghost">
+        <div class="line w60"></div>
+        <div class="block" style="height:80px;background:rgba(201,162,75,.1);border-color:rgba(201,162,75,.3)"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+          <div class="block" style="height:200px"></div>
+          <div class="block" style="height:200px"></div>
+          <div class="block" style="height:200px;border:1px dashed rgba(127,166,201,.4);background:rgba(127,166,201,.08)"></div>
+        </div>
+      </div>
+      <div class="ghost-dim"></div>
+
+      <!-- modal C -->
+      <div class="modal m3">
+        <button class="close">×</button>
+        <div class="m-head">
+          <div class="m-kick">Wider comparison</div>
+          <div class="t">Add a <em>third voice</em> — synthesis gets sharper.</div>
+        </div>
+        <div class="m-body">
+          <div class="side-by">
+            <div class="sb-cell">
+              <div class="sb-av">CI</div>
+              <div class="sb-name">@CryptoInsights</div>
+              <div class="sb-meta"><b>Tier S</b> · rank 01 ±1<br>α +8.42 · first-mover 47%</div>
+            </div>
+            <div class="sb-cell">
+              <div class="sb-av">MM</div>
+              <div class="sb-name">@MacroMaxi</div>
+              <div class="sb-meta"><b>Tier S</b> · rank 02 ±1<br>α +7.11 · first-mover 23%</div>
+            </div>
+            <div class="sb-plus">+</div>
+            <div class="sb-cell locked">
+              <div class="lk-icon">+</div>
+              <div class="lk-t">Add @AlphaDigger</div>
+              <div class="sb-meta"><b>Tier A</b> · rank 04 ±2<br>α +5.60 · first-mover 38%</div>
+              <div class="lk-s" style="margin-top:auto">locked · Pro unlocks <span class="tok">gate.compare.pro</span></div>
+            </div>
+          </div>
+
+          <!-- synthesis preview -->
+          <div class="synth-pre">
+            <div class="h">Synthesis preview · with @AlphaDigger added</div>
+            <p class="t"><b>@CryptoInsights</b> still wins on L1s and <em>first-mover rate</em>. <b>@MacroMaxi</b> still wins on macro timing. <em style="color:var(--accent)">New:</em> <b>@AlphaDigger</b> breaks the ETH tie — their <em>ETH/USD long</em> aligns with CI, making the disagreement <b>2-vs-1</b> instead of 1-vs-1 on that denominator.</p>
+          </div>
+
+          <div class="eov">
+            <div class="h">What widening Compare actually does</div>
+            <div class="row"><span>columns · current</span><b><span class="tok">gate.compare.free</span></b></div>
+            <div class="row"><span>columns · pro</span><b class="hl"><span class="tok">gate.compare.pro</span></b></div>
+            <div class="row"><span>synthesis headline</span><b>regenerates per column</b></div>
+            <div class="row"><span>disagreement drill</span><b>now shows tie-breaking column</b></div>
+          </div>
+
+          <div class="note" style="font-size:10px;padding:10px 12px;margin-bottom:18px;border:1px dashed var(--accent-dim);background:rgba(201,162,75,.04)">
+            <b><span class="tok">plan.pro.name</span></b> · <span class="tok">plan.pro.price.monthly</span>/mo · annual <span class="tok">plan.pro.price.annual</span>/yr · <span class="tok">plan.pro.trial</span> trial
+          </div>
+
+          <div class="m-cta">
+            <button class="primary">Add column + start trial</button>
+            <button class="ghost">See all plans</button>
+            <span class="fp">synthesis auto-regenerates</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 · TOKEN APPLICATION TABLE ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">05 · tokens</div>
+    <h2>Every plan value · <em>still a token</em>.</h2>
+    <div class="sm">
+      tokens used · <b>14 / 14</b><br>
+      resolved · <b>0</b><br>
+      awaiting · <b>product sign-off</b>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>Registry of every <code>.tok</code> occurrence in D4. When product signs off on the 14 values, these flip to resolved copy in exactly these locations — pricing page, three modals, comparison grid, FAQ.</p>
+  </div>
+
+  <div class="tok-apply">
+    <table>
+      <thead><tr><th style="width:190px">token</th><th style="width:150px">placeholder</th><th>used on</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tok">plan.pro.name</span></td><td>"Pro"</td><td>hero · tier card · all 3 modals · FAQ · comparison grid title</td></tr>
+        <tr><td><span class="tok">plan.pro.price.monthly</span></td><td>$29</td><td>tier card · modal A · B · C · <em>primary price anchor</em></td></tr>
+        <tr><td><span class="tok">plan.pro.price.annual</span></td><td>$290</td><td>tier card annual-note · modal A · modal C · hero "save ~17%"</td></tr>
+        <tr><td><span class="tok">plan.pro.trial</span></td><td>7 days</td><td>hero · tier trial pill · tier CTA · all 3 modals · FAQ</td></tr>
+        <tr><td><span class="tok">gate.watched.free</span></td><td>10 creators</td><td>Watch tier list · comparison grid "Watched creators"</td></tr>
+        <tr><td><span class="tok">gate.watched.pro</span></td><td>unlimited</td><td>Pro tier list · comparison grid</td></tr>
+        <tr><td><span class="tok">gate.saved.free</span></td><td>3 views</td><td>Watch tier list · comparison grid · modal B eov · ph-r</td></tr>
+        <tr><td><span class="tok">gate.saved.pro</span></td><td>unlimited</td><td>Pro tier list · comparison grid · modal B eov + sm</td></tr>
+        <tr><td><span class="tok">gate.compare.free</span></td><td>2-way</td><td>Watch tier list · comparison grid · modal C eov + sm</td></tr>
+        <tr><td><span class="tok">gate.compare.pro</span></td><td>4-way</td><td>Pro + Team tier lists · comparison grid · modal C eov + locked-card sub + sm · ph-r</td></tr>
+        <tr><td><span class="tok">gate.signals.live.window</span></td><td>&lt;6h</td><td>ph-r · Pro tier list · comparison grid "Forming theses" · modal A sm</td></tr>
+        <tr><td><span class="tok">gate.signals.free.window</span></td><td>&gt;24h</td><td>Watch tier list</td></tr>
+        <tr><td><span class="tok">gate.alerts.pro</span></td><td>push · unlimited</td><td>Pro tier list · comparison grid "Push"</td></tr>
+        <tr><td><span class="tok">gate.beta.column</span></td><td>β-α visible</td><td>Pro tier list · comparison grid "β-α column"</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 06 · CARRY-FORWARD AUDIT ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">06 · audit</div>
+    <h2>Carry-forward · <em>discipline check</em>.</h2>
+    <div class="sm">
+      items · <b>3 / 3</b><br>
+      all maintained<br>in D4
+    </div>
+  </div>
+
+  <table class="audit">
+    <thead><tr><th>item</th><th>rule</th><th>status</th><th>where</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="tid">CF-1</td>
+        <td class="tn">Compare stays <em>synthesis-first</em> as density grows</td>
+        <td class="st"><span class="tag">held</span></td>
+        <td class="loc">Modal C leads with a <b>synthesis preview</b>; the 3rd-column card is evidence, not the headline. FAQ speaks to synthesis regeneration per column.</td>
+      </tr>
+      <tr>
+        <td class="tid">CF-2</td>
+        <td class="tn">Originator <em>first-class</em> wherever first-mover logic matters</td>
+        <td class="st"><span class="tag">held</span></td>
+        <td class="loc">Modal A surfaces <b>@CryptoInsights · −4h orig</b> in the eov. Modal C uses first-mover % as a tier-card metric and ties it into the ETH-disagreement rebreak. Pricing page lists "Originator glyph on your watchlist" as a Pro differentiator.</td>
+      </tr>
+      <tr>
+        <td class="tid">CF-3</td>
+        <td class="tn">Plan names / pricing <em>tokenized</em> until product confirms</td>
+        <td class="st"><span class="tag">held</span></td>
+        <td class="loc">All 14 tokens still rendered as <code>.tok</code>. Registry in §05 shows every use site. Zero hard-coded plan values in the UI.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 07 · NOTES + NEXT ============ -->
+<section class="section">
+  <div class="sh">
+    <div class="sn">07 · pause</div>
+    <h2>D4 landed. <em>Pausing</em> before D5 &amp; D6.</h2>
+    <div class="sm">
+      D5 · <b>metric hover library</b><br>
+      D6 · <b>mobile responsive</b><br>
+      paused · per working method
+    </div>
+  </div>
+
+  <div class="note">
+    <b>D4 complete.</b> Pricing destination + three in-context upgrade modals — all synthesis-first, originator-first, and entirely token-driven. <br><br>
+    <b>D5 · metric hover library</b> is next. Shared popover surface for <em>α · β-α · CI · tier-weighted N · win rate · retraction rate · first-mover rate · median horizon · velocity · overlap-with-you</em> (last two per v0.2 feedback). Each explains <em>what · how · good value · primitive source</em>, then applies across leaderboard / profile / signals / compare.<br><br>
+    <b>D6 · mobile responsive pass</b>. All P2 + P3 + D4 surfaces at @375 and @768 — thesis cards collapse voices to 3 + count, Compare becomes vertical scroll-and-snap with sticky metric labels, Dashboard 12-col grid collapses to single stack with Watched creators pinned, Pricing tiers stack with the <b>rec</b> tier first.<br><br>
+    Ready to pick up D5 on go. No new blockers introduced.
+  </div>
+</section>
+
+</main>
+</body>
+</html>

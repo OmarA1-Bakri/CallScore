@@ -1,4 +1,5 @@
-export type Tier = "free" | "pro" | "elite";
+export type Tier = "free" | "pro" | "alpha";
+export type LegacyTier = Tier | "elite";
 export type Direction = "bullish" | "bearish" | "neutral";
 export type CallType = "buy" | "sell" | "hold" | "watch" | "avoid";
 export type StrategyType =
@@ -145,4 +146,10 @@ export interface LeaderboardRow {
   readonly worst_call: Call | null;
   readonly tier_required: Tier;
   readonly trend: "up" | "down" | "stable";
+  // Self-correction index (W3). Optional so consumers that have not yet
+  // migrated their row-building code keep compiling; UI treats undefined as
+  // the zero-state ("rarely", 0, 0).
+  readonly selfCorrectionScore?: number;
+  readonly revisionCount?: number;
+  readonly selfCorrectionTier?: "honest" | "some" | "rarely";
 }

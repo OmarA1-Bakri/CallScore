@@ -5,13 +5,28 @@ const BULLISH_PATTERNS = [
   /\b(buy|buying|long|accumulate|accumulating|bullish|best buy|strong buy|great buy)\b/i,
   /\b(go(?:ing)? up|push up|move up|rip higher|heading higher|upside)\b/i,
   /\b(target|targets|hit|reach|go to|get to|towards)\b/i,
-  /\b(undervalued|breakout|rally|pump|moon|higher high)\b/i,
+  /\b(undervalued|break(?:ing)?\s*out|breakout|rally|pump|moon|higher high)\b/i,
 ];
+
+const AMBIGUOUS_SYMBOL_SUPPORT: Partial<Record<string, RegExp>> = {
+  LINKUSDT: /(?:\bchain\s?link\b|\$LINK\b)/i,
+  NEARUSDT: /(?:\bNEAR\s+Protocol\b|\$NEAR\b)/i,
+  DOTUSDT: /(?:\bPolkadot\b|\$DOT\b)/i,
+  ARUSDT: /(?:\bArweave\b|\$AR\b)/i,
+};
 
 const BEARISH_PATTERNS = [
   /\b(sell|selling|short|shorting|bearish|avoid|stay away)\b/i,
   /\b(go(?:ing)? down|break down|heading lower|drop|dump|collapse|crash)\b/i,
   /\b(overvalued|dead coin|dead project|rug)\b/i,
+];
+
+const ACTIONABLE_WATCH_PATTERNS = [
+  /\b(support|resistance|level|zone|range|hold(?:s|ing)?|break(?:s|ing)?|breakout|breakdown|accumulation|accumulate|watch|wait|entry|long|short|profit book|take profit)\b/i,
+  /\b(correction|correct|dump|pump|rally|reversal|liquidity grab|fake\s?out|consolidat(?:e|ing|ion))\b/i,
+  /(?:सपोर्ट|रेजिस्टेंस|लेवल|ज़ोन|जोन|रेंज|होल्ड|ब्रेक|लॉन्ग|शॉर्ट|प्रॉफिट\s*बुक|अक्यूमुलेट|करेक्शन|रिकवर|पॉजिटिव\s*मूवमेंट|वेट)/i,
+  /(?:supporto|resistenza|livello|zona|range|rompere|rottura|rialzo|ribasso|accumulazione|debolezza)/i,
+  /(?:support|resisten|area|range|dump|koreksi|reversal|breakout|breakdown|potensi|tunggu|akumulasi)/i,
 ];
 
 const TARGET_CONTEXT_PATTERN =
@@ -48,13 +63,19 @@ function buildSymbolAliases(symbol: string): readonly string[] {
   const aliases = new Set<string>();
   const ticker = SYMBOL_TICKERS[symbol];
   const name = SYMBOL_NAMES[symbol];
-  const ambiguousTickerSymbols = new Set(["NEARUSDT", "ARUSDT", "LINKUSDT", "DOTUSDT"]);
-  if (ticker && !ambiguousTickerSymbols.has(symbol)) aliases.add(ticker.toLowerCase());
+  const isAmbiguousTicker = symbol in AMBIGUOUS_SYMBOL_SUPPORT;
+  if (ticker && !isAmbiguousTicker) aliases.add(ticker.toLowerCase());
   if (name) aliases.add(name.toLowerCase());
-  aliases.add(symbol.replace("USDT", "").toLowerCase());
+  if (!isAmbiguousTicker) aliases.add(symbol.replace("USDT", "").toLowerCase());
 
-  if (symbol === "BTCUSDT") aliases.add("bitcoin");
-  if (symbol === "ETHUSDT") aliases.add("ethereum");
+  if (symbol === "BTCUSDT") {
+    aliases.add("bitcoin");
+    aliases.add("बिटकॉइन");
+  }
+  if (symbol === "ETHUSDT") {
+    aliases.add("ethereum");
+    aliases.add("इथेरियम");
+  }
   if (symbol === "SOLUSDT") aliases.add("solana");
   if (symbol === "DOGEUSDT") aliases.add("dogecoin");
   if (symbol === "LINKUSDT") aliases.add("chainlink");
@@ -87,6 +108,26 @@ function detectDirection(text: string): DirectionEvidence {
 
 function sanitizeWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
+}
+
+function normalizeForQuoteMatch(text: string): string {
+  return sanitizeWhitespace(text).toLowerCase();
+}
+
+function rawQuoteIsSupportedByTranscript(
+  transcript: string | null | undefined,
+  rawQuote: string,
+): boolean {
+  const normalizedQuote = normalizeForQuoteMatch(rawQuote);
+  if (!transcript || transcript.trim().length === 0) return true;
+  if (normalizedQuote.length < 24) return false;
+
+  const normalizedTranscript = normalizeForQuoteMatch(transcript);
+  if (normalizedTranscript.includes(normalizedQuote)) return true;
+
+  // Allow minor trailing differences, but do not allow prompt/example leakage.
+  const quotePrefix = normalizedQuote.slice(0, Math.min(120, normalizedQuote.length));
+  return quotePrefix.length >= 32 && normalizedTranscript.includes(quotePrefix);
 }
 
 function extractWindow(text: string, index: number, radius = 180): string {
@@ -136,21 +177,21 @@ function hasSymbolSupport(
   aliases: readonly string[],
   symbol: string,
 ): boolean {
-  if (symbol === "NEARUSDT") {
-    return /\bNEAR\b/.test(text) || text.toLowerCase().includes("near protocol");
-  }
-  if (symbol === "ARUSDT") {
-    return /\bAR\b/.test(text) || text.toLowerCase().includes("arweave");
-  }
-  if (symbol === "LINKUSDT") {
-    return /\bLINK\b/.test(text) || text.toLowerCase().includes("chainlink") || text.toLowerCase().includes("chain link");
-  }
-  if (symbol === "DOTUSDT") {
-    return /\bDOT\b/.test(text) || text.toLowerCase().includes("polkadot");
+  const ambiguousSymbolSupport = AMBIGUOUS_SYMBOL_SUPPORT[symbol];
+  if (ambiguousSymbolSupport) {
+    return ambiguousSymbolSupport.test(text);
   }
 
   const haystack = text.toLowerCase();
   return aliases.some((alias) => haystack.includes(alias.toLowerCase()));
+}
+
+export function hasExplicitSymbolSupport(symbol: string, text: string): boolean {
+  return hasSymbolSupport(text, buildSymbolAliases(symbol), symbol);
+}
+
+function hasActionableWatchEvidence(text: string): boolean {
+  return countPatternHits(text, ACTIONABLE_WATCH_PATTERNS) > 0;
 }
 
 function normalizeTargetPrice(text: string, targetPrice: number | null): number | null {
@@ -189,25 +230,33 @@ function normalizeTargetPrice(text: string, targetPrice: number | null): number 
 
 export function auditExtraction(input: ExtractionAuditInput): ExtractionAuditResult {
   const aliases = buildSymbolAliases(input.symbol);
+  const rawQuote = sanitizeWhitespace(input.raw_quote ?? "");
+  const quoteSupported = rawQuoteIsSupportedByTranscript(input.transcript, rawQuote);
   const excerpt = pickBestTranscriptExcerpt(
     input.transcript,
-    sanitizeWhitespace(input.raw_quote ?? ""),
+    rawQuote,
     aliases,
   );
   const reasons: string[] = [];
+  if (!quoteSupported) {
+    reasons.push("raw quote is not present in transcript");
+  }
   const symbolSupported = hasSymbolSupport(excerpt, aliases, input.symbol);
   if (!symbolSupported) {
     reasons.push("excerpt does not clearly support the extracted asset");
   }
 
   const evidence = detectDirection(excerpt);
+  const actionableWatch = hasActionableWatchEvidence(excerpt);
   let direction = input.direction;
   if (evidence.direction !== "neutral" && evidence.direction !== input.direction) {
-    reasons.push(`excerpt direction reads ${evidence.direction}, not ${input.direction}`);
     direction = evidence.direction;
+    if (input.direction !== "neutral") {
+      reasons.push(`excerpt direction reads ${evidence.direction}, not ${input.direction}`);
+    }
   }
-  if (evidence.direction === "neutral") {
-    reasons.push("excerpt does not contain a clear directional signal");
+  if (evidence.direction === "neutral" && !actionableWatch) {
+    reasons.push("excerpt does not contain a clear directional or actionable watch signal");
   }
 
   const targetPrice = normalizeTargetPrice(excerpt, input.target_price);
@@ -217,15 +266,16 @@ export function auditExtraction(input: ExtractionAuditInput): ExtractionAuditRes
 
   let confidence = 0.2;
   if (symbolSupported) confidence += 0.35;
-  if (evidence.direction !== "neutral") confidence += 0.3;
+  if (evidence.direction !== "neutral" || actionableWatch) confidence += 0.3;
   if (targetPrice !== null || input.target_price === null) confidence += 0.15;
   if (excerpt.length >= 40) confidence += 0.1;
   if ((input.extraction_confidence ?? 0) >= 0.8) confidence += 0.05;
   confidence = Math.min(1, confidence);
 
   const isValid =
+    quoteSupported &&
     symbolSupported &&
-    evidence.direction !== "neutral" &&
+    (evidence.direction !== "neutral" || actionableWatch) &&
     reasons.length === 0;
 
   return {

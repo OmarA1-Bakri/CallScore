@@ -1,44 +1,19 @@
-import * as fs from "fs";
-import * as path from "path";
 import { query } from "../lib/db";
 import {
   createGeminiModel,
   extractCallsFromTranscript,
 } from "../lib/ai-extraction";
 import type { Video } from "../lib/types";
+import {
+  loadEnv,
+  replaceStoredCallsForVideo,
+  sleep,
+  timestamp,
+} from "./script-helpers";
 
 const REQUEST_GAP_MS = 4_000;
 const BATCH_COOLDOWN_VIDEOS = 50;
 const BATCH_COOLDOWN_MS = 30_000;
-
-function loadEnv(): void {
-  if (process.env.NEON_DATABASE_URL) return;
-  const root = path.resolve(__dirname, "../..");
-  const envPath = fs.existsSync(path.join(root, ".env.local"))
-    ? path.join(root, ".env.local")
-    : path.join(root, ".env");
-  if (!fs.existsSync(envPath)) return;
-  const lines = fs.readFileSync(envPath, "utf-8").split("\n");
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eqIdx = line.indexOf("=");
-    if (eqIdx < 0) continue;
-    const key = line.slice(0, eqIdx).trim();
-    const value = line.slice(eqIdx + 1).trim();
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
-  }
-}
-
-function timestamp(): string {
-  return new Date().toISOString();
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 async function replaceVideoCalls(
   model: ReturnType<typeof createGeminiModel>,
@@ -52,46 +27,13 @@ async function replaceVideoCalls(
   const calls = await extractCallsFromTranscript(model, video.transcript);
   if (dryRun) return calls.length;
 
-  await query("DELETE FROM calls WHERE video_id = $1", [video.id]);
-
-  for (const call of calls) {
-    const callDate = video.published_at ?? video.created_at;
-    await query(
-      `INSERT INTO calls (
-        creator_id, video_id, symbol, direction, call_type,
-        entry_price, target_price, stop_loss, timeframe,
-        confidence, strategy_type, raw_quote,
-        extraction_confidence, specificity_score, call_date
-      ) VALUES (
-        $1, $2, $3, $4, $5,
-        $6, $7, $8, $9,
-        $10, $11, $12,
-        $13, $14, $15
-      )`,
-      [
-        video.creator_id,
-        video.id,
-        call.symbol,
-        call.direction,
-        call.call_type,
-        call.entry_price,
-        call.target_price,
-        call.stop_loss,
-        call.timeframe,
-        call.confidence,
-        call.strategy_type,
-        call.raw_quote,
-        call.extraction_confidence,
-        call.specificity_score,
-        callDate,
-      ],
-    );
-  }
-
-  await query(
-    "UPDATE videos SET calls_extracted = true, extraction_pass = extraction_pass + 1 WHERE id = $1",
-    [video.id],
-  );
+  await replaceStoredCallsForVideo({
+    creatorId: video.creator_id,
+    videoId: video.id,
+    callDate: video.published_at ?? video.created_at,
+    calls,
+    markVideoExtracted: true,
+  });
 
   return calls.length;
 }

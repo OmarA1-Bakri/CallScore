@@ -1,8 +1,23 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": false
+  },
+  "github": {
+    "silent": true
+  },
   "crons": [
     {
       "path": "/api/cron/weekly",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/alerts/scan",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/alerts/send",
+      "schedule": "15 */6 * * *"
     }
   ]
 }

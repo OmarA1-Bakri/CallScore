@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+const OAUTH_STATE_COOKIE_NAME = "ctr_oauth_state";
+const OAUTH_STATE_TTL_SECONDS = 10 * 60;
+
 /**
  * GET /api/auth/whop
  * Redirects the user to Whop's OAuth authorization page.
@@ -25,15 +28,22 @@ export async function GET(): Promise<NextResponse> {
   });
 
   const whopAuthUrl = `https://whop.com/oauth?${params.toString()}`;
-
-  return NextResponse.redirect(whopAuthUrl);
+  const response = NextResponse.redirect(whopAuthUrl);
+  response.cookies.set(OAUTH_STATE_COOKIE_NAME, params.get("state")!, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: OAUTH_STATE_TTL_SECONDS,
+  });
+  return response;
 }
 
 function getRedirectUri(): string {
   const base =
     process.env.NEXT_PUBLIC_BASE_URL ??
     (process.env.NODE_ENV === "production"
-      ? "https://cryptotuberranked.com"
+      ? "https://call-score.com"
       : "http://localhost:3000");
 
   return `${base}/api/auth/whop/callback`;

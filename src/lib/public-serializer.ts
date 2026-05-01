@@ -141,3 +141,38 @@ export function computeCreatorScoreAverages(
     scoredCount: scoredCalls.length,
   };
 }
+
+export function computeCreatorWinRate(
+  calls: readonly Call[],
+  now: Date = new Date(),
+): number {
+  const scored = getScoredCalls(calls, now);
+  if (scored.length === 0) return 0;
+  const wins = scored.filter((call) => {
+    if (call.correct_direction !== null) return call.correct_direction;
+    if (call.direction === "bullish") return (call.return_30d ?? 0) > 0;
+    if (call.direction === "bearish") return (call.return_30d ?? 0) < 0;
+    return false;
+  }).length;
+  return wins / scored.length;
+}
+
+export function computeCreatorAvgAlpha30d(
+  calls: readonly Call[],
+  now: Date = new Date(),
+): number {
+  const scored = getScoredCalls(calls, now);
+  if (scored.length === 0) return 0;
+  const sum = scored.reduce((acc, call) => acc + (call.alpha_30d ?? 0), 0);
+  return sum / scored.length;
+}
+
+export function computeCreatorHitRate(
+  calls: readonly Call[],
+  now: Date = new Date(),
+): number {
+  const scored = getScoredCalls(calls, now);
+  if (scored.length === 0) return 0;
+  const hits = scored.filter((call) => call.hit_target === true).length;
+  return hits / scored.length;
+}

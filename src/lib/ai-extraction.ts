@@ -23,6 +23,13 @@ export interface NormalizedExtractedCall extends ExtractedCall {
   readonly validation_notes: readonly string[];
 }
 
+export interface AuditedExtractedCallCandidate {
+  readonly candidate: ExtractedCallCandidate;
+  readonly normalized: NormalizedExtractedCall;
+  readonly isValid: boolean;
+  readonly validation_notes: readonly string[];
+}
+
 const COIN_LOOKUP: ReadonlyMap<string, string> = (() => {
   const map = new Map<string, string>();
   for (const symbol of TRACKED_SYMBOLS) {
@@ -95,7 +102,7 @@ function sanitizeJson(text: string): string {
   return text.trim().replace(/^```json?\n?/, "").replace(/\n?```$/, "");
 }
 
-function buildPrompt(transcript: string): string {
+export function buildExtractionPrompt(transcript: string): string {
   const truncated =
     transcript.length > MAX_TRANSCRIPT_CHARS
       ? transcript.slice(0, MAX_TRANSCRIPT_CHARS)
@@ -206,13 +213,11 @@ function parseCandidates(text: string): ExtractedCallCandidate[] {
     .filter((item): item is ExtractedCallCandidate => item !== null && item.raw_quote.length > 0);
 }
 
-export function normalizeExtractedCalls(
+export function auditExtractedCallCandidates(
   transcript: string,
   candidates: readonly ExtractedCallCandidate[],
-): NormalizedExtractedCall[] {
-  const bySymbol = new Map<string, NormalizedExtractedCall>();
-
-  for (const candidate of candidates) {
+): AuditedExtractedCallCandidate[] {
+  return candidates.map((candidate) => {
     const audit = auditExtraction({
       symbol: candidate.symbol,
       direction: candidate.direction,
@@ -245,8 +250,25 @@ export function normalizeExtractedCalls(
       validation_notes: audit.reasons,
     };
 
-    if (!audit.isValid) continue;
+    return {
+      candidate,
+      normalized,
+      isValid: audit.isValid,
+      validation_notes: audit.reasons,
+    };
+  });
+}
 
+export function normalizeExtractedCalls(
+  transcript: string,
+  candidates: readonly ExtractedCallCandidate[],
+): NormalizedExtractedCall[] {
+  const bySymbol = new Map<string, NormalizedExtractedCall>();
+
+  for (const audited of auditExtractedCallCandidates(transcript, candidates)) {
+    if (!audited.isValid) continue;
+
+    const normalized = audited.normalized;
     const existing = bySymbol.get(normalized.symbol);
     if (!existing || normalized.extraction_confidence > existing.extraction_confidence) {
       bySymbol.set(normalized.symbol, normalized);
@@ -260,7 +282,7 @@ export async function extractCallsFromTranscript(
   model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
   transcript: string,
 ): Promise<NormalizedExtractedCall[]> {
-  const text = await geminiGenerate(model, buildPrompt(transcript));
+  const text = await geminiGenerate(model, buildExtractionPrompt(transcript));
   const candidates = parseCandidates(text);
   return normalizeExtractedCalls(transcript, candidates);
 }

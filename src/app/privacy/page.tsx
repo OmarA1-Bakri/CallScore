@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - CryptoTubers Ranked",
+  title: "Privacy Policy - CallScore",
   description:
-    "Privacy policy for CryptoTubers Ranked. Learn how we handle your data, what we collect, and how we protect your privacy.",
+    "Privacy policy for CallScore. Learn how we handle your data, what we collect, and how we protect your privacy.",
 };
 
 /* ------------------------------------------------------------------ */
@@ -85,7 +85,7 @@ const POLICY_SECTIONS: readonly PolicySection[] = [
   {
     title: "Contact",
     content: [
-      "For privacy-related questions or data deletion requests, contact us through our feedback page or email us at privacy@cryptotuberranked.com.",
+      "For privacy-related questions or data deletion requests, contact us through our feedback page or email us at privacy@call-score.com.",
     ],
   },
 ] as const;
@@ -100,7 +100,7 @@ export default function PrivacyPage() {
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-8 transition-colors"
+        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-8 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Leaderboard
@@ -108,15 +108,15 @@ export default function PrivacyPage() {
 
       {/* Page header */}
       <section className="mb-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+        <h1 className="text-3xl sm:text-4xl font-bold text-ink-900 mb-3">
           Privacy Policy
         </h1>
-        <p className="text-gray-500 text-sm">
+        <p className="text-ink-500 text-sm">
           Last updated: April 11, 2026
         </p>
-        <p className="text-gray-400 text-sm mt-4 leading-relaxed">
-          CryptoTubers Ranked (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;)
-          operates the website at cryptotuberranked.com. This policy explains
+        <p className="text-ink-600 text-sm mt-4 leading-relaxed">
+          CallScore (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;)
+          operates this website. This policy explains
           what data we collect, how we use it, and your rights regarding that
           data.
         </p>
@@ -125,15 +125,15 @@ export default function PrivacyPage() {
       {/* Policy sections */}
       <div className="space-y-8">
         {POLICY_SECTIONS.map((section, index) => (
-          <section key={section.title} className="glass-card p-6">
-            <h2 className="text-white font-semibold text-base mb-4">
+          <section key={section.title} className="border border-ink-200 p-6">
+            <h2 className="text-ink-900 font-semibold text-base mb-4">
               {index + 1}. {section.title}
             </h2>
             <div className="space-y-3">
               {section.content.map((paragraph) => (
                 <p
                   key={paragraph.slice(0, 40)}
-                  className="text-gray-400 text-sm leading-relaxed"
+                  className="text-ink-600 text-sm leading-relaxed"
                 >
                   {paragraph}
                 </p>

@@ -1,374 +1,317 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  Check,
-  X,
-  Crown,
-  Zap,
-  BarChart3,
-  ArrowLeft,
-  ChevronDown,
-  Radar,
-  TrendingDown,
-  Shield,
-} from "lucide-react";
+import type { Metadata } from "next";
+import type { ReactElement } from "react";
+import { EditorialSection, MetaStrip } from "@/components/primitives";
+
+const TITLE = "Pricing — CallScore";
+const DESCRIPTION =
+  "Three tiers: free, pro ($19/mo), alpha ($49/mo). Full research free. Alerts, exports, and API on paid.";
 
 export const metadata: Metadata = {
-  title: "Pricing — CryptoTubers Ranked",
-  description:
-    "Public beta pricing and roadmap for CryptoTubers Ranked.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/pricing" },
 };
 
-interface TierConfig {
-  readonly name: string;
-  readonly price: string;
-  readonly period: string;
-  readonly tagline: string;
-  readonly features: readonly string[];
-  readonly cta: string;
-  readonly highlighted: boolean;
-  readonly gradient: string;
-  readonly borderColor: string;
-  readonly ctaBg: string;
-  readonly icon: React.ComponentType<{ className?: string }>;
-}
-
-const TIERS: readonly TierConfig[] = [
-  {
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    tagline: "All public research surfaces stay open",
-    features: [
-      "Complete leaderboard (all ranks)",
-      "Creator profiles and call history",
-      "Per-call Alpha Score breakdowns",
-      "Win rate, Alpha Score, and scored-call totals",
-    ],
-    cta: "Get Started",
-    highlighted: false,
-    gradient: "from-gray-400 to-gray-500",
-    borderColor: "border-brand-border",
-    ctaBg: "bg-brand-card hover:bg-brand-card-hover text-white border border-brand-border",
-    icon: BarChart3,
-  },
-  {
-    name: "Pro",
-    price: "$19",
-    period: "/mo",
-    tagline: "Reserved for upcoming premium workflows",
-    features: [
-      "Everything in Free",
-      "Premium workflows are being rebuilt",
-      "Future account-linked exports",
-      "Future saved screens and notifications",
-      "Priority feedback access while premium is in beta",
-    ],
-    cta: "Join Pro Waitlist",
-    highlighted: false,
-    gradient: "from-brand-accent to-purple-400",
-    borderColor: "border-brand-accent/30",
-    ctaBg: "bg-brand-accent hover:bg-brand-accent/80 text-white",
-    icon: Zap,
-  },
-  {
-    name: "Alpha",
-    price: "$49",
-    period: "/mo",
-    tagline: "Future delivery layer for alerts and API access",
-    features: [
-      "Everything in Pro",
-      "Future signal delivery products",
-      "Future API and webhook access",
-      "Future premium alerting surfaces",
-      "Early access to private-alpha experiments",
-    ],
-    cta: "Join Alpha Waitlist",
-    highlighted: true,
-    gradient: "from-brand-gold to-yellow-400",
-    borderColor: "border-brand-gold/30",
-    ctaBg: "bg-brand-gold hover:bg-brand-gold-dim text-brand-dark",
-    icon: Crown,
-  },
-] as const;
+type Glyph = "yes" | "no" | "soon";
 
 interface FeatureRow {
-  readonly feature: string;
-  readonly free: boolean | string;
-  readonly pro: boolean | string;
-  readonly alpha: boolean | string;
+  readonly label: string;
+  readonly free: Glyph;
+  readonly pro: Glyph;
+  readonly alpha: Glyph;
 }
 
-const COMPARISON_FEATURES: readonly FeatureRow[] = [
-  { feature: "Full Leaderboard (All Ranks)", free: true, pro: true, alpha: true },
-  { feature: "Creator Profiles", free: "Full", pro: "Full", alpha: "Full" },
-  { feature: "Call History", free: true, pro: true, alpha: true },
-  { feature: "Score Breakdown per Call", free: true, pro: true, alpha: true },
-  { feature: "Performance Charts", free: true, pro: true, alpha: true },
-  { feature: "Data Freshness", free: "After each public recompute", pro: "Premium roadmap", alpha: "Premium roadmap" },
-  { feature: "Premium Workflows", free: "Public beta only", pro: "Planned", alpha: "Planned" },
-  { feature: "Alerts and API", free: false, pro: "Planned", alpha: "Planned" },
+const FEATURES: readonly FeatureRow[] = [
+  { label: "Full leaderboard (all ranks)",            free: "yes", pro: "yes", alpha: "yes" },
+  { label: "Creator profiles + full call history",    free: "yes", pro: "yes", alpha: "yes" },
+  { label: "Per-call Alpha Score breakdowns",         free: "yes", pro: "yes", alpha: "yes" },
+  { label: "Methodology transparency",                free: "yes", pro: "yes", alpha: "yes" },
+  { label: "Per-creator email alerts",                free: "no",  pro: "yes", alpha: "yes" },
+  { label: "Watchlists (unlimited)",                  free: "no",  pro: "yes", alpha: "yes" },
+  { label: "Recent-performance filter (30/90d)",      free: "no",  pro: "yes", alpha: "yes" },
+  { label: "CSV export of call history",              free: "no",  pro: "yes", alpha: "yes" },
+  { label: "Historical backtest simulator",           free: "no",  pro: "no",  alpha: "yes" },
+  { label: "Anti-consensus / convergence alerts",     free: "no",  pro: "no",  alpha: "yes" },
+  { label: "API access (read-only)",                  free: "no",  pro: "no",  alpha: "yes" },
+  { label: "Webhook notifications",                   free: "no",  pro: "no",  alpha: "yes" },
 ] as const;
 
-interface FaqItem {
-  readonly question: string;
-  readonly answer: string;
+function glyphChar(g: Glyph): string {
+  return g === "yes" ? "✓" : g === "soon" ? "→" : "·";
 }
 
-const FAQ_ITEMS: readonly FaqItem[] = [
-  {
-    question: "Why is the leaderboard free?",
-    answer:
-      "Because the public research surface is the product right now. The leaderboard, creator pages, call history, and score breakdowns stay open while we rebuild the premium delivery layer.",
-  },
-  {
-    question: "How do you calculate the Alpha Score?",
-    answer:
-      "Each call is scored on five public components: direction correctness at 30 days (40pts), alpha over BTC at 30 days (25pts), specificity (15pts), market regime difficulty (10pts), and target hit within 90 days (10pts). There is no hidden normalization or confidence multiplier on the public Alpha Score.",
-  },
-  {
-    question: "What are contrarian signals?",
-    answer:
-      "They are situations where a creator calls the opposite direction of the crowd. We study those cases publicly today; delivery-oriented premium tooling for them is still on the roadmap.",
-  },
-  {
-    question: "What are consensus strength warnings?",
-    answer:
-      "When multiple creators independently call the same coin in the same direction within a short window, we analyze that cluster. The public site already shows the raw research; premium warning surfaces are planned, not shipped.",
-  },
-  {
-    question: "How often is the data updated?",
-    answer:
-      "We scrape new videos daily and rerun the scoring pipeline after new extraction and market-data backfills complete. Public pages reflect the latest completed recompute.",
-  },
-  {
-    question: "Can I cancel anytime?",
-    answer:
-      "Yes, you can cancel your subscription at any time. Your access will continue through the end of your current billing period.",
-  },
-  {
-    question: "If the public site is free, what are Pro and Alpha for?",
-    answer:
-      "For now, they are roadmap tiers rather than unique public-site unlocks. We will only market premium workflows once the delivery surfaces are live and materially different from the public dataset.",
-  },
-] as const;
-
-function getCheckoutUrl(tierName: string): string {
-  if (tierName === "Alpha" || tierName === "Pro") return "/feedback";
-  return "/";
+function glyphClass(g: Glyph): string {
+  return g === "yes"
+    ? "text-pos font-bold"
+    : g === "soon"
+      ? "text-warn font-medium"
+      : "text-ink-500";
 }
 
-export default function PricingPage() {
+function glyphAriaLabel(g: Glyph): string {
+  return g === "yes"
+    ? "included"
+    : g === "soon"
+      ? "coming soon"
+      : "not in this tier";
+}
+
+interface PlanCardProps {
+  readonly name: string;
+  readonly price: string;
+  readonly cadence: string;
+  readonly tagline: string;
+  readonly cta: string;
+  readonly ctaHref: string;
+  readonly emphasis?: boolean; // editorial anchor — slightly wider, accent-low background
+  readonly ctaVariant?: "button" | "soft" | "none"; // round2-005: free tier has no purchase, use soft link
+}
+
+function PlanCard({
+  name,
+  price,
+  cadence,
+  tagline,
+  cta,
+  ctaHref,
+  emphasis = false,
+  ctaVariant = "button",
+}: PlanCardProps): ReactElement {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back link */}
-      <Link
-        href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-8 transition-colors"
+    <div
+      className={`flex flex-col p-6 border ${
+        emphasis
+          ? "border-accent-dim bg-accent-low"
+          : "border-ink-200 bg-ink-50"
+      }`}
+      style={{ borderRadius: 2 }}
+    >
+      {/* Plan name as a styled label, NOT a Chip — Chip is reserved for status/category
+          microlabels (round2-004). Plan-tier identifier sits between Chip (9.5px) and h2. */}
+      <div
+        className={`font-mono text-[12px] tracking-caps uppercase mb-3 ${
+          emphasis ? "text-accent" : "text-ink-700"
+        }`}
       >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Leaderboard
-      </Link>
-
-      {/* Header */}
-      <section className="text-center mb-12">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
-          The Leaderboard Is Free.
-          <br />
-          <span className="text-gradient-gold">The Intelligence Is Not.</span>
-        </h1>
-        <p className="text-gray-400 max-w-xl mx-auto text-sm sm:text-base">
-          Rankings show you who is good. Alpha signals show you who to listen to
-          today, in this market, for this trade.
-        </p>
-      </section>
-
-      {/* Value props */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
-        <ValueProp
-          icon={TrendingDown}
-          title="Bear Market Specialists"
-          description="Miles Deutscher: #19 overall, but #1 in bear markets with 85% win rate. Know who to follow when it matters most."
-        />
-        <ValueProp
-          icon={Radar}
-          title="Contrarian Signals"
-          description="When a top creator goes against the crowd, those calls often matter more. Public data shows the pattern; premium delivery tooling is still in roadmap mode."
-        />
-        <ValueProp
-          icon={Shield}
-          title="Consensus Warnings"
-          description="When all creators agree, accuracy can drop. The public site shows the underlying consensus research; warning-specific premium UX is still planned."
-        />
-      </section>
-
-      {/* Pricing cards */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-        {TIERS.map((tier) => {
-          const Icon = tier.icon;
-
-          return (
-            <div
-              key={tier.name}
-              className={`relative rounded-xl border p-6 ${tier.borderColor} ${
-                tier.highlighted
-                  ? "bg-brand-card glow-gold"
-                  : "bg-brand-card/50"
-              }`}
-            >
-              {tier.highlighted && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="badge-elite text-xs px-3 py-1">
-                    Best Value
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 mb-4">
-                <Icon className="w-5 h-5 text-gray-400" />
-                <span
-                  className={`font-bold bg-gradient-to-r ${tier.gradient} bg-clip-text text-transparent`}
-                >
-                  {tier.name}
-                </span>
-              </div>
-
-              <div className="mb-2">
-                <span className="text-4xl font-bold text-white">
-                  {tier.price}
-                </span>
-                <span className="text-gray-500 text-sm">{tier.period}</span>
-              </div>
-
-              <p className="text-gray-400 text-sm mb-6">{tier.tagline}</p>
-
-              <Link
-                href={getCheckoutUrl(tier.name)}
-                className={`block text-center font-semibold text-sm px-4 py-2.5 rounded-lg transition-colors mb-6 ${tier.ctaBg}`}
-              >
-                {tier.cta}
-              </Link>
-
-              <ul className="space-y-2.5">
-                {tier.features.map((feature) => (
-                  <li
-                    key={feature}
-                    className="flex items-start gap-2 text-gray-300 text-sm"
-                  >
-                    <Check className="w-4 h-4 text-brand-green shrink-0 mt-0.5" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </section>
-
-      {/* Feature comparison */}
-      <section className="mb-16">
-        <h2 className="text-white font-bold text-xl text-center mb-8">
-          Feature Comparison
-        </h2>
-        <div className="glass-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-brand-border">
-                  <th className="text-left text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3">
-                    Feature
-                  </th>
-                  <th className="text-center text-gray-500 text-xs font-medium uppercase tracking-wider px-4 py-3">
-                    Free
-                  </th>
-                  <th className="text-center text-xs font-medium uppercase tracking-wider px-4 py-3 text-brand-accent">
-                    Pro
-                  </th>
-                  <th className="text-center text-xs font-medium uppercase tracking-wider px-4 py-3 text-brand-gold">
-                    Alpha
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARISON_FEATURES.map((row) => (
-                  <tr
-                    key={row.feature}
-                    className="border-b border-brand-border/50 table-row-hover"
-                  >
-                    <td className="px-4 py-3 text-gray-300">{row.feature}</td>
-                    <td className="px-4 py-3 text-center">
-                      <FeatureValue value={row.free} />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <FeatureValue value={row.pro} />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <FeatureValue value={row.alpha} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="max-w-2xl mx-auto mb-16">
-        <h2 className="text-white font-bold text-xl text-center mb-8">
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-4">
-          {FAQ_ITEMS.map((item) => (
-            <FaqCard key={item.question} item={item} />
-          ))}
-        </div>
-      </section>
+        {name}
+      </div>
+      <div className="mt-1 mb-3 flex items-baseline gap-1.5">
+        <span className="font-serif text-[40px] text-ink-900 font-medium tabular-nums leading-none">
+          {price}
+        </span>
+        <span className="font-mono text-[11px] text-ink-500 tracking-wide">{cadence}</span>
+      </div>
+      <p className="font-serif text-[15px] text-ink-700 leading-relaxed mb-6">{tagline}</p>
+      {ctaVariant === "button" && (
+        <Link
+          href={ctaHref}
+          className={`mt-auto inline-block text-center font-mono text-[11px] tracking-caps uppercase px-4 py-2.5 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent ${
+            emphasis
+              ? "bg-accent hover:bg-accent-dim text-ink-0"
+              : "border border-ink-300 text-ink-700 hover:bg-ink-100"
+          }`}
+          style={{ borderRadius: 2 }}
+        >
+          {cta}
+        </Link>
+      )}
+      {ctaVariant === "soft" && (
+        <Link
+          href={ctaHref}
+          className="mt-auto font-mono text-[11px] tracking-wide text-accent hover:underline underline-offset-4 focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+        >
+          {cta} <span aria-hidden="true">&rarr;</span>
+        </Link>
+      )}
     </div>
   );
 }
 
-function FeatureValue({ value }: { readonly value: boolean | string }) {
-  if (value === true) {
-    return <Check className="w-4 h-4 text-brand-green mx-auto" />;
-  }
-  if (value === false) {
-    return <X className="w-4 h-4 text-gray-600 mx-auto" />;
-  }
-  return <span className="text-gray-300 text-xs">{value}</span>;
-}
-
-function FaqCard({ item }: { readonly item: FaqItem }) {
+export default function PricingPage(): ReactElement {
   return (
-    <details className="glass-card group" open={false}>
-      <summary className="flex items-center justify-between cursor-pointer p-4 text-white font-medium text-sm list-none">
-        {item.question}
-        <ChevronDown className="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="px-4 pb-4 text-gray-400 text-sm leading-relaxed">
-        {item.answer}
-      </div>
-    </details>
-  );
-}
+    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
+      {/* HERO */}
+      <section className="pb-12 border-b border-ink-250">
+        <h1 className="font-serif text-[34px] tab:text-[44px] desk:text-[52px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
+          CallScore plans.{" "}
+          <em className="italic font-normal text-accent">Free research, paid delivery.</em>
+        </h1>
+        <p className="font-serif text-[19px] text-ink-700 leading-relaxed max-w-[760px]">
+          Leaderboards stay free. Paid tiers add alerts, exports, backtests, and API access.
+        </p>
+        <MetaStrip
+          cells={[
+            { k: "free tier", v: "$0" },
+            {
+              k: "pro",
+              v: (
+                <>
+                  $19<span className="text-ink-500 text-[14px]"> /mo</span>
+                </>
+              ),
+            },
+            {
+              k: "alpha",
+              v: (
+                <>
+                  $49<span className="text-ink-500 text-[14px]"> /mo</span>
+                </>
+              ),
+            },
+            { k: "refund", v: "30 days" },
+          ]}
+        />
+      </section>
 
-function ValueProp({
-  icon: Icon,
-  title,
-  description,
-}: {
-  readonly icon: React.ComponentType<{ className?: string }>;
-  readonly title: string;
-  readonly description: string;
-}) {
-  return (
-    <div className="glass-card p-5">
-      <div className="flex items-center gap-3 mb-2">
-        <Icon className="w-5 h-5 text-brand-gold" />
-        <h2 className="text-white font-semibold text-sm">{title}</h2>
-      </div>
-      <p className="text-gray-400 text-xs leading-relaxed">{description}</p>
+      {/* 01 — TIERS (asymmetric 1fr-1.2fr-1fr; pro is the editorial anchor) */}
+      <EditorialSection
+        index="01"
+        title={
+          <>
+            Three <em className="italic text-accent">tiers</em>.
+          </>
+        }
+        meta={
+          <>
+            billed monthly &middot; no contracts
+            <br />
+            cancel anytime &middot; refund within 30d
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 tab:grid-cols-3 desk:grid-cols-[1fr_1.2fr_1fr] gap-4">
+          <PlanCard
+            name="Free"
+            price="$0"
+            cadence="forever"
+            tagline="Full public research."
+            cta="Browse leaderboard"
+            ctaHref="/"
+            ctaVariant="soft"
+          />
+          <PlanCard
+            name="Pro"
+            price="$19"
+            cadence="/mo"
+            tagline="Alerts, watchlists, exports."
+            cta="Upgrade to Pro"
+            ctaHref="/api/checkout/pro"
+            emphasis
+          />
+          <PlanCard
+            name="Alpha"
+            price="$49"
+            cadence="/mo"
+            tagline="Backtests, API, webhooks."
+            cta="Upgrade to Alpha"
+            ctaHref="/api/checkout/alpha"
+          />
+        </div>
+      </EditorialSection>
+
+      {/* 02 — FEATURE MATRIX */}
+      <EditorialSection
+        index="02"
+        title={
+          <>
+            Feature <em className="italic text-accent">matrix</em>.
+          </>
+        }
+        meta={
+          <>
+            {FEATURES.length} features &middot; 3 plans
+            <br />
+            &#10003; included &middot; &rarr; coming &middot; &middot; gated
+          </>
+        }
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full font-mono text-[12px]">
+            <caption className="sr-only">Feature availability by tier</caption>
+            <thead className="sticky top-0 bg-ink-50 z-sticky">
+              <tr className="border-b border-ink-250">
+                <th
+                  scope="col"
+                  className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3"
+                >
+                  Feature
+                </th>
+                <th
+                  scope="col"
+                  className="text-center text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
+                >
+                  Free
+                </th>
+                <th
+                  scope="col"
+                  className="text-center text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
+                >
+                  Pro
+                </th>
+                <th
+                  scope="col"
+                  className="text-center text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
+                >
+                  Alpha
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {FEATURES.map((f) => (
+                <tr key={f.label} className="border-b border-ink-150">
+                  <td className="py-3 px-3 font-serif text-[14px] text-ink-800">{f.label}</td>
+                  {(["free", "pro", "alpha"] as const).map((tier) => (
+                    <td
+                      key={tier}
+                      className="py-3 px-3 text-center"
+                      aria-label={glyphAriaLabel(f[tier])}
+                    >
+                      <span className={glyphClass(f[tier])}>{glyphChar(f[tier])}</span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </EditorialSection>
+
+      {/* 03 — FAQ */}
+      <EditorialSection
+        index="03"
+        title={
+          <>
+            <em className="italic text-accent">Why</em> these tiers.
+          </>
+        }
+      >
+        <div className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px] space-y-4">
+          <p>
+            <b className="text-ink-900">Why is research free?</b> Because the value of an
+            accuracy tracker is in the public methodology, not the data lock. If we hid the
+            leaderboard behind a paywall, no one could check our work — which would defeat the
+            point.
+          </p>
+          <p>
+            <b className="text-ink-900">What do paid tiers actually buy?</b> Delivery, not
+            data. Pro alerts you when ranked creators move so you don&apos;t have to refresh.
+            Alpha adds the full apparatus — backtest, anti-consensus signals, API access — for
+            users who want to build on the data.
+          </p>
+          <p>
+            <b className="text-ink-900">No-questions refund?</b> 30 days, full refund, no
+            support thread. Email{" "}
+            <a
+              href="mailto:dave.shipsbuilds@proton.me"
+              className="text-accent hover:underline"
+            >
+              dave.shipsbuilds@proton.me
+            </a>
+            .
+          </p>
+        </div>
+      </EditorialSection>
     </div>
   );
 }

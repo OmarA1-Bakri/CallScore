@@ -1,21 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  ExternalLink,
-  Users,
-  Focus,
-  Youtube,
-  ArrowLeft,
-} from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import AlphaScoreBadge from "@/components/AlphaScoreBadge";
-import RankTierBadge from "@/components/RankTierBadge";
 import PerformanceChart from "@/components/PerformanceChart";
 import CallHistory from "@/components/CallHistory";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
+import { EditorialSection, MetaStrip } from "@/components/primitives";
+import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { hasAccess } from "@/lib/whop";
 import {
+  computeCreatorAvgAlpha30d,
+  computeCreatorHitRate,
   computeCreatorScoreAverages,
+  computeCreatorWinRate,
   getScoredCalls,
   serializeCalls,
 } from "@/lib/public-serializer";
@@ -130,121 +129,102 @@ export default async function CreatorPage({ params }: PageProps) {
       score: Number((row.total / row.count).toFixed(1)),
     }));
 
-  const alphaScore = stats?.alpha_score ?? creator.alpha_score;
-  const winRate = stats?.win_rate ?? creator.win_rate;
-  const avgAlpha30d = stats?.avg_alpha_30d ?? 0;
-  const scoredCallCount = stats?.total_calls ?? scoredCalls.length;
-  const hitRate = stats?.hit_rate ?? 0;
+  const alphaScore = Number(scoreAverages.total.toFixed(1));
+  const winRate = computeCreatorWinRate(allCalls);
+  const avgAlpha30d = computeCreatorAvgAlpha30d(allCalls);
+  const scoredCallCount = scoredCalls.length;
+  const hitRate = computeCreatorHitRate(allCalls);
+  const currentTier = await getCurrentTier();
+  const canExport = hasAccess(currentTier, "pro");
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back link */}
+    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-8">
+      {/* Back link — replaces lucide ArrowLeft with Unicode glyph per spec */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-6 transition-colors"
+        className="inline-flex items-center gap-1.5 font-mono text-[10px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mb-8"
       >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Leaderboard
+        <span aria-hidden="true">←</span> Leaderboard
       </Link>
 
-      {/* Hero section */}
-      <section className="glass-card p-6 sm:p-8 mb-8">
-        <div className="flex flex-col sm:flex-row items-start gap-6">
-          {/* Avatar */}
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-2xl shrink-0">
-            {creator.name
-              .split(" ")
-              .map((p) => p[0])
-              .join("")
-              .toUpperCase()
-              .slice(0, 2)}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                {creator.name}
-              </h1>
-              {stats && (
-                <RankTierBadge
-                  rank={stats.accuracy_rank ?? 99}
-                  totalCalls={stats.total_calls}
-                  wilsonLb={stats.wilson_lb}
-                />
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400 mb-3">
-              <span className="flex items-center gap-1">
-                <Youtube className="w-4 h-4 text-red-500" />
-                {creator.youtube_handle}
-              </span>
-              {creator.subscribers && (
-                <span className="flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5" />
-                  {creator.subscribers} subscribers
-                </span>
-              )}
-              {creator.focus && (
-                <span className="flex items-center gap-1">
-                  <Focus className="w-3.5 h-3.5" />
-                  {creator.focus}
-                </span>
-              )}
-            </div>
-
-            <a
-              href={`https://youtube.com/${creator.youtube_handle}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-brand-gold hover:text-brand-gold-dim text-sm transition-colors"
-            >
-              View on YouTube
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          </div>
+      {/* HERO */}
+      <section className="pb-10 border-b border-ink-250">
+        <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-2">
+          Profile · Rank {stats?.accuracy_rank ?? "—"}
         </div>
+        <h1 className="font-serif text-[34px] tab:text-[44px] text-ink-900 font-medium tracking-tight leading-[1.1] mb-2">
+          {creator.name}
+        </h1>
+        <a
+          href={`https://www.youtube.com/${creator.youtube_handle}`}
+          className="font-mono text-[12px] text-ink-500 hover:text-ink-700 tracking-wide inline-flex items-center gap-1.5"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {creator.youtube_handle} <ExternalLink className="w-3 h-3" />
+        </a>
+        <MetaStrip
+          cells={[
+            { k: "rank", v: stats?.accuracy_rank ?? "—" },
+            { k: "alpha", v: alphaScore.toFixed(1) },
+            { k: "win rate", v: `${(winRate * 100).toFixed(0)}%` },
+            { k: "scored calls", v: scoredCallCount },
+          ]}
+        />
       </section>
 
-      {/* Stats row */}
-      <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <div className="glass-card p-4 flex flex-col items-center">
+      {/* 01 — synthesis */}
+      <EditorialSection index="01" title={<><em className="italic text-accent">Why</em> this rank.</>}>
+        <p className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px]">
+          {creator.name} ranks{" "}
+          <em className="italic text-accent">#{stats?.accuracy_rank ?? "—"}</em> on average alpha
+          across {scoredCallCount} scored calls
+          {scoredCallCount > 0
+            ? `, with a ${(winRate * 100).toFixed(0)}% directional hit rate at 30 days`
+            : ""}
+          .
+        </p>
+      </EditorialSection>
+
+      {/* 02 — headline metrics
+          Approach: reuse <AlphaScoreBadge> for the alpha tile and render
+          three sibling tiles using the same hairline-bordered numeric chip
+          pattern (border + bg-ink-50 + 2px radius). Phase 4 may extract
+          this into a shared <MetricTile> primitive — see plan Step 4 TODO. */}
+      <EditorialSection index="02" title={<>Headline <em className="italic text-accent">metrics</em>.</>}>
+        <div className="grid grid-cols-2 tab:grid-cols-4 gap-4">
           <AlphaScoreBadge score={alphaScore} size="lg" />
+          <MetricTile
+            label="Hit Rate"
+            value={`${(hitRate * 100).toFixed(0)}%`}
+            unit="hit"
+          />
+          <MetricTile
+            label="Avg α 30d"
+            value={`${avgAlpha30d >= 0 ? "+" : ""}${avgAlpha30d.toFixed(1)}`}
+            unit="%"
+            tone={avgAlpha30d >= 0 ? "pos" : "neg"}
+          />
+          <MetricTile
+            label="Scored Calls"
+            value={String(scoredCallCount)}
+            unit="n"
+          />
         </div>
-        <StatCard label="Win Rate" value={`${(winRate * 100).toFixed(1)}%`} />
-        <StatCard
-          label="Win Rate Floor"
-          value={`≥${((stats?.wilson_lb ?? 0) * 100).toFixed(1)}%`}
-        />
-        <StatCard
-          label="Avg Alpha (30d)"
-          value={`${avgAlpha30d >= 0 ? "+" : ""}${avgAlpha30d.toFixed(1)}%`}
-          positive={avgAlpha30d >= 0}
-        />
-        <StatCard label="Scored Calls" value={String(scoredCallCount)} />
-        <StatCard label="Hit Rate" value={`${(hitRate * 100).toFixed(1)}%`} />
-      </section>
+      </EditorialSection>
 
-      {/* Score breakdown + Chart row */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <ScoreBreakdown
-          direction={Number(scoreAverages.direction.toFixed(1))}
-          alpha={Number(scoreAverages.alpha.toFixed(1))}
-          specificity={Number(scoreAverages.specificity.toFixed(1))}
-          regime={Number(scoreAverages.regime.toFixed(1))}
-          target={Number(scoreAverages.target.toFixed(1))}
-        />
-        {performance.length > 0 ? (
-          <PerformanceChart data={performance} />
-        ) : (
-          <div className="glass-card p-5 flex items-center justify-center">
-            <p className="text-gray-500 text-sm">No performance data yet</p>
-          </div>
-        )}
-      </section>
-
-      {/* Call history */}
-      <section>
+      {/* 03 — calls */}
+      <EditorialSection index="03" title={<>Recent <em className="italic text-accent">calls</em>.</>}>
+        <div className="mb-4">
+          <Link
+            href={canExport ? `/api/export/calls?handle=${encodeURIComponent(creator.youtube_handle)}` : "/pricing"}
+            className="inline-block font-mono text-[11px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-3 py-2 transition-colors"
+            style={{ borderRadius: 2 }}
+            prefetch={false}
+          >
+            {canExport ? "Export CSV" : "Export CSV · Pro"}
+          </Link>
+        </div>
         {displayCalls.length > 0 ? (
           <CallHistory
             calls={displayCalls}
@@ -252,35 +232,76 @@ export default async function CreatorPage({ params }: PageProps) {
             scoredCount={scoredCallCount}
           />
         ) : (
-          <div className="glass-card p-12 text-center">
-            <p className="text-gray-500">No calls tracked yet for this creator.</p>
-          </div>
+          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+            No calls tracked yet for this creator.
+          </p>
         )}
-      </section>
+      </EditorialSection>
+
+      {/* 04 — score breakdown */}
+      <EditorialSection
+        index="04"
+        title={<>Score <em className="italic text-accent">breakdown</em>.</>}
+        meta={performance.length > 0 ? <>monthly average score<br />window: all time</> : undefined}
+      >
+        <div className="grid grid-cols-1 desk:grid-cols-2 gap-8">
+          <ScoreBreakdown
+            direction={Number(scoreAverages.direction.toFixed(1))}
+            alpha={Number(scoreAverages.alpha.toFixed(1))}
+            specificity={Number(scoreAverages.specificity.toFixed(1))}
+            regime={Number(scoreAverages.regime.toFixed(1))}
+            target={Number(scoreAverages.target.toFixed(1))}
+          />
+          {performance.length > 0 ? (
+            <PerformanceChart data={performance} />
+          ) : (
+            <div className="border border-ink-200 p-5 flex items-center justify-center" style={{ borderRadius: 2 }}>
+              <p className="font-mono text-[11px] text-ink-500 tracking-wide">No performance data yet</p>
+            </div>
+          )}
+        </div>
+      </EditorialSection>
+
+      {/* 05 — backtest CTA */}
+      <EditorialSection index="05" title={<>Simulate <em className="italic text-accent">returns</em>.</>}>
+        <Link
+          href={`/creator/${encodeURIComponent(creator.youtube_handle)}/backtest`}
+          className="inline-block font-mono text-[11px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-4 py-2.5 transition-colors"
+          style={{ borderRadius: 2 }}
+          prefetch={false}
+        >
+          Run backtest →
+        </Link>
+      </EditorialSection>
     </div>
   );
 }
 
-interface StatCardProps {
+interface MetricTileProps {
   readonly label: string;
   readonly value: string;
-  readonly positive?: boolean;
+  readonly unit: string;
+  readonly tone?: "pos" | "neg" | "default";
 }
 
-function StatCard({ label, value, positive }: StatCardProps) {
+function MetricTile({ label, value, unit, tone = "default" }: MetricTileProps) {
   const valueColor =
-    positive === undefined
-      ? "text-white"
-      : positive
-        ? "text-brand-green"
-        : "text-brand-red";
+    tone === "pos" ? "text-pos" : tone === "neg" ? "text-neg" : "text-ink-900";
 
   return (
-    <div className="glass-card p-4 text-center">
-      <p className="text-gray-500 text-[10px] uppercase tracking-wider mb-2">
+    <div
+      className="inline-flex flex-col items-start gap-1.5 border border-ink-200 bg-ink-50 px-3 py-2.5"
+      style={{ borderRadius: 2 }}
+    >
+      <div className="flex items-baseline gap-1">
+        <span className={`font-serif text-[40px] font-medium tabular-nums tracking-tight ${valueColor}`}>
+          {value}
+        </span>
+        <span className="font-mono text-[13px] text-ink-500 tracking-wide">{unit}</span>
+      </div>
+      <div className="font-mono text-[9px] text-ink-500 tracking-caps uppercase">
         {label}
-      </p>
-      <p className={`text-xl font-bold tabular-nums ${valueColor}`}>{value}</p>
+      </div>
     </div>
   );
 }

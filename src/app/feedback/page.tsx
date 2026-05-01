@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  MessageCircle,
-  Send,
-  CheckCircle2,
-  AlertCircle,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 const CATEGORIES = [
   "Scoring Methodology",
@@ -94,7 +88,7 @@ export default function FeedbackPage() {
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-sm mb-8 transition-colors"
+        className="inline-flex items-center gap-1.5 text-ink-500 hover:text-ink-700 text-sm mb-8 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Leaderboard
@@ -102,19 +96,18 @@ export default function FeedbackPage() {
 
       {/* Hero */}
       <section className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-4 py-1.5 mb-6">
-          <MessageCircle className="w-4 h-4 text-brand-gold" />
-          <span className="text-brand-gold text-xs font-medium">
+        <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/20 px-4 py-1.5 mb-6">
+          <span className="text-accent text-xs font-medium">
             Your Voice Matters
           </span>
         </div>
 
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4 leading-tight">
+        <h1 className="text-3xl sm:text-4xl font-bold text-ink-900 mb-4 leading-tight">
           Help Us{" "}
           <span className="text-gradient-gold">Improve the Rankings</span>
         </h1>
 
-        <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
+        <p className="text-ink-600 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
           We value your input. Share feedback on how we rank creators, what
           criteria you&apos;d like to see, or if you have suggestions to improve
           accuracy. Your voice shapes this platform, and we&apos;re always
@@ -125,19 +118,24 @@ export default function FeedbackPage() {
       {/* Form */}
       <section className="max-w-xl mx-auto mb-16">
         {status === "success" ? (
-          <div className="glass-card p-8 text-center">
-            <CheckCircle2 className="w-12 h-12 text-brand-green mx-auto mb-4" />
-            <h2 className="text-white font-bold text-xl mb-2">
+          <div className="border border-ink-200 p-8 text-center">
+            <p
+              aria-hidden="true"
+              className="text-pos text-3xl font-bold mb-4"
+            >
+              ✓
+            </p>
+            <h2 className="text-ink-900 font-bold text-xl mb-2">
               Thank You for Your Feedback
             </h2>
-            <p className="text-gray-400 text-sm mb-6">
+            <p className="text-ink-600 text-sm mb-6">
               We appreciate you taking the time to share your thoughts. Your
               feedback helps us build a better platform for everyone.
             </p>
             <button
               type="button"
               onClick={() => setStatus("idle")}
-              className="bg-brand-card hover:bg-brand-card-hover text-white border border-brand-border font-semibold text-sm px-6 py-2.5 rounded-lg transition-colors"
+              className="bg-ink-100 hover:bg-ink-150 text-ink-900 border border-ink-200 font-semibold text-sm px-6 py-2.5 transition-colors"
             >
               Send More Feedback
             </button>
@@ -145,16 +143,16 @@ export default function FeedbackPage() {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="glass-card p-6 sm:p-8 space-y-5"
+            className="border border-ink-200 p-6 sm:p-8 space-y-5"
           >
             {/* Name */}
             <div>
               <label
                 htmlFor="feedback-name"
-                className="block text-gray-300 text-sm font-medium mb-1.5"
+                className="block text-ink-700 text-sm font-medium mb-1.5"
               >
                 Name{" "}
-                <span className="text-gray-600 font-normal">(optional)</span>
+                <span className="text-ink-400 font-normal">(optional)</span>
               </label>
               <input
                 id="feedback-name"
@@ -162,7 +160,7 @@ export default function FeedbackPage() {
                 placeholder="Your name"
                 value={form.name}
                 onChange={(e) => updateField("name", e.target.value)}
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 transition-colors"
+                className="w-full bg-ink-0 border border-ink-200 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
               />
             </div>
 
@@ -170,10 +168,10 @@ export default function FeedbackPage() {
             <div>
               <label
                 htmlFor="feedback-email"
-                className="block text-gray-300 text-sm font-medium mb-1.5"
+                className="block text-ink-700 text-sm font-medium mb-1.5"
               >
                 Email{" "}
-                <span className="text-gray-600 font-normal">(optional)</span>
+                <span className="text-ink-400 font-normal">(optional)</span>
               </label>
               <input
                 id="feedback-email"
@@ -181,7 +179,7 @@ export default function FeedbackPage() {
                 placeholder="you@example.com"
                 value={form.email}
                 onChange={(e) => updateField("email", e.target.value)}
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 transition-colors"
+                className="w-full bg-ink-0 border border-ink-200 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors"
               />
             </div>
 
@@ -189,7 +187,7 @@ export default function FeedbackPage() {
             <div>
               <label
                 htmlFor="feedback-category"
-                className="block text-gray-300 text-sm font-medium mb-1.5"
+                className="block text-ink-700 text-sm font-medium mb-1.5"
               >
                 Category
               </label>
@@ -199,7 +197,7 @@ export default function FeedbackPage() {
                 onChange={(e) =>
                   updateField("category", e.target.value as Category)
                 }
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 transition-colors appearance-none cursor-pointer"
+                className="w-full bg-ink-0 border border-ink-200 px-4 py-2.5 text-sm text-ink-900 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors appearance-none cursor-pointer"
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -213,9 +211,9 @@ export default function FeedbackPage() {
             <div>
               <label
                 htmlFor="feedback-message"
-                className="block text-gray-300 text-sm font-medium mb-1.5"
+                className="block text-ink-700 text-sm font-medium mb-1.5"
               >
-                Message <span className="text-brand-red">*</span>
+                Message <span className="text-neg">*</span>
               </label>
               <textarea
                 id="feedback-message"
@@ -224,15 +222,17 @@ export default function FeedbackPage() {
                 value={form.message}
                 onChange={(e) => updateField("message", e.target.value)}
                 required
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-brand-gold/50 focus:ring-1 focus:ring-brand-gold/20 transition-colors resize-vertical min-h-[120px]"
+                className="w-full bg-ink-0 border border-ink-200 px-4 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors resize-vertical min-h-[120px]"
               />
             </div>
 
             {/* Error */}
             {status === "error" && errorMessage && (
-              <div className="flex items-start gap-2 bg-brand-red/10 border border-brand-red/20 rounded-lg px-4 py-3">
-                <AlertCircle className="w-4 h-4 text-brand-red shrink-0 mt-0.5" />
-                <p className="text-brand-red text-sm">{errorMessage}</p>
+              <div className="flex items-start gap-2 bg-neg/10 border border-neg/20 px-4 py-3">
+                <span aria-hidden="true" className="text-neg font-bold">
+                  !
+                </span>
+                <p className="text-neg text-sm">{errorMessage}</p>
               </div>
             )}
 
@@ -240,16 +240,9 @@ export default function FeedbackPage() {
             <button
               type="submit"
               disabled={status === "submitting"}
-              className="w-full flex items-center justify-center gap-2 bg-brand-gold hover:bg-brand-gold-dim text-brand-dark font-semibold text-sm px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-6 py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {status === "submitting" ? (
-                "Sending..."
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Send Feedback
-                </>
-              )}
+              {status === "submitting" ? "Sending..." : "Send Feedback"}
             </button>
           </form>
         )}

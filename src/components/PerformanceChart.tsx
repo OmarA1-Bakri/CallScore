@@ -36,9 +36,9 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
-    <div className="glass-card p-3 text-xs">
-      <p className="text-gray-400 mb-1">{label}</p>
-      <p className="text-brand-green font-bold tabular-nums">
+    <div className="border border-ink-200 bg-ink-50/90 p-3 text-xs">
+      <p className="text-ink-600 mb-1">{label}</p>
+      <p className="text-pos font-bold tabular-nums">
         Alpha Score: {payload[0].value.toFixed(1)}
       </p>
     </div>
@@ -50,8 +50,8 @@ export default function PerformanceChart({
   title = "Alpha Score Over Time",
 }: PerformanceChartProps) {
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-white font-semibold text-sm mb-4">{title}</h3>
+    <div className="border border-ink-200 p-5">
+      <h3 className="text-ink-900 font-semibold text-sm mb-4">{title}</h3>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart

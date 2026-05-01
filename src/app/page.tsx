@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
-import { Trophy, BarChart3, Target, Users } from "lucide-react";
+import type { ReactElement } from "react";
+import Link from "next/link";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
+import { EditorialSection, MetaStrip } from "@/components/primitives";
+import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { getPublicCounts, PUBLIC_COUNT_LABELS } from "@/lib/public-counts";
-import { getCreatorTier } from "@/lib/whop";
+import { getPublicCounts } from "@/lib/public-counts";
+import { getCreatorTier, hasAccess } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
+import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
 import type {
   Creator,
   CreatorStats,
@@ -18,9 +22,9 @@ import type {
 } from "@/lib/types";
 
 export const metadata: Metadata = {
-  title: "Crypto YouTuber Leaderboard — Who Actually Beats The Market? | CryptoTubers Ranked",
+  title: "CallScore — Market Calls, Measured",
   description:
-    "See which crypto YouTubers have the best track record, with every public Alpha Score tied to the published methodology.",
+    "Market calls scored against real price data, with every Alpha Score tied to the published methodology.",
   alternates: { canonical: "/" },
 };
 
@@ -82,6 +86,34 @@ interface StatsRow {
   readonly creator_count: string;
 }
 
+function MarketCallPreview({ totalCalls }: { readonly totalCalls: string }): ReactElement {
+  const rows = [
+    { label: "recorded", value: totalCalls },
+    { label: "scored", value: "price matched" },
+    { label: "ranked", value: "methodology" },
+  ];
+
+  return (
+    <aside className="border border-ink-250 bg-paper p-5 shadow-paper">
+      <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-5">
+        Live market record
+      </div>
+      <div className="space-y-4">
+        {rows.map((row) => (
+          <div key={row.label} className="border-t border-ink-150 pt-3 first:border-t-0 first:pt-0">
+            <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-1">
+              {row.label}
+            </div>
+            <div className="font-serif text-[24px] text-ink-900 leading-none">
+              {row.value}
+            </div>
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 function buildCreator(row: LeaderboardQueryRow): Creator {
   return {
     id: row.creator_id,
@@ -134,11 +166,16 @@ interface PageProps {
   readonly searchParams: { period?: string };
 }
 
-export default async function HomePage({ searchParams }: PageProps) {
+export default async function HomePage({
+  searchParams,
+}: PageProps): Promise<ReactElement> {
   const periodParam = searchParams.period ?? "all_time";
-  const period: Period = (VALID_PERIODS as readonly string[]).includes(periodParam)
+  const requestedPeriod: Period = (VALID_PERIODS as readonly string[]).includes(periodParam)
     ? (periodParam as Period)
     : "all_time";
+  const currentTier = await getCurrentTier();
+  const canUseRecent = hasAccess(currentTier, "pro");
+  const period: Period = canUseRecent ? requestedPeriod : "all_time";
 
   // Fetch leaderboard from DB
   let leaderboard: LeaderboardRow[] = [];
@@ -192,10 +229,17 @@ export default async function HomePage({ searchParams }: PageProps) {
       prevScores.map((r) => [r.creator_id, r.alpha_score]),
     );
 
+    // Self-correction aggregates are optional: tolerate a missing
+    // call_revisions table so the home page still renders pre-migration.
+    const selfCorrectionMap = await computeAllSelfCorrectionAggregates().catch(
+      () => new Map<number, never>(),
+    );
+
     leaderboard = rows.map((row, index) => {
       const rank = row.accuracy_rank ?? index + 1;
       const prev = prevScoreMap.get(row.creator_id);
       const trend = prev !== undefined ? computeTrend(row.alpha_score, prev) : ("stable" as const);
+      const selfCorrection = selfCorrectionMap.get(row.creator_id);
 
       return {
         rank,
@@ -221,6 +265,9 @@ export default async function HomePage({ searchParams }: PageProps) {
           : null,
         tier_required: getCreatorTier(rank),
         trend,
+        selfCorrectionScore: selfCorrection?.score ?? 0,
+        revisionCount: selfCorrection?.revisionCount ?? 0,
+        selfCorrectionTier: selfCorrection?.tier ?? "rarely",
       };
     });
   } catch (err) {
@@ -230,14 +277,17 @@ export default async function HomePage({ searchParams }: PageProps) {
     }
   }
 
-  // Fetch consensus signals
+  // Fetch consensus signals only for Alpha users.
   let signals: ConsensusSignal[] = [];
-  try {
-    signals = await query<ConsensusSignal>(
-      `SELECT * FROM consensus_signals ORDER BY signal_date DESC LIMIT 10`,
-    );
-  } catch {
-    // No signals yet
+  const canUseConsensus = hasAccess(currentTier, "alpha");
+  if (canUseConsensus) {
+    try {
+      signals = await query<ConsensusSignal>(
+        `SELECT * FROM consensus_signals ORDER BY signal_date DESC LIMIT 10`,
+      );
+    } catch {
+      // No signals yet
+    }
   }
 
   let publicCounts = await getPublicCounts().catch(() => null);
@@ -269,98 +319,172 @@ export default async function HomePage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Hero */}
-      <section className="text-center mb-12">
-        <div className="inline-flex items-center gap-2 bg-brand-gold/10 border border-brand-gold/20 rounded-full px-4 py-1.5 mb-6">
-          <Trophy className="w-4 h-4 text-brand-gold" />
-          <span className="text-brand-gold text-xs font-medium">
-            {totalCalls} calls scored against real price data
-          </span>
-        </div>
+    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
+      {/* HERO */}
+      <section className="min-h-[calc(100vh-80px)] pb-12 border-b border-ink-250 flex flex-col justify-center">
+        <div className="grid grid-cols-1 desk:grid-cols-[minmax(0,0.95fr)_minmax(440px,0.75fr)] gap-8 desk:gap-12 items-center">
+          <div>
+            <p className="font-mono text-[11px] text-accent tracking-caps uppercase mb-4">
+              CallScore
+            </p>
+            <h1 className="font-serif text-[42px] tab:text-[58px] desk:text-[72px] text-ink-900 font-medium tracking-tight leading-[0.98] text-balance max-w-[920px] mb-5">
+              Market calls, <em className="italic font-normal text-accent">measured.</em>
+            </h1>
+            <p className="font-serif text-[18px] tab:text-[21px] text-ink-700 leading-relaxed max-w-[720px] mb-7">
+              Track creator calls against real price data. See who finds alpha,
+              who misses, and who corrects course.
+            </p>
+            <div className="flex flex-col tab:flex-row gap-3 mb-8">
+              <Link
+                href="#leaderboard"
+                className="inline-flex justify-center bg-accent hover:bg-accent-dim text-ink-0 font-mono text-[11px] tracking-caps uppercase px-5 py-3 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+                style={{ borderRadius: 2 }}
+              >
+                View leaderboard
+              </Link>
+              <Link
+                href="/pricing"
+                className="inline-flex justify-center border border-ink-300 text-ink-800 hover:bg-ink-100 font-mono text-[11px] tracking-caps uppercase px-5 py-3 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+                style={{ borderRadius: 2 }}
+              >
+                Get alerts
+              </Link>
+            </div>
+            <MetaStrip
+              cells={[
+                { k: "creators", v: <>{publicCounts.trackedCreators}</> },
+                { k: "scored calls", v: totalCalls },
+                {
+                  k: "beating BTC",
+                  v: (
+                    <>
+                      {publicCounts.beatBtcCreators}{" "}
+                      <span className="text-ink-500">/ {publicCounts.rankedCreators}</span>
+                    </>
+                  ),
+                },
+                {
+                  k: "methodology",
+                  v: (
+                    <Link
+                      href="/methodology"
+                      className="text-accent hover:text-accent-dim underline-offset-4 hover:underline"
+                    >
+                      read
+                    </Link>
+                  ),
+                },
+              ]}
+            />
+          </div>
 
-        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
-          Most crypto YouTubers are noise.
-          <br />
-          <span className="text-gradient-gold">
-            We found the signal.
-          </span>
-        </h1>
-
-        <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
-          We track {publicCounts.trackedCreators} crypto YouTubers and score
-          every eligible altcoin call against real market data. The current
-          leaderboard includes {publicCounts.rankedCreators} creators with
-          scored call histories across 18.7M candles of market data.
-        </p>
-
-        {/* Stats row */}
-        <div className="flex flex-wrap justify-center gap-4 sm:gap-6 mt-8">
-          <StatPill
-            icon={Users}
-            label={PUBLIC_COUNT_LABELS.trackedCreators}
-            value={String(publicCounts.trackedCreators)}
-          />
-          <StatPill
-            icon={BarChart3}
-            label={PUBLIC_COUNT_LABELS.scoredCalls}
-            value={totalCalls}
-          />
-          <StatPill
-            icon={Target}
-            label="Creators Beating BTC"
-            value={`${publicCounts.beatBtcCreators} of ${publicCounts.rankedCreators}`}
-          />
+          <MarketCallPreview totalCalls={totalCalls} />
         </div>
       </section>
 
-      {/* Period filter + Leaderboard */}
-      <section className="mb-12">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-white font-bold text-xl">Leaderboard</h2>
-            <p className="text-gray-500 text-sm mt-1">
-              Ranked by average Alpha Score across scored calls
-            </p>
-          </div>
-          <PeriodFilter value={period} />
-        </div>
+      {/* 01 · PREMISE */}
+      <EditorialSection
+        index="01"
+        title={
+          <>
+            The <em className="italic text-accent">premise</em>, sourced.
+          </>
+        }
+        meta={
+          <>
+            three claims · <b className="text-ink-900">peer-reviewed</b>
+            <br />
+            one signature signal · <b className="text-ink-900">self-correction</b>
+          </>
+        }
+      >
+        <ul className="border-y border-ink-150">
+          <PremiseRow
+            claim="76% of influencer-endorsed tokens fail to deliver."
+            source={"Arkham · Mar 2025"}
+          />
+          <PremiseRow
+            claim="Top crypto YouTubers are directionally correct ~22% of the time."
+            source={"Finance Research Letters · 2024"}
+          />
+          <PremiseRow
+            claim={"Influencer-tweeted tokens returned −19% over 3 months."}
+            source={"HBS · Pacelli"}
+          />
+          <li className="flex flex-col tab:flex-row tab:items-baseline tab:justify-between gap-1 px-4 py-3 border-t border-ink-150">
+            <span className="font-serif text-[14px] text-ink-700">
+              We also score who admits when they&apos;re wrong.{" "}
+              <em className="italic text-accent">No other tracker does.</em>
+            </span>
+            <span className="font-mono text-[10px] text-ink-500 tracking-wide whitespace-nowrap">
+              [self-correction index]
+            </span>
+          </li>
+        </ul>
+      </EditorialSection>
 
+      {/* 02 · LEADERBOARD */}
+      <EditorialSection
+        id="leaderboard"
+        index="02"
+        title={
+          <>
+            The ranking, <em className="italic text-accent">by alpha</em>.
+          </>
+        }
+        meta={
+          <>
+            {publicCounts.rankedCreators} ranked creators · {totalCalls} scored calls
+            <br />
+            tier S/A/B/C · low-N flagged
+          </>
+        }
+      >
+        <div className="flex flex-col tab:flex-row tab:items-end tab:justify-between gap-3 mb-4">
+          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+            Sorted by alpha; ties broken by Wilson lower bound.
+          </p>
+          <PeriodFilter value={period} canUseRecent={canUseRecent} />
+        </div>
         {leaderboard.length > 0 ? (
           <Leaderboard rows={leaderboard} />
         ) : (
-          <div className="glass-card p-12 text-center">
-            <p className="text-gray-500">
-              Leaderboard data is being computed. Run the data pipeline to populate scores.
+          <div className="border-t border-ink-250 py-12 text-center">
+            <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+              Leaderboard data is being computed. Run the data pipeline to populate
+              scores.
             </p>
           </div>
         )}
-      </section>
+      </EditorialSection>
 
-      {/* Consensus Signals */}
-      <section className="mb-12 max-w-lg">
-        <ConsensusSignals signals={signals} />
-      </section>
+      {/* 03 · CONSENSUS */}
+      <EditorialSection
+        index="03"
+        title={
+          <>
+            What&apos;s <em className="italic text-accent">forming</em> across creators.
+          </>
+        }
+      >
+        <ConsensusSignals signals={signals} locked={!canUseConsensus} />
+      </EditorialSection>
     </div>
   );
 }
 
-interface StatPillProps {
-  readonly icon: React.ComponentType<{ className?: string }>;
-  readonly label: string;
-  readonly value: string;
+interface PremiseRowProps {
+  readonly claim: string;
+  readonly source: string;
 }
 
-function StatPill({ icon: Icon, label, value }: StatPillProps) {
+function PremiseRow({ claim, source }: PremiseRowProps): ReactElement {
   return (
-    <div className="flex items-center gap-2 bg-brand-card border border-brand-border rounded-lg px-4 py-2.5">
-      <Icon className="w-4 h-4 text-brand-gold" />
-      <div className="text-left">
-        <p className="text-white font-bold text-sm tabular-nums">{value}</p>
-        <p className="text-gray-500 text-[10px] uppercase tracking-wider">
-          {label}
-        </p>
-      </div>
-    </div>
+    <li className="flex flex-col tab:flex-row tab:items-baseline tab:justify-between gap-1 px-4 py-3 border-t border-ink-150 first:border-t-0">
+      <span className="font-serif text-[14px] text-ink-700">{claim}</span>
+      <span className="font-mono text-[10px] text-ink-500 tracking-wide whitespace-nowrap">
+        [{source}]
+      </span>
+    </li>
   );
 }

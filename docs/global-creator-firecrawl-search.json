@@ -1,0 +1,2157 @@
+{
+  "summary": {
+    "generated_at": "2026-04-25T22:59:15Z",
+    "source": "Composio FIRECRAWL_SEARCH",
+    "note": "Firecrawl direct scrape of YouTube /videos pages returned YouTube 403 in smoke test; this artifact uses Firecrawl Search snippets/URLs for shallow coverage triage, not transcripts.",
+    "result_count": 92,
+    "usable": 59,
+    "weak": 33,
+    "credits_before": {
+      "billingPeriodEnd": null,
+      "billingPeriodStart": null,
+      "planCredits": 500,
+      "remainingCredits": 684
+    },
+    "credits_after": {
+      "billingPeriodEnd": null,
+      "billingPeriodStart": null,
+      "planCredits": 500,
+      "remainingCredits": 572
+    }
+  },
+  "results": [
+    {
+      "name": "Crypto India I क्रिप्टो इंडिया",
+      "expected_handle": "@cryptoindia",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@cryptoindia Crypto India I क्रिप्टो इंडिया crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Crypto India I क्रिप्टो इंडिया ; DUMP COMING AGAIN ? || US VS IRAN WAR. 8.9K views ; EMERGENCY UPDATE || NO DEAL BETWEEN US & IRAN || BITCOIN OIL & GOLD UPDATE. 9.8K ...",
+          "position": 1,
+          "title": "Crypto India I क्रिप्टो इंडिया - YouTube",
+          "url": "https://www.youtube.com/@cryptoindia/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 4,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "PUSHPENDRA SINGH DIGITAL",
+      "expected_handle": "@PUSHPENDRASINGHDIGITAL",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@PUSHPENDRASINGHDIGITAL PUSHPENDRA SINGH DIGITAL crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Crypto Market update in Hindi | Bitcoin and Alt coins update. 6.6K views. 9 days ago ; Bitcoin and Alt coins Update | War impact on crypto market | Market ...",
+          "position": 1,
+          "title": "PUSHPENDRA SINGH DIGITAL - YouTube",
+          "url": "https://m.youtube.com/@PUSHPENDRASINGHDIGITAL/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 9,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Tabraiz Shams",
+      "expected_handle": "@Tabraizshams",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@Tabraizshams Tabraiz Shams crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Videos ; Bitcoin Will Rise ! USA Iran Peace Deal Happens Or Not. 1.3K views. 2 days ago ; Trading Is A Joke and Has No Future !! 1.8K views. 3 days ago ; MemeCore ...",
+          "position": 1,
+          "title": "Tabraiz Shams - YouTube",
+          "url": "https://www.youtube.com/@Tabraizshams"
+        },
+        {
+          "description": "Crypto Legall In Pakistan ! No More P2P Blackmailing!! 2K. 16h ago ; Why I am Bulish on Bitcoin! 1.6K · 1d ago ; Rave Coin ( Ravedao ) Huge Pump Possible Reasons ?",
+          "position": 2,
+          "title": "Tabraiz Shams - YouTube",
+          "url": "https://www.youtube.com/@Tabraizshams/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 5,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Angga Andinata",
+      "expected_handle": "@AnggaAndinata",
+      "primary_language": "id",
+      "region": "Asia",
+      "query": "site:youtube.com/@AnggaAndinata Angga Andinata crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Angga Andinata ; Recession on the horizon? 30K views ; The Mastermind Behind the Bitcoin Bear Market Revealed? 25K views ; The Final Wave: Bitcoin 8 Wave Cycle.",
+          "position": 1,
+          "title": "Angga Andinata - YouTube",
+          "url": "https://www.youtube.com/@AnggaAndinata/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Bitinning",
+      "expected_handle": "@Bitinning",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@Bitinning Bitinning crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Videos ; Market Update, Geopolitics & Crypto. 9.3K views. 4 days ago ; $20 Trillion Opportunity. 18K views. 7 days ago ; After Strait Of Hormuz, Now Strait Of ...",
+          "position": 1,
+          "title": "Bitinning - YouTube",
+          "url": "https://www.youtube.com/@Bitinning"
+        },
+        {
+          "description": "Bitinning ; Market Update, Geopolitics & Crypto. 8.1K views ; $20 Trillion Opportunity. 17K views ; After Strait Of Hormuz, Now Strait Of Malacca, America Next ...",
+          "position": 2,
+          "title": "Bitinning - YouTube",
+          "url": "https://www.youtube.com/@Bitinning/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 4,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "everything hindi",
+      "expected_handle": "@everythinghindi",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@everythinghindi everything hindi crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Crypto Update · 12:31 · Crypto Update #2 Polkadot | Coin Switch | Banking News | Lowest BuySell Charges | Binance LaunchPad. everything hindi. 10K views. 4 ...",
+          "position": 1,
+          "title": "everything hindi - YouTube",
+          "url": "https://www.youtube.com/@everythinghindi/featured"
+        },
+        {
+          "description": "Videos ; 1 April 2026 से Crypto Users के लिए बड़ा झटका | New Rules Explained. 4.5K views. 19 hours ago ; Binance Trading Hacks 2025 | Every Trader Must Know.",
+          "position": 2,
+          "title": "everything hindi - YouTube",
+          "url": "https://www.youtube.com/@everythinghindi/null"
+        }
+      ],
+      "quality": {
+        "market_refs": 7,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Hasheur",
+      "expected_handle": "channel/UChlTcWDE8gd4tsl_L727NrQ",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UChlTcWDE8gd4tsl_L727NrQ Hasheur crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Videos · Is the crypto world in danger? · New crypto law: Obligation to declare everything? · The Strait of Hormuz will mark Bitcoin history.",
+          "position": 1,
+          "title": "Hasheur - YouTube",
+          "url": "https://www.youtube.com/channel/UChlTcWDE8gd4tsl_L727NrQ"
+        },
+        {
+          "description": "Bienvenue sur ma chaîne ! Je me présente, Owen Simonin (alias Hasheur), je vulgarise sur Youtube différentes technologies, techniques et stratégies ...",
+          "position": 2,
+          "title": "Hasheur - YouTube",
+          "url": "https://www.youtube.com/channel/UChlTcWDE8gd4tsl_L727NrQ/videos)"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "The Crypto Gateway - Investire in Criptovalute",
+      "expected_handle": "channel/UC9X2f4pVXSNzsJ2c6ZQVqBQ",
+      "primary_language": "it",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC9X2f4pVXSNzsJ2c6ZQVqBQ The Crypto Gateway - Investire in Criptovalute crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "BITCOIN e CRYPTO: News e Analisi di Mercato. 3 volte a settimana (lunedì, mercoledì e venerdì) analizziamo tutto ciò che accade nel mondo crypto e che muove ...",
+          "position": 1,
+          "title": "The Crypto Gateway - Investire in Criptovalute - YouTube",
+          "url": "https://www.youtube.com/channel/UC9X2f4pVXSNzsJ2c6ZQVqBQ"
+        },
+        {
+          "description": "Questo canale tratta Bitcoin e le Criptovalute a 360°, allo scopo di imparare ad approcciarle in maniera consapevole e cauta. ...more",
+          "position": 2,
+          "title": "The Crypto Gateway - Investire in Criptovalute - YouTube",
+          "url": "https://www.youtube.com/channel/UC9X2f4pVXSNzsJ2c6ZQVqBQ/videos"
+        },
+        {
+          "description": "Questo canale tratta Bitcoin e le Criptovalute a 360°, allo scopo di imparare ad approcciarle in maniera consapevole e cauta. ...more",
+          "position": 3,
+          "title": "The Crypto Gateway - Investire in Criptovalute - YouTube",
+          "url": "https://www.youtube.com/channel/UC9X2f4pVXSNzsJ2c6ZQVqBQ/shorts"
+        }
+      ],
+      "quality": {
+        "market_refs": 8,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Le Trone",
+      "expected_handle": "channel/UC5kh_CumIL_usjg3pW5J9Qw",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC5kh_CumIL_usjg3pW5J9Qw Crypto Le Trone crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Que vous soyez débutant ou expert, notre analyse crypto quotidienne vous guide dans le trading, l'investissement, et l'univers du Bitcoin et de l'Ethereum.",
+          "position": 1,
+          "title": "Crypto Le Trone - YouTube",
+          "url": "https://www.youtube.com/channel/UC5kh_CumIL_usjg3pW5J9Qw"
+        }
+      ],
+      "quality": {
+        "market_refs": 5,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Cilinix Crypto",
+      "expected_handle": "channel/UC8QWLZNoN3whQ7QMwoDp78A",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC8QWLZNoN3whQ7QMwoDp78A Cilinix Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Cilinix Crypto ... URGENT BITCOIN UPDATE! (Bitcoin Price Prediction & News 2026). 1.1K views. 3 days ago · 8:20. WHEN WILL CRYPTO PUMP AGAIN? (Crypto Market ...",
+          "position": 1,
+          "title": "Cilinix Crypto - YouTube",
+          "url": "https://www.youtube.com/channel/UC8QWLZNoN3whQ7QMwoDp78A/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 8,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Deutschland",
+      "expected_handle": "channel/UC9M0AlqCwycSsL0XfDgaz-g",
+      "primary_language": "de",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC9M0AlqCwycSsL0XfDgaz-g Crypto Deutschland crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "BFM Crypto",
+      "expected_handle": "channel/UC9jq6tr49rHZTUK-Jm1hV4w",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC9jq6tr49rHZTUK-Jm1hV4w BFM Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "BFM CRYPTO: \"11% of French people own cryptocurrencies\" (Louis Laszlo) · 4.5K views ; BFM CRYTPO: \"The war in Iran does not impact Bitcoin\" (Maurgane Nlandu) ; BFM ...",
+          "position": 1,
+          "title": "BFM Crypto - YouTube",
+          "url": "https://www.youtube.com/channel/UC9jq6tr49rHZTUK-Jm1hV4w/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 4,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Flash France",
+      "expected_handle": "channel/UC7t8V-dJPWfmAXEK2tvma1A",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC7t8V-dJPWfmAXEK2tvma1A Crypto Flash France crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Vous trouverez ici les dernières actualités en lien avec les Cryptomonnaies résumées quotidiennement. Je ferai aussi plusieurs analyses sur ...",
+          "position": 1,
+          "title": "Crypto Flash - YouTube",
+          "url": "https://www.youtube.com/channel/UC7t8V-dJPWfmAXEK2tvma1A/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 2,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "SwissCryptoJay",
+      "expected_handle": "channel/UCWM1uBxzGpNb4RyxtFc3A8g",
+      "primary_language": "de",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCWM1uBxzGpNb4RyxtFc3A8g SwissCryptoJay crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Earn With Sapna",
+      "expected_handle": "@earnwithsapna",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@earnwithsapna Earn With Sapna crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Crypto Shubhrant chaudhary",
+      "expected_handle": "@cryptoshubhrantchaudhary8012",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@cryptoshubhrantchaudhary8012 Crypto Shubhrant chaudhary crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "2.3K views · Bitcoin 3 years Cycle explained in Hindi | NO ONE IS TALKING ABOUT THIS. 1.6K views · DONALD TRUMP SELLING BITCOIN - NEWS DECODE. 2.4K views ...",
+          "position": 1,
+          "title": "Crypto Shubhrant chaudhary - YouTube",
+          "url": "https://www.youtube.com/@cryptoshubhrantchaudhary8012"
+        },
+        {
+          "description": "CRYPTO MARKET UPDATE - BITCOIN AND ETH TRADE FOR TODAY MARKET VIEW BY SHUBHRANT. 720 views. 4 months ago · 8:50. BREAKING: Indian Court Says Crypto = Property!",
+          "position": 2,
+          "title": "Crypto Shubhrant chaudhary - YouTube",
+          "url": "https://www.youtube.com/@cryptoshubhrantchaudhary8012/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 12,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Christian Victorius",
+      "expected_handle": "@ChristianVictorius",
+      "primary_language": "id",
+      "region": "Asia",
+      "query": "site:youtube.com/@ChristianVictorius Christian Victorius crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Videos ; BITCOIN REJECT 78K‼️OTW RETEST TO 70K-69K⁉️ 550 views. 20 hours ago ; BITCOIN CONSOLIDATION BEAR FLAG‼️GET READY TO SELL IN MAY AND GO AWAY⁉️ 820 views. 1 ...",
+          "position": 1,
+          "title": "Christian Victorius - YouTube",
+          "url": "https://www.youtube.com/@ChristianVictorius"
+        }
+      ],
+      "quality": {
+        "market_refs": 2,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Amila Bro",
+      "expected_handle": "@AmilaBro",
+      "primary_language": "si",
+      "region": "Asia",
+      "query": "site:youtube.com/@AmilaBro Amila Bro crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "I'm Amila Bro | Youtuber, Professional Trader, Content Creator, Web Developer, Graphic Designer. The best professional trading youtuber | Binance ...",
+          "position": 1,
+          "title": "Amila Bro - YouTube",
+          "url": "https://m.youtube.com/@AmilaBro/videos"
+        },
+        {
+          "description": "I'm Amila Bro | Youtuber, Professional Trader, Content Creator, Web Developer, Graphic Designer. The best professional trading youtuber | Binance ...",
+          "position": 2,
+          "title": "Amila Bro - YouTube",
+          "url": "https://www.youtube.com/@AmilaBro/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 4,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Didi Random",
+      "expected_handle": "channel/UCoMc0zniPatlGpR6OQiM-Qg",
+      "primary_language": "de",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCoMc0zniPatlGpR6OQiM-Qg Didi Random crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "BITCOIN BREAKS EVERYTHING! · If Trump continues and Bitcoin doesn't fall, it means only one thing! · Maximize your OKX bonus! · Bitcoin pullback – THIS is what's ...",
+          "position": 1,
+          "title": "Didi Random | Bitcoin und Vermögensaufbau - YouTube",
+          "url": "https://www.youtube.com/channel/UCoMc0zniPatlGpR6OQiM-Qg/videos"
+        },
+        {
+          "description": "Krypto Trading ; This is the strategy I use to start my trades! Learn to trade easily, step by step. · 2.8K views. 1 month ago ; How to find Fibonacci entry ...",
+          "position": 2,
+          "title": "Didi Random | Bitcoin und Vermögensaufbau - YouTube",
+          "url": "https://www.youtube.com/channel/UCoMc0zniPatlGpR6OQiM-Qg/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Basics",
+      "expected_handle": "@CryptoBasicsBD",
+      "primary_language": "bn",
+      "region": "Asia",
+      "query": "site:youtube.com/@CryptoBasicsBD Crypto Basics crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Videos · Bitcoin আসল পাম্প দিচ্ছে নাকি এটা ট্র্যাপ? | Bull Run Start or Not? | Crypto Market Latest Update · Bear Market শুরু হওয়ার আগেই সতর্ক হোন ...",
+          "position": 1,
+          "title": "Crypto Basics - YouTube",
+          "url": "https://www.youtube.com/@CryptoBasicsBD"
+        },
+        {
+          "description": "Bitcoin সবাইকে Pump করার লোভ দেখাচ্ছে? | Crypto Market Latest Update | Bitcoin Market Update. 6.8K views. 4 months ago · 22:55 · সফল ...",
+          "position": 2,
+          "title": "Crypto Basics - YouTube",
+          "url": "https://www.youtube.com/@CryptoBasicsBD/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 13,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Earn With Rk",
+      "expected_handle": "@EarnWithRK",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@EarnWithRK Earn With Rk crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Be a part of Biggest Crypto Currency Revolution. Latest Crypto News Update & Chart Analysis. Subscribe to get daily updates on crypto updates. ...more",
+          "position": 1,
+          "title": "Earn With Rk - YouTube",
+          "url": "https://www.youtube.com/@EarnWithRK/playlists"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "EZC - Trading",
+      "expected_handle": "channel/UCaEmEcGngLdmOTeyirL4j6w",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCaEmEcGngLdmOTeyirL4j6w EZC - Trading crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "EZC - Trading ; TUTORIAL: Getting Started with BitUnix. 2.5K views ; EVERYONE IS WRONG about BEARMARKET. 7.9K views ; ❌ CARNAGE on the CRYPTO: IS THE ...",
+          "position": 1,
+          "title": "EZC - Trading - YouTube",
+          "url": "https://www.youtube.com/channel/UCaEmEcGngLdmOTeyirL4j6w/videos"
+        },
+        {
+          "description": "EZC - Trading · HOW TO BECOME A CRYPTO SCAMMER (IN 10 STEPS) · Analyses Bitcoin & Altcoins · Shorts · What's going on with Bitcoin? · EVERYTHING was on the ...",
+          "position": 2,
+          "title": "EZC - Trading - YouTube",
+          "url": "https://www.youtube.com/channel/UCaEmEcGngLdmOTeyirL4j6w/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 10,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Bitcoin Expert India",
+      "expected_handle": "@BitcoinExpertIndia",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@BitcoinExpertIndia Bitcoin Expert India crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Videos · ⚠️ अगले 24 से 48 घंटे थोड़ा संभल कर ! होने वाला है फिरसे बड़ा CRASH BITCOIN & CRYPTO में ? US IRAN ? · दूसरे COINS में RECOVERY कब ? BITCOIN $75K, NEXT $140K ? 2026 क्या आएगा ...",
+          "position": 1,
+          "title": "Bitcoin Expert India - YouTube",
+          "url": "https://www.youtube.com/@BitcoinExpertIndia"
+        },
+        {
+          "description": "⚠️ अगले 24 से 48 घंटे थोड़ा संभल कर ! · दूसरे COINS में RECOVERY कब ? · थोड़ा ऊपर जाते ही ये क्या बोल दिया - BITCOIN $140K ? · ⚠️ URGENT - जल्दबाजी मत करना BITCOIN CRYPTO GOLD ...",
+          "position": 2,
+          "title": "Bitcoin Expert India - YouTube",
+          "url": "https://www.youtube.com/@BitcoinExpertIndia/videos"
+        },
+        {
+          "description": "Bitcoin Expert India · LIVE Q&A - क्या टिक पाएगा $40000 पर या होगा 2017 जैसा कमाल ? · LIVE - Pankaj Tanwar AMA on Crypto Future I Bitcoin Regulations · Final update For 18-9- ...",
+          "position": 3,
+          "title": "Bitcoin Expert India - YouTube",
+          "url": "https://www.youtube.com/@BitcoinExpertIndia/streams"
+        }
+      ],
+      "quality": {
+        "market_refs": 17,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Profi Schweiz",
+      "expected_handle": "channel/UCwi9Ntnk_sCw0DSW8bP0DPg",
+      "primary_language": "de",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCwi9Ntnk_sCw0DSW8bP0DPg Crypto Profi Schweiz crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "BITCOIN, you changed my LIFE | The TRUTH about how it all began! · Videos · 10:04. The financial system is breaking – The GREAT (XRP & BTC) Reset is here!",
+          "position": 1,
+          "title": "Crypto Profi Schweiz - YouTube",
+          "url": "https://www.youtube.com/channel/UCwi9Ntnk_sCw0DSW8bP0DPg"
+        },
+        {
+          "description": "Sie möchten lernen, wie man Kryptowährungen kauft, empfängt, sendet und verwaltet. Mit Bitcoin Schulungen, Webinare und Krypto Online Kurse Schweiz werden Sie ...",
+          "position": 2,
+          "title": "Crypto Profi Schweiz - YouTube",
+          "url": "https://www.youtube.com/channel/UCwi9Ntnk_sCw0DSW8bP0DPg/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "KryptoJugend",
+      "expected_handle": "channel/UCRMF41Ybk3qVIyo0fuG8P0g",
+      "primary_language": "de",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCRMF41Ybk3qVIyo0fuG8P0g KryptoJugend crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "PARLONS DE TOUT",
+      "expected_handle": "channel/UC_PZx3xmmWTtXzB_fc0pz9w",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC_PZx3xmmWTtXzB_fc0pz9w PARLONS DE TOUT crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Augusto Backes",
+      "expected_handle": "@AugustoBackes",
+      "primary_language": "pt",
+      "region": "Latin America",
+      "query": "site:youtube.com/@AugustoBackes Augusto Backes crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Augusto Backes ; The chart that changed my understanding of Bitcoin, Ethereum, and the American stock market. 24K views ; I rarely talk about this on the channel ...",
+          "position": 1,
+          "title": "Augusto Backes - YouTube",
+          "url": "https://www.youtube.com/@AugustoBackes/videos"
+        },
+        {
+          "description": "Welcome to the channel of Augusto Backes, the largest crypto influencer in Latin America. ... ... DEZEMBRO PODE SALVAR O ANO DO BITCOIN: Marcelo de Queiroz (MQM ...",
+          "position": 2,
+          "title": "Augusto Backes - YouTube",
+          "url": "https://www.youtube.com/@AugustoBackes/streams"
+        },
+        {
+          "description": "Augusto Backes ; BITCOIN: RISK MANAGEMENT TO MAKE MONEY #shorts. 5.3K views ; BITCOIN AND STOCKS: IF THIS REALLY HAPPENS I WILL... #shorts. 14K views ; Europe ...",
+          "position": 3,
+          "title": "Augusto Backes - YouTube",
+          "url": "https://www.youtube.com/@AugustoBackes/shorts"
+        }
+      ],
+      "quality": {
+        "market_refs": 7,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Sheinix",
+      "expected_handle": "@CryptoSheinix",
+      "primary_language": "es",
+      "region": "Europe",
+      "query": "site:youtube.com/@CryptoSheinix Crypto Sheinix crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Crypto Sheinix. @CryptoSheinix. 70.3K subscribers•709 videos. Software engineer breaking down crypto, DeFi, and Ethereum ... ... Análisis Macro con Gael Sanchez ...",
+          "position": 1,
+          "title": "Crypto Sheinix - YouTube",
+          "url": "https://www.youtube.com/@CryptoSheinix"
+        }
+      ],
+      "quality": {
+        "market_refs": 7,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "MoneyZG",
+      "expected_handle": "channel/UCIEvlRpHBVFthrF6pZzBEXw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCIEvlRpHBVFthrF6pZzBEXw MoneyZG crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "VoskCoin",
+      "expected_handle": "channel/UCT44w6854K62cSiwA1aiXfw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCT44w6854K62cSiwA1aiXfw VoskCoin crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Les Rois du Bitcoin",
+      "expected_handle": "channel/UCv9sIj-mKR4qEr_yYAywR1A",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCv9sIj-mKR4qEr_yYAywR1A Les Rois du Bitcoin crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Czero : Crypto et Bitcoin pour tous",
+      "expected_handle": "channel/UCKffaugnQVKp3G0hrhP-tew",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCKffaugnQVKp3G0hrhP-tew Czero : Crypto et Bitcoin pour tous crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Crypto Love",
+      "expected_handle": "channel/UCu7Sre5A1NMV8J3s2FhluCw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCu7Sre5A1NMV8J3s2FhluCw Crypto Love crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "This playlist features the most important recent Bitcoin and crypto news ... Where It All Began (The OG Crypto Videos). These are the videos that started it ...",
+          "position": 1,
+          "title": "Crypto Love - YouTube",
+          "url": "https://www.youtube.com/channel/UCu7Sre5A1NMV8J3s2FhluCw"
+        },
+        {
+          "description": "Share your videos with friends, family, and the world. ... URGENT VIDEO FOR ALL BITCOIN, ETHEREUM, RIPPLE ... CRYPTO LOVE BITCOIN HALLOWEEN 100K SUB LIVESTREAM!!!",
+          "position": 2,
+          "title": "Crypto Love - YouTube",
+          "url": "https://m.youtube.com/channel/UCu7Sre5A1NMV8J3s2FhluCw/live"
+        }
+      ],
+      "quality": {
+        "market_refs": 9,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "BitJom PH",
+      "expected_handle": "@BitJomPH",
+      "primary_language": "fil",
+      "region": "Asia",
+      "query": "site:youtube.com/@BitJomPH BitJom PH crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Videos · Honest experience using a new platform Coinmy. No hype, just awareness. #educational #crypto · Dubai TOKEN2049 Meta Earth Official Launch #MetaEarth # ...",
+          "position": 1,
+          "title": "BitJom PH - YouTube",
+          "url": "https://www.youtube.com/@BitJomPH/addons/unicode-base"
+        },
+        {
+          "description": "Welcome to my channel, please watch my videos para po sa Technical Analysis, News, Updates and Tutorial about Crypto. Pati na rin sa mga tips and advice on ...",
+          "position": 2,
+          "title": "BitJom PH - YouTube",
+          "url": "https://www.youtube.com/@BitJomPH/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Dương Alex",
+      "expected_handle": "@duongalex2",
+      "primary_language": "vi",
+      "region": "Asia",
+      "query": "site:youtube.com/@duongalex2 Dương Alex crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Ismail Luno",
+      "expected_handle": "@IsmailLuno",
+      "primary_language": "ms",
+      "region": "Asia",
+      "query": "site:youtube.com/@IsmailLuno Ismail Luno crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Ismail Luno ; Crypto Update 9/3/2026 #crypto #cryptocurrency #cryptonews #bitcoin #btc #ethereum #xrp #ismailluno. 362 views ; HATA STAKING 24/7/2025 #hata # ...",
+          "position": 1,
+          "title": "Ismail Luno - YouTube",
+          "url": "https://www.youtube.com/@IsmailLuno"
+        },
+        {
+          "description": "Ismail Luno ; PI NETWORK | PI COIN MALAYSIA ?? 1.8K ; LUNO VS HATA | NAK GUNA MANA ? 21K ; BITCOIN CAPAI NEW ALL TIME HIGH !! 423 ; CARA DAPAT 16% SETAHUN GUNA NEXO.",
+          "position": 2,
+          "title": "Ismail Luno - YouTube",
+          "url": "https://www.youtube.com/@IsmailLuno/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 10,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "JRNY Crypto",
+      "expected_handle": "channel/UC188KLMYLLGqVJZdYq7mYFw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UC188KLMYLLGqVJZdYq7mYFw JRNY Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Kenal Kripto",
+      "expected_handle": "@KenalKripto",
+      "primary_language": "id",
+      "region": "Asia",
+      "query": "site:youtube.com/@KenalKripto Kenal Kripto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Kenal Kripto. @KenalKripto. 50.1K subscribers•32 videos. Kenal Kripto membahas Bitcoin, Altcoin, Blockchain, Crypto Currency, Fintech dan Finance. ...more",
+          "position": 1,
+          "title": "Kenal Kripto - YouTube",
+          "url": "https://www.youtube.com/@KenalKripto"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Blockchain Backer",
+      "expected_handle": "channel/UCia6oYbLKo8fLOguATpACmA",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCia6oYbLKo8fLOguATpACmA Blockchain Backer crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "This is a daily video channel dedicated to cryptocurrency market coverage, including Bitcoin, XRP, the Altcoin Market, and much more!",
+          "position": 1,
+          "title": "Blockchain Backer - YouTube",
+          "url": "https://www.youtube.com/channel/UCia6oYbLKo8fLOguATpACmA"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Wael - Blockchain Academics",
+      "expected_handle": "channel/UChdlb_HfMQ3gtzo7_K22RLA",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UChdlb_HfMQ3gtzo7_K22RLA Wael - Blockchain Academics crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Crypto Kaiba",
+      "expected_handle": "channel/UCx9Z8LQWzCehWv5GqqPUPjw",
+      "primary_language": "mixed",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCx9Z8LQWzCehWv5GqqPUPjw Crypto Kaiba crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "5 Infallible Indicators to Anticipate the Next Crypto Bull Run. 1K views. 1 day ago · 8:04 · BITCOIN: Is Bottom's SIGNAL finally here? (Don't be fooled!)",
+          "position": 1,
+          "title": "Kaiba | Crypto & Trading - YouTube",
+          "url": "https://www.youtube.com/channel/UCx9Z8LQWzCehWv5GqqPUPjw/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 4,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "CoinsKid",
+      "expected_handle": "channel/UCeBbEvlSOeJMwSVYOdXOvvw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCeBbEvlSOeJMwSVYOdXOvvw CoinsKid crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Daily videos on all things crypto, We will try our best to add the latest and freshest crypto news that we can find for you. ...more. Daily videos on all ...",
+          "position": 1,
+          "title": "CoinsKid - YouTube",
+          "url": "https://www.youtube.com/channel/UCeBbEvlSOeJMwSVYOdXOvvw/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "CryptoJack",
+      "expected_handle": "channel/UCBjrrP9frGRuRwoAJ4RQdag",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCBjrrP9frGRuRwoAJ4RQdag CryptoJack crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Just your average guy who loves Crypto. Follow me on my journey of investments, trading and everything Crypto! Daily videos about trading cryptocurrency and ...",
+          "position": 1,
+          "title": "CryptoJack - YouTube",
+          "url": "https://www.youtube.com/channel/UCBjrrP9frGRuRwoAJ4RQdag"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Jesse Eckel",
+      "expected_handle": "channel/UCPFMk8WxX3SJKy1jh61xxGw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCPFMk8WxX3SJKy1jh61xxGw Jesse Eckel crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "I full time invest in crypto and do research on the crypto markets. Sharing what I'm learning, the top projects I'm looking at, and the biggest trends in the ...",
+          "position": 1,
+          "title": "Jesse Eckel - YouTube",
+          "url": "https://www.youtube.com/channel/UCPFMk8WxX3SJKy1jh61xxGw"
+        },
+        {
+          "description": "Videos · Bitcoin's Next Big Move Starts After April · My Crypto Portfolio After 5 BRUTAL Months (What I'm Holding Now) · Everyone Is Waiting For $40k Bitcoin ( ...",
+          "position": 2,
+          "title": "Jesse Eckel - YouTube",
+          "url": "https://www.youtube.com/channel/UCPFMk8WxX3SJKy1jh61xxGw/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Joe Parys Crypto",
+      "expected_handle": "channel/UCRukJuuBAdoHMTBIsFJAgvw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCRukJuuBAdoHMTBIsFJAgvw Joe Parys Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Aventure Crypto",
+      "expected_handle": "channel/UCdeNXmhpAIHMAGQD3vFW99Q",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCdeNXmhpAIHMAGQD3vFW99Q Aventure Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Docteur Crypto",
+      "expected_handle": "channel/UC35L0fCIFfpgTne_3-JnFIg",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC35L0fCIFfpgTne_3-JnFIg Docteur Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Docteur Crypto · VERS UN EFFONDREMENT TOTAL DES CRYPTOS ?! · POURQUOI JE RACHÈTE LE CRASH DU BITCOIN MAINTENANT ? · CETTE GROSSE CRYPTO VIENT DE MOURIR !",
+          "position": 1,
+          "title": "Docteur Crypto - YouTube",
+          "url": "https://www.youtube.com/channel/UC35L0fCIFfpgTne_3-JnFIg/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 5,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "KRYPTOSPHERE®",
+      "expected_handle": "channel/UCXkbPLYTAegwnqeMMC08YzA",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCXkbPLYTAegwnqeMMC08YzA KRYPTOSPHERE® crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "KRYPTOSPHERE est une association étudiante spécialisée sur les cryptomonnaies, la blockchain ... Meetup avec Yorick DE MOMBYNES \"Quelle est la valeur du Bitcoin ?",
+          "position": 1,
+          "title": "KRYPTOSPHERE® - YouTube",
+          "url": "https://www.youtube.com/channel/UCXkbPLYTAegwnqeMMC08YzA"
+        },
+        {
+          "description": "KRYPTOSPHERE® · Krypto Tour Lyon 2025 - Table ronde : comprendre la DeFi et ses transformations · Carrière & Opportunités - EDGE Skills au KRYPTO TOUR 2025.",
+          "position": 2,
+          "title": "KRYPTOSPHERE® - YouTube",
+          "url": "https://www.youtube.com/channel/UCXkbPLYTAegwnqeMMC08YzA/videos"
+        },
+        {
+          "description": "Videos ; Carrière & Opportunités - EDGE Skills au KRYPTO TOUR 2025. 29 views. 2 weeks ago ; Crypto & Airdrops - Owen Simonin au KRYPTO TOUR 2025. 102 views. 2 ...",
+          "position": 3,
+          "title": "KRYPTOSPHERE® - YouTube",
+          "url": "https://www.youtube.com/channel/UCXkbPLYTAegwnqeMMC08YzA/featured"
+        }
+      ],
+      "quality": {
+        "market_refs": 4,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Blockchain Crypto",
+      "expected_handle": "channel/UCyyqk56AXPMOz40-Pu7Zo-g",
+      "primary_language": "mixed",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCyyqk56AXPMOz40-Pu7Zo-g Blockchain Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Real-Crypto",
+      "expected_handle": "channel/UC93MJYEjwCW3-9ipq09k7XQ",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UC93MJYEjwCW3-9ipq09k7XQ Real-Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Simply Bitcoin",
+      "expected_handle": "@SimplyBitcoin",
+      "primary_language": "en",
+      "region": "North America",
+      "query": "site:youtube.com/@SimplyBitcoin Simply Bitcoin crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Bitcoin news and info given to you raw. · Michael Saylor's NEW Plan To OWN 28% Of ALL Bitcoin | What's Coming is Unimaginable! · Strategy Buys 4,000 Bitcoin in 30 ...",
+          "position": 1,
+          "title": "Simply Bitcoin - YouTube",
+          "url": "https://www.youtube.com/@simplybitcoin"
+        }
+      ],
+      "quality": {
+        "market_refs": 5,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Parlons Crypto - L'émission",
+      "expected_handle": "channel/UCx3KJIw43_1q4gKpJkiaRJg",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCx3KJIw43_1q4gKpJkiaRJg Parlons Crypto - L'émission crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Parlons Crypto est une émission entièrement dédiée à la blockchain et aux cryptomonnaies. Animée par Thibaut Boutrou et Stéphane Molère, chaque semaine, ...",
+          "position": 1,
+          "title": "Parlons Crypto - L'émission - YouTube",
+          "url": "https://www.youtube.com/channel/UCx3KJIw43_1q4gKpJkiaRJg"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Professeur Crypto",
+      "expected_handle": "channel/UCtzw_6YsLpjza0Wt-YBg_wA",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCtzw_6YsLpjza0Wt-YBg_wA Professeur Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Thibault - Crypto-Team",
+      "expected_handle": "channel/UCAVBB7OQNJ6s7Fgs2_5GjcA",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCAVBB7OQNJ6s7Fgs2_5GjcA Thibault - Crypto-Team crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Thibault - Crypto-Team. @thibault-cryptoteam ... Videos. Shorts. Live. Playlists. Posts. Search. Latest. Popular. Oldest. 29:55 · IL DECOUVRE BITCOIN EN 2012 - ...",
+          "position": 1,
+          "title": "Thibault - Crypto-Team - YouTube",
+          "url": "https://www.youtube.com/channel/UCAVBB7OQNJ6s7Fgs2_5GjcA/videos?view=0&sort=dd&flow=grid"
+        },
+        {
+          "description": "Les TUTOs · CRÉER SA CRYPTO EN 5 MINUTES · Comment acheter du Bitcoin ? · Faire un transfert en crypto.",
+          "position": 2,
+          "title": "Thibault - YouTube",
+          "url": "https://www.youtube.com/channel/UCAVBB7OQNJ6s7Fgs2_5GjcA"
+        }
+      ],
+      "quality": {
+        "market_refs": 7,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Blockchain Ben",
+      "expected_handle": "channel/UC3p4k68KnVGJvLQkEE83P_w",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UC3p4k68KnVGJvLQkEE83P_w Blockchain Ben crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Brandon Kelly Crypto Trader",
+      "expected_handle": "channel/UC-f5nPBEDyUBZz_jOPBwAfQ",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UC-f5nPBEDyUBZz_jOPBwAfQ Brandon Kelly Crypto Trader crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Videos ; ETHEREUM Price Prediction $16,000?! BK Bitcoin Analysis ETH BTC Today. 1.3K views ; BITCOIN Price Prediction $114,070 | BTC Analysis Today BK Crypto.",
+          "position": 1,
+          "title": "BK Crypto Trader - The Boss of Bitcoin - YouTube",
+          "url": "https://www.youtube.com/channel/UC-f5nPBEDyUBZz_jOPBwAfQ"
+        },
+        {
+          "description": "BK Crypto Trader - The Boss of Bitcoin ; ETHEREUM Price Prediction $16,000?! BK Bitcoin Analysis ETH BTC Today. 1.3K views ; BITCOIN Price Prediction $114,070 | ...",
+          "position": 2,
+          "title": "BK Crypto Trader - The Boss of Bitcoin - YouTube",
+          "url": "https://www.youtube.com/channel/UC-f5nPBEDyUBZz_jOPBwAfQ/videos"
+        },
+        {
+          "description": "Brandon Kelly | Cryptocurrency Trading 101: Staying Positive · Brandon Kelly | The Flow of Crypto · How to Use Social Media to Amplify Marketing and Community ...",
+          "position": 3,
+          "title": "BK Crypto Trader - The Boss of Bitcoin - YouTube",
+          "url": "https://www.youtube.com/channel/UC-f5nPBEDyUBZz_jOPBwAfQ/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 28,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "CoinCasso",
+      "expected_handle": "channel/UCRGIWPbcK7pPlZ0bePHZxDQ",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCRGIWPbcK7pPlZ0bePHZxDQ CoinCasso crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Bitcoin Indonesia",
+      "expected_handle": "channel/UC8uYnlRXt__92AUhLWLWgFw",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UC8uYnlRXt__92AUhLWLWgFw Bitcoin Indonesia crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Bitcoin Trading Challenge",
+      "expected_handle": "channel/UC-dLWl8etTtPSGdbbcYffGw",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UC-dLWl8etTtPSGdbbcYffGw Bitcoin Trading Challenge crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "I'm a Cryptocurrency Day Trader with a passion for educating others about the market. The channel includes various types of cryptocurrency market analyses.",
+          "position": 1,
+          "title": "Bitcoin Trading Challenge - YouTube",
+          "url": "https://www.youtube.com/channel/UC-dLWl8etTtPSGdbbcYffGw"
+        },
+        {
+          "description": "I'm a Cryptocurrency Day Trader with a passion for educating others about the market. The channel includes various types of cryptocurrency market analyses ...",
+          "position": 2,
+          "title": "Bitcoin Trading Challenge - YouTube",
+          "url": "https://www.youtube.com/channel/UC-dLWl8etTtPSGdbbcYffGw/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 12,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Not Your Financial Advisor",
+      "expected_handle": "@CryptopherTan",
+      "primary_language": "mixed",
+      "region": "Asia",
+      "query": "site:youtube.com/@CryptopherTan Not Your Financial Advisor crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Hey Guys! This Channel is dedicated to everything about Money, Bitcoin, Cryptocurrency, Forex, Stocks, Investing, & Trading para sa aking mga kababayan.",
+          "position": 1,
+          "title": "Not Your Financial Advisor - YouTube",
+          "url": "https://www.youtube.com/@CryptopherTan"
+        },
+        {
+          "description": "ARE WE IN A BITCOIN BEAR MARKET? ... The Next Crypto Rally Starts NOW + Our Bold Bitcoin 2025 Prediction ... NFA Ep.9: Why $124K Bitcoin is NOT EXCITING, ...",
+          "position": 2,
+          "title": "Not Your Financial Advisor - YouTube",
+          "url": "https://m.youtube.com/@CryptopherTan/videos?view=0&sort=dd&shelf_id=3"
+        },
+        {
+          "description": "Hey Guys! This Channel is dedicated to everything about Money, Bitcoin, Cryptocurrency, Forex, Stocks, Investing, & Trading para sa aking mga kababayan.",
+          "position": 3,
+          "title": "Not Your Financial Advisor - YouTube",
+          "url": "https://www.youtube.com/@CryptopherTan/playlists"
+        }
+      ],
+      "quality": {
+        "market_refs": 14,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Banter +",
+      "expected_handle": "channel/UCybasP-2D2b5kTLAb_kvhWQ",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCybasP-2D2b5kTLAb_kvhWQ Crypto Banter + crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Chart Hackers ; Bitcoin Back At Key Level… But This Time It's Risky! 2.7K views ; Bitcoin Looks Weak… That's Why I'm Buying! [Key Zones Revealed]. 3.3K views.",
+          "position": 1,
+          "title": "Chart Hackers - YouTube",
+          "url": "https://www.youtube.com/channel/UCybasP-2D2b5kTLAb_kvhWQ/videos?view=0&sort=dd"
+        },
+        {
+          "description": "Chart Hackers ; URGENT BTC WEEKEND UPDATES. 1.6K views ; THE HARDEST PART ABOUT TRADING. 1.2K views ; URGENT BTC LEVELS FOR THE NEXT 12 HOURS. 1.9K views ;",
+          "position": 2,
+          "title": "Chart Hackers - YouTube",
+          "url": "https://www.youtube.com/channel/UCybasP-2D2b5kTLAb_kvhWQ/shorts"
+        }
+      ],
+      "quality": {
+        "market_refs": 5,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Crow",
+      "expected_handle": "channel/UCwsRWmIL5XKqFtdytBfeX0g",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCwsRWmIL5XKqFtdytBfeX0g Crypto Crow crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Share your videos with friends, family, and the world.",
+          "position": 1,
+          "title": "Crypto Crow - YouTube",
+          "url": "https://www.youtube.com/channel/UCwsRWmIL5XKqFtdytBfeX0g"
+        }
+      ],
+      "quality": {
+        "market_refs": 1,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Crypto Face",
+      "expected_handle": "channel/UCnpL_SpKLZpwAAIWmWpCIzQ",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCnpL_SpKLZpwAAIWmWpCIzQ Crypto Face crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Crypto Face ; Bear Market Over? Bull Market Beginning? 9.6K views ; Bitcoin 7 Day Bull Candle Confirmation is a 100%.... 11K views ; Were About to PUMP.... 10K ...",
+          "position": 1,
+          "title": "Crypto Face - YouTube",
+          "url": "https://www.youtube.com/channel/UCnpL_SpKLZpwAAIWmWpCIzQ/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 5,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Mason",
+      "expected_handle": "channel/UCPR9ga3sv5oakMB544M61Bw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCPR9ga3sv5oakMB544M61Bw Crypto Mason crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Thinking Crypto",
+      "expected_handle": "channel/UCjpkwsuHgYx9fBE0ojsJ_-w",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCjpkwsuHgYx9fBE0ojsJ_-w Thinking Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "On this channel you will find videos on Crypto News, Trends, Sentiments and Interviews. Learn about Web3, Blockchain, Cryptocurrencies and Digital Assets.",
+          "position": 1,
+          "title": "Thinking Crypto - YouTube",
+          "url": "https://www.youtube.com/channel/UCjpkwsuHgYx9fBE0ojsJ_-w"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Tom Crown",
+      "expected_handle": "channel/UCiuD3eNaZ95eSXImp_eSIww",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCiuD3eNaZ95eSXImp_eSIww Tom Crown crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Live Bitcoin and Cryptocurrency News & Trading. Live crypto news and bitcoin trading streamed daily. 1:06:09 · BRACE YOURSELF! LIVE GOLD OIL BITCOIN TRADING.",
+          "position": 1,
+          "title": "Tom Crown - YouTube",
+          "url": "https://www.youtube.com/channel/UCiuD3eNaZ95eSXImp_eSIww/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 8,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Healthy Pockets",
+      "expected_handle": "@HealthyPockets",
+      "primary_language": "es",
+      "region": "Europe",
+      "query": "site:youtube.com/@HealthyPockets Healthy Pockets crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Bitcoin is repeating this pattern again and nobody is noticing. · This has only happened 4 times in 50 years. · Why Bitcoin Could Reach New All-Time Highs in 2026.",
+          "position": 1,
+          "title": "Healthy Pockets - YouTube",
+          "url": "https://www.youtube.com/@HealthyPockets/videos"
+        },
+        {
+          "description": "Videos ; Bitcoin is repeating this pattern again and nobody is noticing. 7.6K · 12h ago ; This has only happened 4 times in 50 years. It just happened again. 10K.",
+          "position": 2,
+          "title": "Healthy Pockets - YouTube",
+          "url": "https://www.youtube.com/@HealthyPockets"
+        },
+        {
+          "description": "Healthy Pockets. @HealthyPockets. 461K subscribers•736 videos ... Videos. Shorts. Playlists. Posts. Search. Healthy Pockets ... + Bitcoin (BTC). Solana (SOL).",
+          "position": 3,
+          "title": "Healthy Pockets - YouTube",
+          "url": "https://www.youtube.com/@HealthyPockets/posts"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Andreas M. Antonopoulos",
+      "expected_handle": "@aantonop",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/@aantonop Andreas M. Antonopoulos crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Bitcoin and Open Blockchain Livestream Q&A with Andreas M. Antonopoulos - May 2022. 30K views. Streamed 3 years ago · 1:26:34 · BIP119, EU regulatory attack, El ...",
+          "position": 1,
+          "title": "aantonop - YouTube",
+          "url": "https://www.youtube.com/@aantonop/streams"
+        }
+      ],
+      "quality": {
+        "market_refs": 1,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Bintense",
+      "expected_handle": "channel/UClPeiwRWRPf6XLMLRYFsdaw",
+      "primary_language": "mixed",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UClPeiwRWRPf6XLMLRYFsdaw Bintense crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "What We Offer: ○ User-centric and streamlined cryptocurrency exchanges for BTC and ETH. ○ Transparent exchange rates aligned with current market prices.",
+          "position": 1,
+          "title": "Bintense - YouTube",
+          "url": "https://www.youtube.com/channel/UClPeiwRWRPf6XLMLRYFsdaw/about"
+        }
+      ],
+      "quality": {
+        "market_refs": 5,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Alina",
+      "expected_handle": "channel/UCrXpxOgkXOAJnEdbGVnF1gg",
+      "primary_language": "mixed",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCrXpxOgkXOAJnEdbGVnF1gg Crypto Alina crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Crypto Inspector",
+      "expected_handle": "channel/UCEpMrACLAX8W2NvbWe_kZQQ",
+      "primary_language": "mixed",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCEpMrACLAX8W2NvbWe_kZQQ Crypto Inspector crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Stay ahead in the fast-paced world of crypto with our weekly updates! · AI Will Soon Control Your Crypto… · They Mocked Him… Then Bitcoin Proved Them WRONG.",
+          "position": 1,
+          "title": "Crypto Inspector - YouTube",
+          "url": "https://www.youtube.com/channel/UCEpMrACLAX8W2NvbWe_kZQQ"
+        },
+        {
+          "description": "I don't know! 1 vote. Crypto Inspector · 3 years ago. Which Crypto Asset do you believe is best to invest in nowadays? #cryptocurrencies #crypto #bitcoin #ether",
+          "position": 2,
+          "title": "Crypto Inspector - YouTube",
+          "url": "https://www.youtube.com/channel/UCEpMrACLAX8W2NvbWe_kZQQ/posts"
+        }
+      ],
+      "quality": {
+        "market_refs": 11,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Joris",
+      "expected_handle": "channel/UCzdIts_jgMM-ehV4bKmObKw",
+      "primary_language": "mixed",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCzdIts_jgMM-ehV4bKmObKw Joris crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Joris · BITCOIN, TRUMP LANCE SA CRYPTO ! · ÉLECTIONS USA : Où va BITCOIN ? · ETHEREUM, NOUVEAU POINT BAS CONTRE BITCOIN, QUE FAUT-IL FAIRE ? · BITCOIN, C'EST LE ...",
+          "position": 1,
+          "title": "Joris - YouTube",
+          "url": "https://www.youtube.com/channel/UCzdIts_jgMM-ehV4bKmObKw/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "The Bitcoin Express",
+      "expected_handle": "channel/UCEjgpiDPhTErrJm6zeNeAAw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCEjgpiDPhTErrJm6zeNeAAw The Bitcoin Express crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "2 years ago · 10:00. Everything In Crypto Will Pump!! Don't Get Left Behind!! 4.1K views. 2 years ago · 4:17 · Is Jeff Bezos Secretly Buying 100 Bitcoin Every ...",
+          "position": 1,
+          "title": "The Bitcoin Express - YouTube",
+          "url": "https://www.youtube.com/channel/UCEjgpiDPhTErrJm6zeNeAAw/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Bitcoin TV",
+      "expected_handle": "channel/UCSSXEml-1o9J1ZsNGMF1lQg",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCSSXEml-1o9J1ZsNGMF1lQg Bitcoin TV crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Crypto Anup",
+      "expected_handle": "channel/UCY7zYMsiIAA_sP1mY--I23Q",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCY7zYMsiIAA_sP1mY--I23Q Crypto Anup crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "**MY MOST IMPORTANT VIDEO** FOR ALL BITCOIN HOLDERS!!!!!!! [a must see btc ... Urgent Ethereum Price Update❗️ #ethereum #eth #bitcoin #crypto. 4.6K views.",
+          "position": 1,
+          "title": "Crypto Anup - YouTube",
+          "url": "https://www.youtube.com/channel/UCY7zYMsiIAA_sP1mY--I23Q"
+        },
+        {
+          "description": "Posts. Search. Latest. Popular. Oldest. 6:35. BITCOIN: DO THIS NOW!!!!!! [watch ASAP!!!!!] 1.9K views. 1 day ago · 6:09 · BITCOIN: 99% WILL GET THIS WRONG!!!",
+          "position": 2,
+          "title": "Crypto Anup - YouTube",
+          "url": "https://www.youtube.com/channel/UCY7zYMsiIAA_sP1mY--I23Q/videos"
+        },
+        {
+          "description": "Crypto Anup ; BITCOIN: IT'S NOW OR NEVER!!!!!! (Btc holders watch this NOW!!!!!) 1.5K views ; ❌ BITCOIN: THIS IS HOW IT ENDS!!!!!??? ❌ [MUST SEE CHART!!!!!].",
+          "position": 3,
+          "title": "Crypto Anup - YouTube",
+          "url": "https://www.youtube.com/channel/UCY7zYMsiIAA_sP1mY--I23Q/videos?view=0&sort=da&flow=grid"
+        }
+      ],
+      "quality": {
+        "market_refs": 17,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Gains",
+      "expected_handle": "channel/UCbFFuUCrfkahTOwO3nUqISw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCbFFuUCrfkahTOwO3nUqISw Crypto Gains crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "UPDATE: Hey Guys My BACKUP Channel! https://www.youtube.com/@CryptoGainsReloaded Come Watch ALL NEW Content Over here! ...more",
+          "position": 1,
+          "title": "Crypto Gains - YouTube",
+          "url": "https://www.youtube.com/channel/UCbFFuUCrfkahTOwO3nUqISw/videos"
+        },
+        {
+          "description": "Bitcoin & ALTCOIN Technical Analysis Videos - Most Recent Price News -Bitcoin Price Analysis ; HOLY CRAP!!... IS THIS THE BOTTOM? · 3.4K views. 11 days ago.",
+          "position": 2,
+          "title": "Crypto Gains - YouTube",
+          "url": "https://www.youtube.com/channel/UCbFFuUCrfkahTOwO3nUqISw/featured"
+        },
+        {
+          "description": "Bitcoin & ALTCOIN Technical Analysis Videos - Most Recent Price News -Bitcoin Price Analysis ; FINAL DUMP? Then BULL MARKET BEGINS!! · 1.8K views. 4 days ago.",
+          "position": 3,
+          "title": "Crypto Gains - YouTube",
+          "url": "https://m.youtube.com/channel/UCbFFuUCrfkahTOwO3nUqISw/channels?view=49&shelf_id=11"
+        }
+      ],
+      "quality": {
+        "market_refs": 15,
+        "youtube_hits": 3,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto Lifer",
+      "expected_handle": "channel/UC4c5FPpwCpb6q8J--i8QHtA",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UC4c5FPpwCpb6q8J--i8QHtA Crypto Lifer crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Crypto Notes",
+      "expected_handle": "channel/UChwiV3-_Gu57hxZg1EGnpUA",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UChwiV3-_Gu57hxZg1EGnpUA Crypto Notes crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Crypto Notes · Meeting With Binance Istanbul Turkey Highlights Binance Blockchain week 2023 · Videos · Popular videos · Created playlists · Shorts · Top 10 ...",
+          "position": 1,
+          "title": "Crypto Notes - YouTube",
+          "url": "https://m.youtube.com/channel/UChwiV3-_Gu57hxZg1EGnpUA/addons"
+        }
+      ],
+      "quality": {
+        "market_refs": 4,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Crypto With James",
+      "expected_handle": "channel/UC_4YPGotjV0uXKVaIHFeA5A",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UC_4YPGotjV0uXKVaIHFeA5A Crypto With James crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Jayson Casper",
+      "expected_handle": "channel/UCWfHVQvljwmIivf6dSI8Vzw",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCWfHVQvljwmIivf6dSI8Vzw Jayson Casper crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "TitoVlogs Crypto Channel",
+      "expected_handle": "channel/UCIE_Zy3QRwBc6lSYo58YMpA",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCIE_Zy3QRwBc6lSYo58YMpA TitoVlogs Crypto Channel crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Is Bitcoin Winter Finally Over? Profit Taking Signals & Big Bank Moves (LIVE ANALYSIS). 1.5K views. Streamed 1 day ago ; Bitcoin Breakout or Trap? Why Big ...",
+          "position": 1,
+          "title": "TitoVlogs - YouTube",
+          "url": "https://www.youtube.com/channel/UCIE_Zy3QRwBc6lSYo58YMpA"
+        },
+        {
+          "description": "Meeting TPAI traders in SG | Formula 1 weekend | TitongGala · Bitcoin and Gold's 2025 Price Journey | Trader's Journey Podcast Ep7 · Bitcoin is in LIMBO! · Lessons ...",
+          "position": 2,
+          "title": "TitoVlogs - YouTube",
+          "url": "https://www.youtube.com/channel/UCIE_Zy3QRwBc6lSYo58YMpA/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 5,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "crypto Eri",
+      "expected_handle": "channel/UCfcuwyq5HVvFvQS17OhQK8w",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCfcuwyq5HVvFvQS17OhQK8w crypto Eri crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "The Crypto Eri channel is a place to learn about the top performing digital assets, and to educate yourself about the new digital global economy.",
+          "position": 1,
+          "title": "crypto Eri - YouTube",
+          "url": "https://www.youtube.com/channel/UCfcuwyq5HVvFvQS17OhQK8w"
+        }
+      ],
+      "quality": {
+        "market_refs": 2,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Hashoshi",
+      "expected_handle": "@Hashoshi4",
+      "primary_language": "en",
+      "region": "North America",
+      "query": "site:youtube.com/@Hashoshi4 Hashoshi crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "CYT-Crypto",
+      "expected_handle": "channel/UCG4V9PJQ4-U41nJzLPyOfNA",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCG4V9PJQ4-U41nJzLPyOfNA CYT-Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Crypto King Keyur",
+      "expected_handle": "@CryptoKingKeyur",
+      "primary_language": "hi",
+      "region": "Asia",
+      "query": "site:youtube.com/@CryptoKingKeyur Crypto King Keyur crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Welcome to my YouTube Channel – Crypto King Keyur where I give information about Cryptocurrency, Bitcoin, Altcoins, Technology Facts, Technical Analysis, ...",
+          "position": 1,
+          "title": "Crypto King Keyur - YouTube",
+          "url": "https://www.youtube.com/@CryptoKingKeyur/posts"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Asia Forex Mentor Ezekiel Chew",
+      "expected_handle": "@asiaforexmentor",
+      "primary_language": "mixed",
+      "region": "Asia",
+      "query": "site:youtube.com/@asiaforexmentor Asia Forex Mentor Ezekiel Chew crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Jp Mercado",
+      "expected_handle": "@JpMercado",
+      "primary_language": "fil",
+      "region": "Asia",
+      "query": "site:youtube.com/@JpMercado Jp Mercado crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Jp Mercado · Crypto Updates: GET Rewards on Binance Futures NOW!! · Paano mag Trade sa Binance? · Get a chance to win a Mutant Ape Yacht Club NFT worth 1.6Million ...",
+          "position": 1,
+          "title": "Jp Mercado - YouTube",
+          "url": "https://m.youtube.com/@JpMercado/videos"
+        },
+        {
+          "description": "Subscribe. Home. Videos. Shorts. Playlists. Posts. Search. Happening Right now! Token2049 Singapore #cryptocurrency #bitcoin #cryptonews #nft #airdrop. 2.7K ...",
+          "position": 2,
+          "title": "Jp Mercado - YouTube",
+          "url": "https://www.youtube.com/@JpMercado/shorts"
+        }
+      ],
+      "quality": {
+        "market_refs": 6,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "SwissBorg",
+      "expected_handle": "channel/UC_Jyx7gJXh3yHFxZSJIlIhQ",
+      "primary_language": "mixed",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UC_Jyx7gJXh3yHFxZSJIlIhQ SwissBorg crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Crypto Market Explained, Trading Signals, Bitcoin for Christmas & All the Latest News | Pow Wow 50. 2.6K views. 3 months ago · 17:12 · Major Update Incoming!",
+          "position": 1,
+          "title": "SwissBorg - YouTube",
+          "url": "https://www.youtube.com/channel/UC_Jyx7gJXh3yHFxZSJIlIhQ/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 4,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "The Crypto Archive",
+      "expected_handle": "channel/UCJmFw-ob-CDR3LIuKnflB1g",
+      "primary_language": "mixed",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCJmFw-ob-CDR3LIuKnflB1g The Crypto Archive crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "Coinaute",
+      "expected_handle": "channel/UCNR5zkIkJpYy9NlkJuW53Gw",
+      "primary_language": "fr",
+      "region": "Europe",
+      "query": "site:youtube.com/channel/UCNR5zkIkJpYy9NlkJuW53Gw Coinaute crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "Coinaute est un média français spécialisé dans tout l'univers du Web3, des cryptos & de la blockchain… Sur notre chaîne, vous trouverez des interviews, ...",
+          "position": 1,
+          "title": "Coinaute - YouTube",
+          "url": "https://www.youtube.com/channel/UCNR5zkIkJpYy9NlkJuW53Gw/videos"
+        }
+      ],
+      "quality": {
+        "market_refs": 3,
+        "youtube_hits": 1,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    },
+    {
+      "name": "Knightron Crypto",
+      "expected_handle": "channel/UCnPDCHW3809c93ngyYx9sDA",
+      "primary_language": "en",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCnPDCHW3809c93ngyYx9sDA Knightron Crypto crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 0,
+      "web": [],
+      "quality": {
+        "market_refs": 0,
+        "youtube_hits": 0,
+        "identity_match": false,
+        "decision": "weak"
+      }
+    },
+    {
+      "name": "WhalePool",
+      "expected_handle": "channel/UCSAXsgdvfiS9WqAxwjMm8aQ",
+      "primary_language": "mixed",
+      "region": "Global",
+      "query": "site:youtube.com/channel/UCSAXsgdvfiS9WqAxwjMm8aQ WhalePool crypto bitcoin latest videos",
+      "success": true,
+      "credits_used": 2,
+      "web": [
+        {
+          "description": "WhalePool · The Bottom Boys - Whalepool Live · Serai DEX with Kayaba - A new DEX for Monero, Bitcoin, and Ethereum · Podcast with Rafael Cosman, CEO & Co-founder ...",
+          "position": 1,
+          "title": "WhalePool - YouTube",
+          "url": "https://www.youtube.com/channel/UCSAXsgdvfiS9WqAxwjMm8aQ/videos"
+        },
+        {
+          "description": "Whalepool as a community seeks not just to provide platforms for traders to gather and exchange ideas on, but also to educate and welcome new traders to the ...",
+          "position": 2,
+          "title": "WhalePool - YouTube",
+          "url": "https://www.youtube.com/channel/UCSAXsgdvfiS9WqAxwjMm8aQ/live"
+        }
+      ],
+      "quality": {
+        "market_refs": 2,
+        "youtube_hits": 2,
+        "identity_match": true,
+        "decision": "usable"
+      }
+    }
+  ]
+}
