@@ -44,7 +44,7 @@ function renderTable(rows: readonly Row[]): ReactElement {
             <th
               key={h.key}
               scope="col"
-              className={`font-mono text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 border-b border-ink-250 ${
+              className={`font-mono text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 border-b border-ink-250 ${
                 h.align === "right" ? "text-right" : h.align === "center" ? "text-center" : "text-left"
               }`}
             >

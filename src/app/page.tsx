@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import Link from "next/link";
+import { ArrowRight, LockKeyhole, Scale, ShieldCheck, Target, Trophy, TrendingUp } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
-import { EditorialSection, MetaStrip } from "@/components/primitives";
+import { EditorialSection } from "@/components/primitives";
 import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { getPublicCounts } from "@/lib/public-counts";
@@ -84,34 +85,6 @@ interface StatsRow {
   readonly total_calls: string;
   readonly avg_accuracy: string;
   readonly creator_count: string;
-}
-
-function MarketCallPreview({ totalCalls }: { readonly totalCalls: string }): ReactElement {
-  const rows = [
-    { label: "recorded", value: totalCalls },
-    { label: "scored", value: "price matched" },
-    { label: "ranked", value: "methodology" },
-  ];
-
-  return (
-    <aside className="border border-ink-250 bg-paper p-5 shadow-paper">
-      <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-5">
-        Live market record
-      </div>
-      <div className="space-y-4">
-        {rows.map((row) => (
-          <div key={row.label} className="border-t border-ink-150 pt-3 first:border-t-0 first:pt-0">
-            <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-1">
-              {row.label}
-            </div>
-            <div className="font-serif text-[24px] text-ink-900 leading-none">
-              {row.value}
-            </div>
-          </div>
-        ))}
-      </div>
-    </aside>
-  );
 }
 
 function buildCreator(row: LeaderboardQueryRow): Creator {
@@ -319,67 +292,68 @@ export default async function HomePage({
   }
 
   return (
-    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
+    <div className="max-w-page mx-auto px-4 tab:px-8 desk:px-10">
       {/* HERO */}
-      <section className="min-h-[calc(100vh-80px)] pb-12 border-b border-ink-250 flex flex-col justify-center">
-        <div className="grid grid-cols-1 desk:grid-cols-[minmax(0,0.95fr)_minmax(440px,0.75fr)] gap-8 desk:gap-12 items-center">
-          <div>
-            <p className="font-mono text-[11px] text-accent tracking-caps uppercase mb-4">
-              CallScore
+      <section className="relative min-h-[calc(100vh-80px)] pb-8 desk:pb-12 border-b border-ink-250 overflow-hidden">
+        <div
+          className="absolute inset-x-[-32px] bottom-[-220px] h-[420px] opacity-40 pointer-events-none"
+          style={{
+            background:
+              "repeating-radial-gradient(ellipse at center, rgba(201,162,75,0.28) 0 1px, transparent 1px 22px)",
+            transform: "perspective(720px) rotateX(68deg)",
+            transformOrigin: "50% 100%",
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative grid grid-cols-1 desk:grid-cols-[minmax(520px,0.82fr)_minmax(760px,1.18fr)] gap-10 desk:gap-16 items-center pt-10 tab:pt-14 desk:pt-8">
+          <div className="desk:pt-6">
+            <p
+              className="inline-flex items-center gap-2 border border-accent/30 bg-accent/5 px-3 py-2 font-mono text-[12px] text-accent tracking-caps uppercase mb-6"
+              style={{ borderRadius: 999 }}
+            >
+              <span className="h-1.5 w-1.5 bg-accent" style={{ borderRadius: 999 }} aria-hidden="true" />
+              The standard for crypto calls
             </p>
-            <h1 className="font-serif text-[42px] tab:text-[58px] desk:text-[72px] text-ink-900 font-medium tracking-tight leading-[0.98] text-balance max-w-[920px] mb-5">
+            <h1 className="font-serif text-[65px] tab:text-[97px] desk:text-[119px] text-ink-900 font-normal tracking-tight leading-[0.88] text-balance max-w-[880px] mb-7">
               Market calls, <em className="italic font-normal text-accent">measured.</em>
             </h1>
-            <p className="font-serif text-[18px] tab:text-[21px] text-ink-700 leading-relaxed max-w-[720px] mb-7">
-              Track creator calls against real price data. See who finds alpha,
-              who misses, and who corrects course.
+            <p className="font-serif text-[21px] tab:text-[24px] text-ink-700 leading-relaxed max-w-[760px] mb-8">
+              Track crypto creators&apos; market calls against real price data.
+              Score every eligible call. Rank signal, not noise.
             </p>
-            <div className="flex flex-col tab:flex-row gap-3 mb-8">
+            <div className="flex flex-col tab:flex-row gap-3 mb-7">
               <Link
                 href="#leaderboard"
-                className="inline-flex justify-center bg-accent hover:bg-accent-dim text-ink-0 font-mono text-[11px] tracking-caps uppercase px-5 py-3 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
-                style={{ borderRadius: 2 }}
+                className="inline-flex items-center justify-center gap-3 bg-accent hover:bg-accent-dim text-ink-0 font-mono text-[13px] tracking-caps uppercase px-7 py-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+                style={{ borderRadius: 4 }}
               >
                 View leaderboard
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link
-                href="/pricing"
-                className="inline-flex justify-center border border-ink-300 text-ink-800 hover:bg-ink-100 font-mono text-[11px] tracking-caps uppercase px-5 py-3 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
-                style={{ borderRadius: 2 }}
+                href="/methodology"
+                className="inline-flex justify-center border border-ink-300 text-ink-900 hover:border-accent/60 hover:text-accent font-mono text-[13px] tracking-caps uppercase px-7 py-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+                style={{ borderRadius: 4 }}
               >
-                Get alerts
+                Explore methodology
               </Link>
             </div>
-            <MetaStrip
-              cells={[
-                { k: "creators", v: <>{publicCounts.trackedCreators}</> },
-                { k: "scored calls", v: totalCalls },
-                {
-                  k: "beating BTC",
-                  v: (
-                    <>
-                      {publicCounts.beatBtcCreators}{" "}
-                      <span className="text-ink-500">/ {publicCounts.rankedCreators}</span>
-                    </>
-                  ),
-                },
-                {
-                  k: "methodology",
-                  v: (
-                    <Link
-                      href="/methodology"
-                      className="text-accent hover:text-accent-dim underline-offset-4 hover:underline"
-                    >
-                      read
-                    </Link>
-                  ),
-                },
-              ]}
-            />
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-ink-600 font-sans text-[16px]">
+              <HeroTrustItem label="Transparent" />
+              <HeroTrustItem label="Evidence-based" />
+              <HeroTrustItem label="Unbiased" />
+            </div>
           </div>
 
-          <MarketCallPreview totalCalls={totalCalls} />
+          <MarketCallPreview
+            totalCalls={totalCalls}
+            creatorCount={publicCounts.trackedCreators}
+            beatBtcCreators={publicCounts.beatBtcCreators}
+            rankedCreators={publicCounts.rankedCreators}
+            rows={leaderboard}
+          />
         </div>
+        <HeroFeatureRail />
       </section>
 
       {/* 01 · PREMISE */}
@@ -412,11 +386,11 @@ export default async function HomePage({
             source={"HBS · Pacelli"}
           />
           <li className="flex flex-col tab:flex-row tab:items-baseline tab:justify-between gap-1 px-4 py-3 border-t border-ink-150">
-            <span className="font-serif text-[14px] text-ink-700">
+            <span className="font-serif text-[15px] text-ink-700">
               We also score who admits when they&apos;re wrong.{" "}
               <em className="italic text-accent">No other tracker does.</em>
             </span>
-            <span className="font-mono text-[10px] text-ink-500 tracking-wide whitespace-nowrap">
+            <span className="font-mono text-[11px] text-ink-500 tracking-wide whitespace-nowrap">
               [self-correction index]
             </span>
           </li>
@@ -441,7 +415,7 @@ export default async function HomePage({
         }
       >
         <div className="flex flex-col tab:flex-row tab:items-end tab:justify-between gap-3 mb-4">
-          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+          <p className="font-mono text-[12px] text-ink-500 tracking-wide">
             Sorted by alpha; ties broken by Wilson lower bound.
           </p>
           <PeriodFilter value={period} canUseRecent={canUseRecent} />
@@ -450,7 +424,7 @@ export default async function HomePage({
           <Leaderboard rows={leaderboard} />
         ) : (
           <div className="border-t border-ink-250 py-12 text-center">
-            <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+            <p className="font-mono text-[12px] text-ink-500 tracking-wide">
               Leaderboard data is being computed. Run the data pipeline to populate
               scores.
             </p>
@@ -478,13 +452,294 @@ interface PremiseRowProps {
   readonly source: string;
 }
 
+function HeroTrustItem({ label }: { readonly label: string }): ReactElement {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <ShieldCheck className="h-4 w-4 text-ink-500" aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+function HeroFeatureRail(): ReactElement {
+  const features = [
+    {
+      icon: Target,
+      title: "Track Every Eligible Call",
+      body: "We extract market calls from creator videos.",
+    },
+    {
+      icon: Scale,
+      title: "Score with Evidence",
+      body: "Objective scoring based on real market outcomes.",
+    },
+    {
+      icon: Trophy,
+      title: "Rank by Signal, Not Noise",
+      body: "Creators ranked by alpha, consistency and accuracy.",
+    },
+    {
+      icon: TrendingUp,
+      title: "See Who Adapts",
+      body: "We score corrections and course changes.",
+    },
+    {
+      icon: LockKeyhole,
+      title: "Unlock More Power",
+      body: "Alerts, exports, backtests, API access and webhooks.",
+    },
+  ] as const;
+
+  return (
+    <div
+      className="relative mt-10 desk:mt-4 border border-ink-250 bg-ink-50/70 shadow-popover"
+      style={{ borderRadius: 8 }}
+    >
+      <div className="absolute inset-x-8 top-0 h-px bg-accent/70" aria-hidden="true" />
+      <div className="grid grid-cols-1 tab:grid-cols-2 desk:grid-cols-5">
+        {features.map((feature) => {
+          const Icon = feature.icon;
+          return (
+            <div
+              key={feature.title}
+              className="min-w-0 border-b tab:border-r desk:border-b-0 border-ink-200 last:border-b-0 desk:last:border-r-0 px-5 py-6"
+            >
+              <Icon className="h-7 w-7 text-accent mb-4" strokeWidth={1.7} aria-hidden="true" />
+              <h2 className="font-sans text-[17px] text-ink-900 font-medium leading-tight mb-2">
+                {feature.title}
+              </h2>
+              <p className="text-[14px] text-ink-600 leading-relaxed">{feature.body}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PremiseRow({ claim, source }: PremiseRowProps): ReactElement {
   return (
     <li className="flex flex-col tab:flex-row tab:items-baseline tab:justify-between gap-1 px-4 py-3 border-t border-ink-150 first:border-t-0">
-      <span className="font-serif text-[14px] text-ink-700">{claim}</span>
-      <span className="font-mono text-[10px] text-ink-500 tracking-wide whitespace-nowrap">
+      <span className="font-serif text-[15px] text-ink-700">{claim}</span>
+      <span className="font-mono text-[11px] text-ink-500 tracking-wide whitespace-nowrap">
         [{source}]
       </span>
     </li>
   );
+}
+
+interface MarketCallPreviewProps {
+  readonly totalCalls: string;
+  readonly creatorCount: number;
+  readonly beatBtcCreators: number;
+  readonly rankedCreators: number;
+  readonly rows: readonly LeaderboardRow[];
+}
+
+function MarketCallPreview({
+  totalCalls,
+  creatorCount,
+  beatBtcCreators,
+  rankedCreators,
+  rows,
+}: MarketCallPreviewProps): ReactElement {
+  const previewRows = rows.slice(0, 5);
+  const hitRate =
+    previewRows.length > 0
+      ? previewRows.reduce((sum, row) => sum + row.stats.win_rate, 0) / previewRows.length
+      : 0;
+  const avgAlpha =
+    previewRows.length > 0
+      ? previewRows.reduce((sum, row) => sum + row.stats.avg_alpha_30d, 0) / previewRows.length
+      : 0;
+  const missedShare = Math.max(0, Math.round((1 - hitRate) * 100));
+  const hitShare = Math.max(0, Math.round(hitRate * 100));
+  const neutralShare = Math.max(0, 100 - missedShare - hitShare);
+
+  return (
+    <div
+      className="relative w-full desk:rotate-[-1deg] border border-ink-250 bg-ink-0/80 p-4 tab:p-5 shadow-popover overflow-hidden"
+      style={{ borderRadius: 10 }}
+      aria-label="CallScore product preview"
+    >
+      <div
+        className="absolute inset-0 opacity-45 pointer-events-none"
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(201,162,75,0.12), transparent 32%), radial-gradient(circle at 78% 12%, rgba(201,162,75,0.11), transparent 34%)",
+        }}
+        aria-hidden="true"
+      />
+      <div
+        className="relative border border-ink-200 bg-ink-50/70 p-4 mb-4"
+        style={{ borderRadius: 8 }}
+      >
+        <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-3">
+          Call Summary
+        </p>
+        <div className="grid grid-cols-2 tab:grid-cols-4 gap-0">
+          <PreviewMetric label="creators tracked" value={String(creatorCount)} />
+          <PreviewMetric label="ranked creators" value={String(rankedCreators)} />
+          <PreviewMetric label="scored calls" value={totalCalls} />
+          <PreviewMetric
+            label="beating BTC"
+            value={`${beatBtcCreators}/${Math.max(rankedCreators, beatBtcCreators)}`}
+          />
+        </div>
+      </div>
+
+      <div className="relative grid grid-cols-1 tab:grid-cols-[minmax(0,1fr)_156px] gap-4 mb-4">
+        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 8 }}>
+          <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-4">
+            Score Distribution
+          </p>
+          <div
+            className="h-3 grid gap-0.5 mb-3"
+            style={{
+              gridTemplateColumns: `${Math.max(missedShare, 1)}fr ${Math.max(neutralShare, 1)}fr ${Math.max(hitShare, 1)}fr`,
+            }}
+          >
+            <span className="bg-neg" style={{ borderRadius: 2 }} />
+            <span className="bg-accent" style={{ borderRadius: 2 }} />
+            <span className="bg-pos" style={{ borderRadius: 2 }} />
+          </div>
+          <div className="grid grid-cols-3 font-mono text-[11px] text-ink-500">
+            <span><b className="text-neg font-normal">{missedShare}%</b><br />Missed</span>
+            <span><b className="text-accent font-normal">{neutralShare}%</b><br />Neutral</span>
+            <span><b className="text-pos font-normal">{hitShare}%</b><br />Hit</span>
+          </div>
+        </div>
+        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 8 }}>
+          <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-2">
+            Avg 30d Delta
+          </p>
+          <p className={`font-serif text-[43px] leading-none ${avgAlpha >= 0 ? "text-pos" : "text-neg"}`}>
+            {formatSignedNumber(avgAlpha)}
+          </p>
+          <p className="font-mono text-[11px] text-ink-500 mt-2">30d vs BTC</p>
+        </div>
+      </div>
+
+      <div
+        className="relative border border-ink-200 bg-ink-50/70 p-4"
+        style={{ borderRadius: 8 }}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-ink-200 pb-3 mb-3">
+          <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase">
+            Top Creators
+          </p>
+          <div className="hidden tab:flex items-center gap-6 font-mono text-[11px] text-ink-500 tracking-caps uppercase">
+            <span className="text-ink-900 border-b border-accent pb-1">All Time</span>
+            <span>90 Days</span>
+            <span>30 Days</span>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
+            <div className="grid grid-cols-[50px_minmax(150px,1fr)_92px_76px_78px_72px] gap-4 pb-2 font-mono text-[10px] text-ink-500 tracking-caps uppercase">
+              <span>rank</span>
+              <span>creator</span>
+              <span>alpha</span>
+              <span>30d Δ</span>
+              <span>win %</span>
+              <span>last call</span>
+            </div>
+            {previewRows.length > 0 ? (
+              previewRows.map((row) => {
+                const alphaTone =
+                  row.stats.alpha_score >= 50
+                    ? "text-pos"
+                    : row.stats.alpha_score < 30
+                      ? "text-neg"
+                      : "text-ink-800";
+                const deltaTone = row.stats.avg_alpha_30d >= 0 ? "text-pos" : "text-neg";
+                const lastCall = row.best_call ?? row.worst_call;
+                return (
+                  <div
+                    key={row.creator.id}
+                    className="grid grid-cols-[50px_minmax(150px,1fr)_92px_76px_78px_72px] gap-4 border-t border-ink-200 py-3 font-mono text-[13px] items-center"
+                  >
+                    <span className="text-accent">{String(row.rank).padStart(2, "0")}</span>
+                    <span className="flex items-center gap-3 min-w-0 text-ink-900">
+                      <span
+                        className="grid h-7 w-7 shrink-0 place-items-center border border-ink-300 bg-ink-100 text-[12px] text-ink-800"
+                        style={{ borderRadius: 4 }}
+                        aria-hidden="true"
+                      >
+                        {getInitials(row.creator.name)}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate">{row.creator.name}</span>
+                        <span className="block truncate text-[11px] text-ink-500">
+                          {row.creator.youtube_handle}
+                        </span>
+                      </span>
+                    </span>
+                    <span className={`${alphaTone} tabular-nums`}>
+                      {row.stats.alpha_score.toFixed(1)}
+                      <span className="text-ink-500 text-[11px] ml-1">α</span>
+                    </span>
+                    <span className={`${deltaTone} tabular-nums`}>
+                      {formatSignedNumber(row.stats.avg_alpha_30d)}
+                    </span>
+                    <span className="text-ink-800 tabular-nums">
+                      {formatPercent(row.stats.win_rate)}
+                    </span>
+                    <span className="text-ink-800">
+                      {lastCall?.symbol?.replace("USDT", "") ?? "—"}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="border-t border-ink-200 py-8 text-center font-mono text-[12px] text-ink-500 tracking-wide">
+                Real leaderboard rows appear here after the data pipeline computes scores.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="absolute inset-x-12 bottom-[-24px] h-10 bg-accent/25 blur-2xl"
+        aria-hidden="true"
+      />
+    </div>
+  );
+}
+
+function PreviewMetric({
+  label,
+  value,
+}: {
+  readonly label: string;
+  readonly value: string;
+}): ReactElement {
+  return (
+    <div className="min-w-0 border-r border-ink-200 last:border-r-0 px-3 first:pl-0 last:pr-0 py-1">
+      <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-1 truncate">
+        {label}
+      </p>
+      <p className="font-serif text-[23px] tab:text-[29px] text-ink-900 leading-none tabular-nums">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatSignedNumber(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 }

@@ -10,7 +10,7 @@ export default function Wordmark({
   href = "/",
   size = "md",
 }: WordmarkProps): ReactElement {
-  const fontSize = size === "sm" ? "text-[14px]" : "text-[17px]";
+  const fontSize = size === "sm" ? "text-[15px]" : "text-[18px]";
   return (
     <Link
       href={href}

@@ -142,22 +142,22 @@ export default async function CreatorPage({ params }: PageProps) {
       {/* Back link — replaces lucide ArrowLeft with Unicode glyph per spec */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 font-mono text-[10px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mb-8"
+        className="inline-flex items-center gap-1.5 font-mono text-[11px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mb-8"
       >
         <span aria-hidden="true">←</span> Leaderboard
       </Link>
 
       {/* HERO */}
       <section className="pb-10 border-b border-ink-250">
-        <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-2">
+        <div className="font-mono text-[11px] text-ink-500 tracking-caps uppercase mb-2">
           Profile · Rank {stats?.accuracy_rank ?? "—"}
         </div>
-        <h1 className="font-serif text-[34px] tab:text-[44px] text-ink-900 font-medium tracking-tight leading-[1.1] mb-2">
+        <h1 className="font-serif text-[35px] tab:text-[45px] text-ink-900 font-medium tracking-tight leading-[1.1] mb-2">
           {creator.name}
         </h1>
         <a
           href={`https://www.youtube.com/${creator.youtube_handle}`}
-          className="font-mono text-[12px] text-ink-500 hover:text-ink-700 tracking-wide inline-flex items-center gap-1.5"
+          className="font-mono text-[13px] text-ink-500 hover:text-ink-700 tracking-wide inline-flex items-center gap-1.5"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -175,7 +175,7 @@ export default async function CreatorPage({ params }: PageProps) {
 
       {/* 01 — synthesis */}
       <EditorialSection index="01" title={<><em className="italic text-accent">Why</em> this rank.</>}>
-        <p className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px]">
+        <p className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[680px]">
           {creator.name} ranks{" "}
           <em className="italic text-accent">#{stats?.accuracy_rank ?? "—"}</em> on average alpha
           across {scoredCallCount} scored calls
@@ -218,7 +218,7 @@ export default async function CreatorPage({ params }: PageProps) {
         <div className="mb-4">
           <Link
             href={canExport ? `/api/export/calls?handle=${encodeURIComponent(creator.youtube_handle)}` : "/pricing"}
-            className="inline-block font-mono text-[11px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-3 py-2 transition-colors"
+            className="inline-block font-mono text-[12px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-3 py-2 transition-colors"
             style={{ borderRadius: 2 }}
             prefetch={false}
           >
@@ -232,7 +232,7 @@ export default async function CreatorPage({ params }: PageProps) {
             scoredCount={scoredCallCount}
           />
         ) : (
-          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+          <p className="font-mono text-[12px] text-ink-500 tracking-wide">
             No calls tracked yet for this creator.
           </p>
         )}
@@ -256,7 +256,7 @@ export default async function CreatorPage({ params }: PageProps) {
             <PerformanceChart data={performance} />
           ) : (
             <div className="border border-ink-200 p-5 flex items-center justify-center" style={{ borderRadius: 2 }}>
-              <p className="font-mono text-[11px] text-ink-500 tracking-wide">No performance data yet</p>
+              <p className="font-mono text-[12px] text-ink-500 tracking-wide">No performance data yet</p>
             </div>
           )}
         </div>
@@ -266,7 +266,7 @@ export default async function CreatorPage({ params }: PageProps) {
       <EditorialSection index="05" title={<>Simulate <em className="italic text-accent">returns</em>.</>}>
         <Link
           href={`/creator/${encodeURIComponent(creator.youtube_handle)}/backtest`}
-          className="inline-block font-mono text-[11px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-4 py-2.5 transition-colors"
+          className="inline-block font-mono text-[12px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-4 py-2.5 transition-colors"
           style={{ borderRadius: 2 }}
           prefetch={false}
         >
@@ -294,12 +294,12 @@ function MetricTile({ label, value, unit, tone = "default" }: MetricTileProps) {
       style={{ borderRadius: 2 }}
     >
       <div className="flex items-baseline gap-1">
-        <span className={`font-serif text-[40px] font-medium tabular-nums tracking-tight ${valueColor}`}>
+        <span className={`font-serif text-[41px] font-medium tabular-nums tracking-tight ${valueColor}`}>
           {value}
         </span>
-        <span className="font-mono text-[13px] text-ink-500 tracking-wide">{unit}</span>
+        <span className="font-mono text-[14px] text-ink-500 tracking-wide">{unit}</span>
       </div>
-      <div className="font-mono text-[9px] text-ink-500 tracking-caps uppercase">
+      <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase">
         {label}
       </div>
     </div>

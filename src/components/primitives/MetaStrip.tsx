@@ -20,7 +20,7 @@ export default function MetaStrip({ cells }: MetaStripProps): ReactElement {
           <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
             {cell.k}
           </dt>
-          <dd className="font-serif text-[24px] text-ink-900 font-medium tracking-tight">
+          <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight">
             {cell.v}
           </dd>
         </div>

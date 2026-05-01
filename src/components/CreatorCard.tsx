@@ -112,7 +112,7 @@ function StatItem({ label, value, positive }: StatItemProps) {
 
   return (
     <div>
-      <p className="text-ink-500 text-[10px] uppercase tracking-wider mb-0.5">
+      <p className="text-ink-500 text-[11px] uppercase tracking-wider mb-0.5">
         {label}
       </p>
       <p className={`text-sm font-semibold tabular-nums ${valueColor}`}>{value}</p>

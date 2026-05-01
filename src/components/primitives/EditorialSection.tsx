@@ -20,12 +20,12 @@ export default function EditorialSection({
   return (
     <section id={id} className={`py-12 ${first ? "" : "border-t border-ink-250"}`}>
       <header className="grid grid-cols-1 desk:grid-cols-[96px_1fr_280px] gap-8 items-baseline mb-8">
-        <div className="font-mono text-[11px] text-ink-500 tracking-caps uppercase">{index}</div>
-        <h2 className="font-serif text-[28px] desk:text-[32px] text-ink-900 font-medium tracking-tight leading-snug text-balance">
+        <div className="font-mono text-[12px] text-ink-500 tracking-caps uppercase">{index}</div>
+        <h2 className="font-serif text-[29px] desk:text-[33px] text-ink-900 font-medium tracking-tight leading-snug text-balance">
           {title}
         </h2>
         {meta && (
-          <div className="font-mono text-[10px] text-ink-500 tracking-wide leading-relaxed desk:text-right">
+          <div className="font-mono text-[11px] text-ink-500 tracking-wide leading-relaxed desk:text-right">
             {meta}
           </div>
         )}

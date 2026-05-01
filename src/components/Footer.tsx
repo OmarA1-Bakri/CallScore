@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import CallScoreBrand from "./CallScoreBrand";
 
 export default function Footer() {
   return (
@@ -10,21 +10,7 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2.5 mb-3">
-              <Image
-                src="/logo-icon.png"
-                alt="CallScore"
-                width={468}
-                height={468}
-                className="h-8 w-auto"
-              />
-              <div>
-                <span className="text-ink-900 font-extrabold text-sm tracking-tight leading-none">
-                  CallScore
-                </span>
-                <span className="block text-accent font-bold text-[10px] tracking-[0.2em] uppercase leading-none mt-0.5">
-                  Measured
-                </span>
-              </div>
+              <CallScoreBrand compact />
             </div>
             <p className="text-ink-500 text-sm leading-relaxed">
               Market calls, measured.

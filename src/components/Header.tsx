@@ -1,8 +1,8 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Crown } from "lucide-react";
 import type { ReactElement } from "react";
 import { getSession } from "@/lib/auth";
+import CallScoreBrand from "./CallScoreBrand";
 import MobileMenu from "./MobileMenu";
 
 export default async function Header(): Promise<ReactElement> {
@@ -13,30 +13,14 @@ export default async function Header(): Promise<ReactElement> {
   return (
     <header className="sticky top-0 z-masthead bg-ink-0/90 backdrop-blur-bar border-b border-ink-250">
       <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-24">
           {/* Logo */}
           <Link
             href="/"
             className="flex items-center gap-2.5 group"
             aria-label="CallScore home"
           >
-            <Image
-              src="/logo-icon.png"
-              alt=""
-              aria-hidden="true"
-              width={468}
-              height={468}
-              className="h-10 w-auto group-hover:scale-[1.04] transition-transform"
-              priority
-            />
-            <div className="hidden tab:block">
-              <span className="text-ink-900 font-extrabold text-base tracking-tight leading-none">
-                CallScore
-              </span>
-              <span className="block text-accent font-bold text-[11px] tracking-[0.2em] uppercase leading-none mt-0.5">
-                Measured
-              </span>
-            </div>
+            <CallScoreBrand />
           </Link>
 
           {/* Desktop nav */}

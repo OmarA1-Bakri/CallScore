@@ -97,21 +97,21 @@ export default function MethodologyPage(): ReactElement {
       {/* Back link */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 font-mono text-[10px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mt-8 mb-8"
+        className="inline-flex items-center gap-1.5 font-mono text-[11px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mt-8 mb-8"
       >
         <span aria-hidden="true">←</span> Leaderboard
       </Link>
 
       {/* HERO */}
       <section className="pb-12 border-b border-ink-250">
-        <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-4">
+        <div className="font-mono text-[11px] text-ink-500 tracking-caps uppercase mb-4">
           Methodology · Public
         </div>
-        <h1 className="font-serif text-[34px] tab:text-[44px] desk:text-[52px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
+        <h1 className="font-serif text-[35px] tab:text-[45px] desk:text-[53px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
           How we score.{" "}
           <em className="italic font-normal text-accent">In public.</em>
         </h1>
-        <p className="font-serif text-[19px] text-ink-700 leading-relaxed max-w-[760px]">
+        <p className="font-serif text-[20px] text-ink-700 leading-relaxed max-w-[760px]">
           One formula, five components, capped 0–100. Every score reproducible
           from the published pipeline.{" "}
           <em className="italic text-accent">If a number looks wrong, audit me.</em>
@@ -138,13 +138,13 @@ export default function MethodologyPage(): ReactElement {
         <ol className="grid grid-cols-1 tab:grid-cols-5 gap-4">
           {PIPELINE_STEPS.map((step, i) => (
             <li key={step.name} className="border-t border-ink-250 pt-3">
-              <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-1">
+              <div className="font-mono text-[11px] text-ink-500 tracking-caps uppercase mb-1">
                 step {String(i + 1).padStart(2, "0")}
               </div>
-              <div className="font-serif text-[18px] text-ink-900 font-medium leading-tight mb-1">
+              <div className="font-serif text-[19px] text-ink-900 font-medium leading-tight mb-1">
                 {step.name}
               </div>
-              <div className="font-mono text-[11px] text-ink-600 leading-relaxed">
+              <div className="font-mono text-[12px] text-ink-600 leading-relaxed">
                 {step.detail}
               </div>
             </li>
@@ -165,16 +165,16 @@ export default function MethodologyPage(): ReactElement {
           </>
         }
       >
-        <table className="w-full font-mono text-[12px]">
+        <table className="w-full font-mono text-[13px]">
           <thead>
             <tr className="border-b border-ink-250">
-              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2">
+              <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2">
                 Component
               </th>
-              <th className="text-right text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-20">
+              <th className="text-right text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 w-20">
                 Max
               </th>
-              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-6">
+              <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-6">
                 How it&apos;s earned
               </th>
             </tr>
@@ -182,13 +182,13 @@ export default function MethodologyPage(): ReactElement {
           <tbody>
             {SCORE_ROWS.map((c) => (
               <tr key={c.label} className="border-b border-ink-200">
-                <td className="py-3 font-serif text-[14px] text-ink-900">{c.label}</td>
+                <td className="py-3 font-serif text-[15px] text-ink-900">{c.label}</td>
                 <td className="py-3 text-right tabular-nums text-ink-700">{c.max}</td>
                 <td className="py-3 pl-6 text-ink-600 leading-relaxed">{c.how}</td>
               </tr>
             ))}
             <tr>
-              <td className="py-3 font-serif text-[14px] text-ink-900 font-medium">
+              <td className="py-3 font-serif text-[15px] text-ink-900 font-medium">
                 Total
               </td>
               <td className="py-3 text-right tabular-nums text-accent font-medium">
@@ -208,7 +208,7 @@ export default function MethodologyPage(): ReactElement {
         title={<>Tracked <em className="italic text-accent">coins</em>.</>}
         meta={<>{TRACKED_COINS.length} symbols · Binance OHLCV</>}
       >
-        <p className="font-serif text-[15px] text-ink-700 leading-relaxed mb-5 max-w-[680px]">
+        <p className="font-serif text-[16px] text-ink-700 leading-relaxed mb-5 max-w-[680px]">
           Calls on these tickers are matched against minute-grained Binance
           candles. Anything outside this universe is logged but not scored.
         </p>
@@ -225,16 +225,16 @@ export default function MethodologyPage(): ReactElement {
         title={<>Tier <em className="italic text-accent">ranges</em>.</>}
         meta={<>S / A / B / C bands</>}
       >
-        <table className="w-full font-mono text-[12px]">
+        <table className="w-full font-mono text-[13px]">
           <thead>
             <tr className="border-b border-ink-250">
-              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-16">
+              <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 w-16">
                 Tier
               </th>
-              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-32">
+              <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 w-32">
                 Alpha range
               </th>
-              <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-6">
+              <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-6">
                 Reading
               </th>
             </tr>
@@ -246,7 +246,7 @@ export default function MethodologyPage(): ReactElement {
                   <Chip tone={tierTone(t.tier)}>{t.tier}</Chip>
                 </td>
                 <td className="py-3 tabular-nums text-ink-700">{t.range}</td>
-                <td className="py-3 pl-6 font-serif text-[14px] text-ink-700 leading-relaxed">
+                <td className="py-3 pl-6 font-serif text-[15px] text-ink-700 leading-relaxed">
                   {t.read}
                 </td>
               </tr>
@@ -261,7 +261,7 @@ export default function MethodologyPage(): ReactElement {
         title={<><em className="italic text-accent">Audit</em> me.</>}
         meta={<>Reproducible · open source</>}
       >
-        <div className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px] space-y-4">
+        <div className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[680px] space-y-4">
           <p>
             The recompute pipeline is reproducible. Every score traces to a
             transcript line, a Binance candle range, and a deterministic
@@ -284,7 +284,7 @@ export default function MethodologyPage(): ReactElement {
 
 function AuditLinks(): ReactElement {
   return (
-    <p className="font-mono text-[12px] text-ink-600 not-italic">
+    <p className="font-mono text-[13px] text-ink-600 not-italic">
       <Link
         href="https://github.com/dave-builder/crypto-tuber-ranked"
         className="text-accent hover:underline underline-offset-4"

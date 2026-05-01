@@ -31,11 +31,11 @@ export default function AboutPage(): ReactElement {
   return (
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
       <section className="pb-12 border-b border-ink-250">
-        <h1 className="font-serif text-[34px] tab:text-[44px] desk:text-[52px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
+        <h1 className="font-serif text-[35px] tab:text-[45px] desk:text-[53px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
           Why CallScore exists.{" "}
           <em className="italic font-normal text-accent">Market calls, measured.</em>
         </h1>
-        <p className="font-serif text-[19px] text-ink-700 leading-relaxed max-w-[760px]">
+        <p className="font-serif text-[20px] text-ink-700 leading-relaxed max-w-[760px]">
           No opinions. No sponsorships. Public methodology.
           <em className="italic text-accent"> Founder-accountable.</em>
         </p>
@@ -75,8 +75,8 @@ export default function AboutPage(): ReactElement {
                 i > 0 ? "border-t border-ink-150" : ""
               }`}
             >
-              <span className="font-serif text-[14px] text-ink-700">{p.claim}</span>
-              <span className="font-mono text-[10px] text-ink-500 tracking-wide whitespace-nowrap">
+              <span className="font-serif text-[15px] text-ink-700">{p.claim}</span>
+              <span className="font-mono text-[11px] text-ink-500 tracking-wide whitespace-nowrap">
                 [{p.source}]
               </span>
             </li>
@@ -168,7 +168,7 @@ export default function AboutPage(): ReactElement {
 
 function Prose({ children }: { readonly children: ReactElement | ReactElement[] }): ReactElement {
   return (
-    <div className="font-serif text-[16px] text-ink-700 leading-relaxed space-y-4 max-w-[680px]">
+    <div className="font-serif text-[17px] text-ink-700 leading-relaxed space-y-4 max-w-[680px]">
       {children}
     </div>
   );
