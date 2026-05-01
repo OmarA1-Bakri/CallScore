@@ -7,26 +7,26 @@ import { serif, sans, mono } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CRYPTO-TUBER RANKED — Who Actually Beats The Market?",
+  title: "CallScore — Market Calls, Measured",
   description:
-    "Every altcoin call from 20 crypto YouTubers, scored against 18.7M Binance candles. Public methodology, auditable data, no sponsorships.",
-  metadataBase: new URL("https://cryptotuberranked.com"),
+    "Market calls scored against real price data. Public methodology, auditable history, no sponsorships.",
+  metadataBase: new URL("https://call-score.com"),
   icons: {
     icon: "/favicon.ico",
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "CRYPTO-TUBER RANKED — Who Actually Beats The Market?",
+    title: "CallScore — Market Calls, Measured",
     description:
-      "Every altcoin call from 20 crypto YouTubers, scored against 18.7M Binance candles. Public methodology, auditable data, no sponsorships.",
+      "Market calls scored against real price data. Public methodology, auditable history, no sponsorships.",
     type: "website",
     images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "CRYPTO-TUBER RANKED",
+    title: "CallScore",
     description:
-      "Altcoin calls from 20 crypto YouTubers, scored against 18.7M Binance candles. Public methodology, no sponsorships.",
+      "Market calls scored against real price data. Public methodology, no sponsorships.",
   },
 };
 

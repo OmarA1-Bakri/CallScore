@@ -88,6 +88,16 @@ export async function recordAlertUnsubscribe(userId: string): Promise<void> {
   );
 }
 
+export async function hasAlertUnsubscribe(userId: string): Promise<boolean> {
+  const rows = await query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM alerts_unsubscribes WHERE user_id = $1
+     ) AS exists`,
+    [userId],
+  );
+  return rows[0]?.exists === true;
+}
+
 /**
  * Enqueue a "new call" alert. Idempotent on (user_id, call_id) — the
  * unique partial index ensures the same call is never queued twice for

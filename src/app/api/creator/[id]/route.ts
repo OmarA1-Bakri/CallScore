@@ -39,10 +39,10 @@ interface CountRow {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: { id: string } },
 ): Promise<NextResponse> {
   try {
-    const { id: idParam } = await params;
+    const { id: idParam } = params;
     const creatorId = parseInt(idParam, 10);
 
     if (isNaN(creatorId) || creatorId < 1) {

@@ -12,23 +12,22 @@ export default function Footer() {
             <div className="flex items-center gap-2.5 mb-3">
               <Image
                 src="/logo-icon.png"
-                alt="CryptoTubers Ranked"
+                alt="CallScore"
                 width={468}
                 height={468}
                 className="h-8 w-auto"
               />
               <div>
                 <span className="text-ink-900 font-extrabold text-sm tracking-tight leading-none">
-                  CryptoTubers
+                  CallScore
                 </span>
                 <span className="block text-accent font-bold text-[10px] tracking-[0.2em] uppercase leading-none mt-0.5">
-                  Ranked
+                  Measured
                 </span>
               </div>
             </div>
             <p className="text-ink-500 text-sm leading-relaxed">
-              We track, rank, and score the top 20 crypto YouTube influencers
-              by the actual accuracy of their altcoin calls.
+              Market calls, measured.
             </p>
           </div>
 
@@ -107,7 +106,7 @@ export default function Footer() {
         <div className="border-t border-ink-200 pt-6">
           <p className="text-ink-400 text-xs leading-relaxed mb-4">
             <strong className="text-ink-500">Financial Disclaimer:</strong>{" "}
-            CRYPTO-TUBER RANKED is an informational analytics platform only. Nothing
+            CallScore is an informational analytics platform only. Nothing
             on this site constitutes financial advice, investment recommendations,
             or endorsements. Cryptocurrency investments are highly volatile and
             carry substantial risk of loss. Past performance of any creator does not
@@ -115,7 +114,7 @@ export default function Footer() {
             a licensed financial advisor before making any investment decisions.
           </p>
           <p className="text-ink-400 text-xs">
-            &copy; {new Date().getFullYear()} CRYPTO-TUBER RANKED. All rights
+            &copy; {new Date().getFullYear()} CallScore. All rights
             reserved.
           </p>
         </div>

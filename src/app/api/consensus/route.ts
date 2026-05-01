@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getUserTier } from "@/lib/whop";
+import { getUserTier, hasAccess } from "@/lib/whop";
 import { getRequestAuthContext } from "@/lib/auth";
 import type { ConsensusSignal } from "@/lib/types";
 
@@ -24,15 +24,15 @@ function parsePositiveInt(
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    // Elite-only endpoint
+    // Alpha-only endpoint
     const auth = getRequestAuthContext(request);
     const userTier = auth.session?.tier ?? await getUserTier(auth.accessToken);
 
-    if (userTier !== "elite") {
+    if (!hasAccess(userTier, "alpha")) {
       return NextResponse.json(
         {
-          error: "Elite subscription required",
-          required_tier: "elite",
+          error: "Alpha subscription required",
+          required_tier: "alpha",
           current_tier: userTier,
         },
         { status: 403 },

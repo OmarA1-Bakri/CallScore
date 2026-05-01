@@ -3,7 +3,7 @@ import { Lock, Crown } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
 interface TierGateProps {
-  readonly tier: "pro" | "elite";
+  readonly tier: "pro" | "alpha";
   readonly children: ReactNode;
 }
 
@@ -14,7 +14,7 @@ const TIERS = {
     description: "Deep analytics on every creator",
     Icon: Lock,
   },
-  elite: {
+  alpha: {
     label: "Alpha",
     price: "$49/mo",
     description: "Actionable signals, not just rankings",

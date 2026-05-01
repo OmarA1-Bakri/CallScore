@@ -43,7 +43,7 @@ function getRedirectUri(): string {
   const base =
     process.env.NEXT_PUBLIC_BASE_URL ??
     (process.env.NODE_ENV === "production"
-      ? "https://cryptotuberranked.com"
+      ? "https://call-score.com"
       : "http://localhost:3000");
 
   return `${base}/api/auth/whop/callback`;

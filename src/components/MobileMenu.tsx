@@ -69,6 +69,31 @@ export default function MobileMenu({
               <div className="py-2 text-xs text-ink-500 uppercase tracking-caps">
                 Tier · {tier}
               </div>
+              <Link
+                href="/settings/alerts"
+                onClick={() => setOpen(false)}
+                className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+              >
+                Alerts
+              </Link>
+              {tier === "alpha" && (
+                <>
+                  <Link
+                    href="/settings/api"
+                    onClick={() => setOpen(false)}
+                    className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+                  >
+                    API
+                  </Link>
+                  <Link
+                    href="/settings/webhooks"
+                    onClick={() => setOpen(false)}
+                    className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+                  >
+                    Webhooks
+                  </Link>
+                </>
+              )}
               <form action="/api/auth/logout" method="post">
                 <button
                   type="submit"

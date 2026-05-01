@@ -12,13 +12,18 @@ const PERIODS: ReadonlyArray<{ readonly value: Period; readonly label: string }>
 
 interface PeriodFilterProps {
   readonly value: Period;
+  readonly canUseRecent?: boolean;
 }
 
-export default function PeriodFilter({ value }: PeriodFilterProps): ReactElement {
+export default function PeriodFilter({ value, canUseRecent = true }: PeriodFilterProps): ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   function handleClick(period: Period): void {
+    if (!canUseRecent && period !== "all_time") {
+      router.push("/pricing");
+      return;
+    }
     const params = new URLSearchParams(searchParams.toString());
     if (period === "all_time") params.delete("period");
     else params.set("period", period);
@@ -39,7 +44,9 @@ export default function PeriodFilter({ value }: PeriodFilterProps): ReactElement
             className={`font-mono text-[11px] tracking-caps uppercase px-4 py-2.5 -mb-px border-b-2 transition-colors ${
               active
                 ? "border-accent text-ink-900"
-                : "border-transparent text-ink-500 hover:text-ink-700"
+                : !canUseRecent && p.value !== "all_time"
+                  ? "border-transparent text-ink-400"
+                  : "border-transparent text-ink-500 hover:text-ink-700"
             }`}
           >
             {p.label}

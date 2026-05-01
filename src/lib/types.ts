@@ -1,4 +1,5 @@
-export type Tier = "free" | "pro" | "elite";
+export type Tier = "free" | "pro" | "alpha";
+export type LegacyTier = Tier | "elite";
 export type Direction = "bullish" | "bearish" | "neutral";
 export type CallType = "buy" | "sell" | "hold" | "watch" | "avoid";
 export type StrategyType =

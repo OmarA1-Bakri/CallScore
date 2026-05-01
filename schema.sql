@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS creators (
     youtube_channel_id TEXT,
     subscribers TEXT,
     focus TEXT,
-    tier TEXT CHECK (tier IN ('free', 'pro', 'elite')) DEFAULT 'free',
+    tier TEXT CHECK (tier IN ('free', 'pro', 'alpha', 'elite')) DEFAULT 'free',
     total_calls INTEGER DEFAULT 0,
     win_rate DOUBLE PRECISION DEFAULT 0,
     avg_return DOUBLE PRECISION DEFAULT 0,

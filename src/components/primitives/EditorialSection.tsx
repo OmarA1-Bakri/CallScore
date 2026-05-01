@@ -6,6 +6,7 @@ interface EditorialSectionProps {
   readonly meta?: ReactNode;       // right-rail mono caption
   readonly children: ReactNode;
   readonly first?: boolean;        // suppress top border
+  readonly id?: string;
 }
 
 export default function EditorialSection({
@@ -14,9 +15,10 @@ export default function EditorialSection({
   meta,
   children,
   first = false,
+  id,
 }: EditorialSectionProps): ReactElement {
   return (
-    <section className={`py-12 ${first ? "" : "border-t border-ink-250"}`}>
+    <section id={id} className={`py-12 ${first ? "" : "border-t border-ink-250"}`}>
       <header className="grid grid-cols-1 desk:grid-cols-[96px_1fr_280px] gap-8 items-baseline mb-8">
         <div className="font-mono text-[11px] text-ink-500 tracking-caps uppercase">{index}</div>
         <h2 className="font-serif text-[28px] desk:text-[32px] text-ink-900 font-medium tracking-tight leading-snug text-balance">

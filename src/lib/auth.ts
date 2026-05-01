@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import type { Tier } from "./types";
+import { normalizeTier } from "./whop";
 
 /* ------------------------------------------------------------------ */
 /*  Session shape                                                      */
@@ -83,7 +84,10 @@ function decode(token: string): Session | null {
     // Check expiration
     if (Date.now() > session.exp) return null;
 
-    return session;
+    return {
+      ...session,
+      tier: normalizeTier(session.tier),
+    };
   } catch {
     return null;
   }
@@ -133,7 +137,7 @@ export async function createSession(
 ): Promise<void> {
   const session: Session = {
     userId,
-    tier,
+    tier: normalizeTier(tier),
     accessToken,
     exp: Date.now() + SESSION_TTL_MS,
   };

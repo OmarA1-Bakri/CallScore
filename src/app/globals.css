@@ -184,6 +184,7 @@
   .value-positive { color: var(--pos); }
   .value-negative { color: var(--neg); }
 
+  .badge-alpha,
   .badge-elite,
   .badge-pro,
   .badge-free,
@@ -196,6 +197,7 @@
     letter-spacing: 0.04em;
   }
 
+  .badge-alpha,
   .badge-elite { @apply border-accent/30 bg-accent/10 text-accent; }
   .badge-pro { @apply border-new/30 bg-new/10 text-new; }
   .badge-free { @apply border-ink-300 bg-ink-100 text-ink-600; }

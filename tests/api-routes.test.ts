@@ -54,6 +54,36 @@ const apiContracts = [
     literal: "/api/alerts/unsubscribe",
     route: "src/app/api/alerts/unsubscribe/route.ts",
   },
+  {
+    surface: "Alert settings nav",
+    file: "src/components/Header.tsx",
+    literal: "/settings/alerts",
+    route: "src/app/settings/alerts/page.tsx",
+  },
+  {
+    surface: "API settings nav",
+    file: "src/components/Header.tsx",
+    literal: "/settings/api",
+    route: "src/app/settings/api/page.tsx",
+  },
+  {
+    surface: "CSV export CTA",
+    file: "src/app/creator/[handle]/page.tsx",
+    literal: "/api/export/calls",
+    route: "src/app/api/export/calls/route.ts",
+  },
+  {
+    surface: "API key settings form",
+    file: "src/app/settings/api/page.tsx",
+    literal: "/api/api-keys",
+    route: "src/app/api/api-keys/route.ts",
+  },
+  {
+    surface: "Webhook settings form",
+    file: "src/app/settings/webhooks/page.tsx",
+    literal: "/api/webhooks",
+    route: "src/app/api/webhooks/route.ts",
+  },
 ] as const;
 
 test("frontend API links have matching app routes", () => {

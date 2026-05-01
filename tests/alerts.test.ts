@@ -253,7 +253,7 @@ async function fakeQuery<T>(
 
 type SessionStub = {
   userId: string;
-  tier: "free" | "pro" | "elite";
+  tier: "free" | "pro" | "alpha";
   accessToken: string;
   exp: number;
 } | null;
@@ -431,11 +431,11 @@ test("POST /api/alerts/watch returns 200 for pro-tier session", async () => {
   assert.equal(list[0].creator_id, 7);
 });
 
-test("POST /api/alerts/watch accepts elite (alpha) tier", async () => {
+test("POST /api/alerts/watch accepts alpha tier", async () => {
   resetDb();
   stubbedSession = {
     userId: "user_alpha",
-    tier: "elite",
+    tier: "alpha",
     accessToken: "x",
     exp: Date.now() + 60_000,
   };

@@ -7,7 +7,9 @@ import PerformanceChart from "@/components/PerformanceChart";
 import CallHistory from "@/components/CallHistory";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
+import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { hasAccess } from "@/lib/whop";
 import {
   computeCreatorAvgAlpha30d,
   computeCreatorHitRate,
@@ -132,6 +134,8 @@ export default async function CreatorPage({ params }: PageProps) {
   const avgAlpha30d = computeCreatorAvgAlpha30d(allCalls);
   const scoredCallCount = scoredCalls.length;
   const hitRate = computeCreatorHitRate(allCalls);
+  const currentTier = await getCurrentTier();
+  const canExport = hasAccess(currentTier, "pro");
 
   return (
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-8">
@@ -211,6 +215,16 @@ export default async function CreatorPage({ params }: PageProps) {
 
       {/* 03 — calls */}
       <EditorialSection index="03" title={<>Recent <em className="italic text-accent">calls</em>.</>}>
+        <div className="mb-4">
+          <Link
+            href={canExport ? `/api/export/calls?handle=${encodeURIComponent(creator.youtube_handle)}` : "/pricing"}
+            className="inline-block font-mono text-[11px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-3 py-2 transition-colors"
+            style={{ borderRadius: 2 }}
+            prefetch={false}
+          >
+            {canExport ? "Export CSV" : "Export CSV · Pro"}
+          </Link>
+        </div>
         {displayCalls.length > 0 ? (
           <CallHistory
             calls={displayCalls}

@@ -21,6 +21,7 @@
     "audit:recompute": "node --import tsx src/scripts/audit-recompute.ts",
     "audit:coverage": "node --import tsx src/scripts/audit-coverage-report.ts",
     "audit:global": "node --import tsx src/scripts/audit-global-coverage.ts",
+    "whop:bootstrap": "node --import tsx src/scripts/bootstrap-whop.ts",
     "promote:candidates": "node --import tsx src/scripts/promote-creator-candidates.ts",
     "backfill:public-integrity": "node --import tsx src/scripts/backfill-public-integrity.ts",
     "reextract:low-confidence": "node --import tsx src/scripts/reextract-low-confidence-videos.ts",

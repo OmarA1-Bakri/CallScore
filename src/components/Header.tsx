@@ -18,7 +18,7 @@ export default async function Header(): Promise<ReactElement> {
           <Link
             href="/"
             className="flex items-center gap-2.5 group"
-            aria-label="CryptoTubers Ranked home"
+            aria-label="CallScore home"
           >
             <Image
               src="/logo-icon.png"
@@ -31,10 +31,10 @@ export default async function Header(): Promise<ReactElement> {
             />
             <div className="hidden tab:block">
               <span className="text-ink-900 font-extrabold text-base tracking-tight leading-none">
-                CryptoTubers
+                CallScore
               </span>
               <span className="block text-accent font-bold text-[11px] tracking-[0.2em] uppercase leading-none mt-0.5">
-                Ranked
+                Measured
               </span>
             </div>
           </Link>
@@ -65,6 +65,20 @@ export default async function Header(): Promise<ReactElement> {
 
             {loggedIn ? (
               <div className="flex items-center gap-3">
+                <Link
+                  href="/settings/alerts"
+                  className="text-ink-700 hover:text-ink-900 transition-colors text-sm"
+                >
+                  Alerts
+                </Link>
+                {tier === "alpha" && (
+                  <Link
+                    href="/settings/api"
+                    className="text-ink-700 hover:text-ink-900 transition-colors text-sm"
+                  >
+                    API
+                  </Link>
+                )}
                 <TierBadge tier={tier} />
                 <form action="/api/auth/logout" method="post">
                   <button
@@ -107,7 +121,7 @@ export default async function Header(): Promise<ReactElement> {
 /* ------------------------------------------------------------------ */
 
 function TierBadge({ tier }: { readonly tier: string }): ReactElement {
-  if (tier === "elite") {
+  if (tier === "alpha") {
     return (
       <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-accent/20 text-accent border border-accent/30">
         <Crown className="w-3 h-3" />

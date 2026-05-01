@@ -30,7 +30,7 @@ test("Leaderboard is not wrapped in glass-card", () => {
 });
 
 test("Leaderboard renders score-Tier column distinct from auth-tier grouping", () => {
-  // Score tier (S/A/B/C) is a per-row cell; auth tier (free/pro/elite) is the
+  // Score tier (S/A/B/C) is a per-row cell; auth tier (free/pro/alpha) is the
   // group wrapper. Both must coexist.
   assert.match(src, /tier_required/, "auth-tier grouping must be preserved");
   assert.match(src, /score.*tier|tier.*score|RankTierBadge/i, "score-Tier column must render");

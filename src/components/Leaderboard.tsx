@@ -3,9 +3,9 @@
 //
 // Two-tier model — distinct concepts:
 //
-//   1. AUTH TIER (free / pro / elite) — `row.tier_required`, set by getCreatorTier(rank).
-//      Drives row-group VISIBILITY (Whop subscription gating). Wraps elite/pro groups
-//      in <TierGate> overlay. Free tier renders ungated.
+//   1. AUTH TIER (free / pro / alpha) — `row.tier_required`, set by getCreatorTier(rank).
+//      Drives row-group VISIBILITY (Whop subscription gating). Wraps alpha/pro
+//      groups in <TierGate> overlay. Free tier renders ungated.
 //
 //   2. SCORE TIER (S / A / B / C) — derived in <RankTierBadge> from rank + N + wilson_lb.
 //      Drives PER-ROW BADGE in the "Tier" column. Visible to all viewers regardless of
@@ -61,13 +61,13 @@ function renderTable(rows: readonly Row[]): ReactElement {
 }
 
 export default function Leaderboard({ rows }: LeaderboardProps): ReactElement {
-  const elite = rows.filter((r) => r.tier_required === "elite");
+  const alpha = rows.filter((r) => r.tier_required === "alpha");
   const pro = rows.filter((r) => r.tier_required === "pro");
   const free = rows.filter((r) => r.tier_required === "free");
 
   return (
     <div className="overflow-x-auto">
-      {elite.length > 0 && <TierGate tier="elite">{renderTable(elite)}</TierGate>}
+      {alpha.length > 0 && <TierGate tier="alpha">{renderTable(alpha)}</TierGate>}
       {pro.length > 0 && <TierGate tier="pro">{renderTable(pro)}</TierGate>}
       {free.length > 0 && renderTable(free)}
     </div>

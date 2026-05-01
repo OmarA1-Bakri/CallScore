@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
 
-const TITLE = "Pricing — CryptoTubers Ranked";
+const TITLE = "Pricing — CallScore";
 const DESCRIPTION =
   "Three tiers: free, pro ($19/mo), alpha ($49/mo). Full research free. Alerts, exports, and API on paid.";
 
@@ -134,13 +134,11 @@ export default function PricingPage(): ReactElement {
       {/* HERO */}
       <section className="pb-12 border-b border-ink-250">
         <h1 className="font-serif text-[34px] tab:text-[44px] desk:text-[52px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
-          Pay once alerts earn their keep.{" "}
-          <em className="italic font-normal text-accent">Free research, forever.</em>
+          CallScore plans.{" "}
+          <em className="italic font-normal text-accent">Free research, paid delivery.</em>
         </h1>
         <p className="font-serif text-[19px] text-ink-700 leading-relaxed max-w-[760px]">
-          The leaderboard, creator histories, score breakdowns, and methodology stay free.
-          Paid tiers buy <em className="italic text-accent">delivery</em>: alerts, exports,
-          simulators, API.
+          Leaderboards stay free. Paid tiers add alerts, exports, backtests, and API access.
         </p>
         <MetaStrip
           cells={[
@@ -187,7 +185,7 @@ export default function PricingPage(): ReactElement {
             name="Free"
             price="$0"
             cadence="forever"
-            tagline="Full research access. Read every score, every methodology, every creator history."
+            tagline="Full public research."
             cta="Browse leaderboard"
             ctaHref="/"
             ctaVariant="soft"
@@ -196,7 +194,7 @@ export default function PricingPage(): ReactElement {
             name="Pro"
             price="$19"
             cadence="/mo"
-            tagline="Alerts when ranked creators move. Watchlists, CSV export, recent-performance windows."
+            tagline="Alerts, watchlists, exports."
             cta="Upgrade to Pro"
             ctaHref="/api/checkout/pro"
             emphasis
@@ -205,7 +203,7 @@ export default function PricingPage(): ReactElement {
             name="Alpha"
             price="$49"
             cadence="/mo"
-            tagline="The full apparatus. Backtest, anti-consensus alerts, API, webhooks."
+            tagline="Backtests, API, webhooks."
             cta="Upgrade to Alpha"
             ctaHref="/api/checkout/alpha"
           />

@@ -9,7 +9,7 @@ import {
 import { TRACKED_CREATOR_COUNT } from "@/lib/tracked-creators";
 
 export const metadata: Metadata = {
-  title: "Methodology — How We Score Crypto YouTubers | CryptoTubers Ranked",
+  title: "Methodology — CallScore",
   description:
     "Our scoring methodology: one public Alpha Score formula, confidence-gated extraction, and real market-data verification.",
   alternates: { canonical: "/methodology" },
@@ -318,4 +318,3 @@ function tierTone(tier: string): ChipTone {
       return "neutral";
   }
 }
-

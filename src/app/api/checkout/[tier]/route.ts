@@ -28,9 +28,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ tier: string }> },
+  { params }: { params: { tier: string } },
 ): Promise<NextResponse> {
-  const { tier: rawTier } = await params;
+  const { tier: rawTier } = params;
   const tier = rawTier.toLowerCase();
 
   if (!isTier(tier)) {

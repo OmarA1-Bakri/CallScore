@@ -81,12 +81,12 @@ test("computeCreatorWinRate returns 1 when every scored call is profitable", () 
   assert.equal(computeCreatorWinRate(calls, NOW), 1);
 });
 
-test("computeCreatorWinRate returns the fraction of positive-return scored calls", () => {
+test("computeCreatorWinRate returns the fraction of directionally correct scored calls", () => {
   const calls: Call[] = [
-    buildCall({ id: 1, return_30d: 10 }),
-    buildCall({ id: 2, return_30d: -5 }),
-    buildCall({ id: 3, return_30d: 0 }),
-    buildCall({ id: 4, return_30d: 2 }),
+    buildCall({ id: 1, correct_direction: true, return_30d: 10 }),
+    buildCall({ id: 2, correct_direction: false, return_30d: -5 }),
+    buildCall({ id: 3, correct_direction: false, return_30d: 0 }),
+    buildCall({ id: 4, correct_direction: true, return_30d: 2 }),
   ];
   // 2 wins / 4 scored = 0.5
   assert.equal(computeCreatorWinRate(calls, NOW), 0.5);

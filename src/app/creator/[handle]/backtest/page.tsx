@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
+import { hasAccess } from "@/lib/whop";
 import {
   BACKTEST_STRATEGIES,
   MAX_BACKTEST_CAPITAL,
@@ -264,6 +266,7 @@ export default async function BacktestPage({
   searchParams,
 }: PageProps) {
   const handle = decodeURIComponent(params.handle);
+  const currentTier = await getCurrentTier();
 
   let creator: Creator;
   try {
@@ -275,6 +278,38 @@ export default async function BacktestPage({
     creator = creators[0];
   } catch {
     notFound();
+  }
+
+  if (!hasAccess(currentTier, "alpha")) {
+    return (
+      <div
+        className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-mono"
+        style={{ color: COLOR_PHOSPHOR }}
+      >
+        <Link
+          href={`/creator/${encodeURIComponent(handle)}`}
+          className="text-xs hover:underline"
+          style={{ color: COLOR_MID }}
+        >
+          ← back to {creator.name}
+        </Link>
+        <section className="mt-8 border p-6 rounded" style={{ borderColor: COLOR_DIM }}>
+          <p className="text-xs mb-2" style={{ color: COLOR_MID }}>
+            alpha required
+          </p>
+          <h1 className="text-3xl font-bold">
+            Historical backtests are an Alpha feature.
+          </h1>
+          <Link
+            href="/pricing"
+            className="inline-block mt-5 border px-3 py-2 text-xs"
+            style={{ borderColor: COLOR_PHOSPHOR }}
+          >
+            Upgrade to Alpha
+          </Link>
+        </section>
+      </div>
+    );
   }
 
   const now = new Date();

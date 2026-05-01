@@ -14,6 +14,7 @@ test("migration plan applies schema then numbered migrations in order", () => {
     normalize("migrations/002-call-revisions.sql"),
     normalize("migrations/003-call-revisions-revised-id.sql"),
     normalize("migrations/004-alert-unsubscribes.sql"),
+    normalize("migrations/005-alpha-platform.sql"),
   ]);
 });
 

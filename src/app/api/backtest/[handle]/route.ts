@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { requireSessionAccess } from "@/lib/premium";
 import {
   BACKTEST_STRATEGIES,
   BacktestValidationError,
@@ -14,9 +15,6 @@ import {
   parseIsoDateAsStartOfDay,
 } from "@/lib/backtest-params";
 import type { Creator } from "@/lib/types";
-
-// TODO: gate behind Pro+ when premium launches. Current release is public
-// for GTM so creators can be verified by anyone.
 
 const DEFAULT_STRATEGY: BacktestStrategy = "equal_weight";
 const DEFAULT_CAPITAL = 1000;
@@ -82,10 +80,13 @@ function parseQuery(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ handle: string }> },
+  { params }: { params: { handle: string } },
 ): Promise<NextResponse> {
+  const session = await requireSessionAccess("alpha");
+  if (session instanceof NextResponse) return session;
+
   try {
-    const { handle: rawHandle } = await params;
+    const { handle: rawHandle } = params;
     const handle = decodeURIComponent(rawHandle);
     if (handle.length === 0) {
       return NextResponse.json(

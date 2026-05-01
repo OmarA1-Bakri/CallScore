@@ -15,11 +15,11 @@ export default function Wordmark({
     <Link
       href={href}
       className={`font-serif font-medium ${fontSize} text-ink-900 tracking-tight leading-none inline-flex items-baseline`}
-      aria-label="CryptoTubers Ranked home"
+      aria-label="CallScore home"
     >
-      CTR
+      CallScore
       <span className="text-ink-500 mx-1.5">·</span>
-      <em className="italic font-normal text-accent">credibility that ranks</em>
+      <em className="italic font-normal text-accent">market calls, measured</em>
     </Link>
   );
 }

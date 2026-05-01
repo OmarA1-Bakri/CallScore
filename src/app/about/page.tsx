@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
 
-const TITLE = "About — CryptoTubers Ranked";
+const TITLE = "About — CallScore";
 const DESCRIPTION =
-  "Why I track every crypto YouTuber's call against real prices. No opinions, no sponsorships, no deletion. Public methodology, auditable data.";
+  "Why CallScore tracks market calls against real prices. No opinions, no sponsorships, no deletion.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -32,11 +32,11 @@ export default function AboutPage(): ReactElement {
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
       <section className="pb-12 border-b border-ink-250">
         <h1 className="font-serif text-[34px] tab:text-[44px] desk:text-[52px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
-          Why I track every crypto YouTuber&apos;s call.{" "}
-          <em className="italic font-normal text-accent">Against real prices.</em>
+          Why CallScore exists.{" "}
+          <em className="italic font-normal text-accent">Market calls, measured.</em>
         </h1>
         <p className="font-serif text-[19px] text-ink-700 leading-relaxed max-w-[760px]">
-          No opinions, no sponsorships, no deletion. Public methodology, auditable data.
+          No opinions. No sponsorships. Public methodology.
           <em className="italic text-accent"> Founder-accountable.</em>
         </p>
         <MetaStrip

@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - CryptoTubers Ranked",
+  title: "Privacy Policy - CallScore",
   description:
-    "Privacy policy for CryptoTubers Ranked. Learn how we handle your data, what we collect, and how we protect your privacy.",
+    "Privacy policy for CallScore. Learn how we handle your data, what we collect, and how we protect your privacy.",
 };
 
 /* ------------------------------------------------------------------ */
@@ -85,7 +85,7 @@ const POLICY_SECTIONS: readonly PolicySection[] = [
   {
     title: "Contact",
     content: [
-      "For privacy-related questions or data deletion requests, contact us through our feedback page or email us at privacy@cryptotuberranked.com.",
+      "For privacy-related questions or data deletion requests, contact us through our feedback page or email us at privacy@call-score.com.",
     ],
   },
 ] as const;
@@ -115,8 +115,8 @@ export default function PrivacyPage() {
           Last updated: April 11, 2026
         </p>
         <p className="text-ink-600 text-sm mt-4 leading-relaxed">
-          CryptoTubers Ranked (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;)
-          operates the website at cryptotuberranked.com. This policy explains
+          CallScore (&quot;we,&quot; &quot;us,&quot; &quot;our&quot;)
+          operates this website. This policy explains
           what data we collect, how we use it, and your rights regarding that
           data.
         </p>

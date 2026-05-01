@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getCreatorTier } from "@/lib/whop";
+import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
+import { getRequestAuthContext } from "@/lib/auth";
 import type {
   Creator,
   CreatorStats,
@@ -155,6 +156,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const period: Period = periodParam;
+    if (period !== "all_time") {
+      const auth = getRequestAuthContext(request);
+      const userTier = auth.session?.tier ?? (await getUserTier(auth.accessToken, auth.session?.userId));
+      if (!hasAccess(userTier, "pro")) {
+        return NextResponse.json(
+          { error: "upgrade_required", required_tier: "pro", upgrade_url: "/pricing" },
+          { status: 402 },
+        );
+      }
+    }
 
     const rows = await query<LeaderboardQueryRow>(
       `SELECT

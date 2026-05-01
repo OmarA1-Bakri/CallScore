@@ -11,7 +11,7 @@ export async function POST(): Promise<NextResponse> {
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ??
     (process.env.NODE_ENV === "production"
-      ? "https://cryptotuberranked.com"
+      ? "https://call-score.com"
       : "http://localhost:3000");
 
   return NextResponse.redirect(`${baseUrl}/`, 303);

@@ -5,6 +5,7 @@ import { SYMBOL_TICKERS } from "@/lib/constants";
 
 interface ConsensusSignalsProps {
   readonly signals: readonly ConsensusSignal[];
+  readonly locked?: boolean;
 }
 
 function formatDate(dateStr: string): string {
@@ -15,18 +16,30 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function ConsensusSignals({ signals }: ConsensusSignalsProps) {
+export default function ConsensusSignals({ signals, locked = false }: ConsensusSignalsProps) {
   return (
     <div className="border border-ink-200 p-5">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <span aria-hidden="true" className="text-accent">★</span>
         <h3 className="text-ink-900 font-semibold text-sm">Consensus Signals</h3>
-        <span className="badge-elite ml-auto">Alpha</span>
+        <span className="badge-alpha ml-auto">Alpha</span>
       </div>
 
       {/* Signal list */}
-      {signals.length === 0 ? (
+      {locked ? (
+        <div className="border border-accent-dim bg-accent-low p-4">
+          <p className="font-serif text-[16px] text-ink-900">
+            Alpha unlocks live convergence and anti-consensus signals.
+          </p>
+          <a
+            href="/pricing"
+            className="inline-block mt-3 font-mono text-[11px] tracking-caps uppercase text-accent hover:underline"
+          >
+            Upgrade to Alpha
+          </a>
+        </div>
+      ) : signals.length === 0 ? (
         <p className="text-ink-500 text-sm">No recent consensus signals.</p>
       ) : (
         <div className="space-y-3">

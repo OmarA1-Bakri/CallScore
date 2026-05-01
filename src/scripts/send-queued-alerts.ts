@@ -13,7 +13,7 @@
  *   - RESEND_API_KEY
  *   - RESEND_FROM_EMAIL
  *   - SESSION_SECRET      (used to HMAC-sign unsubscribe tokens)
- *   - ALERTS_BASE_URL     (optional, default https://cryptotuberranked.com)
+ *   - ALERTS_BASE_URL     (optional, default https://call-score.com)
  *   - ALERTS_CLAIM_BATCH  (optional, default 500)
  *
  * A (user_id -> email) resolver is wired through the `users` table if
@@ -58,7 +58,7 @@ function baseUrl(): string {
   return (
     process.env.ALERTS_BASE_URL ??
     process.env.NEXT_PUBLIC_BASE_URL ??
-    "https://cryptotuberranked.com"
+    "https://call-score.com"
   );
 }
 
@@ -82,7 +82,7 @@ function buildSubject(group: DigestGroup): string {
   const callCount = buckets.reduce((sum, b) => sum + b.rows.length, 0);
   const label = creatorCount === 1 ? firstCreator : `${creatorCount} creators`;
   const plural = callCount === 1 ? "call" : "calls";
-  return `${label} made ${callCount} new ${plural} — CryptoTubers Ranked`;
+  return `${label} made ${callCount} new ${plural} - CallScore`;
 }
 
 function buildTextBody(
@@ -91,7 +91,7 @@ function buildTextBody(
   unsubscribeUrl: string,
 ): string {
   const lines: string[] = [];
-  lines.push("CryptoTubers Ranked — new calls from creators you watch");
+  lines.push("CallScore - new calls from creators you watch");
   lines.push("");
   for (const bucket of Array.from(group.creatorBuckets.values())) {
     lines.push(`-- ${bucket.creatorName} (${bucket.rows.length}) --`);

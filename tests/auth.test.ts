@@ -11,7 +11,7 @@ import {
 function buildSession(overrides: Partial<Session> = {}): Session {
   return {
     userId: "user-123",
-    tier: "elite",
+    tier: "alpha",
     accessToken: "session-token",
     exp: 1_900_000_000_000,
     ...overrides,

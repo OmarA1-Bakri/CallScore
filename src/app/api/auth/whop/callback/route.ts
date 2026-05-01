@@ -20,7 +20,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ??
     (process.env.NODE_ENV === "production"
-      ? "https://cryptotuberranked.com"
+      ? "https://call-score.com"
       : "http://localhost:3000");
 
   const redirectWithStateClear = (path: string): NextResponse => {
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const userInfo = await fetchWhopUser(tokenData.access_token);
 
     // Check subscription tier
-    const tier = await getUserTier(tokenData.access_token);
+    const tier = await getUserTier(tokenData.access_token, userInfo.id ?? null);
 
     // Create session
     await createSession(
