@@ -26,3 +26,6 @@ output/playwright/
 .omx/
 
 .worktrees/
+
+# Local AI tool profiles
+.openclaude-profile.json
