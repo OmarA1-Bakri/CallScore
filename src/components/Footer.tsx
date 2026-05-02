@@ -90,15 +90,23 @@ export default function Footer() {
 
         {/* Disclaimer */}
         <div className="border-t border-ink-200 pt-6">
-          <p className="text-ink-400 text-xs leading-relaxed mb-4">
-            <strong className="text-ink-500">Financial Disclaimer:</strong>{" "}
-            CallScore is an informational analytics platform only. Nothing
-            on this site constitutes financial advice, investment recommendations,
-            or endorsements. Cryptocurrency investments are highly volatile and
-            carry substantial risk of loss. Past performance of any creator does not
-            guarantee future results. Always do your own research (DYOR) and consult
-            a licensed financial advisor before making any investment decisions.
-          </p>
+          <details className="group mb-4">
+            <summary className="cursor-pointer list-none text-xs leading-relaxed text-ink-400">
+              <strong className="text-ink-500">Financial Disclaimer:</strong>{" "}
+              CallScore is an informational analytics platform only.
+              <span className="ml-2 font-mono uppercase tracking-caps text-accent">
+                Read full disclaimer
+              </span>
+            </summary>
+            <p className="mt-3 text-xs leading-relaxed text-ink-400">
+              Nothing on this site constitutes financial advice, investment
+              recommendations, or endorsements. Cryptocurrency investments are
+              highly volatile and carry substantial risk of loss. Past performance
+              of any creator does not guarantee future results. Always do your own
+              research (DYOR) and consult a licensed financial advisor before
+              making any investment decisions.
+            </p>
+          </details>
           <p className="text-ink-400 text-xs">
             &copy; {new Date().getFullYear()} CallScore. All rights
             reserved.

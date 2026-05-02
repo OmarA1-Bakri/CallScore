@@ -26,10 +26,10 @@ export default function MobileMenu({
   }, [open]);
 
   return (
-    <>
+    <div className="relative tab:hidden">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="tab:hidden text-ink-600 hover:text-ink-900"
+        className="text-ink-600 hover:text-ink-900"
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         aria-controls="mobile-nav"
@@ -40,7 +40,7 @@ export default function MobileMenu({
       {open && (
         <nav
           id="mobile-nav"
-          className="tab:hidden pb-4 space-y-2"
+          className="absolute right-0 top-12 z-popover w-[min(82vw,260px)] border border-ink-250 bg-ink-0 p-3 shadow-popover space-y-2"
           aria-label="Mobile navigation"
         >
           <Link
@@ -125,6 +125,6 @@ export default function MobileMenu({
           )}
         </nav>
       )}
-    </>
+    </div>
   );
 }

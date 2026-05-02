@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://cryptotuberranked.com/sitemap.xml
+Sitemap: https://www.call-score.com/sitemap.xml

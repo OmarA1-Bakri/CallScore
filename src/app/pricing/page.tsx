@@ -300,15 +300,12 @@ export default function PricingPage(): ReactElement {
             users who want to build on the data.
           </p>
           <p>
-            <b className="text-ink-900">No-questions refund?</b> 30 days, full refund, no
-            support thread. Email{" "}
-            <a
-              href="mailto:dave.shipsbuilds@proton.me"
-              className="text-accent hover:underline"
-            >
-              dave.shipsbuilds@proton.me
-            </a>
-            .
+            <b className="text-ink-900">Refunds?</b> 30 days, full refund. Send the
+            request through the{" "}
+            <Link href="/feedback" className="text-accent hover:underline">
+              feedback page
+            </Link>{" "}
+            with the email used at checkout.
           </p>
         </div>
       </EditorialSection>

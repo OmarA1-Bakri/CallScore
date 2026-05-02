@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import Link from "next/link";
-import { ArrowRight, LockKeyhole, Scale, ShieldCheck, Target, Trophy, TrendingUp } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
-import { EditorialSection } from "@/components/primitives";
+import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { getPublicCounts } from "@/lib/public-counts";
@@ -271,6 +270,13 @@ export default async function HomePage({
       trackedCalls: 0,
       scoredCalls: 0,
       beatBtcCreators: 0,
+      llmValidatedCalls: 0,
+      publicScoredCalls: 0,
+      pendingHorizonCalls: 0,
+      missingPriceCalls: 0,
+      missing30dCalls: 0,
+      targetPendingCalls: 0,
+      excludedLowConfidenceCalls: 0,
     };
   }
 
@@ -305,7 +311,7 @@ export default async function HomePage({
           }}
           aria-hidden="true"
         />
-        <div className="relative grid grid-cols-1 desk:grid-cols-[minmax(520px,0.82fr)_minmax(760px,1.18fr)] gap-10 desk:gap-16 items-center pt-10 tab:pt-14 desk:pt-8">
+        <div className="relative grid grid-cols-1 desk:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-10 desk:gap-14 items-center pt-10 tab:pt-14 desk:pt-8">
           <div className="desk:pt-6">
             <p
               className="inline-flex items-center gap-2 border border-accent/30 bg-accent/5 px-3 py-2 font-mono text-[12px] text-accent tracking-caps uppercase mb-6"
@@ -328,7 +334,7 @@ export default async function HomePage({
                 style={{ borderRadius: 4 }}
               >
                 View leaderboard
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <span aria-hidden="true">→</span>
               </Link>
               <Link
                 href="/methodology"
@@ -343,6 +349,18 @@ export default async function HomePage({
               <HeroTrustItem label="Evidence-based" />
               <HeroTrustItem label="Unbiased" />
             </div>
+            <p className="mt-4 max-w-[620px] font-mono text-[11px] uppercase tracking-caps text-ink-500">
+              Every eligible score ties back to source calls, timestamped evidence,
+              and the published price-window methodology.
+            </p>
+            <MetaStrip
+              cells={[
+                { k: "raw calls", v: publicCounts.trackedCalls.toLocaleString() },
+                { k: "LLM validated", v: publicCounts.llmValidatedCalls.toLocaleString() },
+                { k: "public scored", v: publicCounts.publicScoredCalls.toLocaleString() },
+                { k: "low-conf excluded", v: publicCounts.excludedLowConfidenceCalls.toLocaleString() },
+              ]}
+            />
           </div>
 
           <MarketCallPreview
@@ -350,6 +368,9 @@ export default async function HomePage({
             creatorCount={publicCounts.trackedCreators}
             beatBtcCreators={publicCounts.beatBtcCreators}
             rankedCreators={publicCounts.rankedCreators}
+            pendingHorizonCalls={publicCounts.pendingHorizonCalls}
+            excludedLowConfidenceCalls={publicCounts.excludedLowConfidenceCalls}
+            llmValidatedCalls={publicCounts.llmValidatedCalls}
             rows={leaderboard}
           />
         </div>
@@ -408,7 +429,7 @@ export default async function HomePage({
         }
         meta={
           <>
-            {publicCounts.rankedCreators} ranked creators · {totalCalls} scored calls
+            {publicCounts.rankedCreators} ranked creators · {totalCalls} public-scored calls
             <br />
             tier S/A/B/C · low-N flagged
           </>
@@ -455,7 +476,7 @@ interface PremiseRowProps {
 function HeroTrustItem({ label }: { readonly label: string }): ReactElement {
   return (
     <span className="inline-flex items-center gap-2">
-      <ShieldCheck className="h-4 w-4 text-ink-500" aria-hidden="true" />
+      <span className="font-mono text-[11px] text-accent" aria-hidden="true">✓</span>
       {label}
     </span>
   );
@@ -463,31 +484,11 @@ function HeroTrustItem({ label }: { readonly label: string }): ReactElement {
 
 function HeroFeatureRail(): ReactElement {
   const features = [
-    {
-      icon: Target,
-      title: "Track Every Eligible Call",
-      body: "We extract market calls from creator videos.",
-    },
-    {
-      icon: Scale,
-      title: "Score with Evidence",
-      body: "Objective scoring based on real market outcomes.",
-    },
-    {
-      icon: Trophy,
-      title: "Rank by Signal, Not Noise",
-      body: "Creators ranked by alpha, consistency and accuracy.",
-    },
-    {
-      icon: TrendingUp,
-      title: "See Who Adapts",
-      body: "We score corrections and course changes.",
-    },
-    {
-      icon: LockKeyhole,
-      title: "Unlock More Power",
-      body: "Alerts, exports, backtests, API access and webhooks.",
-    },
+    { mark: "01", title: "Track Every Eligible Call", body: "We extract market calls from creator videos." },
+    { mark: "02", title: "Score with Evidence", body: "Objective scoring based on real market outcomes." },
+    { mark: "03", title: "Rank by Signal, Not Noise", body: "Creators ranked by alpha, consistency and accuracy." },
+    { mark: "04", title: "See Who Adapts", body: "We score corrections and course changes." },
+    { mark: "05", title: "Unlock More Power", body: "Alerts, exports, backtests, API access and webhooks." },
   ] as const;
 
   return (
@@ -497,21 +498,20 @@ function HeroFeatureRail(): ReactElement {
     >
       <div className="absolute inset-x-8 top-0 h-px bg-accent/70" aria-hidden="true" />
       <div className="grid grid-cols-1 tab:grid-cols-2 desk:grid-cols-5">
-        {features.map((feature) => {
-          const Icon = feature.icon;
-          return (
-            <div
-              key={feature.title}
-              className="min-w-0 border-b tab:border-r desk:border-b-0 border-ink-200 last:border-b-0 desk:last:border-r-0 px-5 py-6"
-            >
-              <Icon className="h-7 w-7 text-accent mb-4" strokeWidth={1.7} aria-hidden="true" />
-              <h2 className="font-sans text-[17px] text-ink-900 font-medium leading-tight mb-2">
-                {feature.title}
-              </h2>
-              <p className="text-[14px] text-ink-600 leading-relaxed">{feature.body}</p>
-            </div>
-          );
-        })}
+        {features.map((feature) => (
+          <div
+            key={feature.title}
+            className="min-w-0 border-b tab:border-r desk:border-b-0 border-ink-200 last:border-b-0 desk:last:border-r-0 px-5 py-6"
+          >
+            <p className="font-mono text-[11px] text-accent tracking-caps uppercase mb-4">
+              {feature.mark}
+            </p>
+            <h2 className="font-sans text-[17px] text-ink-900 font-medium leading-tight mb-2">
+              {feature.title}
+            </h2>
+            <p className="text-[14px] text-ink-600 leading-relaxed">{feature.body}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -533,6 +533,9 @@ interface MarketCallPreviewProps {
   readonly creatorCount: number;
   readonly beatBtcCreators: number;
   readonly rankedCreators: number;
+  readonly pendingHorizonCalls: number;
+  readonly excludedLowConfidenceCalls: number;
+  readonly llmValidatedCalls: number;
   readonly rows: readonly LeaderboardRow[];
 }
 
@@ -541,6 +544,9 @@ function MarketCallPreview({
   creatorCount,
   beatBtcCreators,
   rankedCreators,
+  pendingHorizonCalls,
+  excludedLowConfidenceCalls,
+  llmValidatedCalls,
   rows,
 }: MarketCallPreviewProps): ReactElement {
   const previewRows = rows.slice(0, 5);
@@ -555,10 +561,11 @@ function MarketCallPreview({
   const missedShare = Math.max(0, Math.round((1 - hitRate) * 100));
   const hitShare = Math.max(0, Math.round(hitRate * 100));
   const neutralShare = Math.max(0, 100 - missedShare - hitShare);
+  const topCreator = previewRows[0];
 
   return (
     <div
-      className="relative w-full desk:rotate-[-1deg] border border-ink-250 bg-ink-0/80 p-4 tab:p-5 shadow-popover overflow-hidden"
+      className="relative mx-auto w-full max-w-[1040px] border border-ink-250 bg-ink-0/85 p-4 tab:p-5 shadow-popover overflow-hidden"
       style={{ borderRadius: 10 }}
       aria-label="CallScore product preview"
     >
@@ -577,18 +584,52 @@ function MarketCallPreview({
         <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-3">
           Call Summary
         </p>
-        <div className="grid grid-cols-2 tab:grid-cols-4 gap-0">
+        <div className="grid grid-cols-2 tab:grid-cols-4 gap-y-4 tab:gap-y-0">
           <PreviewMetric label="creators tracked" value={String(creatorCount)} />
           <PreviewMetric label="ranked creators" value={String(rankedCreators)} />
-          <PreviewMetric label="scored calls" value={totalCalls} />
+          <PreviewMetric label="public-scored" value={totalCalls} />
           <PreviewMetric
             label="beating BTC"
             value={`${beatBtcCreators}/${Math.max(rankedCreators, beatBtcCreators)}`}
           />
         </div>
+        <div className="mt-4 grid grid-cols-3 gap-y-4 border-t border-ink-200 pt-4">
+          <PreviewMetric label="LLM validated" value={String(llmValidatedCalls)} />
+          <PreviewMetric label="pending horizon" value={String(pendingHorizonCalls)} />
+          <PreviewMetric label="low-conf excluded" value={String(excludedLowConfidenceCalls)} />
+        </div>
       </div>
 
-      <div className="relative grid grid-cols-1 tab:grid-cols-[minmax(0,1fr)_156px] gap-4 mb-4">
+      {topCreator && (
+        <div
+          className="relative tab:hidden border border-ink-200 bg-ink-50/70 p-4 mb-4"
+          style={{ borderRadius: 8 }}
+        >
+          <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-3">
+            Current leader
+          </p>
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <p className="truncate font-serif text-[27px] leading-none text-ink-900">
+                {topCreator.creator.name}
+              </p>
+              <p className="mt-2 truncate font-mono text-[11px] text-ink-500">
+                {topCreator.creator.youtube_handle}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="font-serif text-[36px] leading-none text-pos">
+                {topCreator.stats.alpha_score.toFixed(1)}
+              </p>
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-caps text-ink-500">
+                alpha
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative hidden tab:grid tab:grid-cols-[minmax(0,1fr)_156px] gap-4 mb-4">
         <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 8 }}>
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-4">
             Score Distribution
@@ -621,7 +662,7 @@ function MarketCallPreview({
       </div>
 
       <div
-        className="relative border border-ink-200 bg-ink-50/70 p-4"
+        className="relative hidden tab:block border border-ink-200 bg-ink-50/70 p-4"
         style={{ borderRadius: 8 }}
       >
         <div className="flex items-center justify-between gap-4 border-b border-ink-200 pb-3 mb-3">
@@ -716,7 +757,7 @@ function PreviewMetric({
   readonly value: string;
 }): ReactElement {
   return (
-    <div className="min-w-0 border-r border-ink-200 last:border-r-0 px-3 first:pl-0 last:pr-0 py-1">
+    <div className="min-w-0 border-r border-ink-150 last:border-r-0 px-4 first:pl-0 last:pr-0 py-1">
       <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-1 truncate">
         {label}
       </p>

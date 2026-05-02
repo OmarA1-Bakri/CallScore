@@ -66,10 +66,21 @@ export default function Leaderboard({ rows }: LeaderboardProps): ReactElement {
   const free = rows.filter((r) => r.tier_required === "free");
 
   return (
-    <div className="overflow-x-auto">
-      {alpha.length > 0 && <TierGate tier="alpha">{renderTable(alpha)}</TierGate>}
-      {pro.length > 0 && <TierGate tier="pro">{renderTable(pro)}</TierGate>}
-      {free.length > 0 && renderTable(free)}
+    <div className="relative">
+      <div className="mb-2 flex items-center justify-end tab:hidden">
+        <span className="font-mono text-[10px] uppercase tracking-caps text-ink-500">
+          Scroll table
+        </span>
+      </div>
+      <div className="overflow-x-auto pb-2">
+        {alpha.length > 0 && <TierGate tier="alpha">{renderTable(alpha)}</TierGate>}
+        {pro.length > 0 && <TierGate tier="pro">{renderTable(pro)}</TierGate>}
+        {free.length > 0 && renderTable(free)}
+      </div>
+      <div
+        className="pointer-events-none absolute bottom-2 right-0 top-7 w-12 bg-gradient-to-l from-ink-0 to-transparent tab:hidden"
+        aria-hidden="true"
+      />
     </div>
   );
 }
