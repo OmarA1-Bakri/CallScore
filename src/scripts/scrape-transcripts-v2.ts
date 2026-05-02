@@ -15,6 +15,7 @@ interface Args {
   readonly transcriptLangs: readonly string[];
   readonly onlyMissing: boolean;
   readonly write: boolean;
+  readonly auditOut: string | null;
 }
 
 type MutableArgs = {
@@ -28,6 +29,7 @@ type MutableArgs = {
   transcriptLangs: string[];
   onlyMissing: boolean;
   write: boolean;
+  auditOut: string | null;
 };
 
 interface FirecrawlRow {
@@ -129,6 +131,7 @@ export function parseScrapeV2Args(argv: readonly string[]): Args {
     transcriptLangs: ["original", "en"],
     onlyMissing: true,
     write: false,
+    auditOut: null,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -150,12 +153,19 @@ export function parseScrapeV2Args(argv: readonly string[]): Args {
     else if (arg === "--since-days") args.sinceDays = Math.max(1, Number.parseInt(next(), 10) || 1);
     else if (arg === "--transcript-langs") args.transcriptLangs = next().split(",").map((s) => s.trim()).filter(Boolean);
     else if (arg === "--include-existing") args.onlyMissing = false;
+    else if (arg === "--audit-out") args.auditOut = next();
     else if (arg === "--write") args.write = true;
     else if (arg === "--dry-run") args.write = false;
     else throw new Error(`Unknown argument: ${arg}`);
   }
 
   return args as Args;
+}
+
+function audit(args: Args, row: Record<string, unknown>): void {
+  if (!args.auditOut) return;
+  fs.mkdirSync(path.dirname(args.auditOut), { recursive: true });
+  fs.appendFileSync(args.auditOut, `${JSON.stringify(row)}\n`);
 }
 
 function repoRoot(): string {
@@ -448,6 +458,18 @@ async function processCreator(creator: Creator, args: Args): Promise<{ inserted:
 
     const transcriptResult = await fetchTranscript(details, args.transcriptLangs);
     if (!transcriptResult.ok) {
+      audit(args, {
+        record_type: "transcript_backfill",
+        ts: timestamp(),
+        mode: args.write ? "WRITE" : "DRY",
+        status: "terminal_no_transcript",
+        reason: transcriptResult.reason,
+        detail: transcriptResult.detail,
+        video_id: existing[0]?.id,
+        creator_id: creator.id,
+        youtube_video_id: entry.id,
+        creator: creator.youtube_handle,
+      });
       console.log(`[${timestamp()}]   ${transcriptResult.reason} ${entry.id} ${details.title ?? entry.title ?? ""}${transcriptResult.detail ? ` detail=${transcriptResult.detail}` : ""}`);
       failed++;
       continue;
@@ -458,6 +480,19 @@ async function processCreator(creator: Creator, args: Args): Promise<{ inserted:
       await upsertVideo(creator, details, transcript.text, quality, publishedAt);
       await query("UPDATE creators SET last_scraped_at = NOW() WHERE id = $1", [creator.id]);
     }
+    audit(args, {
+      record_type: "transcript_backfill",
+      ts: timestamp(),
+      mode: args.write ? "WRITE" : "DRY",
+      status: args.write ? "updated" : "would_update",
+      video_id: existing[0]?.id,
+      creator_id: creator.id,
+      youtube_video_id: entry.id,
+      creator: creator.youtube_handle,
+      transcript_chars: transcript.text.length,
+      transcript_quality: quality,
+      source: transcript.source,
+    });
     inserted++;
     console.log(
       `[${timestamp()}]   ${args.write ? "saved" : "would-save"} ${entry.id} q=${quality.toFixed(2)} lang=${transcript.lang}${transcript.auto ? ":auto" : ""} ${details.title ?? entry.title ?? ""}`,

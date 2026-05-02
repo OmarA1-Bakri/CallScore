@@ -8,6 +8,7 @@ test("parseScrapeV2Args keeps scrape v2 dry-run by default", () => {
   assert.equal(args.limitVideos, 2);
   assert.deepEqual(args.transcriptLangs, ["original", "en", "all"]);
   assert.equal(args.write, false);
+  assert.equal(args.auditOut, null);
 });
 
 test("parseCaptionPayload handles json3 captions", () => {

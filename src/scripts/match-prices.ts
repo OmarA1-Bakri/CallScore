@@ -37,6 +37,38 @@ function timestamp(): string {
   return new Date().toISOString();
 }
 
+interface MatchPricesArgs {
+  readonly rematchAll: boolean;
+  readonly limit: number;
+  readonly batchSize: number;
+  readonly startAfterId: number;
+}
+
+function argValue(argv: readonly string[], flag: string): string | null {
+  const index = argv.indexOf(flag);
+  if (index < 0 || !argv[index + 1]) return null;
+  return argv[index + 1];
+}
+
+function positiveInt(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function nonNegativeInt(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
+export function parseMatchPricesArgs(argv = process.argv.slice(2)): MatchPricesArgs {
+  return {
+    rematchAll: argv.includes("--all") || argv.includes("--full") || argv.includes("--recompute"),
+    limit: positiveInt(argValue(argv, "--limit"), Number.MAX_SAFE_INTEGER),
+    batchSize: positiveInt(argValue(argv, "--batch-size"), 200),
+    startAfterId: nonNegativeInt(argValue(argv, "--start-after-id"), 0),
+  };
+}
+
 // ── In-memory price cache ─────────────────────────────────────────
 // Key: `${symbol}:${roundedMs}` → { close, regime }
 // Rounds timestamps to 5-min intervals to maximize cache hits.
@@ -255,25 +287,29 @@ async function processCall(call: UnmatchedCall): Promise<boolean> {
 }
 
 // ── Main ──────────────────────────────────────────────────────────
-async function main(): Promise<void> {
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
+  const args = parseMatchPricesArgs(argv);
 
-  console.log(`[${timestamp()}] Starting price matching (with cache)...`);
+  console.log(`[${timestamp()}] Starting price matching (${args.rematchAll ? "full recompute" : "missing-only"}, with cache)...`);
 
-  const BATCH_SIZE = 200;
   let totalMatched = 0;
   let totalSkipped = 0;
-  let lastId = 0;
+  let totalSeen = 0;
+  let lastId = args.startAfterId;
 
   while (true) {
+    const remaining = args.limit - totalSeen;
+    if (remaining <= 0) break;
+
     // Use cursor-based pagination (faster than OFFSET for large datasets)
     const batch = await query<UnmatchedCall>(
       `SELECT id, symbol, direction, target_price, stop_loss, call_date
        FROM calls
-       WHERE price_at_call IS NULL AND id > $1
+       WHERE ${args.rematchAll ? "id > $1" : "price_at_call IS NULL AND id > $1"}
        ORDER BY id ASC
        LIMIT $2`,
-      [lastId, BATCH_SIZE],
+      [lastId, Math.min(args.batchSize, remaining)],
     );
 
     if (batch.length === 0) break;
@@ -283,6 +319,7 @@ async function main(): Promise<void> {
     );
 
     for (const call of batch) {
+      totalSeen++;
       try {
         const matched = await processCall(call);
         if (matched) {
@@ -304,12 +341,14 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `[${timestamp()}] Price matching complete: ${totalMatched} matched, ${totalSkipped} skipped`,
+    `[${timestamp()}] Price matching complete: ${totalSeen} considered, ${totalMatched} matched, ${totalSkipped} skipped`,
   );
   console.log(`[${timestamp()}] Cache stats: ${priceCache.size} price entries, ${highLowCache.size} high/low entries`);
 }
 
-main().catch((err) => {
-  console.error(`[${new Date().toISOString()}] Fatal error:`, err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`[${new Date().toISOString()}] Fatal error:`, err);
+    process.exit(1);
+  });
+}
