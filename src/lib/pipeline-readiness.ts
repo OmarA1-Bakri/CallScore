@@ -250,6 +250,7 @@ export function buildPipelineReadinessSummary(input: {
   readonly promotionRecords: readonly PromotionAuditRecord[];
   readonly terminalPublicationDateRecords?: readonly TerminalVideoAuditRecord[];
   readonly terminalTranscriptRecords?: readonly TerminalVideoAuditRecord[];
+  readonly requireFullShadowRecheck?: boolean;
 }): PipelineReadinessSummary {
   const shadow = summarizeShadowArtifacts(input.extractionRecords, input.diffRecords);
   const promotion = summarizePromotionAudit(input.promotionRecords);
@@ -267,7 +268,9 @@ export function buildPipelineReadinessSummary(input: {
   if (shadow.failedExtractions > 0) blockers.push("shadow_failed_extractions");
   if (creatorCompleteness.byStatus.missing_publication_dates > 0) blockers.push("missing_publication_dates");
   if (creatorCompleteness.byStatus.missing_transcripts > 0) blockers.push("missing_transcripts_or_terminal_reasons");
-  if (creatorCompleteness.byStatus.pending_shadow > 0) blockers.push("pending_shadow_recheck");
+  if (input.requireFullShadowRecheck !== false && creatorCompleteness.byStatus.pending_shadow > 0) {
+    blockers.push("pending_shadow_recheck");
+  }
 
   return {
     generated_at: input.generatedAt,

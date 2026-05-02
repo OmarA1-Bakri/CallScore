@@ -273,6 +273,7 @@ export function buildDataPipelineStageCommands(args: DataPipelineArgs): Record<S
       "--promote-in", shadowPromoteAuditOut,
       "--transcript-audit-in", transcriptAuditOut,
       "--run-id", args.shadowRunId,
+      "--allow-partial-shadow",
       "--audit-out", path.resolve(repoRoot(), args.auditDir, "pipeline-readiness.json"),
       "--summary",
     ])],

@@ -152,3 +152,20 @@ test("buildPipelineReadinessSummary accepts terminal date and transcript audit c
   assert.equal(summary.terminalCoverage.transcriptVideos, 1);
   assert.deepEqual(summary.blockers, []);
 });
+
+test("buildPipelineReadinessSummary can allow bounded shadow runs for shipping readiness", () => {
+  const summary = buildPipelineReadinessSummary({
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    publicCounts: DEFAULT_PUBLIC_COUNTS,
+    creators: [
+      creator({ extraction_eligible_videos: 2 }),
+    ],
+    extractionRecords: [shadow()],
+    diffRecords: [],
+    promotionRecords: [],
+    requireFullShadowRecheck: false,
+  });
+
+  assert.equal(summary.creatorCompleteness.byStatus.pending_shadow, 1);
+  assert.ok(!summary.blockers.includes("pending_shadow_recheck"));
+});

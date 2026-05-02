@@ -24,6 +24,7 @@ interface PipelineReadinessArgs {
   readonly auditOut: string | null;
   readonly failOnBlockers: boolean;
   readonly summary: boolean;
+  readonly requireFullShadowRecheck: boolean;
 }
 
 interface PromotionAuditRecord {
@@ -51,6 +52,7 @@ export function parsePipelineReadinessArgs(argv = process.argv.slice(2)): Pipeli
     auditOut: argValue(argv, "--audit-out"),
     failOnBlockers: argv.includes("--fail-on-blockers"),
     summary: argv.includes("--summary"),
+    requireFullShadowRecheck: !argv.includes("--allow-partial-shadow"),
   };
 }
 
@@ -168,6 +170,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     promotionRecords,
     terminalPublicationDateRecords,
     terminalTranscriptRecords,
+    requireFullShadowRecheck: args.requireFullShadowRecheck,
   });
 
   if (args.auditOut) writeJsonFile(args.auditOut, summary);

@@ -112,7 +112,7 @@ async function fetchViaSerpApi(videoId: string): Promise<TranscriptResult | null
   }
 }
 
-function stripCaptionText(text: string): string {
+export function stripCaptionText(text: string): string {
   return text
     .replace(/^WEBVTT.*$/gm, "")
     .replace(/^Kind:.*$/gm, "")
@@ -127,6 +127,11 @@ function stripCaptionText(text: string): string {
     .join(" ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function extractRequestedSubtitleUrl(text: string): string | null {
+  const match = text.match(/['"]url['"]:\s*['"]([^'"]+)['"]/);
+  return match?.[1].replace(/\\u0026/g, "&") ?? null;
 }
 
 async function fetchViaYtDlp(videoId: string): Promise<TranscriptResult | null> {
@@ -145,7 +150,11 @@ async function fetchViaYtDlp(videoId: string): Promise<TranscriptResult | null> 
       "requested_subtitles",
       `https://www.youtube.com/watch?v=${videoId}`,
     ], { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 });
-    const text = stripCaptionText(stdout);
+    const subtitleUrl = extractRequestedSubtitleUrl(stdout);
+    const captionText = subtitleUrl
+      ? await fetch(subtitleUrl, { signal: AbortSignal.timeout(20_000) }).then((response) => response.ok ? response.text() : "")
+      : stdout;
+    const text = stripCaptionText(captionText);
     if (text.length < 200) return null;
     return { text, quality: transcriptQuality(text), source: "yt-dlp" };
   } catch {

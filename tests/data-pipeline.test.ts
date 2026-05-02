@@ -4,7 +4,11 @@ import { buildDataPipelineStageCommands, parseDataPipelineArgs } from "../src/sc
 import { parseMatchPricesArgs } from "../src/scripts/match-prices";
 import { parseVerifyPublicSurfaceArgs } from "../src/scripts/verify-public-surface";
 import { parseBackfillPublicationDatesArgs } from "../src/scripts/backfill-publication-dates";
-import { parseBackfillTranscriptsArgs } from "../src/scripts/backfill-transcripts";
+import {
+  extractRequestedSubtitleUrl,
+  parseBackfillTranscriptsArgs,
+  stripCaptionText,
+} from "../src/scripts/backfill-transcripts";
 
 test("data pipeline defaults to safe local dry-run for top creators", () => {
   const args = parseDataPipelineArgs([]);
@@ -163,6 +167,18 @@ test("transcript backfill is dry-run and bounded by default", () => {
   assert.equal(args.write, false);
 });
 
+test("yt-dlp requested_subtitles output is dereferenced instead of stored as transcript text", () => {
+  const url = "https://www.youtube.com/api/timedtext?v=abc\\u0026lang=en";
+  assert.equal(
+    extractRequestedSubtitleUrl(`{'en-orig': {'ext': 'vtt', 'url': '${url}'}}`),
+    "https://www.youtube.com/api/timedtext?v=abc&lang=en",
+  );
+  assert.equal(
+    stripCaptionText("WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nhello <c>world</c>\nhello world"),
+    "hello world",
+  );
+});
+
 test("data pipeline wires shadow commands safely in dry-run mode", () => {
   const args = parseDataPipelineArgs([
     "--creators",
@@ -186,6 +202,7 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
   assert.ok(commands["shadow-promote"][0].some((part) => part.endsWith("shadow-promote.jsonl")));
   assert.equal(commands["shadow-promote"][0].includes("--write"), false);
   assert.ok(commands["pipeline-readiness"][0].includes("src/scripts/audit-pipeline-readiness.ts"));
+  assert.ok(commands["pipeline-readiness"][0].includes("--allow-partial-shadow"));
   assert.ok(commands["verify-public-surface"][0].includes("src/scripts/verify-public-surface.ts"));
   assert.deepEqual(commands["match-prices"], []);
 });
