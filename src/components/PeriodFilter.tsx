@@ -41,7 +41,7 @@ export default function PeriodFilter({ value, canUseRecent = true }: PeriodFilte
             role="tab"
             aria-selected={active}
             onClick={() => handleClick(p.value)}
-            className={`font-mono text-[11px] tracking-caps uppercase px-4 py-2.5 -mb-px border-b-2 transition-colors ${
+            className={`font-mono text-[12px] tracking-caps uppercase px-4 py-2.5 -mb-px border-b-2 transition-colors ${
               active
                 ? "border-accent text-ink-900"
                 : !canUseRecent && p.value !== "all_time"

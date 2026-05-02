@@ -90,23 +90,23 @@ function PlanCard({
       {/* Plan name as a styled label, NOT a Chip — Chip is reserved for status/category
           microlabels (round2-004). Plan-tier identifier sits between Chip (9.5px) and h2. */}
       <div
-        className={`font-mono text-[12px] tracking-caps uppercase mb-3 ${
+        className={`font-mono text-[13px] tracking-caps uppercase mb-3 ${
           emphasis ? "text-accent" : "text-ink-700"
         }`}
       >
         {name}
       </div>
       <div className="mt-1 mb-3 flex items-baseline gap-1.5">
-        <span className="font-serif text-[40px] text-ink-900 font-medium tabular-nums leading-none">
+        <span className="font-serif text-[41px] text-ink-900 font-medium tabular-nums leading-none">
           {price}
         </span>
-        <span className="font-mono text-[11px] text-ink-500 tracking-wide">{cadence}</span>
+        <span className="font-mono text-[12px] text-ink-500 tracking-wide">{cadence}</span>
       </div>
-      <p className="font-serif text-[15px] text-ink-700 leading-relaxed mb-6">{tagline}</p>
+      <p className="font-serif text-[16px] text-ink-700 leading-relaxed mb-6">{tagline}</p>
       {ctaVariant === "button" && (
         <Link
           href={ctaHref}
-          className={`mt-auto inline-block text-center font-mono text-[11px] tracking-caps uppercase px-4 py-2.5 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent ${
+          className={`mt-auto inline-block text-center font-mono text-[12px] tracking-caps uppercase px-4 py-2.5 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent ${
             emphasis
               ? "bg-accent hover:bg-accent-dim text-ink-0"
               : "border border-ink-300 text-ink-700 hover:bg-ink-100"
@@ -119,7 +119,7 @@ function PlanCard({
       {ctaVariant === "soft" && (
         <Link
           href={ctaHref}
-          className="mt-auto font-mono text-[11px] tracking-wide text-accent hover:underline underline-offset-4 focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+          className="mt-auto font-mono text-[12px] tracking-wide text-accent hover:underline underline-offset-4 focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
         >
           {cta} <span aria-hidden="true">&rarr;</span>
         </Link>
@@ -133,11 +133,11 @@ export default function PricingPage(): ReactElement {
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
       {/* HERO */}
       <section className="pb-12 border-b border-ink-250">
-        <h1 className="font-serif text-[34px] tab:text-[44px] desk:text-[52px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
+        <h1 className="font-serif text-[35px] tab:text-[45px] desk:text-[53px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
           CallScore plans.{" "}
           <em className="italic font-normal text-accent">Free research, paid delivery.</em>
         </h1>
-        <p className="font-serif text-[19px] text-ink-700 leading-relaxed max-w-[760px]">
+        <p className="font-serif text-[20px] text-ink-700 leading-relaxed max-w-[760px]">
           Leaderboards stay free. Paid tiers add alerts, exports, backtests, and API access.
         </p>
         <MetaStrip
@@ -147,7 +147,7 @@ export default function PricingPage(): ReactElement {
               k: "pro",
               v: (
                 <>
-                  $19<span className="text-ink-500 text-[14px]"> /mo</span>
+                  $19<span className="text-ink-500 text-[15px]"> /mo</span>
                 </>
               ),
             },
@@ -155,7 +155,7 @@ export default function PricingPage(): ReactElement {
               k: "alpha",
               v: (
                 <>
-                  $49<span className="text-ink-500 text-[14px]"> /mo</span>
+                  $49<span className="text-ink-500 text-[15px]"> /mo</span>
                 </>
               ),
             },
@@ -227,31 +227,31 @@ export default function PricingPage(): ReactElement {
         }
       >
         <div className="overflow-x-auto">
-          <table className="w-full font-mono text-[12px]">
+          <table className="w-full font-mono text-[13px]">
             <caption className="sr-only">Feature availability by tier</caption>
             <thead className="sticky top-0 bg-ink-50 z-sticky">
               <tr className="border-b border-ink-250">
                 <th
                   scope="col"
-                  className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3"
+                  className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3"
                 >
                   Feature
                 </th>
                 <th
                   scope="col"
-                  className="text-center text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
+                  className="text-center text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
                 >
                   Free
                 </th>
                 <th
                   scope="col"
-                  className="text-center text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
+                  className="text-center text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
                 >
                   Pro
                 </th>
                 <th
                   scope="col"
-                  className="text-center text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
+                  className="text-center text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2.5 px-3 w-20"
                 >
                   Alpha
                 </th>
@@ -260,7 +260,7 @@ export default function PricingPage(): ReactElement {
             <tbody>
               {FEATURES.map((f) => (
                 <tr key={f.label} className="border-b border-ink-150">
-                  <td className="py-3 px-3 font-serif text-[14px] text-ink-800">{f.label}</td>
+                  <td className="py-3 px-3 font-serif text-[15px] text-ink-800">{f.label}</td>
                   {(["free", "pro", "alpha"] as const).map((tier) => (
                     <td
                       key={tier}
@@ -286,7 +286,7 @@ export default function PricingPage(): ReactElement {
           </>
         }
       >
-        <div className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px] space-y-4">
+        <div className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[680px] space-y-4">
           <p>
             <b className="text-ink-900">Why is research free?</b> Because the value of an
             accuracy tracker is in the public methodology, not the data lock. If we hid the

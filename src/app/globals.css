@@ -77,7 +77,7 @@
     background: var(--ink-000);
     color: var(--ink-700);
     font-family: var(--font-sans);
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.5;
     font-feature-settings: "tnum", "ss01";
   }

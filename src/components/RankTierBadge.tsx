@@ -19,13 +19,13 @@ export default function RankTierBadge({ rank, totalCalls, wilsonLb }: RankTierBa
   return (
     <div className="flex items-center gap-1.5">
       <span
-        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${tier.color}`}
+        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold uppercase border ${tier.color}`}
       >
         {tier.label}
       </span>
       {lowData && (
         <span
-          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent border border-accent/20"
+          className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-accent/10 text-accent border border-accent/20"
           title={`Only ${totalCalls} scored calls — ranking may shift with more data`}
         >
           Low N
@@ -40,7 +40,7 @@ export function WilsonRange({ wilsonLb, winRate }: { readonly wilsonLb: number; 
   const displayWr = (winRate * 100).toFixed(0);
 
   return (
-    <span className="text-[10px] text-ink-500 tabular-nums" title="Wilson 95% lower bound">
+    <span className="text-[11px] text-ink-500 tabular-nums" title="Wilson 95% lower bound">
       {displayLb}–{displayWr}%
     </span>
   );

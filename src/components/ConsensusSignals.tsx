@@ -29,12 +29,12 @@ export default function ConsensusSignals({ signals, locked = false }: ConsensusS
       {/* Signal list */}
       {locked ? (
         <div className="border border-accent-dim bg-accent-low p-4">
-          <p className="font-serif text-[16px] text-ink-900">
+          <p className="font-serif text-[17px] text-ink-900">
             Alpha unlocks live convergence and anti-consensus signals.
           </p>
           <a
             href="/pricing"
-            className="inline-block mt-3 font-mono text-[11px] tracking-caps uppercase text-accent hover:underline"
+            className="inline-block mt-3 font-mono text-[12px] tracking-caps uppercase text-accent hover:underline"
           >
             Upgrade to Alpha
           </a>

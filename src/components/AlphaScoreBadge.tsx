@@ -13,9 +13,9 @@ function tone(score: number): { fg: string; bar: string } {
 }
 
 const SIZES = {
-  sm: { num: "text-[20px]", unit: "text-[10px]" },
-  md: { num: "text-[28px]", unit: "text-[11px]" },
-  lg: { num: "text-[40px]", unit: "text-[13px]" },
+  sm: { num: "text-[21px]", unit: "text-[11px]" },
+  md: { num: "text-[29px]", unit: "text-[12px]" },
+  lg: { num: "text-[41px]", unit: "text-[14px]" },
 } as const;
 
 export default function AlphaScoreBadge({
@@ -37,7 +37,7 @@ export default function AlphaScoreBadge({
         </span>
         <span className={`font-mono ${s.unit} text-ink-500 tracking-wide`}>α</span>
       </div>
-      <div className="font-mono text-[9px] text-ink-500 tracking-caps uppercase">
+      <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase">
         Alpha Score
       </div>
     </div>
@@ -50,7 +50,7 @@ export function AlphaScoreBar({ score }: { readonly score: number }): ReactEleme
   const t = tone(rounded);
   return (
     <div className="flex items-center gap-2 min-w-[140px]">
-      <span className={`font-mono text-[12px] tabular-nums w-9 text-right ${t.fg}`}>
+      <span className={`font-mono text-[13px] tabular-nums w-9 text-right ${t.fg}`}>
         {rounded}
       </span>
       <div className="flex-1 h-px relative bg-ink-200">

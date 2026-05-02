@@ -294,7 +294,7 @@ function SortableHeader({
           ⇅
         </span>
         {isActive && (
-          <span className="text-accent text-[8px]">
+          <span className="text-accent text-[9px]">
             {currentDir === "asc" ? "ASC" : "DESC"}
           </span>
         )}

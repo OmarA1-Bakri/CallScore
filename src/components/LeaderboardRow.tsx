@@ -27,7 +27,7 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
     <tr className="border-b border-ink-150 hover:bg-ink-100/60 transition-colors">
       {/* Rank — serif numeral */}
       <td className="py-3 pr-4 align-baseline w-[56px]">
-        <span className="font-serif text-[18px] text-accent font-medium tabular-nums">
+        <span className="font-serif text-[19px] text-accent font-medium tabular-nums">
           {String(row.rank).padStart(2, "0")}
         </span>
       </td>
@@ -38,40 +38,40 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
           className="flex items-baseline gap-2.5 group focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
         >
           <span
-            className="inline-flex items-center justify-center w-[22px] h-[22px] bg-ink-200 border border-ink-300 font-serif text-[10px] text-ink-800 shrink-0"
+            className="inline-flex items-center justify-center w-[22px] h-[22px] bg-ink-200 border border-ink-300 font-serif text-[11px] text-ink-800 shrink-0"
             style={{ borderRadius: 2 }}
             aria-hidden="true"
           >
             {getInitials(row.creator.name)}
           </span>
           <span className="min-w-0">
-            <span className="block font-serif text-[15px] text-ink-900 group-hover:text-accent transition-colors leading-tight truncate">
+            <span className="block font-serif text-[16px] text-ink-900 group-hover:text-accent transition-colors leading-tight truncate">
               {row.creator.name}
             </span>
-            <span className="block font-mono text-[10px] text-ink-500 tracking-wide mt-0.5 truncate">
+            <span className="block font-mono text-[11px] text-ink-500 tracking-wide mt-0.5 truncate">
               {row.creator.youtube_handle}
             </span>
           </span>
         </Link>
       </td>
       {/* Alpha — score with unit */}
-      <td className={`py-3 pr-4 text-right tabular-nums font-mono text-[13px] ${alphaTone}`}>
+      <td className={`py-3 pr-4 text-right tabular-nums font-mono text-[14px] ${alphaTone}`}>
         {alpha.toFixed(1)}
-        <span className="text-ink-500 text-[10px] ml-1">α</span>
+        <span className="text-ink-500 text-[11px] ml-1">α</span>
       </td>
       {/* 30d Δ */}
-      <td className="py-3 pr-4 text-right tabular-nums font-mono text-[12px]">
+      <td className="py-3 pr-4 text-right tabular-nums font-mono text-[13px]">
         <span className={delta30 >= 0 ? "text-pos" : "text-neg"}>
           {delta30 >= 0 ? "+" : ""}
           {delta30.toFixed(1)}
         </span>
       </td>
       {/* Win % */}
-      <td className="py-3 pr-4 text-right tabular-nums font-mono text-[12px] text-ink-700">
+      <td className="py-3 pr-4 text-right tabular-nums font-mono text-[13px] text-ink-700">
         {winPct}<span className="text-ink-500">%</span>
       </td>
       {/* N — scored-call count */}
-      <td className="py-3 pr-4 text-right tabular-nums font-mono text-[12px] text-ink-600">
+      <td className="py-3 pr-4 text-right tabular-nums font-mono text-[13px] text-ink-600">
         {row.stats.total_calls}
       </td>
       {/* Tier — score-based S/A/B/C (distinct from auth-tier row grouping) */}
@@ -83,7 +83,7 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
         />
       </td>
       {/* Last call — most recent scored symbol */}
-      <td className="py-3 text-right font-mono text-[11px] text-ink-600">{lastCall}</td>
+      <td className="py-3 text-right font-mono text-[12px] text-ink-600">{lastCall}</td>
     </tr>
   );
 }

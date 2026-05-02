@@ -148,21 +148,21 @@ export default async function CallDetailPage({ params }: PageProps) {
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-12">
       <Link
         href={`/creator/${creatorHandle}`}
-        className="inline-flex items-center gap-1.5 font-mono text-[10px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mb-8"
+        className="inline-flex items-center gap-1.5 font-mono text-[11px] text-ink-500 hover:text-ink-700 tracking-caps uppercase mb-8"
       >
         <span aria-hidden="true">←</span> {creatorName}
       </Link>
 
       {/* HERO */}
       <section className="pb-10 border-b border-ink-250">
-        <div className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-2">
+        <div className="font-mono text-[11px] text-ink-500 tracking-caps uppercase mb-2">
           Call · {new Date(serializedCall.call_date).toISOString().slice(0, 10)} · {creatorName}
         </div>
-        <h1 className="font-serif text-[34px] tab:text-[44px] text-ink-900 font-medium tracking-tight leading-[1.1] mb-2">
+        <h1 className="font-serif text-[35px] tab:text-[45px] text-ink-900 font-medium tracking-tight leading-[1.1] mb-2">
           {ticker}{" "}
           <em className="italic font-normal text-accent">{directionLabel}</em>
         </h1>
-        <p className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px]">
+        <p className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[680px]">
           Scored against Binance candles for the 30-day window following the call date.
           {serializedCall.target_price !== null && (
             <>
@@ -192,7 +192,7 @@ export default async function CallDetailPage({ params }: PageProps) {
             target={serializedCall.public_score_components.target}
           />
         ) : (
-          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+          <p className="font-mono text-[12px] text-ink-500 tracking-wide">
             Score is being computed. Check back after the next pipeline run.
           </p>
         )}
@@ -210,7 +210,7 @@ export default async function CallDetailPage({ params }: PageProps) {
               <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
                 30d return
               </dt>
-              <dd className="font-serif text-[24px] text-ink-900 font-medium tracking-tight tabular-nums">
+              <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight tabular-nums">
                 {serializedCall.return_30d >= 0 ? "+" : ""}
                 {serializedCall.return_30d.toFixed(1)}%
               </dd>
@@ -220,7 +220,7 @@ export default async function CallDetailPage({ params }: PageProps) {
                 <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
                   alpha vs BTC
                 </dt>
-                <dd className="font-serif text-[24px] text-ink-900 font-medium tracking-tight tabular-nums">
+                <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight tabular-nums">
                   {serializedCall.alpha_30d >= 0 ? "+" : ""}
                   {serializedCall.alpha_30d.toFixed(1)}%
                 </dd>
@@ -231,7 +231,7 @@ export default async function CallDetailPage({ params }: PageProps) {
                 <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
                   price at +30d
                 </dt>
-                <dd className="font-serif text-[24px] text-ink-900 font-medium tracking-tight tabular-nums">
+                <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight tabular-nums">
                   ${serializedCall.price_30d.toLocaleString()}
                 </dd>
               </div>
@@ -239,7 +239,7 @@ export default async function CallDetailPage({ params }: PageProps) {
           </dl>
         ) : (
           <div className="border-t border-ink-250 py-12 text-center">
-            <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+            <p className="font-mono text-[12px] text-ink-500 tracking-wide">
               Performance data not yet computed for this call.
             </p>
           </div>
@@ -264,7 +264,7 @@ export default async function CallDetailPage({ params }: PageProps) {
             />
           </div>
         ) : youtubeVideoId ? (
-          <p className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[680px]">
+          <p className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[680px]">
             Timestamp not yet linked.{" "}
             <a
               href={`https://www.youtube.com/watch?v=${youtubeVideoId}`}
@@ -276,7 +276,7 @@ export default async function CallDetailPage({ params }: PageProps) {
             </a>
           </p>
         ) : (
-          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+          <p className="font-mono text-[12px] text-ink-500 tracking-wide">
             Source clip not yet linked to this call. The transcript is in our pipeline but the video URL is pending.
           </p>
         )}
@@ -293,12 +293,12 @@ export default async function CallDetailPage({ params }: PageProps) {
         meta={<>extraction provenance<br />reproduce with: npm run audit:recompute</>}
       >
         {serializedCall.extraction_confidence !== null ? (
-          <table className="w-full font-mono text-[11px]">
+          <table className="w-full font-mono text-[12px]">
             <thead>
               <tr className="border-b border-ink-250">
-                <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-32">When</th>
-                <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 w-24">Stage</th>
-                <th className="text-left text-[10px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-4">Output</th>
+                <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 w-32">When</th>
+                <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 w-24">Stage</th>
+                <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-4">Output</th>
               </tr>
             </thead>
             <tbody>
@@ -314,7 +314,7 @@ export default async function CallDetailPage({ params }: PageProps) {
             </tbody>
           </table>
         ) : (
-          <p className="font-mono text-[11px] text-ink-500 tracking-wide">
+          <p className="font-mono text-[12px] text-ink-500 tracking-wide">
             No recompute history yet. This call was scored once at extraction.
           </p>
         )}

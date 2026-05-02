@@ -171,7 +171,7 @@ function LedgerRow({ call }: LedgerRowProps) {
   const verdict = hit ? "HIT " : "MISS";
   return (
     <div
-      className="font-mono text-[11px] sm:text-xs whitespace-pre"
+      className="font-mono text-[12px] sm:text-xs whitespace-pre"
       style={{ color }}
     >
       {`${date}  ${ticker} ${direction} ${entry} ${exit} ${ret} ${alpha}  ${verdict}`}
@@ -485,7 +485,7 @@ export default async function BacktestPage({
                 style={{ borderColor: COLOR_DIM }}
               >
                 <div
-                  className="font-mono text-[11px] sm:text-xs whitespace-pre mb-2"
+                  className="font-mono text-[12px] sm:text-xs whitespace-pre mb-2"
                   style={{ color: COLOR_MID }}
                 >
                   {`DATE        TICKER     DIR   ENTRY      EXIT       RET%     ALPHA     HIT/MISS`}
@@ -507,7 +507,7 @@ export default async function BacktestPage({
       )}
 
       <footer
-        className="pt-4 border-t text-[11px]"
+        className="pt-4 border-t text-[12px]"
         style={{ borderColor: COLOR_DIM, color: COLOR_MID }}
       >
         {`// scoring: return_30d (close-to-close) :: benchmark: BTCUSDT :: source: CryptoTubers Ranked`}

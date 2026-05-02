@@ -52,7 +52,7 @@ export default function SelfCorrectionBadge({
 
   return (
     <span
-      className="font-mono text-[11px] inline-flex items-center"
+      className="font-mono text-[12px] inline-flex items-center"
       style={{ color }}
       title={title}
     >
