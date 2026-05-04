@@ -17,8 +17,55 @@ export interface ApiKeyAuth {
   readonly apiKeyId: number;
 }
 
+export interface ApiKeyRequestRow {
+  readonly id: number;
+  readonly api_key_id: number;
+  readonly key_name: string;
+  readonly key_prefix: string;
+  readonly method: string;
+  readonly path: string;
+  readonly created_at: string;
+}
+
+export interface ApiKeyReveal {
+  readonly name: string;
+  readonly prefix: string;
+  readonly secret: string;
+}
+
+export const API_KEY_REVEAL_COOKIE_NAME = "ctr_api_key_reveal";
+
 function hashKey(secret: string): string {
   return crypto.createHash("sha256").update(secret).digest("hex");
+}
+
+export function createApiKeyRevealCookieValue(reveal: ApiKeyReveal): string {
+  return Buffer.from(JSON.stringify(reveal), "utf8").toString("base64url");
+}
+
+export function parseApiKeyRevealCookieValue(
+  value: string | null | undefined,
+): ApiKeyReveal | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<ApiKeyReveal>;
+    if (
+      typeof parsed.name !== "string" ||
+      typeof parsed.prefix !== "string" ||
+      typeof parsed.secret !== "string"
+    ) {
+      return null;
+    }
+    return {
+      name: parsed.name,
+      prefix: parsed.prefix,
+      secret: parsed.secret,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function generateApiKeySecret(): string {
@@ -72,4 +119,52 @@ export async function verifyApiKey(secret: string): Promise<ApiKeyAuth | null> {
   );
   const row = rows[0];
   return row ? { userId: row.user_id, tier: "alpha", apiKeyId: row.id } : null;
+}
+
+export async function recordApiKeyRequest(
+  userId: string,
+  apiKeyId: number,
+  method: string,
+  path: string,
+): Promise<void> {
+  try {
+    await query(
+      `INSERT INTO alpha_api_key_requests (api_key_id, user_id, method, path)
+       VALUES ($1, $2, $3, $4)`,
+      [apiKeyId, userId, method.slice(0, 16), path.slice(0, 256)],
+    );
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "request log unavailable";
+    console.warn("[api-keys.recordApiKeyRequest]", message);
+  }
+}
+
+export async function listApiKeyRequests(
+  userId: string,
+  limit: number = 20,
+): Promise<ApiKeyRequestRow[]> {
+  try {
+    return await query<ApiKeyRequestRow>(
+      `SELECT
+         r.id,
+         r.api_key_id,
+         k.name AS key_name,
+         k.prefix AS key_prefix,
+         r.method,
+         r.path,
+         r.created_at
+       FROM alpha_api_key_requests r
+       JOIN alpha_api_keys k ON k.id = r.api_key_id
+       WHERE r.user_id = $1
+       ORDER BY r.created_at DESC
+       LIMIT $2`,
+      [userId, limit],
+    );
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "request logs unavailable";
+    console.warn("[api-keys.listApiKeyRequests]", message);
+    return [];
+  }
 }
