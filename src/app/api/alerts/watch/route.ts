@@ -22,12 +22,68 @@ function upgradeRequired(): NextResponse {
   );
 }
 
+function buildSettingsRedirect(
+  requestUrl: string,
+  status: "added" | "removed" | "error",
+  queryValue: FormDataEntryValue | null,
+): URL {
+  const url = new URL("/settings/alerts", requestUrl);
+  if (status === "error") url.searchParams.set("error", "creator_not_found");
+  else url.searchParams.set(status, "1");
+
+  if (typeof queryValue === "string") {
+    const q = queryValue.trim().slice(0, 80);
+    if (q) url.searchParams.set("q", q);
+  }
+  return url;
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const session = await getSession();
   if (!session) return unauthorized();
 
   if (!hasAccess(session.tier, "pro")) {
     return upgradeRequired();
+  }
+
+  const contentType = request.headers.get("content-type") ?? "";
+  if (
+    contentType.includes("application/x-www-form-urlencoded") ||
+    contentType.includes("multipart/form-data")
+  ) {
+    const form = await request.formData();
+    const creatorId = parseCreatorId(form.get("creatorId"));
+    const q = form.get("q");
+    if (creatorId === null) {
+      return NextResponse.json(
+        { error: "invalid_creator_id" },
+        { status: 400, headers: { "cache-control": "no-store" } },
+      );
+    }
+
+    if (form.get("_action") === "remove") {
+      await removeWatch(session.userId, creatorId);
+      return NextResponse.redirect(
+        buildSettingsRedirect(request.url, "removed", q),
+        303,
+      );
+    }
+
+    try {
+      await addWatch(session.userId, creatorId);
+      return NextResponse.redirect(
+        buildSettingsRedirect(request.url, "added", q),
+        303,
+      );
+    } catch (error: unknown) {
+      if (isForeignKeyViolation(error)) {
+        return NextResponse.redirect(
+          buildSettingsRedirect(request.url, "error", q),
+          303,
+        );
+      }
+      throw error;
+    }
   }
 
   let body: WatchPayload = {};
