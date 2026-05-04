@@ -26,7 +26,7 @@ export default function MobileMenu({
   }, [open]);
 
   return (
-    <div className="relative tab:hidden">
+    <div className="relative desk:hidden">
       <button
         onClick={() => setOpen((prev) => !prev)}
         className="text-ink-600 hover:text-ink-900"
@@ -40,67 +40,58 @@ export default function MobileMenu({
       {open && (
         <nav
           id="mobile-nav"
-          className="absolute right-0 top-12 z-popover w-[min(82vw,260px)] border border-ink-250 bg-ink-0 p-3 shadow-popover space-y-2"
+          className="absolute right-0 top-11 z-popover w-[min(82vw,280px)] border border-ink-250 bg-ink-0 p-3 shadow-popover"
           aria-label="Mobile navigation"
         >
           <Link
-            href="/"
+            href="/#leaderboard"
             onClick={() => setOpen(false)}
-            className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
           >
-            Leaderboard
+            LEADERBOARD
           </Link>
           <Link
             href="/methodology"
             onClick={() => setOpen(false)}
-            className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
           >
-            Methodology
+            METHODOLOGY
           </Link>
           <Link
             href="/pricing"
             onClick={() => setOpen(false)}
-            className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
           >
-            Pricing
+            PRICING
           </Link>
           {loggedIn ? (
             <>
-              <div className="py-2 text-xs text-ink-500 uppercase tracking-caps">
-                Tier · {tier}
+              <div className="border-b border-ink-150 py-3 font-mono text-mono-xs uppercase tracking-kicker text-accent">
+                TIER · {tier}
               </div>
               <Link
-                href="/settings/alerts"
+                href="/settings"
                 onClick={() => setOpen(false)}
-                className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+                className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
               >
-                Alerts
+                SETTINGS
               </Link>
               {tier === "alpha" && (
-                <>
-                  <Link
-                    href="/settings/api"
-                    onClick={() => setOpen(false)}
-                    className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
-                  >
-                    API
-                  </Link>
-                  <Link
-                    href="/settings/webhooks"
-                    onClick={() => setOpen(false)}
-                    className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
-                  >
-                    Webhooks
-                  </Link>
-                </>
+                <Link
+                  href="/backtest"
+                  onClick={() => setOpen(false)}
+                  className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+                >
+                  BACKTEST LAB
+                </Link>
               )}
               <form action="/api/auth/logout" method="post">
                 <button
                   type="submit"
                   onClick={() => setOpen(false)}
-                  className="block text-ink-600 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+                  className="block w-full py-3 text-left font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
                 >
-                  Logout
+                  LOGOUT
                 </button>
               </form>
             </>
@@ -110,16 +101,16 @@ export default function MobileMenu({
                 href="/api/auth/whop"
                 prefetch={false}
                 onClick={() => setOpen(false)}
-                className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+                className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
               >
-                Sign In
+                SIGN IN
               </Link>
               <Link
                 href="/pricing"
                 onClick={() => setOpen(false)}
-                className="inline-block bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-4 py-2 transition-colors"
+                className="mt-3 inline-block border border-accent/60 bg-transparent px-3.5 py-2 font-mono text-mono-sm uppercase tracking-caps text-accent transition-colors hover:border-accent hover:bg-accent-low"
               >
-                Get Access
+                GET ACCESS
               </Link>
             </>
           )}
