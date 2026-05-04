@@ -27,8 +27,10 @@ const EVENTS = [
 
 const DELIVERY_ATTEMPTS = 3;
 
-function formatDate(value: string): string {
-  return value.replace("T", " ").slice(0, 16);
+function formatDate(value: unknown): string {
+  if (!value) return "never";
+  const normalized = value instanceof Date ? value.toISOString() : String(value);
+  return normalized.replace("T", " ").slice(0, 16);
 }
 
 function eventSchema(type: string, body: string): ReactElement {
