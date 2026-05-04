@@ -1,19 +1,54 @@
 import { NextResponse } from "next/server";
+import { query } from "@/lib/db";
 
 interface FeedbackPayload {
   readonly name?: string;
   readonly email?: string;
   readonly category: string;
+  readonly issueType?: string;
+  readonly contextUrl?: string;
+  readonly sourceUrl?: string;
   readonly message: string;
 }
 
-const VALID_CATEGORIES = new Set([
-  "Scoring Methodology",
-  "Creator Suggestion",
-  "Feature Request",
-  "Bug Report",
-  "Other",
+const FEEDBACK_CATEGORIES = [
+  "Scoring Evidence",
+  "Creator Data",
+  "Call Source",
+  "Product Issue",
+  "Billing / Refund",
+] as const;
+const VALID_CATEGORIES = new Set<string>(FEEDBACK_CATEGORIES);
+const CATEGORY_ALIASES = new Map<string, string>([
+  ["Scoring Methodology", "Scoring Evidence"],
+  ["Creator Suggestion", "Creator Data"],
+  ["Feature Request", "Product Issue"],
+  ["Bug Report", "Product Issue"],
+  ["Other", "Product Issue"],
+  ["Billing Access", "Billing / Refund"],
 ]);
+
+function normalizeCategory(value: string): string | null {
+  if (VALID_CATEGORIES.has(value)) return value;
+  return CATEGORY_ALIASES.get(value) ?? null;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value.trim() || undefined : undefined;
+}
+
+function composePersistedMessage(feedback: FeedbackPayload): string {
+  const rows = [
+    feedback.issueType ? `Issue type: ${feedback.issueType}` : null,
+    feedback.contextUrl ? `Context URL: ${feedback.contextUrl}` : null,
+    feedback.sourceUrl ? `Evidence URL: ${feedback.sourceUrl}` : null,
+    "",
+    "Evidence:",
+    feedback.message.trim(),
+  ].filter((row): row is string => row !== null);
+
+  return rows.join("\n");
+}
 
 function isValidPayload(body: unknown): body is FeedbackPayload {
   if (typeof body !== "object" || body === null) return false;
@@ -24,12 +59,18 @@ function isValidPayload(body: unknown): body is FeedbackPayload {
     return false;
   }
 
-  if (typeof obj.category !== "string" || !VALID_CATEGORIES.has(obj.category)) {
+  if (
+    typeof obj.category !== "string" ||
+    normalizeCategory(obj.category) === null
+  ) {
     return false;
   }
 
   if (obj.name !== undefined && typeof obj.name !== "string") return false;
   if (obj.email !== undefined && typeof obj.email !== "string") return false;
+  if (obj.issueType !== undefined && typeof obj.issueType !== "string") return false;
+  if (obj.contextUrl !== undefined && typeof obj.contextUrl !== "string") return false;
+  if (obj.sourceUrl !== undefined && typeof obj.sourceUrl !== "string") return false;
 
   return true;
 }
@@ -46,20 +87,38 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const feedback: FeedbackPayload = {
-      name: body.name,
-      email: body.email,
-      category: body.category,
-      message: body.message,
+      name: normalizeOptionalString(body.name),
+      email: normalizeOptionalString(body.email),
+      category: normalizeCategory(body.category)!,
+      issueType: normalizeOptionalString(body.issueType),
+      contextUrl: normalizeOptionalString(body.contextUrl),
+      sourceUrl: normalizeOptionalString(body.sourceUrl),
+      message: body.message.trim(),
     };
 
-    // Log feedback to server console for now.
-    // TODO: Persist to database or forward via email in a future iteration.
+    try {
+      await query(
+        `INSERT INTO feedback_reports (category, email, message)
+         VALUES ($1, $2, $3)`,
+        [
+          feedback.category,
+          feedback.email ?? null,
+          composePersistedMessage(feedback),
+        ],
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "feedback persistence unavailable";
+      console.warn("[FEEDBACK_PERSISTENCE]", message);
+    }
+
     console.info("[FEEDBACK]", {
       timestamp: new Date().toISOString(),
       category: feedback.category,
-      name_provided: Boolean(feedback.name?.trim()),
-      email_provided: Boolean(feedback.email?.trim()),
-      message_chars: feedback.message.trim().length,
+      issue_type: feedback.issueType ?? null,
+      name_provided: Boolean(feedback.name),
+      email_provided: Boolean(feedback.email),
+      message_chars: feedback.message.length,
     });
 
     return NextResponse.json({ success: true });

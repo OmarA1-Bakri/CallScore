@@ -216,6 +216,7 @@ function filterEligible(
       {
         extraction_confidence: call.extraction_confidence,
         call_date: call.call_date,
+        price_at_call: call.price_at_call,
         target_price: call.target_price,
         price_30d: call.price_30d,
         price_90d: call.price_90d,
