@@ -8,7 +8,10 @@ import CallHistory from "@/components/CallHistory";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { getCurrentTier } from "@/lib/auth";
+import { creatorHandlePath, findCreatorByHandle } from "@/lib/creator-handles";
 import { query } from "@/lib/db";
+import { CREATOR_JUDGMENT_WINDOW_LABEL, getJudgmentWindowSql } from "@/lib/judgment-window";
+import { getLiveCallPriceJoinSql, getLiveCallPriceSelectSql } from "@/lib/live-call-pricing";
 import { hasAccess } from "@/lib/whop";
 import {
   computeCreatorAvgAlpha30d,
@@ -28,20 +31,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const handle = decodeURIComponent(params.handle);
 
   try {
-    const creators = await query<Creator>(
-      `SELECT * FROM creators WHERE youtube_handle = $1 LIMIT 1`,
-      [handle],
-    );
-
-    if (creators.length === 0) {
+    const creator = await findCreatorByHandle<Creator>(handle);
+    if (!creator) {
       return { title: "Creator Not Found | CryptoTubers Ranked" };
     }
-
-    const creator = creators[0];
     return {
       title: `${creator.name} — Creator Profile | CryptoTubers Ranked`,
       description: `See ${creator.name}'s crypto call track record, alpha score, win rate, and full call history on CryptoTubers Ranked.`,
-      alternates: { canonical: `/creator/${handle}` },
+      alternates: { canonical: `/creator/${creatorHandlePath(creator.youtube_handle)}` },
     };
   } catch {
     return { title: "Creator Not Found | CryptoTubers Ranked" };
@@ -59,19 +56,16 @@ export default async function CreatorPage({ params }: PageProps) {
   // Fetch creator — handle missing table gracefully
   let creator: Creator;
   try {
-    const creators = await query<Creator>(
-      `SELECT * FROM creators WHERE youtube_handle = $1 LIMIT 1`,
-      [handle],
-    );
-    if (creators.length === 0) {
+    const resolvedCreator = await findCreatorByHandle<Creator>(handle);
+    if (!resolvedCreator) {
       notFound();
     }
-    creator = creators[0];
+    creator = resolvedCreator;
   } catch {
     notFound();
   }
 
-  // Fetch creator stats (all_time period)
+  // Fetch creator stats (all_time period stores the rolling creator judgment window).
   let stats: CreatorStats | null = null;
   try {
     const statsRows = await query<CreatorStats>(
@@ -83,15 +77,17 @@ export default async function CreatorPage({ params }: PageProps) {
     // Stats table may not exist yet
   }
 
-  // Fetch all calls so the creator-level aggregates use the same eligibility
-  // rules as the call page and recompute pipeline.
+  // Fetch judgment-window calls so creator aggregates and call history use the
+  // same level-playing-field window as the leaderboard.
   const CALL_LIMIT = 50;
   let allCalls: Call[] = [];
   try {
     allCalls = await query<Call>(
-      `SELECT *
-       FROM calls
-       WHERE creator_id = $1
+      `SELECT c.*, ${getLiveCallPriceSelectSql()}
+       FROM calls c
+       ${getLiveCallPriceJoinSql("c")}
+       WHERE c.creator_id = $1
+         AND ${getJudgmentWindowSql("c")}
        ORDER BY call_date DESC`,
       [creator.id],
     );
@@ -215,14 +211,26 @@ export default async function CreatorPage({ params }: PageProps) {
 
       {/* 03 — calls */}
       <EditorialSection index="03" title={<>Recent <em className="italic text-accent">calls</em>.</>}>
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap gap-2">
           <Link
-            href={canExport ? `/api/export/calls?handle=${encodeURIComponent(creator.youtube_handle)}` : "/pricing"}
+            href={
+              canExport
+                ? `/api/export/calls?handle=${encodeURIComponent(creator.youtube_handle)}`
+                : "/pricing"
+            }
             className="inline-block font-mono text-[12px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-3 py-2 transition-colors"
             style={{ borderRadius: 2 }}
             prefetch={false}
           >
             {canExport ? "Export CSV" : "Export CSV · Pro"}
+          </Link>
+          <Link
+            href={`/settings/alerts?q=${encodeURIComponent(creator.youtube_handle)}`}
+            className="inline-block font-mono text-[12px] tracking-caps uppercase border border-ink-250 text-ink-700 hover:bg-ink-100 px-3 py-2 transition-colors"
+            style={{ borderRadius: 2 }}
+            prefetch={false}
+          >
+            Watch creator · Pro
           </Link>
         </div>
         {displayCalls.length > 0 ? (
@@ -242,7 +250,7 @@ export default async function CreatorPage({ params }: PageProps) {
       <EditorialSection
         index="04"
         title={<>Score <em className="italic text-accent">breakdown</em>.</>}
-        meta={performance.length > 0 ? <>monthly average score<br />window: all time</> : undefined}
+        meta={performance.length > 0 ? <>monthly average score<br />window: {CREATOR_JUDGMENT_WINDOW_LABEL.toLowerCase()}</> : undefined}
       >
         <div className="grid grid-cols-1 desk:grid-cols-2 gap-8">
           <ScoreBreakdown
@@ -265,7 +273,7 @@ export default async function CreatorPage({ params }: PageProps) {
       {/* 05 — backtest CTA */}
       <EditorialSection index="05" title={<>Simulate <em className="italic text-accent">returns</em>.</>}>
         <Link
-          href={`/creator/${encodeURIComponent(creator.youtube_handle)}/backtest`}
+          href={`/creator/${creatorHandlePath(creator.youtube_handle)}/backtest`}
           className="inline-block font-mono text-[12px] tracking-caps uppercase border border-accent-dim text-accent hover:bg-accent-low px-4 py-2.5 transition-colors"
           style={{ borderRadius: 2 }}
           prefetch={false}
