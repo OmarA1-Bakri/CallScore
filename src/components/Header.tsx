@@ -74,7 +74,7 @@ export default async function Header(): Promise<ReactElement> {
                 </form>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-5">
                 <Link
                   href="/api/auth/whop"
                   prefetch={false}

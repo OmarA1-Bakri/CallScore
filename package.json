@@ -18,6 +18,13 @@
     "extract:local": "node --import tsx src/scripts/extract-calls-local.ts",
     "match": "node --import tsx src/scripts/match-prices.ts",
     "score": "node --import tsx src/scripts/compute-scores.ts",
+    "refresh:candles": "node --import tsx src/scripts/refresh-candles.ts",
+    "pipeline:data": "node --import tsx src/scripts/run-data-pipeline.ts",
+    "hygiene:secrets": "node --import tsx src/scripts/check-secret-hygiene.ts",
+    "audit:pipeline": "node --import tsx src/scripts/audit-pipeline-readiness.ts",
+    "verify:public": "node --import tsx src/scripts/verify-public-surface.ts",
+    "backfill:publication-dates": "node --import tsx src/scripts/backfill-publication-dates.ts",
+    "backfill:transcripts": "node --import tsx src/scripts/backfill-transcripts.ts",
     "audit:recompute": "node --import tsx src/scripts/audit-recompute.ts",
     "audit:coverage": "node --import tsx src/scripts/audit-coverage-report.ts",
     "audit:global": "node --import tsx src/scripts/audit-global-coverage.ts",
@@ -27,7 +34,10 @@
     "reextract:low-confidence": "node --import tsx src/scripts/reextract-low-confidence-videos.ts",
     "consensus": "node --import tsx src/scripts/detect-consensus.ts",
     "pipeline": "npm run scrape && npm run extract && npm run match && npm run score && npm run consensus",
-    "db:migrate": "node --import tsx src/scripts/migrate.ts"
+    "db:migrate": "node --import tsx src/scripts/migrate.ts",
+    "shadow:extract": "node --import tsx src/scripts/shadow-extract-transcripts.ts",
+    "shadow:diff": "node --import tsx src/scripts/shadow-diff-extractions.ts",
+    "shadow:promote": "node --import tsx src/scripts/promote-shadow-extractions.ts"
   },
   "dependencies": {
     "@google/genai": "^1.49.0",

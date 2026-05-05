@@ -15,13 +15,13 @@ const DEFAULT_OLLAMA_HOST = "https://ollama.com";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TRANSCRIPT_CHARS = 8_000;
 
-type ExtractionProvider = "openrouter" | "ollama";
+export type ExtractionProvider = "openrouter" | "ollama";
 const DEFAULT_CHUNK_CHARS = MAX_TRANSCRIPT_CHARS;
 const DEFAULT_CHUNK_OVERLAP = 500;
 const DEFAULT_MAX_CHUNKS = 100;
 const MAX_ALLOWED_CHUNKS = 100;
 
-interface OpenRouterArgs {
+export interface OpenRouterArgs {
   readonly creatorHandle: string | null;
   readonly videoIds: readonly number[];
   readonly includeExtracted: boolean;
@@ -41,7 +41,7 @@ interface OpenRouterArgs {
   readonly requestTimeoutMs: number;
 }
 
-interface ChunkSettings {
+export interface ChunkSettings {
   readonly chunkChars: number;
   readonly chunkOverlap: number;
   readonly maxChunks: number;
@@ -55,7 +55,7 @@ export interface TranscriptChunk {
   readonly text: string;
 }
 
-interface OpenRouterCandidate {
+export interface OpenRouterCandidate {
   readonly symbol: string;
   readonly direction: Direction;
   readonly call_type: CallType;
@@ -96,7 +96,11 @@ function readProvider(value: string | null): ExtractionProvider {
   throw new Error(`Unsupported extraction provider: ${value}. Expected openrouter or ollama.`);
 }
 
-export function buildOllamaHeaders(host: string, apiKey = process.env.OLLAMA_API_KEY): Record<string, string> {
+export function getOllamaApiKey(env = process.env): string | undefined {
+  return env.OLLAMA_API_KEY || env.OLLAMA_TOKEN;
+}
+
+export function buildOllamaHeaders(host: string, apiKey = getOllamaApiKey()): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const normalizedHost = host.replace(/\/+$/, "");
   if (normalizedHost === DEFAULT_OLLAMA_HOST && apiKey) headers.Authorization = `Bearer ${apiKey}`;
@@ -341,8 +345,8 @@ async function callOpenRouter(args: OpenRouterArgs, model: string, transcript: s
 async function callOllama(args: OpenRouterArgs, model: string, transcript: string, title?: string | null, chunk?: TranscriptChunk, fullTranscript?: string): Promise<string> {
   const host = args.ollamaHost.replace(/\/+$/, "");
   const headers = buildOllamaHeaders(host);
-  if (host === DEFAULT_OLLAMA_HOST && !process.env.OLLAMA_API_KEY) {
-    throw new Error("OLLAMA_API_KEY not configured for direct Ollama Cloud API");
+  if (host === DEFAULT_OLLAMA_HOST && !getOllamaApiKey()) {
+    throw new Error("OLLAMA_API_KEY or OLLAMA_TOKEN not configured for direct Ollama Cloud API");
   }
 
   const controller = new AbortController();
@@ -388,7 +392,7 @@ async function callExtractionProvider(args: OpenRouterArgs, model: string, trans
   return callOpenRouter(args, model, transcript, title, chunk, fullTranscript);
 }
 
-interface ChunkExtractionAudit {
+export interface ChunkExtractionAudit {
   readonly chunk: TranscriptChunk;
   readonly model: string;
   readonly rawText: string;
@@ -396,7 +400,7 @@ interface ChunkExtractionAudit {
   readonly audited: ReturnType<typeof auditExtractedCallCandidates>;
 }
 
-interface ExtractionResult {
+export interface ExtractionResult {
   readonly model: string;
   readonly rawText: string;
   readonly candidates: readonly OpenRouterCandidate[];
@@ -436,7 +440,7 @@ async function extractChunkWithModelFallback(
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-async function extractWithModelFallback(args: OpenRouterArgs, transcript: string, title?: string | null): Promise<ExtractionResult> {
+export async function extractWithModelFallback(args: OpenRouterArgs, transcript: string, title?: string | null): Promise<ExtractionResult> {
   const chunks = splitTranscriptIntoChunks(transcript, args);
   const chunkResults: ChunkExtractionAudit[] = [];
 
