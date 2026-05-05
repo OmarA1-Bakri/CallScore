@@ -55,16 +55,34 @@ const apiContracts = [
     route: "src/app/api/alerts/unsubscribe/route.ts",
   },
   {
+    surface: "Account settings nav",
+    file: "src/components/SettingsShell.tsx",
+    literal: "/settings/account",
+    route: "src/app/settings/account/page.tsx",
+  },
+  {
+    surface: "Billing settings nav",
+    file: "src/components/SettingsShell.tsx",
+    literal: "/settings/billing",
+    route: "src/app/settings/billing/page.tsx",
+  },
+  {
     surface: "Alert settings nav",
-    file: "src/components/Header.tsx",
+    file: "src/components/SettingsShell.tsx",
     literal: "/settings/alerts",
     route: "src/app/settings/alerts/page.tsx",
   },
   {
     surface: "API settings nav",
-    file: "src/components/Header.tsx",
+    file: "src/components/SettingsShell.tsx",
     literal: "/settings/api",
     route: "src/app/settings/api/page.tsx",
+  },
+  {
+    surface: "Webhooks settings nav",
+    file: "src/components/SettingsShell.tsx",
+    literal: "/settings/webhooks",
+    route: "src/app/settings/webhooks/page.tsx",
   },
   {
     surface: "CSV export CTA",
@@ -74,15 +92,27 @@ const apiContracts = [
   },
   {
     surface: "API key settings form",
-    file: "src/app/settings/api/page.tsx",
+    file: "src/components/ApiKeyManager.tsx",
     literal: "/api/api-keys",
     route: "src/app/api/api-keys/route.ts",
   },
   {
     surface: "Webhook settings form",
-    file: "src/app/settings/webhooks/page.tsx",
+    file: "src/components/WebhookManager.tsx",
     literal: "/api/webhooks",
     route: "src/app/api/webhooks/route.ts",
+  },
+  {
+    surface: "Notifications settings nav",
+    file: "src/components/SettingsShell.tsx",
+    literal: "/settings/notifications",
+    route: "src/app/settings/notifications/page.tsx",
+  },
+  {
+    surface: "Team settings nav",
+    file: "src/components/SettingsShell.tsx",
+    literal: "/settings/team",
+    route: "src/app/settings/team/page.tsx",
   },
 ] as const;
 
@@ -99,4 +129,15 @@ test("frontend API links have matching app routes", () => {
       `${contract.surface} points at missing route ${contract.route}`,
     );
   }
+});
+
+test("feedback surface and route stay aligned on evidence fields", () => {
+  const pageSource = readFileSync(join(root, "src/app/feedback/page.tsx"), "utf8");
+  const routeSource = readFileSync(join(root, "src/app/api/feedback/route.ts"), "utf8");
+
+  assert.ok(pageSource.includes("Billing / Refund"));
+  assert.ok(routeSource.includes("Billing / Refund"));
+  assert.ok(pageSource.includes("issueType"));
+  assert.ok(routeSource.includes("issueType"));
+  assert.ok(routeSource.includes("composePersistedMessage"));
 });

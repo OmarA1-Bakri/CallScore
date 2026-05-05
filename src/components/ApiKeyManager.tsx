@@ -11,9 +11,22 @@ interface ApiKeyManagerProps {
   readonly initialStatus?: string;
 }
 
-function formatDate(value: string | null): string {
+function normalizeDateValue(value: unknown): string {
   if (!value) return "never";
-  return value.slice(0, 10);
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
+function formatDate(value: unknown): string {
+  const normalized = normalizeDateValue(value);
+  if (normalized === "never") return normalized;
+  return normalized.slice(0, 10);
+}
+
+function formatTimestamp(value: unknown): string {
+  const normalized = normalizeDateValue(value);
+  if (normalized === "never") return normalized;
+  return normalized.replace("T", " ").slice(0, 16);
 }
 
 function CodeBlock({ children }: { readonly children: string }): ReactElement {
@@ -322,7 +335,7 @@ export default function ApiKeyManager({
                   </p>
                 </div>
                 <p className="text-ink-500">
-                  {request.created_at.replace("T", " ").slice(0, 16)}
+                  {formatTimestamp(request.created_at)}
                 </p>
               </div>
             ))}

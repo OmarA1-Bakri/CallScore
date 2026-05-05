@@ -20,21 +20,22 @@ interface FeatureRow {
   readonly free: Glyph;
   readonly pro: Glyph;
   readonly alpha: Glyph;
+  readonly href?: string;
 }
 
 const FEATURES: readonly FeatureRow[] = [
-  { label: "Full leaderboard (all ranks)",            free: "yes", pro: "yes", alpha: "yes" },
-  { label: "Creator profiles + full call history",    free: "yes", pro: "yes", alpha: "yes" },
-  { label: "Per-call Alpha Score breakdowns",         free: "yes", pro: "yes", alpha: "yes" },
-  { label: "Methodology transparency",                free: "yes", pro: "yes", alpha: "yes" },
-  { label: "Per-creator email alerts",                free: "no",  pro: "yes", alpha: "yes" },
-  { label: "Watchlists (unlimited)",                  free: "no",  pro: "yes", alpha: "yes" },
-  { label: "Recent-performance filter (30/90d)",      free: "no",  pro: "yes", alpha: "yes" },
-  { label: "CSV export of call history",              free: "no",  pro: "yes", alpha: "yes" },
-  { label: "Historical backtest simulator",           free: "no",  pro: "no",  alpha: "yes" },
-  { label: "Anti-consensus / convergence alerts",     free: "no",  pro: "no",  alpha: "yes" },
-  { label: "API access (read-only)",                  free: "no",  pro: "no",  alpha: "yes" },
-  { label: "Webhook notifications",                   free: "no",  pro: "no",  alpha: "yes" },
+  { label: "Full leaderboard (all ranks)",              free: "yes", pro: "yes", alpha: "yes", href: "/" },
+  { label: "Creator profiles + full call history",      free: "yes", pro: "yes", alpha: "yes", href: "/" },
+  { label: "Per-call Alpha Score breakdowns",           free: "yes", pro: "yes", alpha: "yes", href: "/methodology" },
+  { label: "Methodology transparency",                  free: "yes", pro: "yes", alpha: "yes", href: "/methodology" },
+  { label: "Per-creator email alerts + queue",          free: "no",  pro: "yes", alpha: "yes", href: "/settings/alerts" },
+  { label: "Watchlists with creator management",        free: "no",  pro: "yes", alpha: "yes", href: "/settings/alerts" },
+  { label: "Recent-performance filter (30/90d planned)", free: "no", pro: "soon", alpha: "soon" },
+  { label: "CSV export of creator call history",        free: "no",  pro: "yes", alpha: "yes", href: "/api/export/calls" },
+  { label: "Historical backtest simulator",             free: "no",  pro: "no",  alpha: "yes", href: "/backtest" },
+  { label: "Anti-consensus alerts (Alpha preview)",     free: "no",  pro: "no",  alpha: "soon", href: "/settings/alerts" },
+  { label: "API access with key manager",               free: "no",  pro: "no",  alpha: "yes", href: "/settings/api" },
+  { label: "Webhook notifications + delivery log",      free: "no",  pro: "no",  alpha: "yes", href: "/settings/webhooks" },
 ] as const;
 
 function glyphChar(g: Glyph): string {
@@ -64,6 +65,7 @@ interface PlanCardProps {
   readonly tagline: string;
   readonly cta: string;
   readonly ctaHref: string;
+  readonly manageLinks?: readonly { readonly label: string; readonly href: string; readonly prefetch?: boolean }[];
   readonly emphasis?: boolean; // editorial anchor — slightly wider, accent-low background
   readonly ctaVariant?: "button" | "soft" | "none"; // round2-005: free tier has no purchase, use soft link
 }
@@ -75,6 +77,7 @@ function PlanCard({
   tagline,
   cta,
   ctaHref,
+  manageLinks = [],
   emphasis = false,
   ctaVariant = "button",
 }: PlanCardProps): ReactElement {
@@ -103,6 +106,20 @@ function PlanCard({
         <span className="font-mono text-[12px] text-ink-500 tracking-wide">{cadence}</span>
       </div>
       <p className="font-serif text-[16px] text-ink-700 leading-relaxed mb-6">{tagline}</p>
+      {manageLinks.length > 0 && (
+        <div className="mb-5 flex flex-wrap gap-x-3 gap-y-2 border-t border-ink-200 pt-4">
+          {manageLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              prefetch={link.prefetch}
+              className="font-mono text-[11px] tracking-wide text-accent hover:underline underline-offset-4"
+            >
+              {link.label} <span aria-hidden="true">&rarr;</span>
+            </Link>
+          ))}
+        </div>
+      )}
       {ctaVariant === "button" && (
         <Link
           href={ctaHref}
@@ -197,6 +214,10 @@ export default function PricingPage(): ReactElement {
             tagline="Alerts, watchlists, exports."
             cta="Upgrade to Pro"
             ctaHref="/api/checkout/pro"
+            manageLinks={[
+              { label: "Manage alerts", href: "/settings/alerts" },
+              { label: "Export calls", href: "/api/export/calls", prefetch: false },
+            ]}
             emphasis
           />
           <PlanCard
@@ -206,6 +227,11 @@ export default function PricingPage(): ReactElement {
             tagline="Backtests, API, webhooks."
             cta="Upgrade to Alpha"
             ctaHref="/api/checkout/alpha"
+            manageLinks={[
+              { label: "Backtest Lab", href: "/backtest" },
+              { label: "API keys", href: "/settings/api" },
+              { label: "Webhooks", href: "/settings/webhooks" },
+            ]}
           />
         </div>
       </EditorialSection>
@@ -222,7 +248,7 @@ export default function PricingPage(): ReactElement {
           <>
             {FEATURES.length} features &middot; 3 plans
             <br />
-            &#10003; included &middot; &rarr; coming &middot; &middot; gated
+            &#10003; included &middot; &rarr; preview/planned &middot; &middot; gated
           </>
         }
       >
@@ -260,7 +286,19 @@ export default function PricingPage(): ReactElement {
             <tbody>
               {FEATURES.map((f) => (
                 <tr key={f.label} className="border-b border-ink-150">
-                  <td className="py-3 px-3 font-serif text-[15px] text-ink-800">{f.label}</td>
+                  <td className="py-3 px-3 font-serif text-[15px] text-ink-800">
+                    {f.href ? (
+                      <Link
+                        href={f.href}
+                        prefetch={f.href.startsWith("/api/") ? false : undefined}
+                        className="hover:text-accent hover:underline underline-offset-4"
+                      >
+                        {f.label}
+                      </Link>
+                    ) : (
+                      f.label
+                    )}
+                  </td>
                   {(["free", "pro", "alpha"] as const).map((tier) => (
                     <td
                       key={tier}
@@ -296,8 +334,9 @@ export default function PricingPage(): ReactElement {
           <p>
             <b className="text-ink-900">What do paid tiers actually buy?</b> Delivery, not
             data. Pro alerts you when ranked creators move so you don&apos;t have to refresh.
-            Alpha adds the full apparatus — backtest, anti-consensus signals, API access — for
-            users who want to build on the data.
+            Alpha adds the Backtest Lab, API keys, and webhook delivery logs for users who want
+            to build on the data. Anti-consensus delivery is marked preview until the consensus
+            worker is live.
           </p>
           <p>
             <b className="text-ink-900">Refunds?</b> 30 days, full refund. Send the

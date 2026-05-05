@@ -12,7 +12,9 @@ test("creator page uses editorial primitives", () => {
 
 test("creator page preserves notFound and query fetches", () => {
   assert.match(src, /notFound\(\)/);
-  assert.match(src, /query<Creator>/);
+  assert.match(src, /findCreatorByHandle<Creator>/);
+  assert.match(src, /query<CreatorStats>/);
+  assert.match(src, /query<Call>/);
 });
 
 test("creator page does not use rounded-{lg,xl}", () => {

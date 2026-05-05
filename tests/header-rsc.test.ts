@@ -32,3 +32,19 @@ test("Header.tsx reads session server-side, not via fetch + useEffect", () => {
 test("MobileMenu.tsx is the client island", () => {
   assert.match(mobileMenuSrc, /^\s*["']use client["']/m);
 });
+
+test("header auth redirects use canonical masthead typography", () => {
+  assert.match(headerSrc, />\s*SIGN IN\s*</);
+  assert.match(headerSrc, />\s*GET ACCESS\s*</);
+  assert.doesNotMatch(headerSrc, />\s*Sign In\s*</);
+  assert.doesNotMatch(headerSrc, />\s*Get Access\s*</);
+  assert.doesNotMatch(headerSrc, /\bh-24\b/);
+  assert.doesNotMatch(headerSrc, /bg-accent\s/);
+});
+
+test("mobile menu redirect labels match canonical masthead labels", () => {
+  assert.match(mobileMenuSrc, />\s*SIGN IN\s*</);
+  assert.match(mobileMenuSrc, />\s*GET ACCESS\s*</);
+  assert.doesNotMatch(mobileMenuSrc, />\s*Sign In\s*</);
+  assert.doesNotMatch(mobileMenuSrc, />\s*Get Access\s*</);
+});
