@@ -24,6 +24,9 @@ export interface ShadowExtractionRunMetadata {
     readonly video_ids: readonly number[];
     readonly limit: number;
     readonly include_extracted: boolean;
+    readonly chunk_agents?: number;
+    readonly video_agents?: number;
+    readonly low_confidence_ready?: boolean;
   };
 }
 

@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/alerts/send",
       "schedule": "15 */6 * * *"
+    },
+    {
+      "path": "/api/cron/ml/enqueue",
+      "schedule": "0 3 * * *"
     }
   ]
 }

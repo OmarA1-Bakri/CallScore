@@ -11,6 +11,7 @@ export interface AuditCoverageRow {
   readonly raw_quote: string | null;
   readonly extraction_confidence: number;
   readonly call_date: string;
+  readonly price_at_call: number | null;
   readonly target_price: number | null;
   readonly price_30d: number | null;
   readonly price_90d: number | null;

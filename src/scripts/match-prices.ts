@@ -69,10 +69,26 @@ export function parseMatchPricesArgs(argv = process.argv.slice(2)): MatchPricesA
   };
 }
 
+export function getCallSelectionPredicate(args: Pick<MatchPricesArgs, "rematchAll">): string {
+  if (args.rematchAll) return "id > $1";
+  return [
+    "id > $1",
+    `(
+         price_at_call IS NULL
+      OR btc_price_at_call IS NULL
+      OR (call_date <= NOW() - INTERVAL '7 days' AND (price_7d IS NULL OR btc_price_7d IS NULL OR return_7d IS NULL))
+      OR (call_date <= NOW() - INTERVAL '30 days' AND (price_30d IS NULL OR btc_price_30d IS NULL OR return_30d IS NULL))
+      OR (call_date <= NOW() - INTERVAL '90 days' AND (price_90d IS NULL OR btc_price_90d IS NULL OR return_90d IS NULL))
+      OR (target_price IS NOT NULL AND call_date <= NOW() - INTERVAL '90 days' AND hit_target IS NULL)
+    )`,
+  ].join(" AND ");
+}
+
 // ── In-memory price cache ─────────────────────────────────────────
 // Key: `${symbol}:${roundedMs}` → { close, regime }
 // Rounds timestamps to 5-min intervals to maximize cache hits.
 const ROUND_MS = 5 * 60 * 1000; // 5 min
+const MATCH_CONCURRENCY = 12;
 const priceCache = new Map<string, { close: number; regime: number | null } | null>();
 
 function roundTime(ms: number): number {
@@ -291,7 +307,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
   const args = parseMatchPricesArgs(argv);
 
-  console.log(`[${timestamp()}] Starting price matching (${args.rematchAll ? "full recompute" : "missing-only"}, with cache)...`);
+  console.log(`[${timestamp()}] Starting price matching (${args.rematchAll ? "full recompute" : "incomplete market data"}, with cache)...`);
 
   let totalMatched = 0;
   let totalSkipped = 0;
@@ -306,7 +322,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     const batch = await query<UnmatchedCall>(
       `SELECT id, symbol, direction, target_price, stop_loss, call_date
        FROM calls
-       WHERE ${args.rematchAll ? "id > $1" : "price_at_call IS NULL AND id > $1"}
+       WHERE ${getCallSelectionPredicate(args)}
        ORDER BY id ASC
        LIMIT $2`,
       [lastId, Math.min(args.batchSize, remaining)],
@@ -318,22 +334,38 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       `[${timestamp()}] Processing batch of ${batch.length} (from id ${batch[0].id}, cache size: ${priceCache.size})`,
     );
 
-    for (const call of batch) {
-      totalSeen++;
-      try {
-        const matched = await processCall(call);
-        if (matched) {
-          totalMatched++;
-        } else {
-          totalSkipped++;
+    let nextIndex = 0;
+    let batchMatched = 0;
+    let batchSkipped = 0;
+
+    const worker = async (): Promise<void> => {
+      while (nextIndex < batch.length) {
+        const call = batch[nextIndex];
+        nextIndex++;
+        if (!call) return;
+        try {
+          const matched = await processCall(call);
+          if (matched) {
+            batchMatched++;
+          } else {
+            batchSkipped++;
+          }
+        } catch (error: unknown) {
+          batchSkipped++;
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error(`[${timestamp()}]   Error matching call ${call.id}: ${msg}`);
         }
-      } catch (error: unknown) {
-        totalSkipped++;
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[${timestamp()}]   Error matching call ${call.id}: ${msg}`);
       }
-      lastId = call.id;
-    }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(MATCH_CONCURRENCY, batch.length) }, () => worker()),
+    );
+
+    totalSeen += batch.length;
+    totalMatched += batchMatched;
+    totalSkipped += batchSkipped;
+    lastId = batch[batch.length - 1].id;
 
     console.log(
       `[${timestamp()}] Batch done: ${totalMatched} matched, ${totalSkipped} skipped (total)`,

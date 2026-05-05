@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildOllamaChatRequestBody,
   buildOllamaHeaders,
   extractJsonArrayText,
   openRouterPrompt,
@@ -33,15 +34,17 @@ test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback"
   assert.equal(args.chunkChars, 8000);
   assert.equal(args.chunkOverlap, 500);
   assert.equal(args.maxChunks, 100);
+  assert.equal(args.chunkAgents, 1);
   assert.equal(args.requestTimeoutMs, 60_000);
 });
 
 test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
-  const explicit = parseOpenRouterExtractionArgs(["--chunk-chars", "1200", "--chunk-overlap", "200", "--max-chunks", "7"]);
+  const explicit = parseOpenRouterExtractionArgs(["--chunk-chars", "1200", "--chunk-overlap", "200", "--max-chunks", "7", "--chunk-agents", "2"]);
 
   assert.equal(explicit.chunkChars, 1200);
   assert.equal(explicit.chunkOverlap, 200);
   assert.equal(explicit.maxChunks, 7);
+  assert.equal(explicit.chunkAgents, 2);
 
   const invalid = parseOpenRouterExtractionArgs(["--chunk-chars", "0", "--chunk-overlap", "8000", "--max-chunks", "-1"]);
 
@@ -58,6 +61,10 @@ test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
 
   assert.equal(tooManyChunks.maxChunks, 100);
 
+  const tooManyChunkAgents = parseOpenRouterExtractionArgs(["--chunk-agents", "99"]);
+
+  assert.equal(tooManyChunkAgents.chunkAgents, 3);
+
   const explicitTimeout = parseOpenRouterExtractionArgs(["--request-timeout-ms", "120000"]);
   assert.equal(explicitTimeout.requestTimeoutMs, 120_000);
 
@@ -69,17 +76,18 @@ test("Ollama provider defaults to direct Ollama Cloud host and cloud model", () 
   const args = withoutOllamaHost(() => parseOpenRouterExtractionArgs(["--provider", "ollama"]));
 
   assert.equal(args.provider, "ollama");
-  assert.equal(args.model, "deepseek-v4-flash");
+  assert.equal(args.model, "kimi-k2.6");
   assert.equal(args.fallbackModel, null);
   assert.equal(args.ollamaHost, "https://ollama.com");
   assert.equal(args.dryRun, true);
+  assert.equal(args.requestTimeoutMs, 180_000);
 });
 
 test("Ollama provider defaults local daemon cloud-offload model when using a local host", () => {
   const args = parseOpenRouterExtractionArgs(["--provider", "ollama", "--ollama-host", "http://127.0.0.1:11434"]);
 
   assert.equal(args.provider, "ollama");
-  assert.equal(args.model, "deepseek-v4-flash:cloud");
+  assert.equal(args.model, "kimi-k2.6:cloud");
   assert.equal(args.fallbackModel, null);
   assert.equal(args.ollamaHost, "http://127.0.0.1:11434");
 });
@@ -117,6 +125,20 @@ test("Ollama headers only attach the API key to Ollama Cloud", () => {
   assert.deepEqual(buildOllamaHeaders("https://example.invalid", "secret"), {
     "Content-Type": "application/json",
   });
+});
+
+test("Ollama chat body disables thinking for JSON extraction", () => {
+  const body = buildOllamaChatRequestBody(
+    "deepseek-v4-flash",
+    "Bitcoin can hold support and push higher.",
+    "BTC update",
+  );
+
+  assert.equal(body.model, "deepseek-v4-flash");
+  assert.equal(body.stream, false);
+  assert.equal(body.format, "json");
+  assert.equal(body.think, false);
+  assert.deepEqual(body.options, { temperature: 0, num_predict: 2000 });
 });
 
 test("unknown extraction provider is rejected instead of silently falling back", () => {

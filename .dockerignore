@@ -1,0 +1,16 @@
+.git
+.next
+node_modules
+.env
+.env.local
+.env.vercel
+.env.hermes
+.omx
+.tmp
+temp
+audit-output
+output/playwright
+.worktrees
+.playwright-mcp
+*.tsbuildinfo
+*.png

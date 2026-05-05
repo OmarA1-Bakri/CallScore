@@ -37,7 +37,12 @@
     "db:migrate": "node --import tsx src/scripts/migrate.ts",
     "shadow:extract": "node --import tsx src/scripts/shadow-extract-transcripts.ts",
     "shadow:diff": "node --import tsx src/scripts/shadow-diff-extractions.ts",
-    "shadow:promote": "node --import tsx src/scripts/promote-shadow-extractions.ts"
+    "shadow:promote": "node --import tsx src/scripts/promote-shadow-extractions.ts",
+    "pipeline:worker": "node --import tsx src/scripts/hermes-worker.ts",
+    "pipeline:worker:once": "node --import tsx src/scripts/hermes-worker.ts --once",
+    "ml:autoresearch": "node --import tsx src/scripts/ml-autoresearch.ts",
+    "bakeoff:ollama": "node --import tsx src/scripts/bakeoff-ollama-cloud-models.ts",
+    "shadow:validate": "node --import tsx src/scripts/validate-shadow-extractions.ts"
   },
   "dependencies": {
     "@google/genai": "^1.49.0",

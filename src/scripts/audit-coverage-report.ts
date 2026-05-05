@@ -19,6 +19,7 @@ async function loadRows(): Promise<AuditCoverageRow[]> {
       raw_quote,
       extraction_confidence,
       call_date::text AS call_date,
+      price_at_call,
       target_price,
       price_30d,
       price_90d,

@@ -9,9 +9,11 @@ import { loadEnv, replaceStoredCallsForVideo, sleep, timestamp } from "./script-
 const DEFAULT_PROVIDER = "openrouter";
 const DEFAULT_MODEL = "google/gemma-4-31b-it:free";
 const DEFAULT_FALLBACK_MODEL = "google/gemma-4-31b-it";
-const DEFAULT_OLLAMA_CLOUD_MODEL = "deepseek-v4-flash";
-const DEFAULT_OLLAMA_LOCAL_CLOUD_MODEL = "deepseek-v4-flash:cloud";
+const DEFAULT_OLLAMA_CLOUD_MODEL = "kimi-k2.6";
+const DEFAULT_OLLAMA_LOCAL_CLOUD_MODEL = "kimi-k2.6:cloud";
 const DEFAULT_OLLAMA_HOST = "https://ollama.com";
+const DEFAULT_OPENROUTER_TIMEOUT_MS = 60_000;
+const DEFAULT_OLLAMA_TIMEOUT_MS = 180_000;
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TRANSCRIPT_CHARS = 8_000;
 
@@ -20,6 +22,8 @@ const DEFAULT_CHUNK_CHARS = MAX_TRANSCRIPT_CHARS;
 const DEFAULT_CHUNK_OVERLAP = 500;
 const DEFAULT_MAX_CHUNKS = 100;
 const MAX_ALLOWED_CHUNKS = 100;
+const DEFAULT_CHUNK_AGENTS = 1;
+const MAX_CHUNK_AGENTS = 3;
 
 export interface OpenRouterArgs {
   readonly creatorHandle: string | null;
@@ -38,6 +42,7 @@ export interface OpenRouterArgs {
   readonly chunkChars: number;
   readonly chunkOverlap: number;
   readonly maxChunks: number;
+  readonly chunkAgents: number;
   readonly requestTimeoutMs: number;
 }
 
@@ -80,6 +85,14 @@ function argValue(argv: readonly string[], flag: string): string | null {
 function positiveInt(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function boundedPositiveInt(
+  value: string | null,
+  fallback: number,
+  max: number,
+): number {
+  return Math.min(positiveInt(value, fallback), max);
 }
 
 function positiveIntList(value: string | null): number[] {
@@ -131,6 +144,9 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
   const defaultOllamaModel = normalizedOllamaHost === DEFAULT_OLLAMA_HOST
     ? DEFAULT_OLLAMA_CLOUD_MODEL
     : DEFAULT_OLLAMA_LOCAL_CLOUD_MODEL;
+  const defaultRequestTimeoutMs = provider === "ollama"
+    ? DEFAULT_OLLAMA_TIMEOUT_MS
+    : DEFAULT_OPENROUTER_TIMEOUT_MS;
   return {
     creatorHandle: argValue(argv, "--creator"),
     videoIds: positiveIntList(argValue(argv, "--video-ids")),
@@ -145,7 +161,12 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
     write,
     dryRun: !write || argv.includes("--dry-run"),
     auditOut: argValue(argv, "--audit-out"),
-    requestTimeoutMs: positiveInt(argValue(argv, "--request-timeout-ms"), 60_000),
+    requestTimeoutMs: positiveInt(argValue(argv, "--request-timeout-ms"), defaultRequestTimeoutMs),
+    chunkAgents: boundedPositiveInt(
+      argValue(argv, "--chunk-agents"),
+      DEFAULT_CHUNK_AGENTS,
+      MAX_CHUNK_AGENTS,
+    ),
     ...chunkSettings,
   };
 }
@@ -158,7 +179,7 @@ export function extractJsonArrayText(text: string): string {
   const end = trimmed.lastIndexOf("]");
   if (start >= 0 && end > start) return trimmed.slice(start, end + 1).trim();
 
-  throw new Error("OpenRouter response did not contain a JSON array");
+  throw new Error("Model response did not contain a JSON array");
 }
 
 function readNumber(value: unknown): number | null {
@@ -357,15 +378,7 @@ async function callOllama(args: OpenRouterArgs, model: string, transcript: strin
       method: "POST",
       signal: controller.signal,
       headers,
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: openRouterPrompt(transcript, title, chunk, fullTranscript ?? transcript) }],
-        stream: false,
-        options: {
-          temperature: 0,
-          num_predict: 2000,
-        },
-      }),
+      body: JSON.stringify(buildOllamaChatRequestBody(model, transcript, title, chunk, fullTranscript)),
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -385,6 +398,28 @@ async function callOllama(args: OpenRouterArgs, model: string, transcript: strin
   const content = (parsed as { message?: { content?: unknown } }).message?.content;
   if (typeof content !== "string") throw new Error(`Ollama ${model} response missing message content: ${body.trim().slice(0, 500)}`);
   return content;
+}
+
+export function buildOllamaChatRequestBody(
+  model: string,
+  transcript: string,
+  title?: string | null,
+  chunk?: TranscriptChunk,
+  fullTranscript?: string,
+): Record<string, unknown> {
+  return {
+    model,
+    messages: [{ role: "user", content: openRouterPrompt(transcript, title, chunk, fullTranscript ?? transcript) }],
+    stream: false,
+    format: "json",
+    // Thinking is enabled by default for supported Ollama models. The extractor
+    // needs fast final JSON, not reasoning traces, so disable it explicitly.
+    think: false,
+    options: {
+      temperature: 0,
+      num_predict: 2000,
+    },
+  };
 }
 
 async function callExtractionProvider(args: OpenRouterArgs, model: string, transcript: string, title?: string | null, chunk?: TranscriptChunk, fullTranscript?: string): Promise<string> {
@@ -443,9 +478,17 @@ async function extractChunkWithModelFallback(
 export async function extractWithModelFallback(args: OpenRouterArgs, transcript: string, title?: string | null): Promise<ExtractionResult> {
   const chunks = splitTranscriptIntoChunks(transcript, args);
   const chunkResults: ChunkExtractionAudit[] = [];
+  const chunkBatchSize = Math.max(1, args.chunkAgents);
 
-  for (const chunk of chunks) {
-    chunkResults.push(await extractChunkWithModelFallback(args, chunk, transcript, title));
+  for (let index = 0; index < chunks.length; index += chunkBatchSize) {
+    const batch = chunks.slice(index, index + chunkBatchSize);
+    chunkResults.push(
+      ...(await Promise.all(
+        batch.map((chunk) =>
+          extractChunkWithModelFallback(args, chunk, transcript, title),
+        ),
+      )),
+    );
   }
 
   const candidates = chunkResults.flatMap((result) => [...result.candidates]);
@@ -565,7 +608,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseOpenRouterExtractionArgs(argv);
   const videos = await loadPendingVideos(args);
   console.log(
-    `[${timestamp()}] ${args.provider} extract ${args.write ? "WRITE" : "DRY-RUN"}: videos=${videos.length}, model=${args.model}, fallback=${args.fallbackModel ?? "none"}`,
+    `[${timestamp()}] ${args.provider} extract ${args.write ? "WRITE" : "DRY-RUN"}: videos=${videos.length}, model=${args.model}, fallback=${args.fallbackModel ?? "none"}, chunkAgents=${args.chunkAgents}`,
   );
 
   let processed = 0;

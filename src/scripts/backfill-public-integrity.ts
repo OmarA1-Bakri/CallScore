@@ -16,6 +16,7 @@ interface AuditRow {
   readonly extraction_confidence: number;
   readonly confidence: string | null;
   readonly call_date: string;
+  readonly price_at_call: number | null;
   readonly price_30d: number | null;
   readonly price_90d: number | null;
   readonly return_30d: number | null;
@@ -92,6 +93,7 @@ async function loadLegacyRowsBatch(
       c.extraction_confidence,
       c.confidence,
       c.call_date::text AS call_date,
+      c.price_at_call,
       c.price_30d,
       c.price_90d,
       c.return_30d,

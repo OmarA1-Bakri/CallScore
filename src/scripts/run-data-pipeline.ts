@@ -20,6 +20,8 @@ const DEFAULT_SHADOW_AGENTS = 1;
 const MAX_SHADOW_AGENTS = 3;
 const DEFAULT_SHADOW_VIDEO_AGENTS = 1;
 const MAX_SHADOW_VIDEO_AGENTS = 3;
+const DEFAULT_SHADOW_CHUNK_AGENTS = 1;
+const MAX_SHADOW_CHUNK_AGENTS = 3;
 
 const STAGES = [
   "secret-hygiene",
@@ -56,6 +58,7 @@ interface DataPipelineArgs {
   readonly shadowRequestTimeoutMs: number;
   readonly shadowAgents: number;
   readonly shadowVideoAgents: number;
+  readonly shadowChunkAgents: number;
   readonly shadowAllowStatuses: string | null;
   readonly rematchAllPrices: boolean;
   readonly limitPriceMatches: number;
@@ -153,8 +156,9 @@ export function parseDataPipelineArgs(
     shadowRunId:
       argValue(argv, "--shadow-run-id") ??
       `pipeline-${path.basename(auditDir).replace(/[^a-zA-Z0-9_-]/g, "-")}`,
-    shadowProvider: argValue(argv, "--shadow-provider"),
-    shadowModel: argValue(argv, "--shadow-model"),
+    shadowProvider:
+      argValue(argv, "--shadow-provider") ?? DEFAULT_SHADOW_PROVIDER,
+    shadowModel: argValue(argv, "--shadow-model") ?? DEFAULT_SHADOW_MODEL,
     shadowRequestTimeoutMs: positiveInt(
       argValue(argv, "--shadow-request-timeout-ms"),
       DEFAULT_SHADOW_REQUEST_TIMEOUT_MS,
@@ -168,6 +172,11 @@ export function parseDataPipelineArgs(
       argValue(argv, "--shadow-video-agents"),
       DEFAULT_SHADOW_VIDEO_AGENTS,
       MAX_SHADOW_VIDEO_AGENTS,
+    ),
+    shadowChunkAgents: boundedPositiveInt(
+      argValue(argv, "--shadow-chunk-agents"),
+      DEFAULT_SHADOW_CHUNK_AGENTS,
+      MAX_SHADOW_CHUNK_AGENTS,
     ),
     shadowAllowStatuses: argValue(argv, "--shadow-allow-statuses"),
     rematchAllPrices: argv.includes("--rematch-all-prices"),
@@ -423,6 +432,10 @@ export function buildDataPipelineStageCommands(
     "--video-agents",
     String(args.shadowVideoAgents),
   ];
+  const shadowChunkAgentsArgs = [
+    "--chunk-agents",
+    String(args.shadowChunkAgents),
+  ];
   const shadowAllowArgs = args.shadowAllowStatuses
     ? ["--allow-statuses", args.shadowAllowStatuses]
     : [];
@@ -499,6 +512,7 @@ export function buildDataPipelineStageCommands(
         ...shadowModelArgs,
         ...shadowRequestTimeoutArgs,
         ...shadowVideoAgentsArgs,
+        ...shadowChunkAgentsArgs,
         ...shadowExecuteFlag,
       ]),
     ),
@@ -612,7 +626,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   mkdirSync(path.resolve(repoRoot(), args.auditDir), { recursive: true });
 
   console.log(
-    `[${timestamp()}] data-pipeline ${args.write ? "WRITE" : "DRY-RUN"}: creators=${args.creators.join(",")} symbols=${args.symbols.length} shadowAgents=${args.shadowAgents} shadowVideoAgents=${args.shadowVideoAgents} auditDir=${args.auditDir}`,
+    `[${timestamp()}] data-pipeline ${args.write ? "WRITE" : "DRY-RUN"}: creators=${args.creators.join(",")} symbols=${args.symbols.length} shadowAgents=${args.shadowAgents} shadowVideoAgents=${args.shadowVideoAgents} shadowChunkAgents=${args.shadowChunkAgents} auditDir=${args.auditDir}`,
   );
   const commandsByStage = buildDataPipelineStageCommands(args);
   let failed = false;
