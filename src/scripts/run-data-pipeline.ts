@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { DEFAULT_CANDLE_REFRESH_SYMBOLS } from "./refresh-candles";
 import { loadEnv, timestamp } from "./script-helpers";
 
@@ -149,44 +149,66 @@ function appendRunAudit(args: DataPipelineArgs, result: StageResult): void {
   );
 }
 
-function runCommand(stage: StageName, command: readonly string[], args: DataPipelineArgs, auditPath?: string): StageResult {
+function runCommand(
+  stage: StageName,
+  command: readonly string[],
+  args: DataPipelineArgs,
+  auditPath?: string,
+): Promise<StageResult> {
   const startedAt = timestamp();
   const start = Date.now();
-  const result = spawnSync(command[0], command.slice(1), {
-    cwd: repoRoot(),
-    env: process.env,
-    encoding: "utf-8",
-    stdio: "pipe",
+  return new Promise((resolve) => {
+    const child = spawn(command[0], command.slice(1), {
+      cwd: repoRoot(),
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+      process.stdout.write(chunk);
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+      process.stderr.write(chunk);
+    });
+    child.on("error", (error) => {
+      stderr += error.message;
+    });
+    child.on("close", (code) => {
+      if (auditPath) {
+        mkdirSync(path.dirname(auditPath), { recursive: true });
+        appendFileSync(
+          auditPath,
+          JSON.stringify({
+            ts: timestamp(),
+            stage,
+            command: [command[0], ...command.slice(1).map((part) => part.includes("=") ? part.split("=")[0] : part)],
+            stdout: stdout.slice(-20_000),
+            stderr: stderr.slice(-20_000),
+            exit_code: code,
+          }) + "\n",
+        );
+      }
+      const stageResult: StageResult = {
+        stage,
+        status: code === 0 ? "completed" : "failed",
+        mode: args.write ? "WRITE" : "DRY",
+        started_at: startedAt,
+        finished_at: timestamp(),
+        duration_ms: Date.now() - start,
+        command,
+        audit_file: auditPath,
+        exit_code: code,
+        error: code === 0 ? undefined : (stderr || "stage failed").slice(-1000),
+      };
+      appendRunAudit(args, stageResult);
+      resolve(stageResult);
+    });
   });
-
-  if (auditPath) {
-    mkdirSync(path.dirname(auditPath), { recursive: true });
-    appendFileSync(auditPath, JSON.stringify({
-      ts: timestamp(),
-      stage,
-      command: [command[0], ...command.slice(1).map((part) => part.includes("=") ? part.split("=")[0] : part)],
-      stdout: result.stdout?.slice(-20_000) ?? "",
-      stderr: result.stderr?.slice(-20_000) ?? "",
-      exit_code: result.status,
-    }) + "\n");
-  }
-
-  const stageResult: StageResult = {
-    stage,
-    status: result.status === 0 ? "completed" : "failed",
-    mode: args.write ? "WRITE" : "DRY",
-    started_at: startedAt,
-    finished_at: timestamp(),
-    duration_ms: Date.now() - start,
-    command,
-    audit_file: auditPath,
-    exit_code: result.status,
-    error: result.status === 0 ? undefined : (result.stderr || result.error?.message || "stage failed").slice(-1000),
-  };
-  appendRunAudit(args, stageResult);
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
-  return stageResult;
 }
 
 function skippedResult(stage: StageName, args: DataPipelineArgs, reason: string): StageResult {
@@ -310,7 +332,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     }
 
     for (const command of commands) {
-      const result = runCommand(stage, command, args, auditFile(args, stage, "log.jsonl"));
+      const result = await runCommand(stage, command, args, auditFile(args, stage, "log.jsonl"));
       if (result.status === "failed") {
         failed = true;
         console.error(`[${timestamp()}] ${stage}: failed; stopping before downstream publish verification`);
