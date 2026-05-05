@@ -15,6 +15,14 @@ export interface WatchRow {
   readonly created_at: string;
 }
 
+export interface WatchWithCreatorRow extends WatchRow {
+  readonly creator_name: string;
+  readonly youtube_handle: string;
+  readonly alpha_score: number;
+  readonly accuracy_rank: number | null;
+  readonly total_calls: number;
+}
+
 /**
  * Raw row shape from `alerts_queue`. `sent_at` is null for rows that
  * have not been delivered (or have been reverted by `revertClaim`);
@@ -24,6 +32,8 @@ export interface AlertQueueRow {
   readonly id: number;
   readonly user_id: string;
   readonly creator_id: number | null;
+  readonly creator_name?: string | null;
+  readonly youtube_handle?: string | null;
   readonly call_id: number | null;
   readonly event_type: string;
   readonly created_at: string;
@@ -69,6 +79,30 @@ export async function listWatches(userId: string): Promise<WatchRow[]> {
      FROM watchlists
      WHERE user_id = $1
      ORDER BY created_at DESC`,
+    [userId],
+  );
+}
+
+export async function listWatchesWithCreators(
+  userId: string,
+): Promise<WatchWithCreatorRow[]> {
+  return query<WatchWithCreatorRow>(
+    `SELECT
+       w.id,
+       w.user_id,
+       w.creator_id,
+       w.created_at,
+       cr.name AS creator_name,
+       cr.youtube_handle,
+       COALESCE(cs.alpha_score, cr.alpha_score) AS alpha_score,
+       COALESCE(cs.accuracy_rank, cr.accuracy_rank) AS accuracy_rank,
+       COALESCE(cs.total_calls, cr.total_calls) AS total_calls
+     FROM watchlists w
+     JOIN creators cr ON cr.id = w.creator_id
+     LEFT JOIN creator_stats cs
+       ON cs.creator_id = cr.id AND cs.period = 'all_time'
+     WHERE w.user_id = $1
+     ORDER BY w.created_at DESC`,
     [userId],
   );
 }
@@ -254,10 +288,20 @@ export async function listRecentAlertsForUser(
   limit: number = 20,
 ): Promise<AlertQueueRow[]> {
   return query<AlertQueueRow>(
-    `SELECT id, user_id, creator_id, call_id, event_type, created_at, sent_at
-     FROM alerts_queue
-     WHERE user_id = $1
-     ORDER BY created_at DESC
+    `SELECT
+       aq.id,
+       aq.user_id,
+       aq.creator_id,
+       cr.name AS creator_name,
+       cr.youtube_handle,
+       aq.call_id,
+       aq.event_type,
+       aq.created_at,
+       aq.sent_at
+     FROM alerts_queue aq
+     LEFT JOIN creators cr ON cr.id = aq.creator_id
+     WHERE aq.user_id = $1
+     ORDER BY aq.created_at DESC
      LIMIT $2`,
     [userId, limit],
   );

@@ -149,7 +149,12 @@ function appendRunAudit(args: DataPipelineArgs, result: StageResult): void {
   );
 }
 
-function runCommand(stage: StageName, command: readonly string[], args: DataPipelineArgs, auditPath?: string): Promise<StageResult> {
+function runCommand(
+  stage: StageName,
+  command: readonly string[],
+  args: DataPipelineArgs,
+  auditPath?: string,
+): Promise<StageResult> {
   const startedAt = timestamp();
   const start = Date.now();
   return new Promise((resolve) => {
@@ -176,16 +181,18 @@ function runCommand(stage: StageName, command: readonly string[], args: DataPipe
     child.on("close", (code) => {
       if (auditPath) {
         mkdirSync(path.dirname(auditPath), { recursive: true });
-        appendFileSync(auditPath, JSON.stringify({
-          ts: timestamp(),
-          stage,
-          command: [command[0], ...command.slice(1).map((part) => part.includes("=") ? part.split("=")[0] : part)],
-          stdout: stdout.slice(-20_000),
-          stderr: stderr.slice(-20_000),
-          exit_code: code,
-        }) + "\n");
+        appendFileSync(
+          auditPath,
+          JSON.stringify({
+            ts: timestamp(),
+            stage,
+            command: [command[0], ...command.slice(1).map((part) => part.includes("=") ? part.split("=")[0] : part)],
+            stdout: stdout.slice(-20_000),
+            stderr: stderr.slice(-20_000),
+            exit_code: code,
+          }) + "\n",
+        );
       }
-
       const stageResult: StageResult = {
         stage,
         status: code === 0 ? "completed" : "failed",
