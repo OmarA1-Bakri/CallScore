@@ -26,10 +26,16 @@ export interface PublicCounts {
   readonly scoredCalls: number;
   readonly beatBtcCreators: number;
   readonly llmValidatedCalls: number;
+  readonly confidencePassCalls: number;
   readonly publicScoredCalls: number;
+  readonly pendingPublicScoringCalls: number;
+  readonly liveOpenCalls: number;
+  readonly pending30dCalls: number;
+  readonly pendingTarget90dCalls: number;
   readonly pendingHorizonCalls: number;
   readonly missingPriceCalls: number;
   readonly missing30dCalls: number;
+  readonly missingTargetCalls: number;
   readonly targetPendingCalls: number;
   readonly excludedLowConfidenceCalls: number;
 }
@@ -41,10 +47,16 @@ export const DEFAULT_PUBLIC_COUNTS: PublicCounts = {
   scoredCalls: 0,
   beatBtcCreators: 0,
   llmValidatedCalls: 0,
+  confidencePassCalls: 0,
   publicScoredCalls: 0,
+  pendingPublicScoringCalls: 0,
+  liveOpenCalls: 0,
+  pending30dCalls: 0,
+  pendingTarget90dCalls: 0,
   pendingHorizonCalls: 0,
   missingPriceCalls: 0,
   missing30dCalls: 0,
+  missingTargetCalls: 0,
   targetPendingCalls: 0,
   excludedLowConfidenceCalls: 0,
 };
@@ -103,9 +115,15 @@ export async function getPublicCounts(): Promise<PublicCounts> {
     publicScoredCalls,
     beatBtcCreators: Number(row.beat_btc_creators),
     llmValidatedCalls: Number(row.llm_validated_calls),
+    confidencePassCalls: Number(row.llm_validated_calls),
+    pendingPublicScoringCalls: Number(row.pending_horizon_calls),
+    liveOpenCalls: Number(row.pending_horizon_calls),
     pendingHorizonCalls: Number(row.pending_horizon_calls),
+    pending30dCalls: Number(row.pending_horizon_calls),
+    pendingTarget90dCalls: Number(row.target_pending_calls),
     missingPriceCalls: Number(row.missing_price_calls),
     missing30dCalls: Number(row.missing_30d_calls),
+    missingTargetCalls: Number(row.target_pending_calls),
     targetPendingCalls: Number(row.target_pending_calls),
     excludedLowConfidenceCalls: Number(row.excluded_low_confidence_calls),
   };

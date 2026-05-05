@@ -262,7 +262,7 @@ export default async function HomePage({
     }
   }
 
-  let publicCounts = await getPublicCounts().catch(() => null);
+  let publicCounts: Awaited<ReturnType<typeof getPublicCounts>> | null = await getPublicCounts().catch(() => null);
   if (!publicCounts) {
     publicCounts = {
       trackedCreators: 20,
@@ -271,10 +271,16 @@ export default async function HomePage({
       scoredCalls: 0,
       beatBtcCreators: 0,
       llmValidatedCalls: 0,
+      confidencePassCalls: 0,
       publicScoredCalls: 0,
+      pendingPublicScoringCalls: 0,
+      liveOpenCalls: 0,
+      pending30dCalls: 0,
+      pendingTarget90dCalls: 0,
       pendingHorizonCalls: 0,
       missingPriceCalls: 0,
       missing30dCalls: 0,
+      missingTargetCalls: 0,
       targetPendingCalls: 0,
       excludedLowConfidenceCalls: 0,
     };

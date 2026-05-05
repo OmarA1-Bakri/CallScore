@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, getRequestAuthContext, type Session } from "./auth";
-import {
-  recordApiKeyRequest,
-  verifyApiKey,
-  type ApiKeyAuth,
-} from "./api-keys";
+import { recordApiKeyRequest, verifyApiKey, type ApiKeyAuth } from "./api-keys";
 import { getUserTier, hasAccess } from "./whop";
 import type { Tier } from "./types";
 

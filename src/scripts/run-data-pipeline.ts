@@ -153,9 +153,8 @@ export function parseDataPipelineArgs(
     shadowRunId:
       argValue(argv, "--shadow-run-id") ??
       `pipeline-${path.basename(auditDir).replace(/[^a-zA-Z0-9_-]/g, "-")}`,
-    shadowProvider:
-      argValue(argv, "--shadow-provider") ?? DEFAULT_SHADOW_PROVIDER,
-    shadowModel: argValue(argv, "--shadow-model") ?? DEFAULT_SHADOW_MODEL,
+    shadowProvider: argValue(argv, "--shadow-provider"),
+    shadowModel: argValue(argv, "--shadow-model"),
     shadowRequestTimeoutMs: positiveInt(
       argValue(argv, "--shadow-request-timeout-ms"),
       DEFAULT_SHADOW_REQUEST_TIMEOUT_MS,
@@ -231,7 +230,6 @@ function sanitizeCommandForAudit(
       .map((part) => (part.includes("=") ? part.split("=")[0] : part)),
   ];
 }
-
 function runCommand(
   stage: StageName,
   command: readonly string[],
