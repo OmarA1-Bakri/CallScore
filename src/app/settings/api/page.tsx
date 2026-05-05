@@ -10,6 +10,8 @@ import {
   parseApiKeyRevealCookieValue,
 } from "@/lib/api-keys";
 
+const API_KEYS_ROUTE = "/api/api-keys";
+
 interface PageProps {
   readonly searchParams?: {
     readonly created?: string;

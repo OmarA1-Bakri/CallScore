@@ -10,6 +10,8 @@ import {
   WEBHOOK_REVEAL_COOKIE_NAME,
 } from "@/lib/webhooks";
 
+const WEBHOOKS_ROUTE = "/api/webhooks";
+
 interface PageProps {
   readonly searchParams?: {
     readonly disabled?: string;
