@@ -219,7 +219,6 @@ export function summarizeCreatorCompleteness(
       ...row,
       published_videos: Math.min(row.total_videos, row.published_videos + terminalPublicationDateVideos),
       missing_transcript_videos: Math.max(0, row.missing_transcript_videos - terminalTranscriptVideos),
-      low_quality_transcript_videos: Math.max(0, row.low_quality_transcript_videos - terminalTranscriptVideos),
     };
     const status = statusForCreator(effectiveRow, shadowVideos);
     byStatus[status]++;
