@@ -76,6 +76,7 @@ export default async function ApiSettingsPage({
       ]}
     >
       <ApiKeyManager
+        // API key forms post to API_KEYS_ROUTE via the client manager.
         initialKeys={keys}
         initialRequestLogs={requestLogs}
         initialCreated={createdReveal}

@@ -54,8 +54,9 @@ async function loadCreatorSuggestions(
   );
 }
 
-function normalizeSearch(value: string | undefined): string {
-  return (value ?? "").trim().slice(0, 80);
+function normalizeSearch(value: string | readonly string[] | undefined): string {
+  const scalar = Array.isArray(value) ? value[0] : value;
+  return (scalar ?? "").trim().slice(0, 80);
 }
 
 function StatusNotice({
