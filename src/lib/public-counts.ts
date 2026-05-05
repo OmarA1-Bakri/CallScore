@@ -3,16 +3,23 @@ import {
   EXTRACTION_CONFIDENCE_THRESHOLD,
   PUBLIC_COUNT_LABELS,
   getCallEligibilitySql,
+  getScoreReadyIgnoringConfidenceSql,
 } from "./public-methodology";
 import { TRACKED_CREATOR_COUNT } from "./tracked-creators";
+import { getLeaderboardEligibilitySql } from "./leaderboard-eligibility";
+import { getJudgmentWindowSql } from "./judgment-window";
 
 interface CountsRow {
   readonly tracked_calls: string;
-  readonly llm_validated_calls: string;
+  readonly confidence_pass_calls: string;
   readonly public_scored_calls: string;
+  readonly pending_public_scoring_calls: string;
   readonly pending_horizon_calls: string;
+  readonly pending_30d_calls: string;
+  readonly pending_target_90d_calls: string;
   readonly missing_price_calls: string;
   readonly missing_30d_calls: string;
+  readonly missing_target_calls: string;
   readonly target_pending_calls: string;
   readonly excluded_low_confidence_calls: string;
   readonly ranked_creators: string;
@@ -30,9 +37,9 @@ export interface PublicCounts {
   readonly publicScoredCalls: number;
   readonly pendingPublicScoringCalls: number;
   readonly liveOpenCalls: number;
+  readonly pendingHorizonCalls: number;
   readonly pending30dCalls: number;
   readonly pendingTarget90dCalls: number;
-  readonly pendingHorizonCalls: number;
   readonly missingPriceCalls: number;
   readonly missing30dCalls: number;
   readonly missingTargetCalls: number;
@@ -51,9 +58,9 @@ export const DEFAULT_PUBLIC_COUNTS: PublicCounts = {
   publicScoredCalls: 0,
   pendingPublicScoringCalls: 0,
   liveOpenCalls: 0,
+  pendingHorizonCalls: 0,
   pending30dCalls: 0,
   pendingTarget90dCalls: 0,
-  pendingHorizonCalls: 0,
   missingPriceCalls: 0,
   missing30dCalls: 0,
   missingTargetCalls: 0,
@@ -63,42 +70,86 @@ export const DEFAULT_PUBLIC_COUNTS: PublicCounts = {
 
 export async function getPublicCounts(): Promise<PublicCounts> {
   const eligibleSql = getCallEligibilitySql("c");
+  const scoreReadyIgnoringConfidenceSql = getScoreReadyIgnoringConfidenceSql("c");
+  const judgmentWindowSql = getJudgmentWindowSql("c");
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
   const rows = await query<CountsRow>(
     `SELECT
-      COUNT(c.id)::text AS tracked_calls,
-      COUNT(c.id) FILTER (WHERE c.extraction_confidence >= $1)::text AS llm_validated_calls,
-      COUNT(c.id) FILTER (WHERE ${eligibleSql})::text AS public_scored_calls,
+      COUNT(c.id) FILTER (WHERE ${judgmentWindowSql})::text AS tracked_calls,
+      COUNT(c.id) FILTER (WHERE ${judgmentWindowSql} AND c.extraction_confidence >= $1)::text AS confidence_pass_calls,
+      COUNT(c.id) FILTER (WHERE ${judgmentWindowSql} AND ${eligibleSql})::text AS public_scored_calls,
       COUNT(c.id) FILTER (
-        WHERE c.extraction_confidence >= $1
+        WHERE ${judgmentWindowSql}
+          AND c.extraction_confidence >= $1
+          AND NOT (${scoreReadyIgnoringConfidenceSql})
+      )::text AS pending_public_scoring_calls,
+      COUNT(c.id) FILTER (
+        WHERE ${judgmentWindowSql}
+          AND c.extraction_confidence >= $1
+          AND c.price_at_call IS NOT NULL
+          AND c.call_date > NOW() - INTERVAL '30 days'
+      )::text AS pending_30d_calls,
+      COUNT(c.id) FILTER (
+        WHERE ${judgmentWindowSql}
+          AND c.extraction_confidence >= $1
+          AND c.price_at_call IS NOT NULL
+          AND c.call_date <= NOW() - INTERVAL '30 days'
+          AND c.price_30d IS NOT NULL
+          AND c.return_30d IS NOT NULL
+          AND c.target_price IS NOT NULL
+          AND c.call_date > NOW() - INTERVAL '90 days'
+      )::text AS pending_target_90d_calls,
+      COUNT(c.id) FILTER (
+        WHERE ${judgmentWindowSql}
+          AND c.extraction_confidence >= $1
           AND c.price_at_call IS NOT NULL
           AND (
             c.call_date > NOW() - INTERVAL '30 days'
-            OR (c.target_price IS NOT NULL AND c.call_date > NOW() - INTERVAL '90 days')
+            OR (
+              c.call_date <= NOW() - INTERVAL '30 days'
+              AND c.price_30d IS NOT NULL
+              AND c.return_30d IS NOT NULL
+              AND c.target_price IS NOT NULL
+              AND c.call_date > NOW() - INTERVAL '90 days'
+            )
           )
       )::text AS pending_horizon_calls,
       COUNT(c.id) FILTER (
-        WHERE c.extraction_confidence >= $1
+        WHERE ${judgmentWindowSql}
+          AND c.extraction_confidence >= $1
           AND c.price_at_call IS NULL
       )::text AS missing_price_calls,
       COUNT(c.id) FILTER (
-        WHERE c.extraction_confidence >= $1
+        WHERE ${judgmentWindowSql}
+          AND c.extraction_confidence >= $1
           AND c.price_at_call IS NOT NULL
           AND c.call_date <= NOW() - INTERVAL '30 days'
           AND (c.price_30d IS NULL OR c.return_30d IS NULL)
       )::text AS missing_30d_calls,
       COUNT(c.id) FILTER (
-        WHERE c.extraction_confidence >= $1
+        WHERE ${judgmentWindowSql}
+          AND c.extraction_confidence >= $1
           AND c.price_at_call IS NOT NULL
+          AND c.call_date <= NOW() - INTERVAL '30 days'
+          AND c.price_30d IS NOT NULL
+          AND c.return_30d IS NOT NULL
           AND c.target_price IS NOT NULL
-          AND (
-            c.call_date > NOW() - INTERVAL '90 days'
-            OR c.price_90d IS NULL
-            OR c.hit_target IS NULL
-          )
+          AND c.call_date <= NOW() - INTERVAL '90 days'
+          AND (c.price_90d IS NULL OR c.hit_target IS NULL)
+      )::text AS missing_target_calls,
+      COUNT(c.id) FILTER (
+        WHERE ${judgmentWindowSql}
+          AND c.extraction_confidence >= $1
+          AND c.price_at_call IS NOT NULL
+          AND c.call_date <= NOW() - INTERVAL '30 days'
+          AND c.price_30d IS NOT NULL
+          AND c.return_30d IS NOT NULL
+          AND c.target_price IS NOT NULL
+          AND c.call_date > NOW() - INTERVAL '90 days'
       )::text AS target_pending_calls,
-      COUNT(c.id) FILTER (WHERE c.extraction_confidence < $1)::text AS excluded_low_confidence_calls,
-      (SELECT COUNT(*)::text FROM creator_stats WHERE period = 'all_time' AND total_calls > 0) AS ranked_creators,
-      (SELECT COUNT(*)::text FROM creator_stats WHERE period = 'all_time' AND total_calls > 0 AND avg_alpha_30d > 0) AS beat_btc_creators
+      COUNT(c.id) FILTER (WHERE ${judgmentWindowSql} AND c.extraction_confidence < $1)::text AS excluded_low_confidence_calls,
+      (SELECT COUNT(*)::text FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql}) AS ranked_creators,
+      (SELECT COUNT(*)::text FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql} AND cs.avg_alpha_30d > 0) AS beat_btc_creators
      FROM calls c`,
     [EXTRACTION_CONFIDENCE_THRESHOLD],
   );
@@ -114,16 +165,16 @@ export async function getPublicCounts(): Promise<PublicCounts> {
     scoredCalls: publicScoredCalls,
     publicScoredCalls,
     beatBtcCreators: Number(row.beat_btc_creators),
-    llmValidatedCalls: Number(row.llm_validated_calls),
-    confidencePassCalls: Number(row.llm_validated_calls),
-    pendingPublicScoringCalls: Number(row.pending_horizon_calls),
-    liveOpenCalls: Number(row.pending_horizon_calls),
+    llmValidatedCalls: Number(row.confidence_pass_calls),
+    confidencePassCalls: Number(row.confidence_pass_calls),
+    pendingPublicScoringCalls: Number(row.pending_public_scoring_calls),
+    liveOpenCalls: Number(row.pending_30d_calls),
     pendingHorizonCalls: Number(row.pending_horizon_calls),
-    pending30dCalls: Number(row.pending_horizon_calls),
-    pendingTarget90dCalls: Number(row.target_pending_calls),
+    pending30dCalls: Number(row.pending_30d_calls),
+    pendingTarget90dCalls: Number(row.pending_target_90d_calls),
     missingPriceCalls: Number(row.missing_price_calls),
     missing30dCalls: Number(row.missing_30d_calls),
-    missingTargetCalls: Number(row.target_pending_calls),
+    missingTargetCalls: Number(row.missing_target_calls),
     targetPendingCalls: Number(row.target_pending_calls),
     excludedLowConfidenceCalls: Number(row.excluded_low_confidence_calls),
   };

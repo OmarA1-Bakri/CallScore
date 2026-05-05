@@ -8,6 +8,8 @@ import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { getPublicCounts } from "@/lib/public-counts";
+import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
+import { CREATOR_JUDGMENT_WINDOW_SHORT_LABEL } from "@/lib/judgment-window";
 import { getCreatorTier, hasAccess } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
@@ -22,9 +24,9 @@ import type {
 } from "@/lib/types";
 
 export const metadata: Metadata = {
-  title: "CallScore — Market Calls, Measured",
+  title: "CallScore — Track Calls. Score Outcomes. Find Alpha.",
   description:
-    "Market calls scored against real price data, with every Alpha Score tied to the published methodology.",
+    "Crypto creator market calls scored against real price data, with every Alpha Score tied to the published methodology.",
   alternates: { canonical: "/" },
 };
 
@@ -149,6 +151,8 @@ export default async function HomePage({
   const canUseRecent = hasAccess(currentTier, "pro");
   const period: Period = canUseRecent ? requestedPeriod : "all_time";
 
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+
   // Fetch leaderboard from DB
   let leaderboard: LeaderboardRow[] = [];
   try {
@@ -183,7 +187,7 @@ export default async function HomePage({
       LEFT JOIN calls bc ON bc.id = cs.best_call_id
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
-        AND cs.total_calls > 0
+        AND ${leaderboardEligibleSql}
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );
@@ -275,9 +279,9 @@ export default async function HomePage({
       publicScoredCalls: 0,
       pendingPublicScoringCalls: 0,
       liveOpenCalls: 0,
+      pendingHorizonCalls: 0,
       pending30dCalls: 0,
       pendingTarget90dCalls: 0,
-      pendingHorizonCalls: 0,
       missingPriceCalls: 0,
       missing30dCalls: 0,
       missingTargetCalls: 0,
@@ -293,8 +297,8 @@ export default async function HomePage({
       `SELECT
         COALESCE(SUM(total_calls), 0)::text AS total_calls,
         CASE WHEN COUNT(*) > 0 THEN ROUND((AVG(win_rate) * 100)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
-        COUNT(DISTINCT creator_id) FILTER (WHERE total_calls > 0)::text AS creator_count
-      FROM creator_stats WHERE period = 'all_time'`,
+        COUNT(DISTINCT creator_id)::text AS creator_count
+      FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql}`,
     );
     if (statsRows.length > 0) {
       totalCalls = Number(statsRows[0].total_calls) > 0 ? statsRows[0].total_calls : "0";
@@ -362,7 +366,7 @@ export default async function HomePage({
             <MetaStrip
               cells={[
                 { k: "raw calls", v: publicCounts.trackedCalls.toLocaleString() },
-                { k: "LLM validated", v: publicCounts.llmValidatedCalls.toLocaleString() },
+                { k: "confidence pass", v: publicCounts.confidencePassCalls.toLocaleString() },
                 { k: "public scored", v: publicCounts.publicScoredCalls.toLocaleString() },
                 { k: "low-conf excluded", v: publicCounts.excludedLowConfidenceCalls.toLocaleString() },
               ]}
@@ -374,9 +378,9 @@ export default async function HomePage({
             creatorCount={publicCounts.trackedCreators}
             beatBtcCreators={publicCounts.beatBtcCreators}
             rankedCreators={publicCounts.rankedCreators}
-            pendingHorizonCalls={publicCounts.pendingHorizonCalls}
+            liveOpenCalls={publicCounts.liveOpenCalls}
             excludedLowConfidenceCalls={publicCounts.excludedLowConfidenceCalls}
-            llmValidatedCalls={publicCounts.llmValidatedCalls}
+            confidencePassCalls={publicCounts.confidencePassCalls}
             rows={leaderboard}
           />
         </div>
@@ -539,9 +543,9 @@ interface MarketCallPreviewProps {
   readonly creatorCount: number;
   readonly beatBtcCreators: number;
   readonly rankedCreators: number;
-  readonly pendingHorizonCalls: number;
+  readonly liveOpenCalls: number;
   readonly excludedLowConfidenceCalls: number;
-  readonly llmValidatedCalls: number;
+  readonly confidencePassCalls: number;
   readonly rows: readonly LeaderboardRow[];
 }
 
@@ -550,9 +554,9 @@ function MarketCallPreview({
   creatorCount,
   beatBtcCreators,
   rankedCreators,
-  pendingHorizonCalls,
+  liveOpenCalls,
   excludedLowConfidenceCalls,
-  llmValidatedCalls,
+  confidencePassCalls,
   rows,
 }: MarketCallPreviewProps): ReactElement {
   const previewRows = rows.slice(0, 5);
@@ -600,8 +604,8 @@ function MarketCallPreview({
           />
         </div>
         <div className="mt-4 grid grid-cols-3 gap-y-4 border-t border-ink-200 pt-4">
-          <PreviewMetric label="LLM validated" value={String(llmValidatedCalls)} />
-          <PreviewMetric label="pending horizon" value={String(pendingHorizonCalls)} />
+          <PreviewMetric label="confidence pass" value={String(confidencePassCalls)} />
+          <PreviewMetric label="live/open" value={String(liveOpenCalls)} />
           <PreviewMetric label="low-conf excluded" value={String(excludedLowConfidenceCalls)} />
         </div>
       </div>
@@ -676,7 +680,7 @@ function MarketCallPreview({
             Top Creators
           </p>
           <div className="hidden tab:flex items-center gap-6 font-mono text-[11px] text-ink-500 tracking-caps uppercase">
-            <span className="text-ink-900 border-b border-accent pb-1">All Time</span>
+            <span className="text-ink-900 border-b border-accent pb-1">{CREATOR_JUDGMENT_WINDOW_SHORT_LABEL}</span>
             <span>90 Days</span>
             <span>30 Days</span>
           </div>

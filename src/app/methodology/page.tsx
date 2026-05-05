@@ -285,12 +285,7 @@ export default function MethodologyPage(): ReactElement {
 function AuditLinks(): ReactElement {
   return (
     <p className="font-mono text-[13px] text-ink-600 not-italic">
-      <Link
-        href="https://github.com/dave-builder/crypto-tuber-ranked"
-        className="text-accent hover:underline underline-offset-4"
-      >
-        View the source
-      </Link>
+      <span className="text-ink-500">Source repository currently private</span>
       <span className="text-ink-400" aria-hidden="true"> · </span>
       <a
         href="mailto:dave.shipsbuilds@proton.me?subject=CryptoTubers%20Ranked%20-%20score%20dispute"

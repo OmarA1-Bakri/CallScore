@@ -1,5 +1,6 @@
 import { query } from "../lib/db";
 import { getPublicCounts } from "../lib/public-counts";
+import { getLeaderboardEligibilitySql } from "../lib/leaderboard-eligibility";
 import { writeJsonFile } from "../lib/shadow-extraction";
 import { loadEnv, timestamp } from "./script-helpers";
 
@@ -44,11 +45,12 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseVerifyPublicSurfaceArgs(argv);
   const checks: VerificationCheck[] = [];
   const publicCounts = await getPublicCounts();
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
   const statsRows = await query<{ ranked_creators: string; total_calls: string }>(
-    `SELECT COUNT(*) FILTER (WHERE total_calls > 0)::text AS ranked_creators,
+    `SELECT COUNT(*) FILTER (WHERE ${leaderboardEligibleSql})::text AS ranked_creators,
             COALESCE(SUM(total_calls), 0)::text AS total_calls
-     FROM creator_stats
-     WHERE period = 'all_time'`,
+     FROM creator_stats cs
+     WHERE cs.period = 'all_time'`,
   );
   const stats = statsRows[0] ?? { ranked_creators: "0", total_calls: "0" };
 

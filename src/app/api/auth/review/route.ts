@@ -4,15 +4,6 @@ import { REVIEWABLE_TIERS, getReviewTier, normalizeNextPath } from "./helpers";
 
 export const dynamic = "force-dynamic";
 
-function baseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    (process.env.NODE_ENV === "production"
-      ? "https://call-score.com"
-      : "http://localhost:3000")
-  );
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const reviewToken = process.env.REVIEW_ACCESS_TOKEN;
 
@@ -38,5 +29,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   await createSession(`review-${tier}`, tier, `review:${tier}`);
 
   const nextPath = normalizeNextPath(searchParams.get("next"));
-  return NextResponse.redirect(`${baseUrl()}${nextPath}`, 303);
+  return NextResponse.redirect(`${request.nextUrl.origin}${nextPath}`, 303);
 }

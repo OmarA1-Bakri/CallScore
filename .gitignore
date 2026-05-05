@@ -3,6 +3,7 @@ node_modules/
 .env
 .env.local
 .env.vercel
+.env.hermes
 *.tsbuildinfo
 next-env.d.ts
 out/
@@ -23,9 +24,10 @@ public/logo-variants.png
 squirrel.toml
 skills-lock.json
 output/playwright/
-.omx/
 
-.worktrees/
 
 # Local AI tool profiles
 .openclaude-profile.json
+artifacts/
+backtest-page-rendered.png
+home-*-alpha-nav.png

@@ -74,7 +74,7 @@ export default function MobileMenu({
                 onClick={() => setOpen(false)}
                 className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
               >
-                SETTINGS
+                ACCOUNT
               </Link>
               {tier === "alpha" && (
                 <Link
@@ -82,7 +82,7 @@ export default function MobileMenu({
                   onClick={() => setOpen(false)}
                   className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
                 >
-                  BACKTEST LAB
+                  ALPHA LAB
                 </Link>
               )}
               <form action="/api/auth/logout" method="post">

@@ -26,6 +26,10 @@ function getScoreLabel(call: SerializedCall): string {
   return "Pending";
 }
 
+function formatSignedPercent(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
 export default function CallHistory({
   calls,
   totalCount,
@@ -41,10 +45,14 @@ export default function CallHistory({
       const aVal =
         sortKey === "score"
           ? (a.public_score ?? -1)
+          : sortKey === "return_30d"
+            ? (a.return_30d ?? a.live_return ?? 0)
           : (a[sortKey] ?? 0);
       const bVal =
         sortKey === "score"
           ? (b.public_score ?? -1)
+          : sortKey === "return_30d"
+            ? (b.return_30d ?? b.live_return ?? 0)
           : (b[sortKey] ?? 0);
       if (typeof aVal === "string" && typeof bVal === "string") {
         return sortDir === "asc"
@@ -174,7 +182,20 @@ export default function CallHistory({
                     </span>
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {call.horizon_status_30d === "pending" ? (
+                    {call.horizon_status_30d === "pending" && call.live_return !== null ? (
+                      <span
+                        className={
+                          call.live_return >= 0
+                            ? "value-positive"
+                            : "value-negative"
+                        }
+                      >
+                        {formatSignedPercent(call.live_return)}
+                        <span className="ml-1 text-ink-400 text-[10px] uppercase tracking-wider">
+                          live
+                        </span>
+                      </span>
+                    ) : call.horizon_status_30d === "pending" ? (
                       <span className="text-ink-400 text-xs uppercase tracking-wider">
                         Pending
                       </span>
@@ -186,15 +207,27 @@ export default function CallHistory({
                             : "value-negative"
                         }
                       >
-                        {call.return_30d >= 0 ? "+" : ""}
-                        {call.return_30d.toFixed(1)}%
+                        {formatSignedPercent(call.return_30d)}
                       </span>
                     ) : (
                       <span className="text-ink-400">--</span>
                     )}
                   </td>
                   <td className="px-4 py-3 tabular-nums hidden lg:table-cell">
-                    {call.horizon_status_30d === "pending" ? (
+                    {call.horizon_status_30d === "pending" && call.live_alpha !== null ? (
+                      <span
+                        className={
+                          call.live_alpha >= 0
+                            ? "value-positive"
+                            : "value-negative"
+                        }
+                      >
+                        {formatSignedPercent(call.live_alpha)}
+                        <span className="ml-1 text-ink-400 text-[10px] uppercase tracking-wider">
+                          live
+                        </span>
+                      </span>
+                    ) : call.horizon_status_30d === "pending" ? (
                       <span className="text-ink-400 text-xs uppercase tracking-wider">
                         Pending
                       </span>
@@ -206,8 +239,7 @@ export default function CallHistory({
                             : "value-negative"
                         }
                       >
-                        {call.alpha_30d >= 0 ? "+" : ""}
-                        {call.alpha_30d.toFixed(1)}%
+                        {formatSignedPercent(call.alpha_30d)}
                       </span>
                     ) : (
                       <span className="text-ink-400">--</span>

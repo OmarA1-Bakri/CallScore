@@ -15,13 +15,15 @@ export default async function Header(): Promise<ReactElement> {
       <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
         <div className="flex h-16 items-center justify-between tab:h-[72px]">
           {/* Logo */}
-          <Link
-            href="/"
-            className="flex items-center gap-2.5 group"
-            aria-label="CallScore home"
-          >
-            <CallScoreBrand />
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="flex items-center gap-2.5 group"
+              aria-label="CallScore home"
+            >
+              <CallScoreBrand />
+            </Link>
+          </div>
 
           {/* Desktop nav */}
           <nav
@@ -49,21 +51,13 @@ export default async function Header(): Promise<ReactElement> {
 
             {loggedIn ? (
               <div className="flex items-center gap-6 border-l border-ink-250 pl-8">
+                <TierBadge tier={tier} />
                 <Link
                   href="/settings"
                   className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
                 >
-                  SETTINGS
+                  ACCOUNT
                 </Link>
-                {tier === "alpha" && (
-                  <Link
-                    href="/backtest"
-                    className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
-                  >
-                    BACKTEST LAB
-                  </Link>
-                )}
-                <TierBadge tier={tier} />
                 <form action="/api/auth/logout" method="post">
                   <button
                     type="submit"

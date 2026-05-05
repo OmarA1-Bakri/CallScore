@@ -1,5 +1,5 @@
 import Link from "next/link";
-import CallScoreBrand from "./CallScoreBrand";
+import Image from "next/image";
 
 export default function Footer() {
   return (
@@ -9,12 +9,14 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2.5 mb-3">
-              <CallScoreBrand compact />
-            </div>
-            <p className="text-ink-500 text-sm leading-relaxed">
-              Market calls, measured.
-            </p>
+            <Image
+              src="/brand/binary-baron-footer-transparent-tight.png"
+              alt="Binary Baron"
+              width={703}
+              height={499}
+              className="h-[86px] w-[122px] object-contain object-left opacity-70"
+              unoptimized
+            />
           </div>
 
           {/* Links */}
@@ -107,10 +109,12 @@ export default function Footer() {
               making any investment decisions.
             </p>
           </details>
-          <p className="text-ink-400 text-xs">
-            &copy; {new Date().getFullYear()} CallScore. All rights
-            reserved.
-          </p>
+          <div className="border-t border-ink-150 pt-5">
+            <p className="text-ink-400 text-xs">
+              &copy; {new Date().getFullYear()} CallScore. All rights
+              reserved.
+            </p>
+          </div>
         </div>
       </div>
     </footer>

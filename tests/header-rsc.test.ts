@@ -42,6 +42,12 @@ test("header auth redirects use canonical masthead typography", () => {
   assert.doesNotMatch(headerSrc, /bg-accent\s/);
 });
 
+test("paid product surfaces do not sit in the primary desktop nav", () => {
+  assert.match(headerSrc, />\s*ACCOUNT\s*</);
+  assert.doesNotMatch(headerSrc, />\s*SETTINGS\s*</);
+  assert.doesNotMatch(headerSrc, />\s*BACKTEST LAB\s*</);
+});
+
 test("mobile menu redirect labels match canonical masthead labels", () => {
   assert.match(mobileMenuSrc, />\s*SIGN IN\s*</);
   assert.match(mobileMenuSrc, />\s*GET ACCESS\s*</);

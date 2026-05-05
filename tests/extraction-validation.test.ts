@@ -133,3 +133,52 @@ test("accepts Hindi support-zone watch language as actionable", () => {
 
   assert.equal(result.isValid, true);
 });
+
+test("accepts common bullish forecast wording from transcripts", () => {
+  assert.equal(
+    audit({
+      symbol: "ETHUSDT",
+      quote: "I believe Ethereum will make a massive comeback in 2025.",
+    }).isValid,
+    true,
+  );
+  assert.equal(
+    audit({
+      symbol: "ETHUSDT",
+      quote: "January to May of this year is the best time to be positioned in Ethereum.",
+    }).isValid,
+    true,
+  );
+  assert.equal(
+    audit({
+      symbol: "BTCUSDT",
+      quote: "Bitcoin hitting all-time highs over $100,000 shows the rocket ship keeps climbing.",
+    }).isValid,
+    true,
+  );
+});
+
+test("accepts common market-strength and market-weakness wording", () => {
+  assert.equal(
+    audit({
+      symbol: "SUIUSDT",
+      quote: "I made one of the big calls that people should load up on Sui; Sui has been one of the best performers.",
+    }).isValid,
+    true,
+  );
+  assert.equal(
+    audit({
+      symbol: "DOGEUSDT",
+      quote: "Doge is looking pretty strong and I think Doge is going to do pretty good.",
+    }).isValid,
+    true,
+  );
+  assert.equal(
+    audit({
+      symbol: "BTCUSDT",
+      direction: "bearish",
+      quote: "The Bitcoin price is now at risk of a potentially heinous capitulatory decline.",
+    }).isValid,
+    true,
+  );
+});

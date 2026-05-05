@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
+import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
 import { getRequestAuthContext } from "@/lib/auth";
 import type {
   Creator,
@@ -156,6 +157,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const period: Period = periodParam;
+    const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
     if (period !== "all_time") {
       const auth = getRequestAuthContext(request);
       const userTier = auth.session?.tier ?? (await getUserTier(auth.accessToken, auth.session?.userId));
@@ -198,7 +200,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       LEFT JOIN calls bc ON bc.id = cs.best_call_id
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
-        AND cs.total_calls > 0
+        AND ${leaderboardEligibleSql}
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );

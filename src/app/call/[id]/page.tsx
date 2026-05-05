@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { query } from "@/lib/db";
+import { getLiveCallPriceJoinSql, getLiveCallPriceSelectSql } from "@/lib/live-call-pricing";
 import { SYMBOL_TICKERS } from "@/lib/constants";
 import { serializeCall } from "@/lib/public-serializer";
 import type { Call, Creator } from "@/lib/types";
@@ -29,7 +30,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   try {
     const calls = await query<Call>(
-      `SELECT * FROM calls WHERE id = $1 LIMIT 1`,
+      `SELECT c.*, ${getLiveCallPriceSelectSql()}
+       FROM calls c
+       ${getLiveCallPriceJoinSql("c")}
+       WHERE c.id = $1 LIMIT 1`,
       [callId],
     );
 
@@ -62,7 +66,10 @@ export default async function CallDetailPage({ params }: PageProps) {
   let call: Call;
   try {
     const calls = await query<Call>(
-      `SELECT * FROM calls WHERE id = $1 LIMIT 1`,
+      `SELECT c.*, ${getLiveCallPriceSelectSql()}
+       FROM calls c
+       ${getLiveCallPriceJoinSql("c")}
+       WHERE c.id = $1 LIMIT 1`,
       [callId],
     );
     if (calls.length === 0) {
@@ -113,7 +120,9 @@ export default async function CallDetailPage({ params }: PageProps) {
   // Outcome label is derived (Call has no `outcome` column). When the 30d
   // horizon hasn't elapsed, surface "pending"; otherwise win / loss / flat.
   const outcomeLabel: string =
-    serializedCall.horizon_status_30d !== "available"
+    serializedCall.is_live_open
+      ? "live/open"
+      : serializedCall.horizon_status_30d !== "available"
       ? "pending"
       : serializedCall.return_30d === null
         ? "—"
@@ -138,11 +147,20 @@ export default async function CallDetailPage({ params }: PageProps) {
     serializedCall.public_score !== null
       ? serializedCall.public_score.toFixed(1)
       : "—";
+  const showLivePerformance = serializedCall.is_live_open && serializedCall.live_return !== null;
 
   const return30dCellValue =
     serializedCall.return_30d !== null
       ? `${serializedCall.return_30d >= 0 ? "+" : ""}${serializedCall.return_30d.toFixed(1)}%`
-      : "—";
+      : showLivePerformance
+        ? `${serializedCall.live_return >= 0 ? "+" : ""}${serializedCall.live_return.toFixed(1)}%`
+        : "—";
+  const returnCellLabel =
+    serializedCall.return_30d !== null
+      ? "30d return"
+      : serializedCall.is_live_open
+        ? "live return"
+        : "30d return";
 
   return (
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-12">
@@ -163,7 +181,9 @@ export default async function CallDetailPage({ params }: PageProps) {
           <em className="italic font-normal text-accent">{directionLabel}</em>
         </h1>
         <p className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[680px]">
-          Scored against Binance candles for the 30-day window following the call date.
+          {serializedCall.is_live_open
+            ? "Live/open call tracked against the latest Binance candle until the 30-day window closes."
+            : "Scored against Binance candles for the 30-day window following the call date."}
           {serializedCall.target_price !== null && (
             <>
               {" "}Target was{" "}
@@ -174,7 +194,7 @@ export default async function CallDetailPage({ params }: PageProps) {
         <MetaStrip
           cells={[
             { k: "alpha score", v: scoreCellValue },
-            { k: "30d return", v: return30dCellValue },
+            { k: returnCellLabel, v: return30dCellValue },
             { k: "outcome", v: outcomeLabel },
             { k: "target hit", v: targetHitLabel },
           ]}
@@ -193,7 +213,9 @@ export default async function CallDetailPage({ params }: PageProps) {
           />
         ) : (
           <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-            Score is being computed. Check back after the next pipeline run.
+            {serializedCall.is_live_open
+              ? "This call is live/open. The final public score locks after the 30-day horizon closes."
+              : "Score is being computed. Check back after the next pipeline run."}
           </p>
         )}
       </EditorialSection>
@@ -201,8 +223,20 @@ export default async function CallDetailPage({ params }: PageProps) {
       {/* 02 — performance */}
       <EditorialSection
         index="02"
-        title={<><em className="italic text-accent">Performance</em> over 30 days.</>}
-        meta={<>price vs BTC benchmark<br />window: call date → +30d</>}
+        title={
+          serializedCall.return_30d !== null
+            ? <><em className="italic text-accent">Performance</em> over 30 days.</>
+            : showLivePerformance
+              ? <><em className="italic text-accent">Live</em> performance.</>
+              : <><em className="italic text-accent">Performance</em> pending.</>
+        }
+        meta={
+          serializedCall.return_30d !== null
+            ? <>price vs BTC benchmark<br />window: call date → +30d</>
+            : showLivePerformance
+              ? <>price vs BTC benchmark<br />window: call date → latest candle</>
+              : <>price vs BTC benchmark<br />window pending</>
+        }
       >
         {serializedCall.return_30d !== null ? (
           <dl className="grid grid-cols-2 tab:grid-cols-3 gap-[18px]">
@@ -233,6 +267,39 @@ export default async function CallDetailPage({ params }: PageProps) {
                 </dt>
                 <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight tabular-nums">
                   ${serializedCall.price_30d.toLocaleString()}
+                </dd>
+              </div>
+            )}
+          </dl>
+        ) : showLivePerformance ? (
+          <dl className="grid grid-cols-2 tab:grid-cols-3 gap-[18px]">
+            <div className="border-t border-ink-250 pt-3.5">
+              <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
+                live return
+              </dt>
+              <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight tabular-nums">
+                {serializedCall.live_return >= 0 ? "+" : ""}
+                {serializedCall.live_return.toFixed(1)}%
+              </dd>
+            </div>
+            {serializedCall.live_alpha !== null && (
+              <div className="border-t border-ink-250 pt-3.5">
+                <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
+                  live alpha vs BTC
+                </dt>
+                <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight tabular-nums">
+                  {serializedCall.live_alpha >= 0 ? "+" : ""}
+                  {serializedCall.live_alpha.toFixed(1)}%
+                </dd>
+              </div>
+            )}
+            {serializedCall.live_price !== null && (
+              <div className="border-t border-ink-250 pt-3.5">
+                <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
+                  latest price
+                </dt>
+                <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight tabular-nums">
+                  ${serializedCall.live_price.toLocaleString()}
                 </dd>
               </div>
             )}

@@ -3,6 +3,8 @@ import { query } from "@/lib/db";
 import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
 import { serializeCalls } from "@/lib/public-serializer";
 import { getRequestAuthContext } from "@/lib/auth";
+import { getJudgmentWindowSql } from "@/lib/judgment-window";
+import { getLiveCallPriceJoinSql, getLiveCallPriceSelectSql } from "@/lib/live-call-pricing";
 import type { Creator, CreatorStats, Call, Tier } from "@/lib/types";
 
 const VALID_SORT_FIELDS = ["date", "score", "return"] as const;
@@ -119,14 +121,20 @@ export async function GET(
         [creatorId],
       ),
       query<Call>(
-        `SELECT * FROM calls
-         WHERE creator_id = $1
+        `SELECT c.*, ${getLiveCallPriceSelectSql()}
+         FROM calls c
+         ${getLiveCallPriceJoinSql("c")}
+         WHERE c.creator_id = $1
+           AND ${getJudgmentWindowSql("c")}
          ORDER BY ${orderClause}
          LIMIT $2 OFFSET $3`,
         [creatorId, limit, offset],
       ),
       query<CountRow>(
-        `SELECT COUNT(*)::text AS count FROM calls WHERE creator_id = $1`,
+        `SELECT COUNT(*)::text AS count
+         FROM calls
+         WHERE creator_id = $1
+           AND ${getJudgmentWindowSql("calls")}`,
         [creatorId],
       ),
     ]);
