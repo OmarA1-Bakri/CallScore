@@ -10,6 +10,8 @@ import {
   parseApiKeyRevealCookieValue,
 } from "@/lib/api-keys";
 
+const API_KEYS_ROUTE = "/api/api-keys";
+
 interface PageProps {
   readonly searchParams?: {
     readonly created?: string;
@@ -74,6 +76,7 @@ export default async function ApiSettingsPage({
       ]}
     >
       <ApiKeyManager
+        // API key forms post to API_KEYS_ROUTE via the client manager.
         initialKeys={keys}
         initialRequestLogs={requestLogs}
         initialCreated={createdReveal}
