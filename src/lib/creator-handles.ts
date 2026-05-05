@@ -6,7 +6,7 @@ export function normalizeCreatorHandle(rawHandle: string): string {
 }
 
 export function creatorHandlePath(rawHandle: string): string {
-  return normalizeCreatorHandle(rawHandle).toLowerCase();
+  return encodeURIComponent(normalizeCreatorHandle(rawHandle).toLowerCase());
 }
 
 export async function findCreatorByHandle<T extends Partial<Creator>>(

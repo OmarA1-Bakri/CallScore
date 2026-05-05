@@ -68,10 +68,16 @@ export interface PipelineReadinessSummary {
     readonly shadowAcceptedCalls: number;
     readonly promotedVideos: number;
     readonly llmValidatedCalls: number;
+    readonly confidencePassCalls: number;
     readonly publicScoredCalls: number;
+    readonly pendingPublicScoringCalls: number;
+    readonly liveOpenCalls: number;
     readonly pendingHorizonCalls: number;
+    readonly pending30dCalls: number;
+    readonly pendingTarget90dCalls: number;
     readonly missingPriceCalls: number;
     readonly missing30dCalls: number;
+    readonly missingTargetCalls: number;
     readonly targetPendingCalls: number;
     readonly excludedLowConfidenceCalls: number;
   };
@@ -219,7 +225,6 @@ export function summarizeCreatorCompleteness(
       ...row,
       published_videos: Math.min(row.total_videos, row.published_videos + terminalPublicationDateVideos),
       missing_transcript_videos: Math.max(0, row.missing_transcript_videos - terminalTranscriptVideos),
-      low_quality_transcript_videos: Math.max(0, row.low_quality_transcript_videos - terminalTranscriptVideos),
     };
     const status = statusForCreator(effectiveRow, shadowVideos);
     byStatus[status]++;
@@ -281,10 +286,16 @@ export function buildPipelineReadinessSummary(input: {
       shadowAcceptedCalls: shadow.acceptedCalls,
       promotedVideos: promotion.promotedVideos,
       llmValidatedCalls: input.publicCounts.llmValidatedCalls,
+      confidencePassCalls: input.publicCounts.confidencePassCalls,
       publicScoredCalls: input.publicCounts.publicScoredCalls,
+      pendingPublicScoringCalls: input.publicCounts.pendingPublicScoringCalls,
+      liveOpenCalls: input.publicCounts.liveOpenCalls,
       pendingHorizonCalls: input.publicCounts.pendingHorizonCalls,
+      pending30dCalls: input.publicCounts.pending30dCalls,
+      pendingTarget90dCalls: input.publicCounts.pendingTarget90dCalls,
       missingPriceCalls: input.publicCounts.missingPriceCalls,
       missing30dCalls: input.publicCounts.missing30dCalls,
+      missingTargetCalls: input.publicCounts.missingTargetCalls,
       targetPendingCalls: input.publicCounts.targetPendingCalls,
       excludedLowConfidenceCalls: input.publicCounts.excludedLowConfidenceCalls,
     },

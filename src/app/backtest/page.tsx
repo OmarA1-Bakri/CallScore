@@ -134,6 +134,39 @@ async function loadCreatorOptions(): Promise<readonly CreatorOption[]> {
   );
 }
 
+async function loadCreatorsByIds(ids: readonly number[]): Promise<readonly CreatorOption[]> {
+  if (ids.length === 0) return [];
+  return await query<CreatorOption>(
+    `SELECT
+       cr.id,
+       cr.name,
+       cr.youtube_handle,
+       COALESCE(cs.alpha_score, cr.alpha_score) AS alpha_score,
+       COALESCE(cs.accuracy_rank, cr.accuracy_rank) AS accuracy_rank,
+       COALESCE(cs.total_calls, cr.total_calls) AS total_calls
+     FROM creators cr
+     LEFT JOIN creator_stats cs
+       ON cs.creator_id = cr.id AND cs.period = 'all_time'
+     WHERE cr.id = ANY($1::int[])
+     ORDER BY COALESCE(cs.accuracy_rank, cr.accuracy_rank, 999999), cr.name ASC`,
+    [ids as number[]],
+  );
+}
+
+function mergeCreatorOptions(
+  base: readonly CreatorOption[],
+  selected: readonly CreatorOption[],
+): readonly CreatorOption[] {
+  const seen = new Set<number>();
+  const merged: CreatorOption[] = [];
+  for (const row of [...selected, ...base]) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    merged.push(row);
+  }
+  return merged;
+}
+
 function parseCreatorIds(
   searchParams: PageProps["searchParams"],
   fallback: readonly CreatorOption[],
@@ -950,10 +983,12 @@ export default async function BacktestLabPage({ searchParams }: PageProps) {
   const tier = await getCurrentTier();
   if (!hasAccess(tier, "alpha")) return <LabLocked />;
 
-  const creators = await loadCreatorOptions();
+  const topCreators = await loadCreatorOptions();
   const now = new Date();
   const defaults = defaultBacktestRange(now);
-  const selectedIds = parseCreatorIds(searchParams, creators);
+  const selectedIds = parseCreatorIds(searchParams, topCreators);
+  const selectedCreators = await loadCreatorsByIds(selectedIds);
+  const creators = mergeCreatorOptions(topCreators, selectedCreators);
   const start = parseIsoDateAsStartOfDay(searchParams.start) ?? defaults.start;
   const end = parseIsoDateAsEndOfDay(searchParams.end) ?? defaults.end;
   const safeEnd = end.getTime() > start.getTime() ? end : defaults.end;
