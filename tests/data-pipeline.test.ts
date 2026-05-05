@@ -47,6 +47,7 @@ test("data pipeline defaults to safe local dry-run for top creators", () => {
   assert.match(args.shadowRunId, /^pipeline-/);
   assert.equal(args.shadowProvider, "ollama");
   assert.equal(args.shadowModel, "kimi-k2.6");
+  assert.equal(args.shadowFallbackModel, null);
   assert.equal(args.shadowRequestTimeoutMs, 180_000);
   assert.equal(args.shadowAgents, 1);
   assert.equal(args.shadowVideoAgents, 1);
@@ -84,6 +85,8 @@ test("data pipeline parses explicit bounds and skip flags", () => {
     "ollama",
     "--shadow-model",
     "deepseek-v4-flash",
+    "--shadow-fallback-model",
+    "glm-5.1",
     "--shadow-request-timeout-ms",
     "240000",
     "--shadow-agents",
@@ -120,6 +123,7 @@ test("data pipeline parses explicit bounds and skip flags", () => {
   assert.equal(args.shadowRunId, "shadow-canary");
   assert.equal(args.shadowProvider, "ollama");
   assert.equal(args.shadowModel, "deepseek-v4-flash");
+  assert.equal(args.shadowFallbackModel, "glm-5.1");
   assert.equal(args.shadowRequestTimeoutMs, 240_000);
   assert.equal(args.shadowAgents, 3);
   assert.equal(args.shadowVideoAgents, 2);
@@ -257,6 +261,7 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
   assert.ok(commands["shadow-extract"][0].includes("shadow-canary"));
   assert.ok(commands["shadow-extract"][0].includes("--provider"));
   assert.ok(commands["shadow-extract"][0].includes("ollama"));
+  assert.equal(commands["shadow-extract"][0].includes("--fallback-model"), false);
   assert.ok(commands["shadow-extract"][0].includes("--request-timeout-ms"));
   assert.ok(commands["shadow-extract"][0].includes("180000"));
   assert.ok(commands["shadow-extract"][0].includes("--video-agents"));
@@ -307,6 +312,21 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
     ),
   );
   assert.deepEqual(commands["match-prices"], []);
+});
+
+test("data pipeline wires optional shadow fallback model to extraction commands", () => {
+  const args = parseDataPipelineArgs([
+    "--creators",
+    "@A",
+    "--audit-dir",
+    ".tmp/pipeline-test",
+    "--shadow-fallback-model",
+    "glm-5.1",
+  ]);
+  const command = buildDataPipelineStageCommands(args)["shadow-extract"][0];
+
+  assert.ok(command.includes("--fallback-model"));
+  assert.ok(command.includes("glm-5.1"));
 });
 
 test("data pipeline write mode executes shadow extraction, guarded promotion, and full rematch when requested", () => {

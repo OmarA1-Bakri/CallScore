@@ -55,6 +55,7 @@ interface DataPipelineArgs {
   readonly shadowRunId: string;
   readonly shadowProvider: string | null;
   readonly shadowModel: string | null;
+  readonly shadowFallbackModel: string | null;
   readonly shadowRequestTimeoutMs: number;
   readonly shadowAgents: number;
   readonly shadowVideoAgents: number;
@@ -159,6 +160,7 @@ export function parseDataPipelineArgs(
     shadowProvider:
       argValue(argv, "--shadow-provider") ?? DEFAULT_SHADOW_PROVIDER,
     shadowModel: argValue(argv, "--shadow-model") ?? DEFAULT_SHADOW_MODEL,
+    shadowFallbackModel: argValue(argv, "--shadow-fallback-model"),
     shadowRequestTimeoutMs: positiveInt(
       argValue(argv, "--shadow-request-timeout-ms"),
       DEFAULT_SHADOW_REQUEST_TIMEOUT_MS,
@@ -424,6 +426,9 @@ export function buildDataPipelineStageCommands(
     ? ["--provider", args.shadowProvider]
     : [];
   const shadowModelArgs = args.shadowModel ? ["--model", args.shadowModel] : [];
+  const shadowFallbackModelArgs = args.shadowFallbackModel
+    ? ["--fallback-model", args.shadowFallbackModel]
+    : [];
   const shadowRequestTimeoutArgs = [
     "--request-timeout-ms",
     String(args.shadowRequestTimeoutMs),
@@ -510,6 +515,7 @@ export function buildDataPipelineStageCommands(
         ),
         ...shadowProviderArgs,
         ...shadowModelArgs,
+        ...shadowFallbackModelArgs,
         ...shadowRequestTimeoutArgs,
         ...shadowVideoAgentsArgs,
         ...shadowChunkAgentsArgs,
