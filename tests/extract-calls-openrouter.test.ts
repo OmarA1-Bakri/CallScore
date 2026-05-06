@@ -4,6 +4,7 @@ import {
   buildOllamaChatRequestBody,
   buildOllamaHeaders,
   extractJsonArrayText,
+  modelAttemptSequence,
   openRouterPrompt,
   parseOpenRouterExtractionArgs,
   splitTranscriptIntoChunks,
@@ -35,6 +36,7 @@ test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback"
   assert.equal(args.chunkOverlap, 500);
   assert.equal(args.maxChunks, 100);
   assert.equal(args.chunkAgents, 1);
+  assert.equal(args.modelAttempts, 2);
   assert.equal(args.requestTimeoutMs, 60_000);
 });
 
@@ -65,6 +67,10 @@ test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
 
   assert.equal(tooManyChunkAgents.chunkAgents, 3);
 
+  const tooManyModelAttempts = parseOpenRouterExtractionArgs(["--model-attempts", "99"]);
+
+  assert.equal(tooManyModelAttempts.modelAttempts, 3);
+
   const explicitTimeout = parseOpenRouterExtractionArgs(["--request-timeout-ms", "120000"]);
   assert.equal(explicitTimeout.requestTimeoutMs, 120_000);
 
@@ -90,6 +96,25 @@ test("Ollama provider defaults local daemon cloud-offload model when using a loc
   assert.equal(args.model, "kimi-k2.6:cloud");
   assert.equal(args.fallbackModel, null);
   assert.equal(args.ollamaHost, "http://127.0.0.1:11434");
+});
+
+test("model attempt sequence retries each model before failing a chunk", () => {
+  assert.deepEqual(
+    modelAttemptSequence({
+      model: "kimi-k2.6",
+      fallbackModel: "glm-5.1",
+      modelAttempts: 2,
+    }),
+    ["kimi-k2.6", "kimi-k2.6", "glm-5.1", "glm-5.1"],
+  );
+  assert.deepEqual(
+    modelAttemptSequence({
+      model: "kimi-k2.6",
+      fallbackModel: "kimi-k2.6",
+      modelAttempts: 2,
+    }),
+    ["kimi-k2.6", "kimi-k2.6"],
+  );
 });
 
 test("Ollama provider accepts explicit model, fallback, and host", () => {
@@ -209,6 +234,8 @@ test("OpenRouter extraction parses explicit CLI arguments safely", () => {
     "--include-extracted",
     "--audit-out",
     "/tmp/openrouter-audit.jsonl",
+    "--model-attempts",
+    "3",
   ]);
 
   assert.equal(args.limit, 21);
@@ -220,6 +247,7 @@ test("OpenRouter extraction parses explicit CLI arguments safely", () => {
   assert.deepEqual(args.videoIds, [7950, 7951, 7969]);
   assert.equal(args.includeExtracted, true);
   assert.equal(args.auditOut, "/tmp/openrouter-audit.jsonl");
+  assert.equal(args.modelAttempts, 3);
 });
 
 test("extractJsonArrayText accepts bare arrays and fenced JSON", () => {

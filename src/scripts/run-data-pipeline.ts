@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { DEFAULT_CANDLE_REFRESH_SYMBOLS } from "./refresh-candles";
-import { loadEnv, timestamp } from "./script-helpers";
+import { loadEnv, runWithConcurrency, timestamp } from "./script-helpers";
 
 const DEFAULT_CREATORS = [
   "@AltcoinDaily",
@@ -22,6 +22,9 @@ const DEFAULT_SHADOW_VIDEO_AGENTS = 1;
 const MAX_SHADOW_VIDEO_AGENTS = 3;
 const DEFAULT_SHADOW_CHUNK_AGENTS = 1;
 const MAX_SHADOW_CHUNK_AGENTS = 3;
+const DEFAULT_SHADOW_MODEL_ATTEMPTS = 2;
+const MAX_SHADOW_MODEL_ATTEMPTS = 3;
+const DEFAULT_SHADOW_GAP_MS = 0;
 
 const STAGES = [
   "secret-hygiene",
@@ -60,6 +63,8 @@ interface DataPipelineArgs {
   readonly shadowAgents: number;
   readonly shadowVideoAgents: number;
   readonly shadowChunkAgents: number;
+  readonly shadowModelAttempts: number;
+  readonly shadowGapMs: number;
   readonly shadowAllowStatuses: string | null;
   readonly rematchAllPrices: boolean;
   readonly limitPriceMatches: number;
@@ -179,6 +184,15 @@ export function parseDataPipelineArgs(
       argValue(argv, "--shadow-chunk-agents"),
       DEFAULT_SHADOW_CHUNK_AGENTS,
       MAX_SHADOW_CHUNK_AGENTS,
+    ),
+    shadowModelAttempts: boundedPositiveInt(
+      argValue(argv, "--shadow-model-attempts"),
+      DEFAULT_SHADOW_MODEL_ATTEMPTS,
+      MAX_SHADOW_MODEL_ATTEMPTS,
+    ),
+    shadowGapMs: nonNegativeInt(
+      argValue(argv, "--shadow-gap-ms"),
+      DEFAULT_SHADOW_GAP_MS,
     ),
     shadowAllowStatuses: argValue(argv, "--shadow-allow-statuses"),
     rematchAllPrices: argv.includes("--rematch-all-prices"),
@@ -365,30 +379,25 @@ function runCommandAsync(
   });
 }
 
-async function runCommandsInBatches(
+async function runCommandsWithPool(
   stage: StageName,
   commands: readonly (readonly string[])[],
   args: DataPipelineArgs,
   concurrency: number,
 ): Promise<readonly StageResult[]> {
-  const results: StageResult[] = [];
-  const limit = Math.max(1, concurrency);
-  for (let index = 0; index < commands.length; index += limit) {
-    const batch = commands.slice(index, index + limit);
-    const batchResults = await Promise.all(
-      batch.map((command) =>
-        runCommandAsync(
-          stage,
-          command,
-          args,
-          auditFile(args, stage, "log.jsonl"),
-        ),
+  const auditPath = auditFile(args, stage, "log.jsonl");
+  return await runWithConcurrency(
+    commands,
+    concurrency,
+    (command) =>
+      runCommandAsync(
+        stage,
+        command,
+        args,
+        auditPath,
       ),
-    );
-    results.push(...batchResults);
-    if (batchResults.some((result) => result.status === "failed")) break;
-  }
-  return results;
+    (result) => result.status === "failed",
+  );
 }
 
 function parallelLimitForStage(
@@ -441,6 +450,11 @@ export function buildDataPipelineStageCommands(
     "--chunk-agents",
     String(args.shadowChunkAgents),
   ];
+  const shadowModelAttemptsArgs = [
+    "--model-attempts",
+    String(args.shadowModelAttempts),
+  ];
+  const shadowGapArgs = ["--gap-ms", String(args.shadowGapMs)];
   const shadowAllowArgs = args.shadowAllowStatuses
     ? ["--allow-statuses", args.shadowAllowStatuses]
     : [];
@@ -519,6 +533,8 @@ export function buildDataPipelineStageCommands(
         ...shadowRequestTimeoutArgs,
         ...shadowVideoAgentsArgs,
         ...shadowChunkAgentsArgs,
+        ...shadowModelAttemptsArgs,
+        ...shadowGapArgs,
         ...shadowExecuteFlag,
       ]),
     ),
@@ -632,7 +648,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   mkdirSync(path.resolve(repoRoot(), args.auditDir), { recursive: true });
 
   console.log(
-    `[${timestamp()}] data-pipeline ${args.write ? "WRITE" : "DRY-RUN"}: creators=${args.creators.join(",")} symbols=${args.symbols.length} shadowAgents=${args.shadowAgents} shadowVideoAgents=${args.shadowVideoAgents} shadowChunkAgents=${args.shadowChunkAgents} auditDir=${args.auditDir}`,
+    `[${timestamp()}] data-pipeline ${args.write ? "WRITE" : "DRY-RUN"}: creators=${args.creators.join(",")} symbols=${args.symbols.length} shadowAgents=${args.shadowAgents} shadowVideoAgents=${args.shadowVideoAgents} shadowChunkAgents=${args.shadowChunkAgents} shadowModelAttempts=${args.shadowModelAttempts} shadowGapMs=${args.shadowGapMs} auditDir=${args.auditDir}`,
   );
   const commandsByStage = buildDataPipelineStageCommands(args);
   let failed = false;
@@ -662,7 +678,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       console.log(
         `[${timestamp()}] ${stage}: running ${commands.length} commands with concurrency=${parallelLimit}`,
       );
-      const results = await runCommandsInBatches(
+      const results = await runCommandsWithPool(
         stage,
         commands,
         args,

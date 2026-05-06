@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   buildDataPipelineStageCommands,
   parseDataPipelineArgs,
 } from "../src/scripts/run-data-pipeline";
+import { runWithConcurrency } from "../src/scripts/script-helpers";
 import {
   getCallSelectionPredicate,
   parseMatchPricesArgs,
@@ -27,6 +29,16 @@ import {
   shouldProcessInBatches,
   summarizeAuditResults,
 } from "../src/scripts/audit-recompute";
+
+async function waitFor(predicate: () => boolean, timeoutMs = 500) {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("timed out waiting for condition");
+    }
+    await delay(5);
+  }
+}
 
 test("data pipeline defaults to safe local dry-run for top creators", () => {
   const args = parseDataPipelineArgs([]);
@@ -52,6 +64,8 @@ test("data pipeline defaults to safe local dry-run for top creators", () => {
   assert.equal(args.shadowAgents, 1);
   assert.equal(args.shadowVideoAgents, 1);
   assert.equal(args.shadowChunkAgents, 1);
+  assert.equal(args.shadowModelAttempts, 2);
+  assert.equal(args.shadowGapMs, 0);
   assert.equal(args.shadowAllowStatuses, null);
   assert.equal(args.rematchAllPrices, false);
   assert.equal(args.limitPriceMatches, Number.MAX_SAFE_INTEGER);
@@ -95,6 +109,10 @@ test("data pipeline parses explicit bounds and skip flags", () => {
     "2",
     "--shadow-chunk-agents",
     "3",
+    "--shadow-model-attempts",
+    "3",
+    "--shadow-gap-ms",
+    "250",
     "--shadow-allow-statuses",
     "new_calls,changed_calls",
     "--rematch-all-prices",
@@ -128,6 +146,8 @@ test("data pipeline parses explicit bounds and skip flags", () => {
   assert.equal(args.shadowAgents, 3);
   assert.equal(args.shadowVideoAgents, 2);
   assert.equal(args.shadowChunkAgents, 3);
+  assert.equal(args.shadowModelAttempts, 3);
+  assert.equal(args.shadowGapMs, 250);
   assert.equal(args.shadowAllowStatuses, "new_calls,changed_calls");
   assert.equal(args.rematchAllPrices, true);
   assert.equal(args.limitPriceMatches, 500);
@@ -268,6 +288,10 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
   assert.ok(commands["shadow-extract"][0].includes("1"));
   assert.ok(commands["shadow-extract"][0].includes("--chunk-agents"));
   assert.ok(commands["shadow-extract"][0].includes("1"));
+  assert.ok(commands["shadow-extract"][0].includes("--model-attempts"));
+  assert.ok(commands["shadow-extract"][0].includes("2"));
+  assert.ok(commands["shadow-extract"][0].includes("--gap-ms"));
+  assert.ok(commands["shadow-extract"][0].includes("0"));
   assert.ok(
     commands["shadow-extract"][0].some((part) =>
       part.endsWith("shadow-run-meta-A.json"),
@@ -327,6 +351,33 @@ test("data pipeline wires optional shadow fallback model to extraction commands"
 
   assert.ok(command.includes("--fallback-model"));
   assert.ok(command.includes("glm-5.1"));
+});
+
+test("data pipeline command pool starts the next item when a lane frees", async () => {
+  const started: number[] = [];
+  let releaseFirst = () => {};
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+
+  const resultsPromise = runWithConcurrency(
+    [0, 1, 2],
+    2,
+    async (item) => {
+      started.push(item);
+      if (item === 0) await firstGate;
+      return item;
+    },
+  );
+
+  try {
+    await waitFor(() => started.length === 3);
+    assert.deepEqual(started, [0, 1, 2]);
+  } finally {
+    releaseFirst();
+  }
+
+  assert.deepEqual(await resultsPromise, [0, 1, 2]);
 });
 
 test("data pipeline write mode executes shadow extraction, guarded promotion, and full rematch when requested", () => {
