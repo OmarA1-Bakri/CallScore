@@ -66,6 +66,7 @@ test("data pipeline defaults to safe local dry-run for top creators", () => {
   assert.equal(args.shadowChunkAgents, 1);
   assert.equal(args.shadowModelAttempts, 2);
   assert.equal(args.shadowGapMs, 0);
+  assert.deepEqual(args.shadowPromoteVideoIds, []);
   assert.equal(args.shadowAllowStatuses, null);
   assert.equal(args.rematchAllPrices, false);
   assert.equal(args.limitPriceMatches, Number.MAX_SAFE_INTEGER);
@@ -113,6 +114,8 @@ test("data pipeline parses explicit bounds and skip flags", () => {
     "3",
     "--shadow-gap-ms",
     "250",
+    "--shadow-promote-video-ids",
+    "101,102,nope,101",
     "--shadow-allow-statuses",
     "new_calls,changed_calls",
     "--rematch-all-prices",
@@ -148,6 +151,7 @@ test("data pipeline parses explicit bounds and skip flags", () => {
   assert.equal(args.shadowChunkAgents, 3);
   assert.equal(args.shadowModelAttempts, 3);
   assert.equal(args.shadowGapMs, 250);
+  assert.deepEqual(args.shadowPromoteVideoIds, [101, 102]);
   assert.equal(args.shadowAllowStatuses, "new_calls,changed_calls");
   assert.equal(args.rematchAllPrices, true);
   assert.equal(args.limitPriceMatches, 500);
@@ -390,6 +394,8 @@ test("data pipeline write mode executes shadow extraction, guarded promotion, an
     "shadow-canary",
     "--shadow-allow-statuses",
     "new_calls",
+    "--shadow-promote-video-ids",
+    "101,102",
     "--limit-promotions",
     "2",
     "--rematch-all-prices",
@@ -406,6 +412,8 @@ test("data pipeline write mode executes shadow extraction, guarded promotion, an
     true,
   );
   assert.equal(commands["shadow-promote"][0].includes("new_calls"), true);
+  assert.equal(commands["shadow-promote"][0].includes("--video-ids"), true);
+  assert.equal(commands["shadow-promote"][0].includes("101,102"), true);
   assert.equal(commands["shadow-promote"][0].includes("2"), true);
   assert.equal(commands["match-prices"][0].includes("--all"), true);
   assert.equal(commands["match-prices"][0].includes("--batch-size"), true);

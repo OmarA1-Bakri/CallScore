@@ -65,6 +65,7 @@ interface DataPipelineArgs {
   readonly shadowChunkAgents: number;
   readonly shadowModelAttempts: number;
   readonly shadowGapMs: number;
+  readonly shadowPromoteVideoIds: readonly number[];
   readonly shadowAllowStatuses: string | null;
   readonly rematchAllPrices: boolean;
   readonly limitPriceMatches: number;
@@ -105,6 +106,18 @@ function boundedPositiveInt(
   max: number,
 ): number {
   return Math.min(positiveInt(value, fallback), max);
+}
+
+function positiveIntList(value: string | null): readonly number[] {
+  if (!value) return [];
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((part) => Number(part.trim()))
+        .filter((parsed) => Number.isInteger(parsed) && parsed > 0),
+    ),
+  );
 }
 
 function nonNegativeInt(value: string | null, fallback: number): number {
@@ -193,6 +206,9 @@ export function parseDataPipelineArgs(
     shadowGapMs: nonNegativeInt(
       argValue(argv, "--shadow-gap-ms"),
       DEFAULT_SHADOW_GAP_MS,
+    ),
+    shadowPromoteVideoIds: positiveIntList(
+      argValue(argv, "--shadow-promote-video-ids"),
     ),
     shadowAllowStatuses: argValue(argv, "--shadow-allow-statuses"),
     rematchAllPrices: argv.includes("--rematch-all-prices"),
@@ -458,6 +474,10 @@ export function buildDataPipelineStageCommands(
   const shadowAllowArgs = args.shadowAllowStatuses
     ? ["--allow-statuses", args.shadowAllowStatuses]
     : [];
+  const shadowPromoteVideoIdArgs =
+    args.shadowPromoteVideoIds.length > 0
+      ? ["--video-ids", args.shadowPromoteVideoIds.join(",")]
+      : [];
   const shadowOut = path.resolve(
     repoRoot(),
     args.auditDir,
@@ -575,6 +595,7 @@ export function buildDataPipelineStageCommands(
         "--limit",
         String(args.limitPromotions),
         ...shadowAllowArgs,
+        ...shadowPromoteVideoIdArgs,
         ...writeFlag,
       ]),
     ],
