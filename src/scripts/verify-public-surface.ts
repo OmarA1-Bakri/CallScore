@@ -1,5 +1,6 @@
 import { query } from "../lib/db";
 import { getPublicCounts } from "../lib/public-counts";
+import { getCallEligibilitySql } from "../lib/public-methodology";
 import { writeJsonFile } from "../lib/shadow-extraction";
 import { loadEnv, timestamp } from "./script-helpers";
 
@@ -39,6 +40,14 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
+export function buildLiveScoreEligibleStatsSql(): string {
+  const eligibleSql = getCallEligibilitySql("c");
+  return `SELECT
+            COUNT(DISTINCT c.creator_id) FILTER (WHERE ${eligibleSql})::text AS ranked_creators,
+            COUNT(*) FILTER (WHERE ${eligibleSql})::text AS total_calls
+          FROM calls c`;
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
   const args = parseVerifyPublicSurfaceArgs(argv);
@@ -51,11 +60,23 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
      WHERE period = 'all_time'`,
   );
   const stats = statsRows[0] ?? { ranked_creators: "0", total_calls: "0" };
+  const liveEligibleRows = await query<{ ranked_creators: string; total_calls: string }>(
+    buildLiveScoreEligibleStatsSql(),
+  );
+  const liveEligible = liveEligibleRows[0] ?? { ranked_creators: "0", total_calls: "0" };
 
   checks.push({
     name: "public_counts_match_creator_stats",
     ok: publicCounts.rankedCreators === Number(stats.ranked_creators) && publicCounts.publicScoredCalls === Number(stats.total_calls),
     detail: `counts ranked=${publicCounts.rankedCreators}/${stats.ranked_creators}, scored=${publicCounts.publicScoredCalls}/${stats.total_calls}`,
+  });
+
+  checks.push({
+    name: "live_score_eligible_calls_match_creator_stats",
+    ok:
+      Number(liveEligible.ranked_creators) === Number(stats.ranked_creators) &&
+      Number(liveEligible.total_calls) === Number(stats.total_calls),
+    detail: `live ranked=${liveEligible.ranked_creators}, stats ranked=${stats.ranked_creators}; live scored=${liveEligible.total_calls}, stats scored=${stats.total_calls}`,
   });
 
   if (args.baseUrl) {

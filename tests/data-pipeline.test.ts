@@ -10,7 +10,10 @@ import {
   getCallSelectionPredicate,
   parseMatchPricesArgs,
 } from "../src/scripts/match-prices";
-import { parseVerifyPublicSurfaceArgs } from "../src/scripts/verify-public-surface";
+import {
+  buildLiveScoreEligibleStatsSql,
+  parseVerifyPublicSurfaceArgs,
+} from "../src/scripts/verify-public-surface";
 import { parseBackfillPublicationDatesArgs } from "../src/scripts/backfill-publication-dates";
 import {
   extractRequestedSubtitleUrl,
@@ -196,6 +199,16 @@ test("public surface verification only fetches external URLs when explicitly req
       .baseUrl,
     "https://www.call-score.com",
   );
+});
+
+test("public surface verification compares live score eligibility against cached creator stats", () => {
+  const sql = buildLiveScoreEligibleStatsSql();
+
+  assert.match(sql, /FROM calls c/);
+  assert.match(sql, /COUNT\(DISTINCT c\.creator_id\)/);
+  assert.match(sql, /extraction_confidence >= 0\.7/);
+  assert.match(sql, /price_at_call IS NOT NULL/);
+  assert.match(sql, /return_30d IS NOT NULL/);
 });
 
 test("publication-date backfill is dry-run and bounded by default", () => {
