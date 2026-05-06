@@ -9,6 +9,8 @@ import {
 } from "../lib/pipeline";
 import { runMlVerifierBatch } from "../lib/ml-verifier";
 import { query } from "../lib/db";
+import { createLogger } from "../lib/logger";
+import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
 import { loadEnv, sleep, timestamp } from "./script-helpers";
 
 const SUPPORTED_JOB_TYPES = ["ml_verifier_batch", "hermes_smoke_test"] as const;
@@ -89,54 +91,103 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
   const args = parseHermesWorkerArgs(argv);
   const claimTypes = args.dryRun ? ["hermes_smoke_test"] : [...SUPPORTED_JOB_TYPES];
+  const logger = createLogger({
+    component: "hermes-worker",
+    worker_id: args.workerId,
+    dry_run: args.dryRun,
+    once: args.once,
+  });
   let stopping = false;
   let processed = 0;
 
   process.once("SIGINT", () => { stopping = true; });
   process.once("SIGTERM", () => { stopping = true; });
 
-  console.log(`[${timestamp()}] Hermes worker starting: worker=${args.workerId}, once=${args.once}, dryRun=${args.dryRun}`);
+  await initMonitoring({ serviceName: "hermes-worker" });
+  logger.info("worker_start", { poll_ms: args.pollMs, max_jobs: args.maxJobs });
   await checkDatabaseConnection();
-  console.log(`[${timestamp()}] Database connection OK`);
+  logger.info("database_ok");
 
   if (args.dryRun) {
     await enqueueSmokeJob(args.workerId);
-    console.log(`[${timestamp()}] Smoke job enqueued for dry-run`);
+    logger.info("smoke_job_enqueued");
   }
 
   while (!stopping && processed < args.maxJobs) {
     const job = await claimNextPipelineJob({ workerId: args.workerId, types: claimTypes });
     if (!job) {
       if (args.once) {
-        console.log(`[${timestamp()}] No pending jobs for ${claimTypes.join(",")}; exiting`);
+        logger.info("no_pending_jobs", { claim_types: claimTypes });
         break;
       }
       await sleep(args.pollMs);
       continue;
     }
 
-    console.log(`[${timestamp()}] Claimed job ${job.id} (${job.type}), attempt ${job.attempts}/${job.max_attempts}`);
+    logger.info("job_claimed", {
+      job_id: job.id,
+      job_type: job.type,
+      run_id: job.run_id,
+      attempt: job.attempts,
+      max_attempts: job.max_attempts,
+    });
     try {
       const metrics = await executeJob(job);
       await completePipelineJob(job, metrics);
-      console.log(`[${timestamp()}] Completed job ${job.id} (${job.type})`);
+      logger.info("job_completed", {
+        job_id: job.id,
+        job_type: job.type,
+        run_id: job.run_id,
+      });
     } catch (error) {
       const result = await retryOrFailPipelineJob(job, error);
+      await captureException(error, {
+        serviceName: "hermes-worker",
+        tags: {
+          component: "hermes-worker",
+          job_type: job.type,
+          retrying: result.retrying,
+        },
+        extra: {
+          job_id: job.id,
+          run_id: job.run_id,
+          attempt: job.attempts,
+          max_attempts: job.max_attempts,
+        },
+      });
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[${timestamp()}] Job ${job.id} failed: ${message}; retrying=${result.retrying}`);
+      logger.error("job_failed", {
+        job_id: job.id,
+        job_type: job.type,
+        run_id: job.run_id,
+        retrying: result.retrying,
+        error: message,
+      });
     }
 
     processed += 1;
     if (args.once) break;
   }
 
-  console.log(`[${timestamp()}] Hermes worker stopped after ${processed} job(s)`);
+  logger.info("worker_stopped", { processed });
 }
 
 if (require.main === module) {
-  main().catch((error) => {
+  main().catch(async (error) => {
+    const logger = createLogger({ component: "hermes-worker" });
     const message = error instanceof Error ? error.stack ?? error.message : String(error);
-    console.error(`[${timestamp()}] Hermes worker fatal error: ${message}`);
+    logger.error("fatal_error", { error: message });
+    try {
+      loadEnv();
+      await captureException(error, {
+        serviceName: "hermes-worker",
+        tags: { component: "hermes-worker", fatal: true },
+      });
+      await flushMonitoring();
+    } catch (monitoringError) {
+      const monitoringMessage = monitoringError instanceof Error ? monitoringError.message : String(monitoringError);
+      logger.error("monitoring_flush_failed", { error: monitoringMessage });
+    }
     process.exit(1);
   });
 }

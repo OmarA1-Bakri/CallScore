@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_CANDLE_REFRESH_SYMBOLS,
   buildFetchWindows,
+  isValidCandleOpenTimeMs,
   parseCandleRefreshArgs,
 } from "../src/scripts/refresh-candles";
+import { INVALID_CANDLE_OPEN_TIME_SQL } from "../src/scripts/validate-candle-open-time-constraint";
 
 const MINUTE = 60_000;
 
@@ -56,4 +58,15 @@ test("buildFetchWindows refreshes forward from latest candle and respects reques
   assert.equal(windows[0].startTime, latestOpenTime + MINUTE);
   assert.equal(windows[0].endTime, latestOpenTime + 1000 * MINUTE);
   assert.equal(windows[1].startTime, latestOpenTime + 1001 * MINUTE);
+});
+
+test("candle open_time guard accepts milliseconds and rejects seconds", () => {
+  assert.equal(isValidCandleOpenTimeMs(Date.parse("2026-05-01T00:00:00Z")), true);
+  assert.equal(isValidCandleOpenTimeMs(1_714_521_600), false);
+  assert.equal(isValidCandleOpenTimeMs(Date.parse("2200-01-01T00:00:00Z")), false);
+});
+
+test("candle constraint validation audits invalid legacy rows before ALTER VALIDATE", () => {
+  assert.match(INVALID_CANDLE_OPEN_TIME_SQL, /COUNT\(\*\)::bigint AS invalid_count/i);
+  assert.match(INVALID_CANDLE_OPEN_TIME_SQL, /open_time <= \$1 OR open_time >= \$2/i);
 });

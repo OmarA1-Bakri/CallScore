@@ -574,19 +574,31 @@ function LabForm({
                 {selectedCreators.length} creator{selectedCreators.length === 1 ? "" : "s"} in scenario
               </p>
             </div>
-            <div className="flex flex-wrap gap-3 font-mono text-[11px] uppercase tracking-caps text-ink-500">
+            <div className="flex flex-wrap gap-3 font-mono text-[11px] uppercase tracking-caps text-ink-600">
               {q && (
-                <Link href={clearSearchHref} className="hover:text-accent">
+                <Link
+                  href={clearSearchHref}
+                  className="inline-flex min-h-10 items-center underline decoration-ink-300 underline-offset-4 hover:text-accent hover:decoration-accent"
+                >
                   Clear search
                 </Link>
               )}
-              <Link href={resetDefaultsHref} className="hover:text-accent">
+              <Link
+                href={resetDefaultsHref}
+                className="inline-flex min-h-10 items-center underline decoration-ink-300 underline-offset-4 hover:text-accent hover:decoration-accent"
+              >
                 Reset defaults
               </Link>
-              <Link href={shareHref} className="hover:text-accent">
+              <Link
+                href={shareHref}
+                className="inline-flex min-h-10 items-center underline decoration-ink-300 underline-offset-4 hover:text-accent hover:decoration-accent"
+              >
                 Share scenario URL
               </Link>
-              <Link href={exportHref} className="hover:text-accent">
+              <Link
+                href={exportHref}
+                className="inline-flex min-h-10 items-center underline decoration-ink-300 underline-offset-4 hover:text-accent hover:decoration-accent"
+              >
                 Export JSON
               </Link>
             </div>
@@ -864,7 +876,11 @@ function CreatorTable({ result }: { readonly result: PortfolioBacktestResult }) 
           Dollar contribution, total sleeve size, and call count for each selected creator.
         </p>
       </div>
-      <div className="max-w-full overflow-x-auto">
+      <div
+        className="max-w-full overflow-x-auto focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+        tabIndex={0}
+        aria-label="Backtest creator allocation table"
+      >
       <table className="min-w-[620px] w-full text-sm">
         <thead className="font-mono text-[11px] uppercase tracking-caps text-ink-500">
           <tr className="border-b border-ink-250">
@@ -930,7 +946,11 @@ function Ledger({ calls }: { readonly calls: readonly PortfolioBacktestCall[] })
           First 80 resolved calls used in the current scenario, with realized PnL and hit status.
         </p>
       </div>
-      <div className="max-w-full overflow-x-auto">
+      <div
+        className="max-w-full overflow-x-auto focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+        tabIndex={0}
+        aria-label="Backtest call ledger table"
+      >
       <table className="min-w-[720px] w-full text-sm">
         <thead className="font-mono text-[11px] uppercase tracking-caps text-ink-500">
           <tr className="border-b border-ink-250">

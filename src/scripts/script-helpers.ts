@@ -30,6 +30,11 @@ interface ReplaceVideoCallsOptions {
   readonly markVideoExtracted?: boolean;
 }
 
+export interface SqlStatement {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+}
+
 const DELETE_VIDEO_CALLS_SQL = "DELETE FROM calls WHERE video_id = $1";
 const INSERT_CALL_SQL = `INSERT INTO calls (
   creator_id, video_id, symbol, direction, call_type,
@@ -78,18 +83,18 @@ export function timestamp(): string {
   return new Date().toISOString();
 }
 
-export async function replaceStoredCallsForVideo({
+export function buildReplaceStoredCallsStatements({
   creatorId,
   videoId,
   callDate,
   calls,
   markVideoExtracted = false,
-}: ReplaceVideoCallsOptions): Promise<void> {
-  const db = getDb();
-  await db.transaction((txn) => [
-    txn(DELETE_VIDEO_CALLS_SQL, [videoId]),
-    ...calls.map((call) =>
-      txn(INSERT_CALL_SQL, [
+}: ReplaceVideoCallsOptions): SqlStatement[] {
+  return [
+    { sql: DELETE_VIDEO_CALLS_SQL, params: [videoId] },
+    ...calls.map((call) => ({
+      sql: INSERT_CALL_SQL,
+      params: [
         creatorId,
         videoId,
         call.symbol,
@@ -105,8 +110,40 @@ export async function replaceStoredCallsForVideo({
         call.extraction_confidence,
         call.specificity_score,
         callDate,
-      ]),
-    ),
-    ...(markVideoExtracted ? [txn(MARK_VIDEO_EXTRACTED_SQL, [videoId])] : []),
-  ]);
+      ],
+    })),
+    ...(markVideoExtracted
+      ? [{ sql: MARK_VIDEO_EXTRACTED_SQL, params: [videoId] }]
+      : []),
+  ];
+}
+
+type TransactionExecutor = (
+  sql: string,
+  params?: readonly unknown[],
+) => Promise<unknown>;
+
+interface TransactionCapableDb {
+  transaction<T>(
+    callback: (txn: TransactionExecutor) => readonly Promise<T>[],
+  ): Promise<readonly T[]>;
+}
+
+export async function executeStatementsInTransaction(
+  db: TransactionCapableDb,
+  statements: readonly SqlStatement[],
+): Promise<void> {
+  await db.transaction((txn) =>
+    statements.map((statement) => txn(statement.sql, statement.params)),
+  );
+}
+
+export async function replaceStoredCallsForVideo(
+  options: ReplaceVideoCallsOptions,
+): Promise<void> {
+  const db = getDb();
+  await executeStatementsInTransaction(
+    db as unknown as TransactionCapableDb,
+    buildReplaceStoredCallsStatements(options),
+  );
 }

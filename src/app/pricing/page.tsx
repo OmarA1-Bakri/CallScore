@@ -103,7 +103,7 @@ function PlanCard({
         <span className="font-serif text-[41px] text-ink-900 font-medium tabular-nums leading-none">
           {price}
         </span>
-        <span className="font-mono text-[12px] text-ink-500 tracking-wide">{cadence}</span>
+        <span className="font-mono text-[12px] tracking-wide text-ink-700">{cadence}</span>
       </div>
       <p className="font-serif text-[16px] text-ink-700 leading-relaxed mb-6">{tagline}</p>
       {manageLinks.length > 0 && (
@@ -113,7 +113,7 @@ function PlanCard({
               key={link.href}
               href={link.href}
               prefetch={link.prefetch}
-              className="font-mono text-[11px] tracking-wide text-accent hover:underline underline-offset-4"
+              className="inline-flex min-h-10 items-center font-mono text-[11px] tracking-wide text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
             >
               {link.label} <span aria-hidden="true">&rarr;</span>
             </Link>
@@ -136,7 +136,7 @@ function PlanCard({
       {ctaVariant === "soft" && (
         <Link
           href={ctaHref}
-          className="mt-auto font-mono text-[12px] tracking-wide text-accent hover:underline underline-offset-4 focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+          className="mt-auto inline-flex min-h-10 items-center font-mono text-[12px] tracking-wide text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
         >
           {cta} <span aria-hidden="true">&rarr;</span>
         </Link>
@@ -252,7 +252,11 @@ export default function PricingPage(): ReactElement {
           </>
         }
       >
-        <div className="overflow-x-auto">
+        <div
+          className="overflow-x-auto focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+          tabIndex={0}
+          aria-label="Pricing feature matrix"
+        >
           <table className="w-full font-mono text-[13px]">
             <caption className="sr-only">Feature availability by tier</caption>
             <thead className="sticky top-0 bg-ink-50 z-sticky">
@@ -291,7 +295,7 @@ export default function PricingPage(): ReactElement {
                       <Link
                         href={f.href}
                         prefetch={f.href.startsWith("/api/") ? false : undefined}
-                        className="hover:text-accent hover:underline underline-offset-4"
+                        className="underline decoration-ink-300 underline-offset-4 transition-colors hover:text-accent hover:decoration-accent"
                       >
                         {f.label}
                       </Link>
@@ -341,7 +345,10 @@ export default function PricingPage(): ReactElement {
           <p>
             <b className="text-ink-900">Refunds?</b> 30 days, full refund. Send the
             request through the{" "}
-            <Link href="/feedback" className="text-accent hover:underline">
+            <Link
+              href="/feedback"
+              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
+            >
               feedback page
             </Link>{" "}
             with the email used at checkout.

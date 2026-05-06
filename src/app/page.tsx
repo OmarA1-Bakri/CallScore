@@ -325,9 +325,9 @@ export default async function HomePage({
           <div className="desk:pt-6">
             <p
               className="inline-flex items-center gap-2 border border-accent/30 bg-accent/5 px-3 py-2 font-mono text-[12px] text-accent tracking-caps uppercase mb-6"
-              style={{ borderRadius: 999 }}
+              style={{ borderRadius: 2 }}
             >
-              <span className="h-1.5 w-1.5 bg-accent" style={{ borderRadius: 999 }} aria-hidden="true" />
+              <span className="h-1.5 w-1.5 bg-accent" style={{ borderRadius: 2 }} aria-hidden="true" />
               The standard for crypto calls
             </p>
             <h1 className="font-serif text-[65px] tab:text-[97px] desk:text-[119px] text-ink-900 font-normal tracking-tight leading-[0.88] text-balance max-w-[880px] mb-7">
@@ -341,7 +341,7 @@ export default async function HomePage({
               <Link
                 href="#leaderboard"
                 className="inline-flex items-center justify-center gap-3 bg-accent hover:bg-accent-dim text-ink-0 font-mono text-[13px] tracking-caps uppercase px-7 py-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
-                style={{ borderRadius: 4 }}
+                style={{ borderRadius: 2 }}
               >
                 View leaderboard
                 <span aria-hidden="true">→</span>
@@ -349,7 +349,7 @@ export default async function HomePage({
               <Link
                 href="/methodology"
                 className="inline-flex justify-center border border-ink-300 text-ink-900 hover:border-accent/60 hover:text-accent font-mono text-[13px] tracking-caps uppercase px-7 py-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
-                style={{ borderRadius: 4 }}
+                style={{ borderRadius: 2 }}
               >
                 Explore methodology
               </Link>
@@ -504,7 +504,7 @@ function HeroFeatureRail(): ReactElement {
   return (
     <div
       className="relative mt-10 desk:mt-4 border border-ink-250 bg-ink-50/70 shadow-popover"
-      style={{ borderRadius: 8 }}
+      style={{ borderRadius: 2 }}
     >
       <div className="absolute inset-x-8 top-0 h-px bg-accent/70" aria-hidden="true" />
       <div className="grid grid-cols-1 tab:grid-cols-2 desk:grid-cols-5">
@@ -576,7 +576,7 @@ function MarketCallPreview({
   return (
     <div
       className="relative mx-auto w-full max-w-[1040px] border border-ink-250 bg-ink-0/85 p-4 tab:p-5 shadow-popover overflow-hidden"
-      style={{ borderRadius: 10 }}
+      style={{ borderRadius: 2 }}
       aria-label="CallScore product preview"
     >
       <div
@@ -589,7 +589,7 @@ function MarketCallPreview({
       />
       <div
         className="relative border border-ink-200 bg-ink-50/70 p-4 mb-4"
-        style={{ borderRadius: 8 }}
+        style={{ borderRadius: 2 }}
       >
         <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-3">
           Call Summary
@@ -613,7 +613,7 @@ function MarketCallPreview({
       {topCreator && (
         <div
           className="relative tab:hidden border border-ink-200 bg-ink-50/70 p-4 mb-4"
-          style={{ borderRadius: 8 }}
+          style={{ borderRadius: 2 }}
         >
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-3">
             Current leader
@@ -640,7 +640,7 @@ function MarketCallPreview({
       )}
 
       <div className="relative hidden tab:grid tab:grid-cols-[minmax(0,1fr)_156px] gap-4 mb-4">
-        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 8 }}>
+        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 2 }}>
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-4">
             Score Distribution
           </p>
@@ -660,7 +660,7 @@ function MarketCallPreview({
             <span><b className="text-pos font-normal">{hitShare}%</b><br />Hit</span>
           </div>
         </div>
-        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 8 }}>
+        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 2 }}>
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-2">
             Avg 30d Delta
           </p>
@@ -673,7 +673,7 @@ function MarketCallPreview({
 
       <div
         className="relative hidden tab:block border border-ink-200 bg-ink-50/70 p-4"
-        style={{ borderRadius: 8 }}
+        style={{ borderRadius: 2 }}
       >
         <div className="flex items-center justify-between gap-4 border-b border-ink-200 pb-3 mb-3">
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase">
@@ -714,7 +714,7 @@ function MarketCallPreview({
                     <span className="flex items-center gap-3 min-w-0 text-ink-900">
                       <span
                         className="grid h-7 w-7 shrink-0 place-items-center border border-ink-300 bg-ink-100 text-[12px] text-ink-800"
-                        style={{ borderRadius: 4 }}
+                        style={{ borderRadius: 2 }}
                         aria-hidden="true"
                       >
                         {getInitials(row.creator.name)}

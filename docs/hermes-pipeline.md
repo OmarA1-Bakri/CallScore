@@ -27,6 +27,8 @@ docker compose --profile debug run --rm hermes-worker-once --dry-run
 ```
 
 Dry-run enqueues a `hermes_smoke_test` job, claims it, writes job events, and exits without touching production call rows.
+Worker stdout/stderr is JSONL structured logging with `event`, `worker_id`,
+`job_id`, and `run_id` fields so production logs can be filtered by run.
 
 ## Vercel endpoints
 

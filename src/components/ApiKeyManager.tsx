@@ -31,7 +31,11 @@ function formatTimestamp(value: unknown): string {
 
 function CodeBlock({ children }: { readonly children: string }): ReactElement {
   return (
-    <pre className="overflow-x-auto border border-ink-250 bg-ink-0 p-3 font-mono text-[12px] leading-relaxed text-ink-700">
+    <pre
+      className="overflow-x-auto border border-ink-250 bg-ink-0 p-3 font-mono text-[12px] leading-relaxed text-ink-700 focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+      tabIndex={0}
+      aria-label="API example code"
+    >
       <code>{children}</code>
     </pre>
   );
@@ -194,12 +198,12 @@ export default function ApiKeyManager({
         </section>
       )}
 
-      <section className="grid gap-4 desk:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid min-w-0 gap-4 desk:grid-cols-[0.9fr_1.1fr]">
         <form
           onSubmit={createKey}
           action="/api/api-keys"
           method="post"
-          className="border border-ink-250 bg-ink-50 p-4"
+          className="min-w-0 border border-ink-250 bg-ink-50 p-4"
         >
           <p className="flex items-center gap-2 font-mono text-mono-sm uppercase tracking-caps text-accent">
             <span aria-hidden="true" className="inline-block h-2 w-2 bg-accent" />
@@ -229,7 +233,7 @@ export default function ApiKeyManager({
           </button>
         </form>
 
-        <div className="border border-ink-250 bg-ink-50 p-4">
+        <div className="min-w-0 border border-ink-250 bg-ink-50 p-4">
           <p className="flex items-center gap-2 font-mono text-mono-sm uppercase tracking-caps text-accent">
             <span aria-hidden="true" className="inline-block h-2 w-2 bg-accent" />
             access contract
@@ -343,8 +347,8 @@ export default function ApiKeyManager({
         )}
       </section>
 
-      <section className="grid gap-4 desk:grid-cols-[1.05fr_0.95fr]">
-        <div className="border border-ink-250 bg-ink-50 p-4">
+      <section className="grid min-w-0 gap-4 desk:grid-cols-[1.05fr_0.95fr]">
+        <div className="min-w-0 max-w-full border border-ink-250 bg-ink-50 p-4">
           <h2 className="font-mono text-[12px] uppercase tracking-caps text-ink-500">
             Endpoint docs
           </h2>
@@ -367,7 +371,7 @@ export default function ApiKeyManager({
             </div>
           </div>
         </div>
-        <div className="border border-ink-250 bg-ink-50 p-4">
+        <div className="min-w-0 max-w-full border border-ink-250 bg-ink-50 p-4">
           <h2 className="font-mono text-[12px] uppercase tracking-caps text-ink-500">
             Examples
           </h2>

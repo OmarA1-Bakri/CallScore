@@ -179,7 +179,7 @@ Standard flows:
 - **Dev server**: `npm run dev` (Next.js on `localhost:3000`)
 - **Typecheck / lint / test / build**: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`
 - **DB migrate**: `npm run db:migrate` (reads files from [migrations/](migrations/))
-- **Pipeline**: `npm run pipeline` runs `scrape → extract → match → score → consensus`. Individual stages: `npm run scrape:v2`, `npm run discover:videos`, `npm run extract:openrouter`, `npm run match`, `npm run score`, `npm run consensus`.
+- **Pipeline**: use the current entrypoint guide in [docs/current-pipeline-entrypoints.md](docs/current-pipeline-entrypoints.md). Prefer `discover:videos → scrape:v2 → extract:openrouter → match → score → consensus`; `npm run scrape` / `npm run extract` are legacy compatibility paths.
 - **Audits**: `npm run audit:recompute`, `npm run audit:coverage`, `npm run audit:global`.
 
 Required environment (read from `.env.local` for dev; from Vercel env in prod):

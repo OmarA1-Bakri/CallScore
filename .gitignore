@@ -31,3 +31,7 @@ output/playwright/
 artifacts/
 backtest-page-rendered.png
 home-*-alpha-nav.png
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md

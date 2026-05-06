@@ -168,33 +168,38 @@ export default function SettingsShell({
         ))}
       </div>
 
-      <div className="grid gap-8 tab:grid-cols-[200px_1fr] desk:grid-cols-[220px_1fr]">
-        <aside className="tab:sticky tab:top-32 tab:self-start" aria-label="Settings navigation">
-          <nav className="-mx-4 flex gap-1 overflow-x-auto border-b border-ink-250 px-4 pb-2 tab:mx-0 tab:block tab:space-y-1 tab:overflow-visible tab:border-b-0 tab:px-0 tab:pb-0">
-            {SETTINGS_TABS.map((item) => {
-              const selected = item.id === active;
-              const className = `flex min-w-fit items-center justify-between gap-4 border-b px-3 py-2 font-mono text-mono-sm uppercase tracking-caps transition-colors tab:border-b-0 tab:border-l-2 ${
-                selected
-                  ? "border-accent bg-ink-50 text-ink-900"
-                  : "border-transparent text-ink-500 hover:text-ink-800"
-              }`;
-              const content = (
-                <>
-                  <span>{item.label}</span>
-                  <span className="text-[9px] text-ink-500">{item.meta}</span>
-                </>
-              );
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  aria-current={selected ? "page" : undefined}
-                  className={className}
-                >
-                  {content}
-                </Link>
-              );
-            })}
+      <div className="grid min-w-0 gap-8 tab:grid-cols-[200px_1fr] desk:grid-cols-[220px_1fr]">
+        <aside
+          className="min-w-0 tab:sticky tab:top-32 tab:self-start"
+          aria-label="Settings navigation"
+        >
+          <nav className="-mx-4 overflow-hidden px-4 tab:mx-0 tab:overflow-visible tab:px-0">
+            <div className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto border-b border-ink-250 pb-2 tab:block tab:space-y-1 tab:overflow-visible tab:border-b-0 tab:pb-0">
+              {SETTINGS_TABS.map((item) => {
+                const selected = item.id === active;
+                const className = `flex min-h-10 min-w-fit items-center justify-between gap-4 border-b px-3 py-2 font-mono text-mono-sm uppercase tracking-caps transition-colors tab:border-b-0 tab:border-l-2 ${
+                  selected
+                    ? "border-accent bg-ink-50 text-ink-900"
+                    : "border-transparent text-ink-600 hover:text-ink-800"
+                }`;
+                const content = (
+                  <>
+                    <span>{item.label}</span>
+                    <span className="text-[9px] text-ink-600">{item.meta}</span>
+                  </>
+                );
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    aria-current={selected ? "page" : undefined}
+                    className={className}
+                  >
+                    {content}
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
         </aside>
 

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { hasAccess } from "@/lib/whop";
 import { addWatch, removeWatch } from "@/lib/alerts";
+import { withNoStore } from "@/lib/http-cache";
 import { parseCreatorId, isForeignKeyViolation } from "./helpers";
+
+export const dynamic = "force-dynamic";
 
 interface WatchPayload {
   readonly creatorId?: unknown;
@@ -63,24 +66,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (form.get("_action") === "remove") {
       await removeWatch(session.userId, creatorId);
-      return NextResponse.redirect(
+      return withNoStore(NextResponse.redirect(
         buildSettingsRedirect(request.url, "removed", q),
         303,
-      );
+      ));
     }
 
     try {
       await addWatch(session.userId, creatorId);
-      return NextResponse.redirect(
+      return withNoStore(NextResponse.redirect(
         buildSettingsRedirect(request.url, "added", q),
         303,
-      );
+      ));
     } catch (error: unknown) {
       if (isForeignKeyViolation(error)) {
-        return NextResponse.redirect(
+        return withNoStore(NextResponse.redirect(
           buildSettingsRedirect(request.url, "error", q),
           303,
-        );
+        ));
       }
       throw error;
     }

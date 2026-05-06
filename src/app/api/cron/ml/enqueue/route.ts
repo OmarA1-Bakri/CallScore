@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cronUnauthorized, verifyCronSecret } from "@/lib/cron";
 import { enqueueNightlyMlVerifierJob } from "@/lib/pipeline";
+import { createCronDeadlineSignal, withCronDeadline } from "../../deadline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,15 @@ async function enqueue(request: NextRequest): Promise<NextResponse> {
   if (!verifyCronSecret(request)) return cronUnauthorized();
 
   const batchSize = await readBatchSize(request);
-  const { run, job } = await enqueueNightlyMlVerifierJob({ batchSize });
+  const deadlineSignal = createCronDeadlineSignal();
+  const deadlineResult = await withCronDeadline(enqueueNightlyMlVerifierJob({ batchSize, signal: deadlineSignal }), deadlineSignal);
+  if (!deadlineResult.completed) {
+    return NextResponse.json(
+      { ok: false, deadline_exceeded: true, message: "ML enqueue exceeded cron deadline" },
+      { status: 503, headers: { "cache-control": "no-store" } },
+    );
+  }
+  const { run, job } = deadlineResult.value;
 
   return NextResponse.json(
     {

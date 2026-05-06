@@ -11,6 +11,8 @@ const INTERVAL = "1m";
 const BINANCE_LIMIT = 1000;
 const MS_PER_MINUTE = 60_000;
 const DEFAULT_START_DATE = "2021-03-01T00:00:00.000Z";
+export const MIN_CANDLE_OPEN_TIME_MS = 946_684_800_000; // 2000-01-01T00:00:00.000Z
+export const MAX_CANDLE_OPEN_TIME_MS = 4_102_444_800_000; // 2100-01-01T00:00:00.000Z
 
 export const DEFAULT_CANDLE_REFRESH_SYMBOLS = Array.from(
   new Set([...TRACKED_SYMBOLS, "XLMUSDT"]),
@@ -116,6 +118,14 @@ export function buildFetchWindows(input: {
   return windows;
 }
 
+export function isValidCandleOpenTimeMs(value: number): boolean {
+  return (
+    Number.isInteger(value) &&
+    value > MIN_CANDLE_OPEN_TIME_MS &&
+    value < MAX_CANDLE_OPEN_TIME_MS
+  );
+}
+
 async function getCoverage(symbol: string): Promise<CandleCoverageRow> {
   const rows = await query<CandleCoverageRow>(
     `SELECT $1::text AS symbol, MAX(open_time)::text AS max_time, COUNT(*)::text AS count
@@ -148,11 +158,17 @@ async function fetchKlines(symbol: string, window: FetchWindow): Promise<Candle[
     low: Number(kline[3]),
     close: Number(kline[4]),
     volume: Number(kline[5]),
-  })).filter((candle) => Number.isFinite(candle.open_time) && Number.isFinite(candle.close));
+  })).filter((candle) => isValidCandleOpenTimeMs(candle.open_time) && Number.isFinite(candle.close));
 }
 
 async function insertCandles(symbol: string, candles: readonly Candle[]): Promise<number> {
   if (candles.length === 0) return 0;
+  const invalidOpenTime = candles.find((candle) => !isValidCandleOpenTimeMs(candle.open_time));
+  if (invalidOpenTime) {
+    throw new Error(
+      `Refusing to insert ${symbol} candle with non-millisecond open_time=${invalidOpenTime.open_time}`,
+    );
+  }
   await query(
     `INSERT INTO candles (symbol, interval, open_time, open, high, low, close, volume)
      SELECT * FROM unnest(

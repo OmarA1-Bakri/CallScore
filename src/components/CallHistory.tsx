@@ -99,7 +99,11 @@ export default function CallHistory({
         </p>
       </div>
 
-      <div className="overflow-x-auto">
+      <div
+        className="overflow-x-auto focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+        tabIndex={0}
+        aria-label="Creator call history table"
+      >
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink-200">
@@ -191,12 +195,12 @@ export default function CallHistory({
                         }
                       >
                         {formatSignedPercent(call.live_return)}
-                        <span className="ml-1 text-ink-400 text-[10px] uppercase tracking-wider">
+                        <span className="ml-1 text-[10px] uppercase tracking-wider text-ink-600">
                           live
                         </span>
                       </span>
                     ) : call.horizon_status_30d === "pending" ? (
-                      <span className="text-ink-400 text-xs uppercase tracking-wider">
+                      <span className="text-xs uppercase tracking-wider text-ink-600">
                         Pending
                       </span>
                     ) : call.return_30d !== null ? (
@@ -210,7 +214,7 @@ export default function CallHistory({
                         {formatSignedPercent(call.return_30d)}
                       </span>
                     ) : (
-                      <span className="text-ink-400">--</span>
+                      <span className="text-ink-600">--</span>
                     )}
                   </td>
                   <td className="px-4 py-3 tabular-nums hidden lg:table-cell">
@@ -223,12 +227,12 @@ export default function CallHistory({
                         }
                       >
                         {formatSignedPercent(call.live_alpha)}
-                        <span className="ml-1 text-ink-400 text-[10px] uppercase tracking-wider">
+                        <span className="ml-1 text-[10px] uppercase tracking-wider text-ink-600">
                           live
                         </span>
                       </span>
                     ) : call.horizon_status_30d === "pending" ? (
-                      <span className="text-ink-400 text-xs uppercase tracking-wider">
+                      <span className="text-xs uppercase tracking-wider text-ink-600">
                         Pending
                       </span>
                     ) : call.alpha_30d !== null ? (
@@ -242,12 +246,12 @@ export default function CallHistory({
                         {formatSignedPercent(call.alpha_30d)}
                       </span>
                     ) : (
-                      <span className="text-ink-400">--</span>
+                      <span className="text-ink-600">--</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center hidden md:table-cell">
                     {call.target_status === "pending" ? (
-                      <span className="text-ink-400 text-xs uppercase tracking-wider">
+                      <span className="text-xs uppercase tracking-wider text-ink-600">
                         Pending
                       </span>
                     ) : call.hit_target === true ? (
@@ -255,7 +259,7 @@ export default function CallHistory({
                     ) : call.hit_target === false ? (
                       <X className="w-4 h-4 text-neg mx-auto" />
                     ) : (
-                      <span className="text-ink-400">--</span>
+                      <span className="text-ink-600">--</span>
                     )}
                   </td>
                 </tr>
@@ -321,7 +325,7 @@ function SortableHeader({
         {label}
         <span
           aria-hidden="true"
-          className={isActive ? "text-accent" : "text-ink-400"}
+          className={isActive ? "text-accent" : "text-ink-600"}
         >
           ⇅
         </span>

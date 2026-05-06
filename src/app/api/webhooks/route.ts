@@ -8,9 +8,11 @@ import {
   listWebhooks,
   WEBHOOK_REVEAL_COOKIE_NAME,
 } from "@/lib/webhooks";
+import { noStoreHeaders, withNoStore } from "@/lib/http-cache";
 import { requireSessionAccess } from "@/lib/premium";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const REVEAL_COOKIE_MAX_AGE_SECONDS = 5 * 60;
 
@@ -27,7 +29,10 @@ function revealCookieOptions() {
 export async function GET(): Promise<NextResponse> {
   const session = await requireSessionAccess("alpha");
   if (session instanceof NextResponse) return session;
-  return NextResponse.json({ webhooks: await listWebhooks(session.userId) });
+  return NextResponse.json(
+    { webhooks: await listWebhooks(session.userId) },
+    { headers: noStoreHeaders() },
+  );
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -39,30 +44,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const form = await request.formData();
     if (form.get("_action") === "clear_reveal") {
       cookieStore.delete(WEBHOOK_REVEAL_COOKIE_NAME);
-      return NextResponse.redirect(new URL("/settings/webhooks", request.url), 303);
+      return withNoStore(NextResponse.redirect(new URL("/settings/webhooks", request.url), 303));
     }
     if (form.get("_action") === "delete") {
       const id = Number(form.get("id"));
       if (!Number.isInteger(id) || id <= 0) {
-        return NextResponse.json({ error: "invalid_id" }, { status: 400 });
+        return NextResponse.json({ error: "invalid_id" }, { status: 400, headers: noStoreHeaders() });
       }
       await deleteWebhook(session.userId, id);
-      return NextResponse.redirect(new URL("/settings/webhooks?disabled=1", request.url), 303);
+      return withNoStore(NextResponse.redirect(new URL("/settings/webhooks?disabled=1", request.url), 303));
     }
     if (form.get("_action") === "test") {
       const id = Number(form.get("id"));
       if (!Number.isInteger(id) || id <= 0) {
-        return NextResponse.json({ error: "invalid_id" }, { status: 400 });
+        return NextResponse.json({ error: "invalid_id" }, { status: 400, headers: noStoreHeaders() });
       }
       await deliverWebhookTest(session.userId, id);
-      return NextResponse.redirect(new URL("/settings/webhooks?tested=1", request.url), 303);
+      return withNoStore(NextResponse.redirect(new URL("/settings/webhooks?tested=1", request.url), 303));
     }
     const webhook = await createWebhook(session.userId, String(form.get("url") ?? ""), form.getAll("eventTypes"));
     if (!webhook) {
-      return NextResponse.redirect(
+      return withNoStore(NextResponse.redirect(
         new URL("/settings/webhooks?error=invalid_https_url", request.url),
         303,
-      );
+      ));
     }
     cookieStore.set(
       WEBHOOK_REVEAL_COOKIE_NAME,
@@ -72,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }),
       revealCookieOptions(),
     );
-    return NextResponse.redirect(new URL("/settings/webhooks", request.url), 303);
+    return withNoStore(NextResponse.redirect(new URL("/settings/webhooks", request.url), 303));
   }
   const body = await request.json().catch(() => ({})) as {
     _action?: string;
@@ -82,21 +87,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   };
   if (body._action === "clear_reveal") {
     cookieStore.delete(WEBHOOK_REVEAL_COOKIE_NAME);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { headers: noStoreHeaders() });
   }
   if (body._action === "test") {
     const id = Number(body.id);
     if (!Number.isInteger(id) || id <= 0) {
-      return NextResponse.json({ error: "invalid_id" }, { status: 400 });
+      return NextResponse.json({ error: "invalid_id" }, { status: 400, headers: noStoreHeaders() });
     }
     const delivery = await deliverWebhookTest(session.userId, id);
-    return NextResponse.json({ ok: Boolean(delivery), delivery });
+    return NextResponse.json({ ok: Boolean(delivery), delivery }, { headers: noStoreHeaders() });
   }
-  if (!body.url) return NextResponse.json({ error: "url_required" }, { status: 400 });
+  if (!body.url) return NextResponse.json({ error: "url_required" }, { status: 400, headers: noStoreHeaders() });
   const webhook = await createWebhook(session.userId, body.url, body.eventTypes);
-  if (!webhook) return NextResponse.json({ error: "invalid_https_url" }, { status: 400 });
+  if (!webhook) return NextResponse.json({ error: "invalid_https_url" }, { status: 400, headers: noStoreHeaders() });
   const { secret, ...row } = webhook;
-  return NextResponse.json({ webhook: row, secret }, { status: 201 });
+  return NextResponse.json({ webhook: row, secret }, { status: 201, headers: noStoreHeaders() });
 }
 
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
@@ -104,7 +109,10 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   if (session instanceof NextResponse) return session;
   const id = Number(request.nextUrl.searchParams.get("id"));
   if (!Number.isInteger(id) || id <= 0) {
-    return NextResponse.json({ error: "invalid_id" }, { status: 400 });
+    return NextResponse.json({ error: "invalid_id" }, { status: 400, headers: noStoreHeaders() });
   }
-  return NextResponse.json({ ok: await deleteWebhook(session.userId, id) });
+  return NextResponse.json(
+    { ok: await deleteWebhook(session.userId, id) },
+    { headers: noStoreHeaders() },
+  );
 }

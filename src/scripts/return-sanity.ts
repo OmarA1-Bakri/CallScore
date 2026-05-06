@@ -68,7 +68,7 @@ async function main(): Promise<void> {
   console.log("\n10 most negative returns:");
   for (const e of extreme) {
     console.log(
-      `  id=${e.id} ${e.symbol} ${e.direction} @${e.price_at_call} → ${e.price_30d} = ${(e.return_30d * 100).toFixed(1)}%  ${e.call_date.substring(0, 10)}`,
+      `  id=${e.id} ${e.symbol} ${e.direction} @${e.price_at_call} → ${e.price_30d} = ${e.return_30d.toFixed(1)}%  ${e.call_date.substring(0, 10)}`,
     );
   }
 
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
   console.log("\n10 most positive returns:");
   for (const e of top) {
     console.log(
-      `  id=${e.id} ${e.symbol} ${e.direction} @${e.price_at_call} → ${e.price_30d} = ${(e.return_30d * 100).toFixed(1)}%  ${e.call_date.substring(0, 10)}`,
+      `  id=${e.id} ${e.symbol} ${e.direction} @${e.price_at_call} → ${e.price_30d} = ${e.return_30d.toFixed(1)}%  ${e.call_date.substring(0, 10)}`,
     );
   }
 

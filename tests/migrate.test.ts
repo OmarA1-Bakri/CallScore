@@ -17,6 +17,8 @@ test("migration plan applies schema then numbered migrations in order", () => {
     normalize("migrations/005-alpha-platform.sql"),
     normalize("migrations/006-autonomous-ml-pipeline.sql"),
     normalize("migrations/007-product-surface-observability.sql"),
+    normalize("migrations/008-candles-guardrails.sql"),
+    normalize("migrations/009-validate-candles-open-time.sql"),
   ]);
 });
 

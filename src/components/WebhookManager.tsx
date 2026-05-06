@@ -35,7 +35,11 @@ function formatDate(value: unknown): string {
 
 function eventSchema(type: string, body: string): ReactElement {
   return (
-    <pre className="overflow-x-auto border border-ink-250 bg-ink-0 p-3 font-mono text-[12px] leading-relaxed text-ink-700">
+    <pre
+      className="overflow-x-auto border border-ink-250 bg-ink-0 p-3 font-mono text-[12px] leading-relaxed text-ink-700 focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+      tabIndex={0}
+      aria-label={`${type} webhook event schema`}
+    >
       <code>{`{
   "type": "new_call_digest",
   "created_at": "2026-05-04T00:00:00.000Z",
@@ -255,12 +259,12 @@ export default function WebhookManager({
         </section>
       )}
 
-      <section className="grid gap-4 desk:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid min-w-0 gap-4 desk:grid-cols-[0.9fr_1.1fr]">
         <form
           onSubmit={createWebhook}
           action="/api/webhooks"
           method="post"
-          className="border border-ink-250 bg-ink-50 p-4"
+          className="min-w-0 border border-ink-250 bg-ink-50 p-4"
         >
           <p className="flex items-center gap-2 font-mono text-mono-sm uppercase tracking-caps text-accent">
             <span aria-hidden="true" className="inline-block h-2 w-2 bg-accent" />
@@ -318,7 +322,7 @@ export default function WebhookManager({
           </button>
         </form>
 
-        <div className="border border-ink-250 bg-ink-50 p-4">
+        <div className="min-w-0 border border-ink-250 bg-ink-50 p-4">
           <p className="flex items-center gap-2 font-mono text-mono-sm uppercase tracking-caps text-accent">
             <span aria-hidden="true" className="inline-block h-2 w-2 bg-accent" />
             delivery contract

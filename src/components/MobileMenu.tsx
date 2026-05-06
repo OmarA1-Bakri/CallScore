@@ -29,7 +29,7 @@ export default function MobileMenu({
     <div className="relative desk:hidden">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="text-ink-600 hover:text-ink-900"
+        className="inline-flex h-[44px] w-[44px] items-center justify-center text-ink-600 hover:text-ink-900"
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         aria-controls="mobile-nav"
@@ -108,7 +108,7 @@ export default function MobileMenu({
               <Link
                 href="/pricing"
                 onClick={() => setOpen(false)}
-                className="mt-3 inline-block border border-accent/60 bg-transparent px-3.5 py-2 font-mono text-mono-sm uppercase tracking-caps text-accent transition-colors hover:border-accent hover:bg-accent-low"
+                className="mt-3 inline-flex min-h-10 items-center border border-accent/60 bg-transparent px-3.5 font-mono text-mono-sm uppercase tracking-caps text-accent transition-colors hover:border-accent hover:bg-accent-low"
               >
                 GET ACCESS
               </Link>

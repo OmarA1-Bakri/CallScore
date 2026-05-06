@@ -61,6 +61,26 @@ test("no rebuilt page uses rounded-{lg,xl,2xl,full} chrome", () => {
   );
 });
 
+test("rebuilt pages only use 2px inline border radius", () => {
+  const offenders: string[] = [];
+  const re = /borderRadius:\s*(\d+)/g;
+  for (const rel of REBUILT_PAGES) {
+    const src = read(rel);
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(src)) !== null) {
+      if (Number(match[1]) !== 2) {
+        offenders.push(`${rel}: borderRadius ${match[1]}`);
+      }
+    }
+    re.lastIndex = 0;
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `non-2px inline border radius found on rebuilt pages:\n${offenders.join("\n")}`,
+  );
+});
+
 test("no rebuilt page nests <main> (root layout already provides it)", () => {
   const offenders: string[] = [];
   const re = /<main\b/;
@@ -121,6 +141,23 @@ test("backtest charts use explicit portfolio and benchmark labels", () => {
   assert.match(src, /Portfolio equity vs/);
   assert.match(src, /Top creator contribution/);
   assert.match(src, /Monthly edge vs benchmark/);
+});
+
+test("home page does not import recharts-backed chart components", () => {
+  const src = read("src/app/page.tsx");
+  assert.doesNotMatch(src, /BacktestLabCharts|PerformanceChart|recharts/);
+});
+
+test("public leaderboard/profile/call pages use live data instead of mock data", () => {
+  for (const rel of [
+    "src/app/page.tsx",
+    "src/app/creator/[handle]/page.tsx",
+    "src/app/call/[id]/page.tsx",
+  ]) {
+    const src = read(rel);
+    assert.doesNotMatch(src, /@\/lib\/mock-data|MOCK_/);
+    assert.match(src, /@\/lib\/db|findCreatorByHandle/);
+  }
 });
 
 test("feedback page supports context hinting and minimal evidence-logged success copy", () => {

@@ -4,10 +4,26 @@ import {
   buildDataPipelineStageCommands,
   parseDataPipelineArgs,
 } from "../src/scripts/run-data-pipeline";
+import { getNextConsensusWindowStart } from "../src/scripts/detect-consensus";
 import {
+  HIGH_LOW_CACHE_MAX_ENTRIES,
+  MATCH_PRICE_CACHE_MAX_ENTRIES,
+  MATCH_PRICES_ADVISORY_LOCK_ID,
   getCallSelectionPredicate,
   parseMatchPricesArgs,
+  setLruCacheEntry,
+  withMatchPricesAdvisoryLock,
 } from "../src/scripts/match-prices";
+import {
+  buildReplaceStoredCallsStatements,
+  executeStatementsInTransaction,
+} from "../src/scripts/script-helpers";
+import {
+  computeAlpha,
+  computeReturn,
+  didHitTarget,
+  isDirectionCorrect,
+} from "../src/lib/scoring";
 import { parseVerifyPublicSurfaceArgs } from "../src/scripts/verify-public-surface";
 import { parseBackfillPublicationDatesArgs } from "../src/scripts/backfill-publication-dates";
 import {
@@ -159,6 +175,47 @@ test("match-prices defaults to incomplete market data and parses full recompute 
   assert.equal(full.batchSize, 50);
   assert.equal(full.startAfterId, 123);
   assert.equal(getCallSelectionPredicate(full), "id > $1");
+});
+
+test("match-prices exposes a stable advisory lock id for single-run idempotency", () => {
+  assert.equal(Number.isInteger(MATCH_PRICES_ADVISORY_LOCK_ID), true);
+  assert.ok(MATCH_PRICES_ADVISORY_LOCK_ID > 0);
+});
+
+test("match-prices skips work under advisory-lock contention", async () => {
+  const statements: string[] = [];
+  const result = await withMatchPricesAdvisoryLock(
+    async () => {
+      throw new Error("work should not run when lock is busy");
+    },
+    async <T>(sql: string): Promise<T[]> => {
+      statements.push(sql);
+      return [{ locked: false }] as T[];
+    },
+  );
+
+  assert.deepEqual(result, { locked: false });
+  assert.equal(statements.length, 1);
+  assert.match(statements[0], /pg_try_advisory_lock/);
+  assert.doesNotMatch(statements.join("\n"), /pg_advisory_unlock/);
+});
+
+test("consensus detection advances past the full anchored window", () => {
+  const calls = [
+    { call_date: "2026-01-01T00:00:00.000Z" },
+    { call_date: "2026-01-02T00:00:00.000Z" },
+    { call_date: "2026-01-07T00:00:00.000Z" },
+    { call_date: "2026-01-09T00:00:00.000Z" },
+  ];
+
+  assert.equal(
+    getNextConsensusWindowStart(calls, 0, Date.parse("2026-01-08T00:00:00.000Z")),
+    3,
+  );
+  assert.equal(
+    getNextConsensusWindowStart(calls, 0, Date.parse("2026-01-10T00:00:00.000Z")),
+    calls.length,
+  );
 });
 
 test("public surface verification only fetches external URLs when explicitly requested", () => {
@@ -431,4 +488,133 @@ test("audit recompute valid-only writes exclude rejected audit rows", () => {
   );
   assert.equal(summarizeAuditResults(results).valid, 1);
   assert.equal(summarizeAuditResults(results).wouldBecomeScored, 1);
+});
+
+
+test("match-prices LRU helper caps caches and refreshes recently used keys", () => {
+  assert.equal(MATCH_PRICE_CACHE_MAX_ENTRIES, 50_000);
+  assert.equal(HIGH_LOW_CACHE_MAX_ENTRIES, 50_000);
+
+  const cache = new Map<string, number>();
+  setLruCacheEntry(cache, "oldest", 1, 3);
+  setLruCacheEntry(cache, "middle", 2, 3);
+  setLruCacheEntry(cache, "newest", 3, 3);
+  setLruCacheEntry(cache, "middle", 22, 3);
+  setLruCacheEntry(cache, "overflow", 4, 3);
+
+  assert.deepEqual(Array.from(cache.entries()), [
+    ["newest", 3],
+    ["middle", 22],
+    ["overflow", 4],
+  ]);
+});
+
+test("replaceStoredCallsForVideo statements preserve transactional SQL order", async () => {
+  const statements = buildReplaceStoredCallsStatements({
+    creatorId: 7,
+    videoId: 42,
+    callDate: "2026-05-01T00:00:00.000Z",
+    markVideoExtracted: true,
+    calls: [
+      {
+        symbol: "ETHUSDT",
+        direction: "bullish",
+        call_type: "buy",
+        entry_price: 100,
+        target_price: 125,
+        stop_loss: 90,
+        timeframe: "30d",
+        confidence: "high",
+        strategy_type: "technical_analysis",
+        raw_quote: "ETH higher",
+        extraction_confidence: 0.9,
+        specificity_score: 0.75,
+      },
+      {
+        symbol: "BTCUSDT",
+        direction: "bearish",
+        call_type: "sell",
+        entry_price: null,
+        target_price: null,
+        stop_loss: null,
+        timeframe: null,
+        confidence: "medium",
+        strategy_type: "fundamental",
+        raw_quote: "BTC lower",
+        extraction_confidence: 0.8,
+        specificity_score: 0.25,
+      },
+    ],
+  });
+
+  assert.match(statements[0].sql, /^DELETE FROM calls WHERE video_id/);
+  assert.deepEqual(statements[0].params, [42]);
+  assert.match(statements[1].sql, /^INSERT INTO calls/);
+  assert.match(statements[2].sql, /^INSERT INTO calls/);
+  assert.match(statements[3].sql, /^UPDATE videos SET calls_extracted = true/);
+
+  const executed: string[] = [];
+  let transactionCalls = 0;
+  await executeStatementsInTransaction(
+    {
+      async transaction(callback) {
+        transactionCalls++;
+        await Promise.all(
+          callback(async (sql) => {
+            executed.push(sql.replace(/\s+/g, " ").trim());
+            return [];
+          }),
+        );
+        return [];
+      },
+    },
+    statements,
+  );
+
+  assert.equal(transactionCalls, 1);
+  assert.deepEqual(
+    executed.map((sql) => sql.split(" ").slice(0, 3).join(" ")),
+    ["DELETE FROM calls", "INSERT INTO calls", "INSERT INTO calls", "UPDATE videos SET"],
+  );
+});
+
+test("replaceStoredCallsForVideo transaction helper propagates rollback failures", async () => {
+  const statements = buildReplaceStoredCallsStatements({
+    creatorId: 7,
+    videoId: 42,
+    callDate: null,
+    calls: [],
+  });
+
+  let transactionCalls = 0;
+  await assert.rejects(
+    executeStatementsInTransaction(
+      {
+        async transaction(callback) {
+          transactionCalls++;
+          callback(async () => []);
+          throw new Error("rollback simulated");
+        },
+      },
+      statements,
+    ),
+    /rollback simulated/,
+  );
+  assert.equal(transactionCalls, 1);
+});
+
+test("scoring helpers return safe values for NaN and Infinity inputs", () => {
+  assert.equal(computeReturn(Number.NaN, 110), 0);
+  assert.equal(computeReturn(100, Number.POSITIVE_INFINITY), 0);
+  assert.equal(computeAlpha(Number.NEGATIVE_INFINITY, 1), 0);
+  assert.equal(computeAlpha(5, Number.NaN), 0);
+
+  assert.equal(isDirectionCorrect("bullish", Number.POSITIVE_INFINITY), false);
+  assert.equal(isDirectionCorrect("bearish", Number.NaN), false);
+  assert.equal(isDirectionCorrect("neutral", Number.NEGATIVE_INFINITY), false);
+
+  assert.equal(didHitTarget("bullish", Number.NaN, null, 120, 90), false);
+  assert.equal(didHitTarget("bullish", 110, Number.NaN, 120, 90), false);
+  assert.equal(didHitTarget("bullish", 110, null, Number.POSITIVE_INFINITY, 90), false);
+  assert.equal(didHitTarget("bearish", 90, null, 120, Number.NEGATIVE_INFINITY), false);
 });

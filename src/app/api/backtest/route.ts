@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { captureApiException } from "@/lib/monitoring";
+import { z } from "zod";
 import {
   BacktestValidationError,
   MAX_BACKTEST_CAPITAL,
@@ -20,6 +22,16 @@ import {
 } from "@/lib/portfolio-backtest";
 
 const DEFAULT_CAPITAL = 1000;
+
+const portfolioQuerySchema = z.object({
+  creatorIds: z.array(z.number().int().positive()).min(1),
+  start: z.string().nullable(),
+  end: z.string().nullable(),
+  capital: z.string().nullable(),
+  strategy: z.string().nullable(),
+  weighting: z.string().nullable(),
+  benchmark: z.string().nullable(),
+});
 
 interface ParsedPortfolioParams {
   readonly creatorIds: readonly number[];
@@ -58,16 +70,26 @@ function parseParams(
   searchParams: URLSearchParams,
   now: Date,
 ): ParsedPortfolioParams | { readonly error: string } {
-  const creatorIds = parseCreatorIds(searchParams);
-  if (creatorIds.length === 0) return { error: "invalid_creator" };
+  const raw = portfolioQuerySchema.safeParse({
+    creatorIds: parseCreatorIds(searchParams),
+    start: searchParams.get("start"),
+    end: searchParams.get("end"),
+    capital: searchParams.get("capital"),
+    strategy: searchParams.get("strategy"),
+    weighting: searchParams.get("weighting"),
+    benchmark: searchParams.get("benchmark"),
+  });
+
+  if (!raw.success) return { error: "invalid_creator" };
 
   const defaults = defaultBacktestRange(now);
-  const startRaw = searchParams.get("start");
+  const { creatorIds } = raw.data;
+  const startRaw = raw.data.start;
   const startDate =
     startRaw === null ? defaults.start : parseIsoDateAsStartOfDay(startRaw);
   if (!startDate) return { error: "invalid_start" };
 
-  const endRaw = searchParams.get("end");
+  const endRaw = raw.data.end;
   const endDate =
     endRaw === null ? defaults.end : parseIsoDateAsEndOfDay(endRaw);
   if (!endDate) return { error: "invalid_end" };
@@ -75,7 +97,7 @@ function parseParams(
     return { error: "invalid_range" };
   }
 
-  const capital = parseCapital(searchParams.get("capital"));
+  const capital = parseCapital(raw.data.capital);
   if (
     capital === null ||
     capital < MIN_BACKTEST_CAPITAL ||
@@ -84,14 +106,14 @@ function parseParams(
     return { error: "invalid_capital" };
   }
 
-  const strategyRaw = searchParams.get("strategy") ?? "equal_weight";
+  const strategyRaw = raw.data.strategy ?? "equal_weight";
   const strategy =
     strategyRaw === "equal_weight" || strategyRaw === "direction_only"
       ? strategyRaw
       : null;
   if (!strategy) return { error: "invalid_strategy" };
 
-  const weightingRaw = searchParams.get("weighting") ?? "equal_creator";
+  const weightingRaw = raw.data.weighting ?? "equal_creator";
   const weighting = PORTFOLIO_WEIGHTING_MODES.includes(
     weightingRaw as PortfolioWeightingMode,
   )
@@ -99,7 +121,7 @@ function parseParams(
     : null;
   if (!weighting) return { error: "invalid_weighting" };
 
-  const benchmarkRaw = searchParams.get("benchmark") ?? "btc";
+  const benchmarkRaw = raw.data.benchmark ?? "btc";
   const benchmark = PORTFOLIO_BENCHMARKS.includes(
     benchmarkRaw as PortfolioBenchmark,
   )
@@ -138,7 +160,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (error instanceof BacktestValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("[portfolio-backtest] unhandled error:", error);
+    void captureApiException(error, "/api/backtest");
     return NextResponse.json(
       { error: "internal_error", message: "Backtest unavailable. Please try again." },
       { status: 500 },

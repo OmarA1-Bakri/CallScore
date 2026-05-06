@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import { ExternalLink } from "lucide-react";
 import AlphaScoreBadge from "@/components/AlphaScoreBadge";
 import PerformanceChart from "@/components/PerformanceChart";
@@ -27,11 +28,15 @@ interface PageProps {
   readonly params: { handle: string };
 }
 
+const getCreatorByHandle = cache(async (handle: string): Promise<Creator | null> => {
+  return findCreatorByHandle<Creator>(handle);
+});
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const handle = decodeURIComponent(params.handle);
 
   try {
-    const creator = await findCreatorByHandle<Creator>(handle);
+    const creator = await getCreatorByHandle(handle);
     if (!creator) {
       return { title: "Creator Not Found | CryptoTubers Ranked" };
     }
@@ -56,7 +61,7 @@ export default async function CreatorPage({ params }: PageProps) {
   // Fetch creator — handle missing table gracefully
   let creator: Creator;
   try {
-    const resolvedCreator = await findCreatorByHandle<Creator>(handle);
+    const resolvedCreator = await getCreatorByHandle(handle);
     if (!resolvedCreator) {
       notFound();
     }

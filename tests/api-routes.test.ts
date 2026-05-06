@@ -141,3 +141,35 @@ test("feedback surface and route stay aligned on evidence fields", () => {
   assert.ok(routeSource.includes("issueType"));
   assert.ok(routeSource.includes("composePersistedMessage"));
 });
+
+test("mutable API inputs use Zod safeParse validation", () => {
+  const feedbackRoute = readFileSync(join(root, "src/app/api/feedback/route.ts"), "utf8");
+  const backtestRoute = readFileSync(join(root, "src/app/api/backtest/route.ts"), "utf8");
+
+  assert.match(feedbackRoute, /from "zod"/);
+  assert.match(feedbackRoute, /feedbackPayloadSchema\.safeParse/);
+  assert.match(backtestRoute, /from "zod"/);
+  assert.match(backtestRoute, /portfolioQuerySchema\.safeParse/);
+});
+
+test("user-specific API routes opt out of shared caching", () => {
+  for (const route of [
+    "src/app/api/auth/session/route.ts",
+    "src/app/api/api-keys/route.ts",
+    "src/app/api/webhooks/route.ts",
+    "src/app/api/alerts/list/route.ts",
+    "src/app/api/alerts/watch/route.ts",
+  ]) {
+    const source = readFileSync(join(root, route), "utf8");
+    assert.match(source, /force-dynamic|noStoreHeaders|cache-control": "no-store"|withNoStore/);
+  }
+});
+
+test("public leaderboard API route preserves documented response envelope", () => {
+  const source = readFileSync(join(root, "src/app/api/leaderboard/route.ts"), "utf8");
+  assert.match(source, /data:\s*\{/);
+  assert.match(source, /leaderboard/);
+  assert.match(source, /meta:\s*\{/);
+  assert.match(source, /period/);
+  assert.match(source, /updated_at/);
+});

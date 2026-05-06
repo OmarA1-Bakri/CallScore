@@ -502,7 +502,7 @@ async function processCreator(creator: Creator, args: Args): Promise<{ inserted:
   return { inserted, skipped, failed, discovered: entries.length };
 }
 
-async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
   const args = parseScrapeV2Args(argv);
   const creators = await loadCreators(args);

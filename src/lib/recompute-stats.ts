@@ -205,6 +205,9 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
         0
       ) AS sharpe_ratio,
       NOW() AS updated_at
+    -- Keep one row per creator even when the period has too few eligible calls.
+    -- Eligibility is applied to ranking, not row existence, so low-N creators
+    -- do not disappear from snapshots after a recompute.
     FROM creators cr
     LEFT JOIN calls c ON c.creator_id = cr.id
     GROUP BY cr.id`,

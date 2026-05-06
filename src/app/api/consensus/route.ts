@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { captureApiException } from "@/lib/monitoring";
 import { query } from "@/lib/db";
 import { getUserTier, hasAccess } from "@/lib/whop";
 import { getRequestAuthContext } from "@/lib/auth";
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     });
   } catch (error: unknown) {
+    void captureApiException(error, "/api/consensus");
     const message =
       error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });

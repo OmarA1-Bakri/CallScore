@@ -286,10 +286,10 @@ function AuditLinks(): ReactElement {
   return (
     <p className="font-mono text-[13px] text-ink-600 not-italic">
       <span className="text-ink-500">Source repository currently private</span>
-      <span className="text-ink-400" aria-hidden="true"> · </span>
+      <span className="text-ink-600" aria-hidden="true"> · </span>
       <a
         href="mailto:dave.shipsbuilds@proton.me?subject=CryptoTubers%20Ranked%20-%20score%20dispute"
-        className="text-accent hover:underline underline-offset-4"
+        className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
       >
         flag a wrong score
       </a>

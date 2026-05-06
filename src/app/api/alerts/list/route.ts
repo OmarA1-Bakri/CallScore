@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { listRecentAlertsForUser, listWatches } from "@/lib/alerts";
 import { hasAccess } from "@/lib/whop";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(): Promise<NextResponse> {
   const session = await getSession();
   if (!session) {

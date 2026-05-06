@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { query } from "@/lib/db";
+import { captureApiException } from "@/lib/monitoring";
 
 interface FeedbackPayload {
   readonly name?: string;
@@ -28,6 +30,16 @@ const CATEGORY_ALIASES = new Map<string, string>([
   ["Billing Access", "Billing / Refund"],
 ]);
 
+const feedbackPayloadSchema = z.object({
+  name: z.string().optional(),
+  email: z.string().optional(),
+  category: z.string(),
+  issueType: z.string().optional(),
+  contextUrl: z.string().optional(),
+  sourceUrl: z.string().optional(),
+  message: z.string().trim().min(1),
+});
+
 function normalizeCategory(value: string): string | null {
   if (VALID_CATEGORIES.has(value)) return value;
   return CATEGORY_ALIASES.get(value) ?? null;
@@ -50,36 +62,12 @@ function composePersistedMessage(feedback: FeedbackPayload): string {
   return rows.join("\n");
 }
 
-function isValidPayload(body: unknown): body is FeedbackPayload {
-  if (typeof body !== "object" || body === null) return false;
-
-  const obj = body as Record<string, unknown>;
-
-  if (typeof obj.message !== "string" || obj.message.trim().length === 0) {
-    return false;
-  }
-
-  if (
-    typeof obj.category !== "string" ||
-    normalizeCategory(obj.category) === null
-  ) {
-    return false;
-  }
-
-  if (obj.name !== undefined && typeof obj.name !== "string") return false;
-  if (obj.email !== undefined && typeof obj.email !== "string") return false;
-  if (obj.issueType !== undefined && typeof obj.issueType !== "string") return false;
-  if (obj.contextUrl !== undefined && typeof obj.contextUrl !== "string") return false;
-  if (obj.sourceUrl !== undefined && typeof obj.sourceUrl !== "string") return false;
-
-  return true;
-}
-
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body: unknown = await request.json();
+    const parsed = feedbackPayloadSchema.safeParse(body);
 
-    if (!isValidPayload(body)) {
+    if (!parsed.success || normalizeCategory(parsed.data.category) === null) {
       return NextResponse.json(
         { success: false, error: "Invalid feedback. Message and valid category are required." },
         { status: 400 },
@@ -87,13 +75,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const feedback: FeedbackPayload = {
-      name: normalizeOptionalString(body.name),
-      email: normalizeOptionalString(body.email),
-      category: normalizeCategory(body.category)!,
-      issueType: normalizeOptionalString(body.issueType),
-      contextUrl: normalizeOptionalString(body.contextUrl),
-      sourceUrl: normalizeOptionalString(body.sourceUrl),
-      message: body.message.trim(),
+      name: normalizeOptionalString(parsed.data.name),
+      email: normalizeOptionalString(parsed.data.email),
+      category: normalizeCategory(parsed.data.category)!,
+      issueType: normalizeOptionalString(parsed.data.issueType),
+      contextUrl: normalizeOptionalString(parsed.data.contextUrl),
+      sourceUrl: normalizeOptionalString(parsed.data.sourceUrl),
+      message: parsed.data.message,
     };
 
     try {
@@ -107,22 +95,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         ],
       );
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "feedback persistence unavailable";
-      console.warn("[FEEDBACK_PERSISTENCE]", message);
+      void captureApiException(error, "/api/feedback", { stage: "persist" });
     }
 
-    console.info("[FEEDBACK]", {
-      timestamp: new Date().toISOString(),
-      category: feedback.category,
-      issue_type: feedback.issueType ?? null,
-      name_provided: Boolean(feedback.name),
-      email_provided: Boolean(feedback.email),
-      message_chars: feedback.message.length,
-    });
-
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error: unknown) {
+    void captureApiException(error, "/api/feedback", { stage: "request" });
     return NextResponse.json(
       { success: false, error: "Failed to process feedback." },
       { status: 500 },

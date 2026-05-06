@@ -2456,7 +2456,7 @@ The repo already has a pipeline (`scrape → extract → match → score → con
 | Creator handle, tier, channel meta | `creators` / `tracked-creators.ts` (already exists) |
 | α (90d) | `creator_stats` (output of `compute-scores.ts`) |
 | Win rate, retraction rate, first-mover | `creator_stats` extensions (may need fields) |
-| Calls table rows | `calls` (extracted by `extract-calls.ts`) |
+| Calls table rows | `calls` (extracted by `extract-calls-openrouter.ts`) |
 | Provenance (source/url/clipTs/sha/archive) | `calls.source_url`, `calls.clip_timestamp`, archive table TBD (see OQ-16) |
 | Consensus theses | `consensus` (output of `detect-consensus.ts`) — **note pipeline currently uses 7d window; spec uses 14d Signals window. See OQ-17 for migration.** |
 | Signal lifecycle (forming/active/fading/invalidated/resolved) | derived from `consensus` + price trace |

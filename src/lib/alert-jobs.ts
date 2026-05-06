@@ -1,4 +1,5 @@
 import { enqueueNewCallAlert, claimPendingAlerts, revertClaim, type ClaimedAlertRow } from "./alerts";
+import { throwIfCronDeadlineExceeded } from "@/app/api/cron/deadline";
 import { query } from "./db";
 import { sendEmail } from "./resend";
 import { buildUnsubscribeUrl } from "./unsubscribe-token";
@@ -19,14 +20,23 @@ export interface AlertSendResult {
   readonly skippedNoEmail: number;
 }
 
+interface CronSignalOptions {
+  readonly signal?: AbortSignal;
+}
+
 interface NewCallRow {
   readonly call_id: number;
   readonly creator_id: number;
   readonly user_id: string;
 }
 
-export async function runAlertScan(hours = 6): Promise<AlertScanResult> {
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal) throwIfCronDeadlineExceeded(signal);
+}
+
+export async function runAlertScan(hours = 6, options: CronSignalOptions = {}): Promise<AlertScanResult> {
   const windowHours = Math.max(1, Math.min(hours, 24 * 7));
+  throwIfAborted(options.signal);
   const pairs = await query<NewCallRow>(
     `SELECT c.id AS call_id, c.creator_id, w.user_id
      FROM calls c
@@ -37,18 +47,16 @@ export async function runAlertScan(hours = 6): Promise<AlertScanResult> {
     [String(windowHours)],
   );
 
-  const results = await Promise.allSettled(
-    pairs.map((row) => enqueueNewCallAlert(row.user_id, row.creator_id, row.call_id)),
-  );
-
   let enqueued = 0;
   let duplicates = 0;
   let failures = 0;
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      if (result.value) enqueued++;
+
+  for (const row of pairs) {
+    throwIfAborted(options.signal);
+    try {
+      if (await enqueueNewCallAlert(row.user_id, row.creator_id, row.call_id)) enqueued++;
       else duplicates++;
-    } else {
+    } catch {
       failures++;
     }
   }
@@ -99,19 +107,35 @@ function htmlBody(rows: readonly ClaimedAlertRow[], base: string, unsubscribeUrl
   return `<div style="font-family:ui-monospace,monospace"><h1>New watched calls</h1><ul>${items}</ul><p><a href="${escapeHtml(unsubscribeUrl)}">unsubscribe</a></p></div>`;
 }
 
-async function userEmailsTableExists(): Promise<boolean> {
+async function userEmailsTableExists(signal?: AbortSignal): Promise<boolean> {
+  throwIfAborted(signal);
   const rows = await query<{ exists: boolean }>(
     `SELECT EXISTS (
        SELECT 1 FROM information_schema.tables
        WHERE table_name = 'users'
      ) AS exists`,
   );
+  throwIfAborted(signal);
   return rows[0]?.exists === true;
 }
 
-export async function runAlertSend(batchSize = 500): Promise<AlertSendResult> {
+function withoutProcessedGroups(
+  groups: Map<string, ClaimedAlertRow[]>,
+  processedUserIds: ReadonlySet<string>,
+): number[] {
+  const ids: number[] = [];
+  for (const [userId, rows] of Array.from(groups.entries())) {
+    if (processedUserIds.has(userId)) continue;
+    ids.push(...rows.map((row) => row.alert_id));
+  }
+  return ids;
+}
+
+export async function runAlertSend(batchSize = 500, options: CronSignalOptions = {}): Promise<AlertSendResult> {
   const limit = Math.max(1, Math.min(batchSize, 10_000));
-  const claimed = await claimPendingAlerts(limit, await userEmailsTableExists());
+  throwIfAborted(options.signal);
+  const claimed = await claimPendingAlerts(limit, await userEmailsTableExists(options.signal));
+  throwIfAborted(options.signal);
   const groups = groupRows(claimed);
   const noEmailIds = claimed.filter((row) => !row.user_email).map((row) => row.alert_id);
   if (noEmailIds.length > 0) await revertClaim(noEmailIds);
@@ -119,33 +143,44 @@ export async function runAlertSend(batchSize = 500): Promise<AlertSendResult> {
   let sent = 0;
   let failed = 0;
   const base = baseUrl();
+  const processedUserIds = new Set<string>();
 
-  for (const [userId, rows] of Array.from(groups.entries())) {
-    const ids = rows.map((row) => row.alert_id);
-    try {
-      const unsubscribeUrl = buildUnsubscribeUrl(base, userId);
-      await sendEmail({
-        to: rows[0].user_email ?? "",
-        subject: subject(rows),
-        html: htmlBody(rows, base, unsubscribeUrl),
-        text: textBody(rows, base, unsubscribeUrl),
-      });
-      await deliverWebhookEvent(userId, "new_call_digest", {
-        alert_ids: ids,
-        calls: rows.map((row) => ({
-          call_id: row.call_id,
-          creator_id: row.creator_id,
-          creator_name: row.creator_name,
-          symbol: row.symbol,
-          direction: row.direction,
-          call_date: row.call_date,
-        })),
-      });
-      sent += ids.length;
-    } catch {
-      failed++;
-      await revertClaim(ids);
+  try {
+    for (const [userId, rows] of Array.from(groups.entries())) {
+      throwIfAborted(options.signal);
+      const ids = rows.map((row) => row.alert_id);
+      try {
+        const unsubscribeUrl = buildUnsubscribeUrl(base, userId);
+        await sendEmail({
+          to: rows[0].user_email ?? "",
+          subject: subject(rows),
+          html: htmlBody(rows, base, unsubscribeUrl),
+          text: textBody(rows, base, unsubscribeUrl),
+        });
+        await deliverWebhookEvent(userId, "new_call_digest", {
+          alert_ids: ids,
+          calls: rows.map((row) => ({
+            call_id: row.call_id,
+            creator_id: row.creator_id,
+            creator_name: row.creator_name,
+            symbol: row.symbol,
+            direction: row.direction,
+            call_date: row.call_date,
+          })),
+        });
+        processedUserIds.add(userId);
+        sent += ids.length;
+      } catch {
+        failed++;
+        await revertClaim(ids);
+        processedUserIds.add(userId);
+      }
     }
+  } catch (error) {
+    if (options.signal?.aborted) {
+      await revertClaim(withoutProcessedGroups(groups, processedUserIds));
+    }
+    throw error;
   }
 
   return { claimed: claimed.length, digests: groups.size, sent, failed, skippedNoEmail: noEmailIds.length };

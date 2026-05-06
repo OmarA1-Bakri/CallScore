@@ -43,19 +43,21 @@ type TierPlanInput = {
 
 const API_BASE = (process.env.WHOP_API_BASE_URL ?? "https://api.whop.com/api/v1").replace(/\/$/, "");
 
-const apiKey = process.env.WHOP_API_KEY;
-
-if (!apiKey) {
-  fail("WHOP_API_KEY is required.");
+export function readBootstrapProducts(env: NodeJS.ProcessEnv = process.env): {
+  readonly free: string;
+  readonly pro: string;
+  readonly alpha: string;
+} {
+  return {
+    free: requiredEnv("WHOP_FREE_PRODUCT_ID", env),
+    pro: requiredEnv("WHOP_PRO_PRODUCT_ID", env),
+    alpha: requiredEnv("WHOP_ALPHA_PRODUCT_ID", env),
+  };
 }
 
-const products = {
-  free: requiredEnv("WHOP_FREE_PRODUCT_ID"),
-  pro: requiredEnv("WHOP_PRO_PRODUCT_ID"),
-  alpha: requiredEnv("WHOP_ALPHA_PRODUCT_ID"),
-};
-
 async function main(): Promise<void> {
+  requiredEnv("WHOP_API_KEY");
+  const products = readBootstrapProducts();
   const companyId = process.env.WHOP_COMPANY_ID ?? (await discoverCompanyIdFromProduct(products.pro));
 
   const desiredPlans: TierPlanInput[] = [
@@ -97,6 +99,7 @@ async function main(): Promise<void> {
 }
 
 async function whop<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const apiKey = requiredEnv("WHOP_API_KEY");
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
@@ -186,8 +189,8 @@ function printEnv(outputs: Record<string, string>): void {
   }
 }
 
-function requiredEnv(key: string): string {
-  const value = process.env[key];
+function requiredEnv(key: string, env: NodeJS.ProcessEnv = process.env): string {
+  const value = env[key];
   if (!value) fail(`${key} is required.`);
   return value;
 }
@@ -205,7 +208,9 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

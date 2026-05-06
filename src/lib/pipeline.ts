@@ -1,3 +1,4 @@
+import { throwIfCronDeadlineExceeded } from "@/app/api/cron/deadline";
 import { query } from "./db";
 
 export type PipelineRunStatus =
@@ -63,6 +64,7 @@ interface EnqueueJobInput {
   readonly priority?: number;
   readonly idempotencyKey: string;
   readonly maxAttempts?: number;
+  readonly signal?: AbortSignal;
 }
 
 interface ClaimNextJobInput {
@@ -115,6 +117,7 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
   readonly run: PipelineRun;
   readonly job: PipelineJob;
 }> {
+  if (input.signal) throwIfCronDeadlineExceeded(input.signal);
   const [run] = await query<PipelineRun>(
     `INSERT INTO pipeline_runs (run_key, type, status, updated_at)
      VALUES ($1, $2, 'queued', NOW())
@@ -126,6 +129,7 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
 
   if (!run) throw new Error("Failed to create or load pipeline run");
 
+  if (input.signal) throwIfCronDeadlineExceeded(input.signal);
   const [job] = await query<PipelineJob>(
     `INSERT INTO pipeline_jobs (
        run_id, type, status, priority, payload, max_attempts, idempotency_key, updated_at
@@ -146,6 +150,7 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
 
   if (!job) throw new Error("Failed to create or load pipeline job");
 
+  if (input.signal) throwIfCronDeadlineExceeded(input.signal);
   await appendPipelineJobEvent({
     runId: run.id,
     jobId: job.id,
@@ -161,6 +166,7 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
 export async function enqueueNightlyMlVerifierJob(input: {
   readonly batchSize?: number;
   readonly now?: Date;
+  readonly signal?: AbortSignal;
 } = {}): Promise<{ readonly run: PipelineRun; readonly job: PipelineJob }> {
   const runKey = nightlyMlVerifierRunKey(input.now);
   const batchSize = input.batchSize ?? DEFAULT_ML_BATCH_SIZE;
@@ -176,6 +182,7 @@ export async function enqueueNightlyMlVerifierJob(input: {
       queued_by: "vercel-cron",
     },
     maxAttempts: 3,
+    signal: input.signal,
   });
 }
 
