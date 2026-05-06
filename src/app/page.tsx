@@ -137,12 +137,13 @@ function buildStats(row: LeaderboardQueryRow): CreatorStats {
 }
 
 interface PageProps {
-  readonly searchParams: { period?: string };
+  readonly searchParams: Promise<{ period?: string }>;
 }
 
 export default async function HomePage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: PageProps): Promise<ReactElement> {
+  const searchParams = await searchParamsPromise;
   const periodParam = searchParams.period ?? "all_time";
   const requestedPeriod: Period = (VALID_PERIODS as readonly string[]).includes(periodParam)
     ? (periodParam as Period)

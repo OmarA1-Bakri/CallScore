@@ -13,15 +13,16 @@ import {
 const API_KEYS_ROUTE = "/api/api-keys";
 
 interface PageProps {
-  readonly searchParams?: {
+  readonly searchParams?: Promise<{
     readonly created?: string;
     readonly revoked?: string;
-  };
+  }>;
 }
 
 export default async function ApiSettingsPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: PageProps) {
+  const searchParams = await searchParamsPromise;
   const session = await requireSessionAccess("alpha");
   if (session instanceof Response) {
     const isGuest = session.status === 401;

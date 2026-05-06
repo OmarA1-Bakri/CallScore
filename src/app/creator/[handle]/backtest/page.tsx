@@ -23,13 +23,13 @@ import {
 import type { Creator } from "@/lib/types";
 
 interface PageProps {
-  readonly params: { handle: string };
-  readonly searchParams: {
+  readonly params: Promise<{ handle: string }>;
+  readonly searchParams: Promise<{
     readonly start?: string;
     readonly end?: string;
     readonly capital?: string;
     readonly strategy?: string;
-  };
+  }>;
 }
 
 const DEFAULT_CAPITAL = 1000;
@@ -38,7 +38,8 @@ const DEFAULT_STRATEGY: BacktestStrategy = "equal_weight";
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const handle = decodeURIComponent(params.handle);
+  const { handle: rawHandle } = await params;
+  const handle = decodeURIComponent(rawHandle);
   try {
     const creator = await findCreatorByHandle<Pick<Creator, "name" | "youtube_handle">>(
       handle,
@@ -394,7 +395,11 @@ export default async function BacktestPage({
   params,
   searchParams,
 }: PageProps) {
-  const handle = decodeURIComponent(params.handle);
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ]);
+  const handle = decodeURIComponent(resolvedParams.handle);
   const currentTier = await getCurrentTier();
 
   let creator: Creator;
@@ -413,10 +418,10 @@ export default async function BacktestPage({
   const now = new Date();
   const { start: defaultStart, end: defaultEnd } = defaultBacktestRange(now);
   const startDate =
-    parseIsoDateAsStartOfDay(searchParams.start) ?? defaultStart;
-  const endDate = parseIsoDateAsEndOfDay(searchParams.end) ?? defaultEnd;
-  const capital = parseCapitalParam(searchParams.capital);
-  const strategy = parseStrategyParam(searchParams.strategy);
+    parseIsoDateAsStartOfDay(resolvedSearchParams.start) ?? defaultStart;
+  const endDate = parseIsoDateAsEndOfDay(resolvedSearchParams.end) ?? defaultEnd;
+  const capital = parseCapitalParam(resolvedSearchParams.capital);
+  const strategy = parseStrategyParam(resolvedSearchParams.strategy);
   const safeStart =
     endDate.getTime() > startDate.getTime() ? startDate : defaultStart;
   const safeEnd =

@@ -10,7 +10,7 @@ import { serializeCall } from "@/lib/public-serializer";
 import type { Call, Creator } from "@/lib/types";
 
 interface PageProps {
-  readonly params: { id: string };
+  readonly params: Promise<{ id: string }>;
 }
 
 // Map raw direction enum to trader vocabulary for display. Italic editorial accent
@@ -23,7 +23,8 @@ const DIRECTION_LABEL: Record<Call["direction"], string> = {
 };
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const callId = parseInt(params.id, 10);
+  const { id } = await params;
+  const callId = parseInt(id, 10);
   if (isNaN(callId)) {
     return { title: "Call Not Found | CryptoTubers Ranked" };
   }
@@ -50,7 +51,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {
       title: `${ticker} ${direction} Call — CryptoTubers Ranked`,
       description: `Detailed breakdown of this ${ticker} ${call.direction} call: ${scoreText}, direction ${call.correct_direction ? "correct" : "wrong"}, with full alpha and regime analysis.`,
-      alternates: { canonical: `/call/${params.id}` },
+      alternates: { canonical: `/call/${id}` },
     };
   } catch {
     return { title: "Call Not Found | CryptoTubers Ranked" };
@@ -58,7 +59,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function CallDetailPage({ params }: PageProps) {
-  const callId = parseInt(params.id, 10);
+  const { id } = await params;
+  const callId = parseInt(id, 10);
   if (isNaN(callId)) {
     notFound();
   }

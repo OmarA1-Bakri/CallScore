@@ -25,7 +25,7 @@ import {
 import type { Creator, CreatorStats, Call } from "@/lib/types";
 
 interface PageProps {
-  readonly params: { handle: string };
+  readonly params: Promise<{ handle: string }>;
 }
 
 const getCreatorByHandle = cache(async (handle: string): Promise<Creator | null> => {
@@ -33,7 +33,8 @@ const getCreatorByHandle = cache(async (handle: string): Promise<Creator | null>
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const handle = decodeURIComponent(params.handle);
+  const { handle: rawHandle } = await params;
+  const handle = decodeURIComponent(rawHandle);
 
   try {
     const creator = await getCreatorByHandle(handle);
@@ -56,7 +57,8 @@ interface PerformancePoint {
 }
 
 export default async function CreatorPage({ params }: PageProps) {
-  const handle = decodeURIComponent(params.handle);
+  const { handle: rawHandle } = await params;
+  const handle = decodeURIComponent(rawHandle);
 
   // Fetch creator — handle missing table gracefully
   let creator: Creator;

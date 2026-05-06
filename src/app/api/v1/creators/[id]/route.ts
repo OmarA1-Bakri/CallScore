@@ -9,12 +9,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const auth = await requireAlphaApiAccess(request);
   if (auth instanceof NextResponse) return auth;
 
-  const { id } = params;
+  const { id } = await params;
   const creatorId = Number(id);
   if (!Number.isInteger(creatorId) || creatorId <= 0) {
     return NextResponse.json({ error: "invalid_id" }, { status: 400, headers: noStoreHeaders() });

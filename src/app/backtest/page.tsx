@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  readonly searchParams: {
+  readonly searchParams: Promise<{
     readonly creator?: string | readonly string[];
     readonly creators?: string;
     readonly start?: string;
@@ -44,7 +44,7 @@ interface PageProps {
     readonly weighting?: string;
     readonly benchmark?: string;
     readonly q?: string;
-  };
+  }>;
 }
 
 interface CreatorOption {
@@ -168,7 +168,7 @@ function mergeCreatorOptions(
 }
 
 function parseCreatorIds(
-  searchParams: PageProps["searchParams"],
+  searchParams: Awaited<PageProps["searchParams"]>,
   fallback: readonly CreatorOption[],
 ): readonly number[] {
   const raw: string[] = [];
@@ -999,7 +999,8 @@ function Ledger({ calls }: { readonly calls: readonly PortfolioBacktestCall[] })
   );
 }
 
-export default async function BacktestLabPage({ searchParams }: PageProps) {
+export default async function BacktestLabPage({ searchParams: searchParamsPromise }: PageProps) {
+  const searchParams = await searchParamsPromise;
   const tier = await getCurrentTier();
   if (!hasAccess(tier, "alpha")) return <LabLocked />;
 

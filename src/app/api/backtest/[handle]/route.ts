@@ -81,13 +81,13 @@ function parseQuery(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { handle: string } },
+  { params }: { params: Promise<{ handle: string }> },
 ): Promise<NextResponse> {
   const session = await requireSessionAccess("alpha");
   if (session instanceof NextResponse) return session;
 
   try {
-    const { handle: rawHandle } = params;
+    const { handle: rawHandle } = await params;
     const handle = decodeURIComponent(rawHandle);
     if (handle.length === 0) {
       return NextResponse.json(
