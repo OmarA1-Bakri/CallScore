@@ -337,7 +337,7 @@ export default async function CallDetailPage({ params }: PageProps) {
               href={`https://www.youtube.com/watch?v=${youtubeVideoId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-accent hover:underline underline-offset-4"
+              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
             >
               Open the full video on YouTube →
             </a>

@@ -49,7 +49,7 @@ export default function AboutPage(): ReactElement {
               v: (
                 <Link
                   href="mailto:dave.shipsbuilds@proton.me"
-                  className="text-accent hover:underline"
+                  className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
                 >
                   contact
                 </Link>
@@ -149,13 +149,16 @@ export default function AboutPage(): ReactElement {
             recompute request and we&apos;ll trace it from transcript to candle.
           </p>
           <p>
-            <Link href="/methodology" className="text-accent hover:underline underline-offset-4">
+            <Link
+              href="/methodology"
+              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
+            >
               Read the full methodology
             </Link>
             {" · "}
             <a
               href="mailto:dave.shipsbuilds@proton.me"
-              className="text-accent hover:underline underline-offset-4"
+              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
             >
               contact
             </a>

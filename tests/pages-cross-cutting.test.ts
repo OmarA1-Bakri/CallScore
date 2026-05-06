@@ -10,7 +10,9 @@
 
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { read, FORBIDDEN_PHOSPHOR } from "./page-helpers";
+import { readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { read, root, FORBIDDEN_PHOSPHOR } from "./page-helpers";
 
 const REBUILT_PAGES: readonly string[] = [
   "src/app/page.tsx",
@@ -63,7 +65,7 @@ test("no rebuilt page uses rounded-{lg,xl,2xl,full} chrome", () => {
 
 test("rebuilt pages only use 2px inline border radius", () => {
   const offenders: string[] = [];
-  const re = /borderRadius:\s*(\d+)/g;
+  const re = /borderRadius:\s*(\d+(?:\.\d+)?)/g;
   for (const rel of REBUILT_PAGES) {
     const src = read(rel);
     let match: RegExpExecArray | null;
@@ -120,6 +122,41 @@ test("SettingsShell owns a single shared settings <h1>", () => {
   const src = read("src/components/SettingsShell.tsx");
   const count = (src.match(/<h1\b/g) ?? []).length;
   assert.equal(count, 1, `SettingsShell should declare exactly one <h1>, found ${count}`);
+});
+
+function collectSourceFiles(dir: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const absolute = join(dir, entry);
+    const stat = statSync(absolute);
+    if (stat.isDirectory()) {
+      files.push(...collectSourceFiles(absolute));
+    } else if (/\.(tsx|ts)$/.test(entry)) {
+      files.push(absolute);
+    }
+  }
+  return files;
+}
+
+test("inline accent links use persistent underline cues", () => {
+  const offenders: string[] = [];
+  const re = /text-accent\s+hover:underline|hover:underline\s+underline-offset-4/g;
+  for (const absolute of [
+    ...collectSourceFiles(join(root, "src/app")),
+    ...collectSourceFiles(join(root, "src/components")),
+  ]) {
+    const rel = relative(root, absolute).replaceAll("\\", "/");
+    const src = read(rel);
+    const matches = src.match(re);
+    if (matches) {
+      offenders.push(`${rel}: ${Array.from(new Set(matches)).join(", ")}`);
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `accent links must not rely on hover-only underline:\n${offenders.join("\n")}`,
+  );
 });
 
 test("backtest creator search preserves selected creators outside the filtered list", () => {
