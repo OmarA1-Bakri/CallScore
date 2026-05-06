@@ -32,6 +32,7 @@ Dry-run enqueues a `hermes_smoke_test` job, claims it, writes job events, and ex
 
 - `GET|POST /api/cron/ml/enqueue` requires `Authorization: Bearer $CRON_SECRET` and queues one idempotent nightly `ml_verifier_batch` job.
 - `GET /api/pipeline/status` requires `Authorization: Bearer $PIPELINE_STATUS_SECRET` (or `$CRON_SECRET`) and returns recent runs/jobs/events.
+- `GET /api/pipeline/stats?limit=15` uses the same bearer auth and returns the holistic data inventory: creators, videos/transcripts, raw calls, confidence/scoring funnel, public eligibility, leaderboard freshness, candle coverage, consensus, and pipeline orchestration totals.
 
 ## v1 safety boundary
 
