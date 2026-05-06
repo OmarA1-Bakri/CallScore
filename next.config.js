@@ -4,7 +4,7 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
-  "frame-ancestors 'none'",
+  "frame-ancestors https://whop.com https://*.whop.com",
   "form-action 'self'",
   "img-src 'self' data: blob: https://yt3.ggpht.com https://i.ytimg.com",
   "font-src 'self' data:",

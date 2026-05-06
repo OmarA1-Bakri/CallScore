@@ -31,7 +31,7 @@ test("global security headers include a restrictive CSP", async () => {
   assert.ok(csp, "Content-Security-Policy header is required");
   assert.match(csp, /default-src 'self'/);
   assert.match(csp, /object-src 'none'/);
-  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /frame-ancestors https:\/\/whop\.com https:\/\/\*\.whop\.com/);
   assert.match(csp, /base-uri 'self'/);
   assert.doesNotMatch(csp, /\n/);
 });
