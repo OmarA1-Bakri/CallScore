@@ -42,7 +42,8 @@
     "pipeline:worker:once": "node --import tsx src/scripts/hermes-worker.ts --once",
     "ml:autoresearch": "node --import tsx src/scripts/ml-autoresearch.ts",
     "bakeoff:ollama": "node --import tsx src/scripts/bakeoff-ollama-cloud-models.ts",
-    "shadow:validate": "node --import tsx src/scripts/validate-shadow-extractions.ts"
+    "shadow:validate": "node --import tsx src/scripts/validate-shadow-extractions.ts",
+    "pipeline:data:continuous": "node --import tsx src/scripts/run-continuous-data-pipeline.ts"
   },
   "dependencies": {
     "@google/genai": "^1.49.0",

@@ -19,3 +19,45 @@ services:
       - .env.hermes
     entrypoint: ["npm", "run", "pipeline:worker:once", "--"]
     command: ["--dry-run"]
+
+  data-pipeline-continuous:
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    image: crypto-tuber-ranked-hermes-worker:latest
+    restart: unless-stopped
+    env_file:
+      - .env.hermes
+    command:
+      - npm
+      - run
+      - pipeline:data:continuous
+      - --
+      - --write
+      - --interval-minutes
+      - "30"
+      - --
+      - --limit-llm-videos
+      - "100"
+      - --limit-price-matches
+      - "1000"
+
+  data-pipeline-continuous-once:
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    image: crypto-tuber-ranked-hermes-worker:latest
+    profiles: ["debug"]
+    env_file:
+      - .env.hermes
+    entrypoint:
+      - npm
+      - run
+      - pipeline:data:continuous
+      - --
+    command:
+      - --once
+      - --dry-run
+      - --
+      - --limit-llm-videos
+      - "5"

@@ -37,3 +37,42 @@ Dry-run enqueues a `hermes_smoke_test` job, claims it, writes job events, and ex
 ## v1 safety boundary
 
 The ML verifier is audit-only: it writes `ml_verification_runs` and pipeline events. It does not update `calls`; promotion remains a separate future workflow after holdout evals are trusted.
+
+## Continuous data pipeline
+
+Use the continuous runner when the launch data pipeline should keep cycling without overlapping itself:
+
+```bash
+npm run pipeline:data:continuous -- --write --interval-minutes 30 -- \
+  --limit-llm-videos 100 \
+  --limit-price-matches 1000
+```
+
+The runner wraps `src/scripts/run-data-pipeline.ts` and adds:
+
+- a lock file at `.tmp/callscore-pipeline/continuous.lock` so only one loop runs at a time;
+- per-cycle audit folders under `.tmp/callscore-pipeline/continuous/`;
+- launch-speed defaults for shadow extraction (`glm-5.1` fallback, `2x2x2` lanes, model attempts `2`, gap `0`);
+- safe write defaults: if no reviewed promotion video IDs are supplied, it automatically adds `--skip-shadow-promote` so unreviewed shadow diffs are not written into production calls;
+- a 30-minute success interval and 10-minute failure retry interval by default.
+
+For a one-cycle dry-run smoke check:
+
+```bash
+docker compose --profile debug run --rm data-pipeline-continuous-once
+```
+
+For continuous operation on Hermes:
+
+```bash
+docker compose up -d data-pipeline-continuous
+```
+
+Reviewed promotions remain explicit. Pass reviewed IDs after the second `--` when you intentionally want promotion in a cycle:
+
+```bash
+npm run pipeline:data:continuous -- --write --once -- \
+  --shadow-promote-video-ids 15267,14687 \
+  --shadow-allow-statuses new_calls,changed_calls
+```
+

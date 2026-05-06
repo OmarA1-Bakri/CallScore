@@ -5,6 +5,10 @@ import {
   buildDataPipelineStageCommands,
   parseDataPipelineArgs,
 } from "../src/scripts/run-data-pipeline";
+import {
+  buildCycleCommand,
+  parseContinuousDataPipelineArgs,
+} from "../src/scripts/run-continuous-data-pipeline";
 import { runWithConcurrency } from "../src/scripts/script-helpers";
 import {
   getCallSelectionPredicate,
@@ -164,6 +168,65 @@ test("data pipeline parses explicit bounds and skip flags", () => {
   assert.equal(args.skipStages.has("secret-hygiene"), true);
   assert.equal(args.skipStages.has("shadow-diff"), true);
   assert.equal(args.skipStages.has("discover"), true);
+});
+
+
+test("continuous data pipeline defaults to a non-overlapping dry-run loop", () => {
+  const args = parseContinuousDataPipelineArgs([]);
+
+  assert.equal(args.write, false);
+  assert.equal(args.once, false);
+  assert.equal(args.maxCycles, 0);
+  assert.equal(args.intervalMs, 30 * 60_000);
+  assert.equal(args.failureIntervalMs, 10 * 60_000);
+  assert.equal(args.auditRoot, ".tmp/callscore-pipeline/continuous");
+  assert.equal(args.lockFile, ".tmp/callscore-pipeline/continuous.lock");
+  assert.deepEqual(args.pipelineArgs, []);
+});
+
+test("continuous data pipeline write mode uses safe launch defaults", () => {
+  const args = parseContinuousDataPipelineArgs([
+    "--write",
+    "--once",
+    "--interval-minutes",
+    "5",
+    "--",
+    "--creators",
+    "@A",
+  ]);
+  const command = buildCycleCommand(args, 2, new Date("2026-05-06T00:00:00.000Z"));
+
+  assert.equal(args.write, true);
+  assert.equal(args.once, true);
+  assert.equal(args.maxCycles, 1);
+  assert.equal(args.intervalMs, 5 * 60_000);
+  assert.ok(command.includes("src/scripts/run-data-pipeline.ts"));
+  assert.ok(command.includes("--write"));
+  assert.ok(command.includes("--skip-shadow-promote"));
+  assert.ok(command.includes("--shadow-fallback-model"));
+  assert.ok(command.includes("glm-5.1"));
+  assert.ok(command.includes("--shadow-agents"));
+  assert.ok(command.includes("2"));
+  assert.ok(command.includes("--audit-dir"));
+  assert.ok(command.some((part) => part.endsWith("continuous/2026-05-06T00-00-00-000Z-cycle-2")));
+  assert.ok(command.includes("--shadow-run-id"));
+  assert.ok(command.includes("continuous-2026-05-06T00-00-00-000Z-cycle-2"));
+});
+
+test("continuous data pipeline preserves reviewed promotion args", () => {
+  const args = parseContinuousDataPipelineArgs([
+    "--write",
+    "--",
+    "--shadow-promote-video-ids",
+    "101,102",
+    "--shadow-allow-statuses",
+    "new_calls",
+  ]);
+  const command = buildCycleCommand(args, 1, new Date("2026-05-06T00:00:00.000Z"));
+
+  assert.ok(command.includes("--shadow-promote-video-ids"));
+  assert.ok(command.includes("101,102"));
+  assert.equal(command.includes("--skip-shadow-promote"), false);
 });
 
 test("match-prices defaults to incomplete market data and parses full recompute bounds", () => {
