@@ -10,17 +10,21 @@ import {
   getScoreReadyIgnoringConfidenceSql,
 } from "../lib/public-methodology";
 
+export type ValidationDecision = "PROMOTE" | "REJECT" | "NEEDS_HUMAN_REVIEW";
+
 export interface AuditRecomputeArgs {
   readonly callId: number | null;
   readonly creatorHandle: string | null;
   readonly allLegacy: boolean;
   readonly scoreReadyLowConfidence: boolean;
   readonly validOnly: boolean;
+  readonly includeValidated: boolean;
   readonly write: boolean;
   readonly json: boolean;
   readonly summary: boolean;
   readonly limit: number | null;
   readonly startAfterId: number | null;
+  readonly auditOut: string | null;
 }
 
 interface AuditRow {
@@ -62,6 +66,7 @@ interface AuditResult {
     readonly excerpt: string;
   };
   readonly reasons: readonly string[];
+  readonly decision: ValidationDecision;
 }
 
 const LOW_CONFIDENCE_READY_BATCH_SIZE = 500;
@@ -99,8 +104,10 @@ export function parseArgs(argv: readonly string[]): AuditRecomputeArgs {
   let write = false;
   let json = false;
   let summary = false;
+  let includeValidated = false;
   let limit: number | null = null;
   let startAfterId: number | null = null;
+  let auditOut: string | null = null;
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -116,6 +123,8 @@ export function parseArgs(argv: readonly string[]): AuditRecomputeArgs {
       scoreReadyLowConfidence = true;
     } else if (arg === "--valid-only") {
       validOnly = true;
+    } else if (arg === "--include-validated") {
+      includeValidated = true;
     } else if (arg === "--write") {
       write = true;
     } else if (arg === "--json") {
@@ -128,6 +137,9 @@ export function parseArgs(argv: readonly string[]): AuditRecomputeArgs {
     } else if (arg === "--start-after-id") {
       startAfterId = positiveInt(argv[index + 1]);
       index++;
+    } else if (arg === "--audit-out" && argv[index + 1]) {
+      auditOut = argv[index + 1];
+      index++;
     }
   }
 
@@ -137,11 +149,13 @@ export function parseArgs(argv: readonly string[]): AuditRecomputeArgs {
     allLegacy,
     scoreReadyLowConfidence,
     validOnly,
+    includeValidated,
     write,
     json,
     summary,
     limit,
     startAfterId,
+    auditOut,
   };
 }
 
@@ -168,6 +182,7 @@ export function buildWhereClause(args: AuditRecomputeArgs): {
     sql = [
       `c.extraction_confidence < ${EXTRACTION_CONFIDENCE_THRESHOLD}`,
       getScoreReadyIgnoringConfidenceSql("c"),
+      ...(args.includeValidated ? [] : ["c.low_confidence_validation_decision IS NULL"]),
     ].join(" AND ");
   } else if (args.allLegacy) {
     sql = "c.extraction_confidence = 0.6";
@@ -253,7 +268,7 @@ export function analyzeAuditRows(rows: readonly AuditRow[]): AuditResult[] {
       invalid_extraction: !audit.isValid,
     });
 
-    return {
+    const baseResult = {
       id: row.id,
       creator: row.creator_name,
       symbol: row.symbol,
@@ -272,7 +287,40 @@ export function analyzeAuditRows(rows: readonly AuditRow[]): AuditResult[] {
       },
       reasons: audit.reasons,
     };
+
+    return {
+      ...baseResult,
+      decision: decideAuditResult(baseResult),
+    };
   });
+}
+
+
+function targetChangedMaterially(
+  before: number | null,
+  after: number | null,
+): boolean {
+  if (before === after) return false;
+  if (before === null || after === null) return true;
+  const denominator = Math.max(Math.abs(before), 1);
+  return Math.abs(before - after) / denominator > 0.01;
+}
+
+export function decideAuditResult(
+  result: Pick<AuditResult, "before" | "after" | "reasons">,
+): ValidationDecision {
+  if (result.reasons.length > 0) {
+    if (result.reasons.some((reason) => reason.startsWith("excerpt direction reads"))) {
+      return "NEEDS_HUMAN_REVIEW";
+    }
+    return "REJECT";
+  }
+  if (result.after.score_status !== "scored") return "NEEDS_HUMAN_REVIEW";
+  if (result.before.direction !== result.after.direction) return "NEEDS_HUMAN_REVIEW";
+  if (targetChangedMaterially(result.before.target_price, result.after.target_price)) {
+    return "NEEDS_HUMAN_REVIEW";
+  }
+  return "PROMOTE";
 }
 
 export async function applyAuditResults(results: readonly AuditResult[]): Promise<void> {
@@ -308,12 +356,28 @@ export async function applyAuditResults(results: readonly AuditResult[]): Promis
   }
 }
 
+export async function persistValidationDecisions(
+  results: readonly AuditResult[],
+): Promise<void> {
+  for (const result of results) {
+    await query(
+      `UPDATE calls
+       SET low_confidence_validation_decision = $1,
+           low_confidence_validated_at = NOW(),
+           low_confidence_validation_by = 'rules_v1',
+           low_confidence_validation_reasons = $2::jsonb
+       WHERE id = $3`,
+      [result.decision, JSON.stringify(result.reasons), result.id],
+    );
+  }
+}
+
 export function filterWritableResults(
   results: readonly AuditResult[],
   args: Pick<AuditRecomputeArgs, "validOnly">,
 ): AuditResult[] {
   if (!args.validOnly) return [...results];
-  return results.filter((result) => result.reasons.length === 0);
+  return results.filter((result) => result.decision === "PROMOTE");
 }
 
 export function summarizeAuditResults(results: readonly AuditResult[]): {
@@ -322,13 +386,20 @@ export function summarizeAuditResults(results: readonly AuditResult[]): {
   readonly invalid: number;
   readonly wouldBecomeScored: number;
   readonly byAfterConfidence: Record<string, number>;
+  readonly byDecision: Record<ValidationDecision, number>;
 } {
   const byAfterConfidence: Record<string, number> = {};
+  const byDecision: Record<ValidationDecision, number> = {
+    PROMOTE: 0,
+    REJECT: 0,
+    NEEDS_HUMAN_REVIEW: 0,
+  };
   let valid = 0;
   let wouldBecomeScored = 0;
   for (const result of results) {
     if (result.reasons.length === 0) valid += 1;
     if (result.after.score_status === "scored") wouldBecomeScored += 1;
+    byDecision[result.decision] += 1;
     const key = result.after.extraction_confidence.toFixed(2);
     byAfterConfidence[key] = (byAfterConfidence[key] ?? 0) + 1;
   }
@@ -338,6 +409,7 @@ export function summarizeAuditResults(results: readonly AuditResult[]): {
     invalid: results.length - valid,
     wouldBecomeScored,
     byAfterConfidence,
+    byDecision,
   };
 }
 
@@ -351,7 +423,7 @@ function printHuman(results: readonly AuditResult[]): void {
       `#${result.id} ${result.creator} ${result.symbol} ` +
       `${result.before.direction}/${result.before.extraction_confidence.toFixed(2)} -> ` +
       `${result.after.direction}/${result.after.extraction_confidence.toFixed(2)} ` +
-      `[${result.after.score_status}]`,
+      `[${result.after.score_status}/${result.decision}]`,
     );
     if (result.before.target_price !== result.after.target_price) {
       console.log(
@@ -361,6 +433,21 @@ function printHuman(results: readonly AuditResult[]): void {
     if (result.reasons.length > 0) {
       console.log(`  notes: ${result.reasons.join("; ")}`);
     }
+  }
+}
+
+
+function writeAuditResults(
+  args: Pick<AuditRecomputeArgs, "auditOut" | "write">,
+  results: readonly AuditResult[],
+): void {
+  if (!args.auditOut) return;
+  fs.mkdirSync(path.dirname(args.auditOut), { recursive: true });
+  for (const result of results) {
+    fs.appendFileSync(
+      args.auditOut,
+      `${JSON.stringify({ ts: new Date().toISOString(), mode: args.write ? "WRITE" : "DRY", ...result })}\n`,
+    );
   }
 }
 
@@ -387,6 +474,10 @@ async function main(): Promise<void> {
       const batchWritableResults = filterWritableResults(batchResults, args);
       results.push(...batchResults);
       writableResults.push(...batchWritableResults);
+      writeAuditResults(args, batchResults);
+      if (args.write && args.scoreReadyLowConfidence && batchResults.length > 0) {
+        await persistValidationDecisions(batchResults);
+      }
       if (args.write && batchWritableResults.length > 0) {
         await applyAuditResults(batchWritableResults);
       }
@@ -397,6 +488,10 @@ async function main(): Promise<void> {
     const rows = await loadAuditRows(args);
     results.push(...analyzeAuditRows(rows));
     writableResults.push(...filterWritableResults(results, args));
+    writeAuditResults(args, results);
+    if (args.write && args.scoreReadyLowConfidence && results.length > 0) {
+      await persistValidationDecisions(results);
+    }
     if (args.write && writableResults.length > 0) {
       await applyAuditResults(writableResults);
     }

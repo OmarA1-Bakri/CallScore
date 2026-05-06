@@ -196,16 +196,36 @@ function writeLock(args: ContinuousDataPipelineArgs, cycle: number): void {
   writeFileSync(file, `${JSON.stringify(record, null, 2)}\n`, { flag: "w" });
 }
 
-function lockIsStale(args: ContinuousDataPipelineArgs): boolean {
+function readLock(args: ContinuousDataPipelineArgs): Partial<LockRecord> | null {
   const file = lockPath(args);
-  if (!existsSync(file)) return false;
+  if (!existsSync(file)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<LockRecord>;
-    const updated = parsed.updated_at ? Date.parse(parsed.updated_at) : 0;
-    return !Number.isFinite(updated) || Date.now() - updated > args.staleLockMs;
+    return JSON.parse(readFileSync(file, "utf8")) as Partial<LockRecord>;
   } catch {
-    return true;
+    return {};
   }
+}
+
+function processIsRunning(pid: number | undefined): boolean | null {
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) return null;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error: unknown) {
+    const code = (error as { code?: string }).code;
+    if (code === "ESRCH") return false;
+    if (code === "EPERM") return true;
+    return null;
+  }
+}
+
+export function lockIsStale(args: ContinuousDataPipelineArgs): boolean {
+  const parsed = readLock(args);
+  if (!parsed) return false;
+  const running = processIsRunning(parsed.pid);
+  if (running === false) return true;
+  const updated = parsed.updated_at ? Date.parse(parsed.updated_at) : 0;
+  return !Number.isFinite(updated) || Date.now() - updated > args.staleLockMs;
 }
 
 function acquireLock(args: ContinuousDataPipelineArgs): boolean {

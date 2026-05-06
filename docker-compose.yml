@@ -37,10 +37,16 @@ services:
       - --interval-minutes
       - "30"
       - --
-      - --limit-llm-videos
-      - "100"
+      - --limit-low-confidence-validations
+      - "500"
+      - --limit-price-repairs
+      - "1000"
       - --limit-price-matches
       - "1000"
+      - --limit-ready-extract-videos
+      - "239"
+      - --limit-llm-videos
+      - "100"
 
   data-pipeline-continuous-once:
     build:
@@ -59,5 +65,13 @@ services:
       - --once
       - --dry-run
       - --
+      - --limit-low-confidence-validations
+      - "50"
+      - --limit-price-repairs
+      - "100"
+      - --limit-price-matches
+      - "100"
+      - --limit-ready-extract-videos
+      - "5"
       - --limit-llm-videos
       - "5"

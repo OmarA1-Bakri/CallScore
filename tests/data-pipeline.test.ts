@@ -1,12 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   buildDataPipelineStageCommands,
   parseDataPipelineArgs,
 } from "../src/scripts/run-data-pipeline";
 import {
   buildCycleCommand,
+  lockIsStale,
   parseContinuousDataPipelineArgs,
 } from "../src/scripts/run-continuous-data-pipeline";
 import { runWithConcurrency } from "../src/scripts/script-helpers";
@@ -14,6 +17,20 @@ import {
   getCallSelectionPredicate,
   parseMatchPricesArgs,
 } from "../src/scripts/match-prices";
+import {
+  parseRepairPriceAtCallArgs,
+  toleranceBand,
+} from "../src/scripts/repair-price-at-call";
+import {
+  buildSymbolFunnelSql,
+  parseSymbolFunnelAuditArgs,
+} from "../src/scripts/audit-symbol-funnel";
+import {
+  callBlockerCaseSql,
+  callsBlockedByReasonSql,
+  normalizePipelineBlockerLimit,
+  pipelineStageCaseSql,
+} from "../src/lib/pipeline-blockers";
 import {
   buildLiveScoreEligibleStatsSql,
   parseVerifyPublicSurfaceArgs,
@@ -31,6 +48,7 @@ import {
 } from "../src/scripts/audit-coverage-100";
 import {
   buildWhereClause,
+  decideAuditResult,
   filterWritableResults,
   parseArgs as parseAuditRecomputeArgs,
   shouldProcessInBatches,
@@ -60,6 +78,12 @@ test("data pipeline defaults to safe local dry-run for top creators", () => {
   ]);
   assert.equal(args.limitVideos, 250);
   assert.equal(args.limitLlmVideos, 100);
+  assert.equal(args.limitReadyExtractVideos, 239);
+  assert.equal(args.limitLowConfidenceValidations, 500);
+  assert.equal(args.limitPriceRepairs, 1000);
+  assert.equal(args.priceRepairBatchSize, 250);
+  assert.equal(args.priceRepairMaxToleranceMinutes, 30);
+  assert.equal(args.fetchBinanceFallback, true);
   assert.equal(args.limitPromotions, 25);
   assert.equal(args.sinceDays, 365);
   assert.equal(args.maxCandleRequestsPerSymbol, 25);
@@ -76,7 +100,7 @@ test("data pipeline defaults to safe local dry-run for top creators", () => {
   assert.deepEqual(args.shadowPromoteVideoIds, []);
   assert.equal(args.shadowAllowStatuses, null);
   assert.equal(args.rematchAllPrices, false);
-  assert.equal(args.limitPriceMatches, Number.MAX_SAFE_INTEGER);
+  assert.equal(args.limitPriceMatches, 1000);
   assert.equal(args.priceMatchBatchSize, 200);
   assert.equal(args.priceMatchStartAfterId, 0);
   assert.equal(args.verifyBaseUrl, null);
@@ -97,6 +121,17 @@ test("data pipeline parses explicit bounds and skip flags", () => {
     "20",
     "--limit-promotions",
     "3",
+    "--limit-ready-extract-videos",
+    "17",
+    "--limit-low-confidence-validations",
+    "19",
+    "--limit-price-repairs",
+    "23",
+    "--price-repair-batch-size",
+    "11",
+    "--price-repair-max-tolerance-minutes",
+    "12",
+    "--no-binance-fallback",
     "--max-candle-requests-per-symbol",
     "4",
     "--audit-dir",
@@ -137,6 +172,7 @@ test("data pipeline parses explicit bounds and skip flags", () => {
     "--skip-shadow-diff",
     "--skip-secret-hygiene",
     "--skip-discover",
+    "--skip-match-prices",
     "--write",
   ]);
 
@@ -146,6 +182,12 @@ test("data pipeline parses explicit bounds and skip flags", () => {
   assert.equal(args.limitVideos, 50);
   assert.equal(args.limitLlmVideos, 20);
   assert.equal(args.limitPromotions, 3);
+  assert.equal(args.limitReadyExtractVideos, 17);
+  assert.equal(args.limitLowConfidenceValidations, 19);
+  assert.equal(args.limitPriceRepairs, 23);
+  assert.equal(args.priceRepairBatchSize, 11);
+  assert.equal(args.priceRepairMaxToleranceMinutes, 12);
+  assert.equal(args.fetchBinanceFallback, false);
   assert.equal(args.maxCandleRequestsPerSymbol, 4);
   assert.equal(args.auditDir, ".tmp/pipeline-test");
   assert.equal(args.shadowRunId, "shadow-canary");
@@ -168,6 +210,7 @@ test("data pipeline parses explicit bounds and skip flags", () => {
   assert.equal(args.skipStages.has("secret-hygiene"), true);
   assert.equal(args.skipStages.has("shadow-diff"), true);
   assert.equal(args.skipStages.has("discover"), true);
+  assert.equal(args.skipStages.has("evaluation-backfill"), true);
 });
 
 
@@ -182,6 +225,27 @@ test("continuous data pipeline defaults to a non-overlapping dry-run loop", () =
   assert.equal(args.auditRoot, ".tmp/callscore-pipeline/continuous");
   assert.equal(args.lockFile, ".tmp/callscore-pipeline/continuous.lock");
   assert.deepEqual(args.pipelineArgs, []);
+});
+
+test("continuous data pipeline treats dead-pid locks as stale", () => {
+  const lockFile = ".tmp/test-continuous-dead-pid.lock";
+  const lockPath = join(__dirname, "..", lockFile);
+  mkdirSync(dirname(lockPath), { recursive: true });
+  writeFileSync(
+    lockPath,
+    JSON.stringify({
+      pid: 999999999,
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      cycle: 1,
+    }),
+  );
+  try {
+    const args = parseContinuousDataPipelineArgs(["--lock-file", lockFile]);
+    assert.equal(lockIsStale(args), true);
+  } finally {
+    if (existsSync(lockPath)) rmSync(lockPath, { force: true });
+  }
 });
 
 test("continuous data pipeline write mode uses safe launch defaults", () => {
@@ -235,6 +299,8 @@ test("match-prices defaults to incomplete market data and parses full recompute 
   assert.equal(defaults.batchSize, 200);
   assert.equal(defaults.limit, Number.MAX_SAFE_INTEGER);
   assert.equal(defaults.startAfterId, 0);
+  assert.equal(defaults.fetchBinance, false);
+  assert.equal(defaults.binanceToleranceMinutes, 30);
   assert.match(getCallSelectionPredicate(defaults), /price_at_call IS NULL/);
   assert.match(getCallSelectionPredicate(defaults), /price_30d IS NULL/);
   assert.match(getCallSelectionPredicate(defaults), /hit_target IS NULL/);
@@ -247,11 +313,16 @@ test("match-prices defaults to incomplete market data and parses full recompute 
     "50",
     "--start-after-id",
     "123",
+    "--fetch-binance",
+    "--binance-tolerance-minutes",
+    "15",
   ]);
   assert.equal(full.rematchAll, true);
   assert.equal(full.limit, 250);
   assert.equal(full.batchSize, 50);
   assert.equal(full.startAfterId, 123);
+  assert.equal(full.fetchBinance, true);
+  assert.equal(full.binanceToleranceMinutes, 15);
   assert.equal(getCallSelectionPredicate(full), "id > $1");
 });
 
@@ -351,6 +422,17 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
       "src/scripts/check-secret-hygiene.ts",
     ),
   );
+  assert.equal(commands["low-confidence-validate"].length, 1);
+  assert.ok(commands["low-confidence-validate"][0].includes("--score-ready-low-confidence"));
+  assert.ok(commands["low-confidence-validate"][0].includes("--valid-only"));
+  assert.equal(commands["low-confidence-validate"][0].includes("--write"), false);
+  assert.equal(commands["price-repair"].length, 1);
+  assert.ok(commands["price-repair"][0].includes("src/scripts/repair-price-at-call.ts"));
+  assert.equal(commands["price-repair"][0].includes("--write"), false);
+  assert.equal(commands["price-repair"][0].includes("--fetch-binance"), true);
+  assert.equal(commands["ready-extract"].length, 1);
+  assert.ok(commands["ready-extract"][0].includes("src/scripts/extract-calls-openrouter.ts"));
+  assert.equal(commands["ready-extract"][0].includes("--write"), false);
   assert.equal(commands["shadow-extract"].length, 2);
   assert.ok(
     commands["shadow-extract"][0].includes(
@@ -415,7 +497,9 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
       "src/scripts/verify-public-surface.ts",
     ),
   );
-  assert.deepEqual(commands["match-prices"], []);
+  assert.deepEqual(commands["evaluation-backfill"], []);
+  assert.ok(commands["blocker-audit"][0].includes("src/scripts/audit-call-blockers.ts"));
+  assert.ok(commands["symbol-funnel-audit"][0].includes("src/scripts/audit-symbol-funnel.ts"));
 });
 
 test("data pipeline wires optional shadow fallback model to extraction commands", () => {
@@ -491,8 +575,12 @@ test("data pipeline write mode executes shadow extraction, guarded promotion, an
   assert.equal(commands["shadow-promote"][0].includes("--video-ids"), true);
   assert.equal(commands["shadow-promote"][0].includes("101,102"), true);
   assert.equal(commands["shadow-promote"][0].includes("2"), true);
-  assert.equal(commands["match-prices"][0].includes("--all"), true);
-  assert.equal(commands["match-prices"][0].includes("--batch-size"), true);
+  assert.equal(commands["low-confidence-validate"][0].includes("--write"), true);
+  assert.equal(commands["price-repair"][0].includes("--write"), true);
+  assert.equal(commands["ready-extract"][0].includes("--write"), true);
+  assert.equal(commands["evaluation-backfill"][0].includes("--all"), true);
+  assert.equal(commands["evaluation-backfill"][0].includes("--batch-size"), true);
+  assert.equal(commands["evaluation-backfill"][0].includes("--fetch-binance"), true);
   assert.equal(
     commands["verify-public-surface"][0].includes("https://www.call-score.com"),
     true,
@@ -548,6 +636,8 @@ test("audit recompute can safely target score-ready low-confidence calls", () =>
   assert.equal(args.limit, 500);
   assert.equal(args.startAfterId, 1000);
   assert.equal(args.summary, true);
+  assert.equal(args.includeValidated, false);
+  assert.equal(args.auditOut, null);
   assert.equal(shouldProcessInBatches(args), false);
   assert.equal(
     shouldProcessInBatches(
@@ -559,6 +649,7 @@ test("audit recompute can safely target score-ready low-confidence calls", () =>
   const where = buildWhereClause(args);
   assert.match(where.sql, /extraction_confidence < 0\.7/);
   assert.match(where.sql, /price_at_call IS NOT NULL/);
+  assert.match(where.sql, /low_confidence_validation_decision IS NULL/);
   assert.match(where.sql, /c\.id > \$1/);
   assert.deepEqual(where.params, [1000]);
 });
@@ -568,11 +659,13 @@ test("audit recompute valid-only writes exclude rejected audit rows", () => {
     {
       id: 1,
       reasons: [],
+      decision: "PROMOTE",
       after: { score_status: "scored", extraction_confidence: 1 },
     },
     {
       id: 2,
       reasons: ["excerpt does not clearly support the extracted asset"],
+      decision: "REJECT",
       after: {
         score_status: "excluded_confidence",
         extraction_confidence: 0.69,
@@ -586,4 +679,69 @@ test("audit recompute valid-only writes exclude rejected audit rows", () => {
   );
   assert.equal(summarizeAuditResults(results).valid, 1);
   assert.equal(summarizeAuditResults(results).wouldBecomeScored, 1);
+  assert.equal(summarizeAuditResults(results).byDecision.PROMOTE, 1);
+  assert.equal(
+    decideAuditResult({
+      reasons: ["excerpt direction reads bearish, not bullish"],
+      before: { direction: "bullish", target_price: null },
+      after: { direction: "bearish", target_price: null, score_status: "invalid_extraction" },
+    } as never),
+    "NEEDS_HUMAN_REVIEW",
+  );
+});
+
+test("price repair uses bounded nearest-candle tolerance bands", () => {
+  const args = parseRepairPriceAtCallArgs([
+    "--write",
+    "--limit",
+    "10",
+    "--batch-size",
+    "5",
+    "--max-tolerance-minutes",
+    "15",
+    "--symbols",
+    "linkusdt,nearusdt",
+    "--audit-out",
+    ".tmp/price.jsonl",
+  ]);
+  assert.equal(args.write, true);
+  assert.equal(args.limit, 10);
+  assert.equal(args.batchSize, 5);
+  assert.equal(args.maxToleranceMinutes, 15);
+  assert.equal(args.fetchBinance, false);
+  assert.deepEqual(args.symbols, ["LINKUSDT", "NEARUSDT"]);
+  assert.equal(toleranceBand(60_000, 60_000), "exact_minute");
+  assert.equal(toleranceBand(60_000, 62_000), "exact_minute");
+  assert.equal(toleranceBand(60_000, 5 * 60_000), "within_5m");
+  assert.equal(toleranceBand(60_000, 31 * 60_000), "within_30m");
+  assert.equal(toleranceBand(60_000, 32 * 60_000), null);
+});
+
+test("symbol funnel audit focuses anomalous symbols and pricing blockers", () => {
+  const args = parseSymbolFunnelAuditArgs([
+    "--symbols",
+    "LINKUSDT,NEARUSDT,XRPUSDT",
+    "--json",
+    "--audit-out",
+    ".tmp/symbols.jsonl",
+  ]);
+  assert.deepEqual(args.symbols, ["LINKUSDT", "NEARUSDT", "XRPUSDT"]);
+  assert.equal(args.json, true);
+  assert.equal(args.auditOut, ".tmp/symbols.jsonl");
+  const sql = buildSymbolFunnelSql();
+  assert.match(sql, /missing_price_at_call/);
+  assert.match(sql, /missing_30d_eval/);
+  assert.match(sql, /low_confidence_validation_decision/);
+  assert.match(sql, /FROM candles/);
+});
+
+test("pipeline blocker dashboard exposes reason, symbol, creator, and stage views", () => {
+  assert.equal(normalizePipelineBlockerLimit(999), 100);
+  assert.match(callBlockerCaseSql("c"), /missing_price_at_call/);
+  assert.match(callBlockerCaseSql("c"), /low_confidence_score_ready_unvalidated/);
+  assert.match(pipelineStageCaseSql("blocker"), /validation/);
+  const sql = callsBlockedByReasonSql();
+  assert.match(sql, /WITH blocked AS/);
+  assert.match(sql, /WHERE NOT/);
+  assert.match(sql, /GROUP BY blocker/);
 });
