@@ -1,7 +1,10 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import crypto from "crypto";
 import type { Tier } from "./types";
 import { normalizeTier } from "./whop";
+import { getUserTier } from "./whop-access";
+import { verifyWhopIframeUser } from "./whop-iframe";
+import { createLogger } from "./logger";
 
 /* ------------------------------------------------------------------ */
 /*  Session shape                                                      */
@@ -10,12 +13,22 @@ import { normalizeTier } from "./whop";
 export interface Session {
   readonly userId: string;
   readonly tier: Tier;
-  readonly accessToken: string;
+  readonly accessToken: string | null;
   readonly exp: number;
 }
 
 export const SESSION_COOKIE_NAME = "ctr_session";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const DEFAULT_WHOP_IFRAME_SESSION_TTL_MS = 6 * 60 * 60 * 1000;
+
+const authLogger = createLogger({ component: "auth" });
+
+function whopIframeSessionTtlMs(): number {
+  const parsed = Number(process.env.WHOP_IFRAME_SESSION_TTL_MS);
+  return Number.isFinite(parsed) && parsed > 0
+    ? Math.floor(parsed)
+    : DEFAULT_WHOP_IFRAME_SESSION_TTL_MS;
+}
 
 interface HeaderStoreLike {
   get(name: string): string | null;
@@ -155,6 +168,9 @@ export async function createSession(
 }
 
 export async function getSession(): Promise<Session | null> {
+  const whopSession = await getWhopIframeSession();
+  if (whopSession) return whopSession;
+
   try {
     const cookieStore = await cookies();
     return getSessionFromToken(
@@ -163,6 +179,34 @@ export async function getSession(): Promise<Session | null> {
   } catch {
     return null;
   }
+}
+
+async function getWhopIframeSession(): Promise<Session | null> {
+  try {
+    const whopUser = await verifyWhopIframeUser(await headers());
+    if (!whopUser) return null;
+
+    return {
+      userId: whopUser.userId,
+      tier: await getUserTier(null, whopUser.userId),
+      accessToken: null,
+      exp: Date.now() + whopIframeSessionTtlMs(),
+    };
+  } catch (error) {
+    if (!isDynamicServerUsageError(error)) {
+      authLogger.error("get_whop_iframe_session_failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return null;
+  }
+}
+
+function isDynamicServerUsageError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const digest = "digest" in error ? String(error.digest) : "";
+  const message = error instanceof Error ? error.message : String(error);
+  return digest.includes("DYNAMIC_SERVER_USAGE") || message.includes("Dynamic server usage");
 }
 
 export async function destroySession(): Promise<void> {

@@ -13,9 +13,8 @@ export default async function TeamSettingsPage() {
       description="Planned team management surface for shared access, seat controls, and delivery ownership. This route is live, but the backend is intentionally not invented yet."
       tier={tier}
       primaryAction={{
-        label: session ? "Request pilot" : "Sign in",
-        href: session ? "/feedback?context=/settings/team" : "/api/auth/whop",
-        prefetch: session ? undefined : false,
+        label: "Request pilot",
+        href: "/feedback?context=/settings/team",
       }}
       secondaryAction={{
         label: "Account",
@@ -23,9 +22,9 @@ export default async function TeamSettingsPage() {
       }}
       status={[
         {
-          label: "Session",
-          value: session ? "Signed in" : "Signed out",
-          tone: session ? "good" : "warn",
+          label: "Identity",
+          value: session ? "Whop verified" : "Guest",
+          tone: session ? "good" : "neutral",
         },
         {
           label: "Seats",
@@ -58,7 +57,7 @@ export default async function TeamSettingsPage() {
             <dl className="mt-4 space-y-3 font-mono text-[12px]">
               <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
                 <dt className="uppercase tracking-caps text-ink-500">Current user</dt>
-                <dd className="text-right text-ink-800">{session?.userId ?? "guest"}</dd>
+                <dd className="text-right text-ink-800">{session?.userId ?? "Guest"}</dd>
               </div>
               <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
                 <dt className="uppercase tracking-caps text-ink-500">Plan</dt>
@@ -79,16 +78,6 @@ export default async function TeamSettingsPage() {
             </h2>
           </div>
           <div className="grid gap-3 p-4 tab:grid-cols-2 desk:grid-cols-4">
-            {!session && (
-              <Link
-                href="/api/auth/whop"
-                prefetch={false}
-                className="inline-flex min-h-11 items-center justify-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0 transition-colors hover:bg-accent-dim"
-              >
-                Sign in
-              </Link>
-            )}
-
             <Link
               href="/settings/account"
               className="inline-flex min-h-11 items-center justify-center border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900"

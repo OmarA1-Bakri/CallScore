@@ -18,7 +18,7 @@ export const DEFAULT_CANDLE_REFRESH_SYMBOLS = Array.from(
   new Set([...TRACKED_SYMBOLS, "XLMUSDT"]),
 );
 
-interface CandleRefreshArgs {
+export interface CandleRefreshArgs {
   readonly symbols: readonly string[];
   readonly startDate: string;
   readonly endDate: string | null;
@@ -48,7 +48,7 @@ interface FetchWindow {
   readonly endTime: number;
 }
 
-interface SymbolRefreshResult {
+export interface SymbolRefreshResult {
   readonly symbol: string;
   readonly mode: "WRITE" | "DRY";
   readonly existing_latest: string | null;
@@ -121,8 +121,8 @@ export function buildFetchWindows(input: {
 export function isValidCandleOpenTimeMs(value: number): boolean {
   return (
     Number.isInteger(value) &&
-    value > MIN_CANDLE_OPEN_TIME_MS &&
-    value < MAX_CANDLE_OPEN_TIME_MS
+    value >= MIN_CANDLE_OPEN_TIME_MS &&
+    value <= MAX_CANDLE_OPEN_TIME_MS
   );
 }
 
@@ -166,7 +166,7 @@ async function insertCandles(symbol: string, candles: readonly Candle[]): Promis
   const invalidOpenTime = candles.find((candle) => !isValidCandleOpenTimeMs(candle.open_time));
   if (invalidOpenTime) {
     throw new Error(
-      `Refusing to insert ${symbol} candle with non-millisecond open_time=${invalidOpenTime.open_time}`,
+      `Refusing to insert ${symbol} candle: open_time=${invalidOpenTime.open_time} is outside the allowed range (year 2000–2100, i.e. 946684800000..4102444800000 ms epoch).`,
     );
   }
   await query(
@@ -243,9 +243,7 @@ async function refreshSymbol(symbol: string, args: CandleRefreshArgs): Promise<S
   };
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  loadEnv();
-  const args = parseCandleRefreshArgs(argv);
+export async function runCandleRefresh(args: CandleRefreshArgs): Promise<readonly SymbolRefreshResult[]> {
   console.log(`[${timestamp()}] refresh-candles ${args.write ? "WRITE" : "DRY-RUN"}: symbols=${args.symbols.join(",")} maxRequestsPerSymbol=${args.maxRequestsPerSymbol}`);
 
   const results: SymbolRefreshResult[] = [];
@@ -276,7 +274,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const failed = results.filter((result) => result.status === "failed").length;
   console.log(`[${timestamp()}] refresh-candles complete: symbols=${results.length} failed=${failed}`);
-  if (failed > 0) process.exitCode = 1;
+  return results;
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  loadEnv();
+  const args = parseCandleRefreshArgs(argv);
+  const results = await runCandleRefresh(args);
+  if (results.some((result) => result.status === "failed")) process.exitCode = 1;
 }
 
 const isEntryPoint =

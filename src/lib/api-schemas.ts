@@ -135,7 +135,7 @@ export function parseApiRow<T>(schema: z.ZodType<T>, row: unknown, label: string
     return schema.parse(row);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new Error(`${label} row shape mismatch: ${z.prettifyError(error)}`);
+      throw new Error(`${label} row shape mismatch: ${JSON.stringify(error.flatten())}`);
     }
     throw error;
   }

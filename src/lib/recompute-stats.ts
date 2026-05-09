@@ -247,10 +247,15 @@ export async function syncCreatorSnapshots(): Promise<void> {
   );
 }
 
-export async function recomputeAllStats(): Promise<void> {
-  await recomputeCallScores();
+export interface RecomputeAllStatsMetrics {
+  readonly scored_calls: number;
+}
+
+export async function recomputeAllStats(): Promise<RecomputeAllStatsMetrics> {
+  const scoredCalls = await recomputeCallScores();
   await recomputeCreatorStats("all_time");
   await recomputeCreatorStats("90d");
   await recomputeCreatorStats("30d");
   await syncCreatorSnapshots();
+  return { scored_calls: scoredCalls };
 }

@@ -16,7 +16,7 @@ function shouldExecute(argv = process.argv.slice(2)): boolean {
 export const INVALID_CANDLE_OPEN_TIME_SQL = `
   SELECT COUNT(*)::bigint AS invalid_count
   FROM candles
-  WHERE open_time <= $1 OR open_time >= $2
+  WHERE open_time < $1 OR open_time > $2
 `;
 
 export async function countInvalidCandleOpenTimes(): Promise<bigint> {

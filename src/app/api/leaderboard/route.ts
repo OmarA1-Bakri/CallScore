@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { captureApiException } from "@/lib/monitoring";
 import { query } from "@/lib/db";
-import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
+import { getCreatorTier } from "@/lib/creator-tier";
+import { hasAccess } from "@/lib/whop";
+import { getUserTier } from "@/lib/whop-access";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
 import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
@@ -185,7 +187,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
 
     const leaderboard: LeaderboardRow[] = rows.map((row, index) => {
-      const rank = row.accuracy_rank ?? index + 1;
+      const rank = index + 1;
       const previousScore = prevScoreMap.get(row.creator_id);
       const trend =
         previousScore !== undefined
@@ -200,19 +202,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         stats: buildStats(row),
         best_call: buildCallSummary(
           row.best_call_id,
-          row.best_call_symbol ?? null,
-          row.best_call_return ?? null,
-          row.best_call_score ?? null,
-          row.best_call_date ?? null,
-          row.best_call_direction ?? null,
+          row.best_call_symbol,
+          row.best_call_return,
+          row.best_call_score,
+          row.best_call_date,
+          row.best_call_direction,
         ) as Call | null,
         worst_call: buildCallSummary(
           row.worst_call_id,
-          row.worst_call_symbol ?? null,
-          row.worst_call_return ?? null,
-          row.worst_call_score ?? null,
-          row.worst_call_date ?? null,
-          row.worst_call_direction ?? null,
+          row.worst_call_symbol,
+          row.worst_call_return,
+          row.worst_call_score,
+          row.worst_call_date,
+          row.worst_call_direction,
         ) as Call | null,
         tier_required: getCreatorTier(rank),
         trend,

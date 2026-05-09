@@ -59,7 +59,7 @@ export default async function BillingSettingsPage() {
             <p className="mt-4 font-serif text-[18px] leading-relaxed text-ink-700">
               {session
                 ? `This session is on the ${tier} plan. Checkout, renewals, and access grants are managed through Whop, not inside CallScore.`
-                : "No active session is attached, so billing cannot be reconciled until the account signs in through Whop."}
+                : "Checkout, renewals, and access grants are managed through the surrounding Whop account, not inside CallScore."}
             </p>
             <dl className="mt-4 space-y-3 font-mono text-[12px]">
               <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
@@ -95,35 +95,18 @@ export default async function BillingSettingsPage() {
             </h2>
           </div>
           <div className="grid gap-3 p-4 tab:grid-cols-2 desk:grid-cols-4">
-            {session ? (
-              <Link
-                href={nextUpgradeHref(tier)}
-                className="inline-flex min-h-11 items-center justify-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0 transition-colors hover:bg-accent-dim"
-              >
-                {nextUpgradeLabel(tier)}
-              </Link>
-            ) : (
-              <Link
-                href="/api/auth/whop"
-                prefetch={false}
-                className="inline-flex min-h-11 items-center justify-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0 transition-colors hover:bg-accent-dim"
-              >
-                Sign in to bill
-              </Link>
-            )}
-
             <Link
-              href="/api/checkout/pro"
-              className="inline-flex min-h-11 items-center justify-center border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900"
+              href={nextUpgradeHref(tier)}
+              className="inline-flex min-h-11 items-center justify-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0 transition-colors hover:bg-accent-dim"
             >
-              Pro checkout
+              {nextUpgradeLabel(tier)}
             </Link>
 
             <Link
-              href="/api/checkout/alpha"
+              href="/settings/account"
               className="inline-flex min-h-11 items-center justify-center border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900"
             >
-              Alpha checkout
+              Account status
             </Link>
 
             <Link

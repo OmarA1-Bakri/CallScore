@@ -8,12 +8,19 @@ import {
   parseOllamaBakeoffArgs,
 } from "../src/scripts/bakeoff-ollama-cloud-models";
 
+function toPosixPath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
 test("ollama bakeoff defaults to safe dry-run using approved recommendation set", () => {
   const args = parseOllamaBakeoffArgs(["--run-id", "bakeoff-test"]);
 
   assert.equal(args.execute, false);
   assert.equal(args.runId, "bakeoff-test");
-  assert.equal(args.outDir, ".tmp/ollama-model-bakeoff/bakeoff-test");
+  assert.equal(
+    toPosixPath(args.outDir),
+    ".tmp/ollama-model-bakeoff/bakeoff-test",
+  );
   assert.deepEqual(args.models, [...DEFAULT_OLLAMA_BAKEOFF_MODELS]);
   assert.equal((args.models as readonly string[]).includes("gpt-oss:120b"), false);
   assert.equal(args.models.some((model) => model.startsWith("gemma3")), false);

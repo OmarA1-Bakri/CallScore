@@ -31,7 +31,7 @@ interface NewCallRow {
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
-  if (signal) throwIfCronDeadlineExceeded(signal);
+  throwIfCronDeadlineExceeded(signal);
 }
 
 export async function runAlertScan(hours = 6, options: CronSignalOptions = {}): Promise<AlertScanResult> {
@@ -124,11 +124,15 @@ function withoutProcessedGroups(
   processedUserIds: ReadonlySet<string>,
 ): number[] {
   const ids: number[] = [];
-  for (const [userId, rows] of Array.from(groups.entries())) {
+  for (const [userId, rows] of groups) {
     if (processedUserIds.has(userId)) continue;
     ids.push(...rows.map((row) => row.alert_id));
   }
   return ids;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 export async function runAlertSend(batchSize = 500, options: CronSignalOptions = {}): Promise<AlertSendResult> {
@@ -146,9 +150,10 @@ export async function runAlertSend(batchSize = 500, options: CronSignalOptions =
   const processedUserIds = new Set<string>();
 
   try {
-    for (const [userId, rows] of Array.from(groups.entries())) {
+    for (const [userId, rows] of groups) {
       throwIfAborted(options.signal);
       const ids = rows.map((row) => row.alert_id);
+      let emailSent = false;
       try {
         const unsubscribeUrl = buildUnsubscribeUrl(base, userId);
         await sendEmail({
@@ -157,6 +162,8 @@ export async function runAlertSend(batchSize = 500, options: CronSignalOptions =
           html: htmlBody(rows, base, unsubscribeUrl),
           text: textBody(rows, base, unsubscribeUrl),
         });
+        emailSent = true;
+        sent += ids.length;
         await deliverWebhookEvent(userId, "new_call_digest", {
           alert_ids: ids,
           calls: rows.map((row) => ({
@@ -169,10 +176,12 @@ export async function runAlertSend(batchSize = 500, options: CronSignalOptions =
           })),
         });
         processedUserIds.add(userId);
-        sent += ids.length;
-      } catch {
-        failed++;
-        await revertClaim(ids);
+      } catch (error) {
+        if (isAbortError(error)) throw error;
+        if (!emailSent) {
+          failed += ids.length;
+          await revertClaim(ids);
+        }
         processedUserIds.add(userId);
       }
     }

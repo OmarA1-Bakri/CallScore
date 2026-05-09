@@ -11,7 +11,7 @@ import {
 import type { LiveCallPricingFields } from "./live-call-pricing";
 import type { Call } from "./types";
 
-type SerializableCallInput = Call & LiveCallPricingFields;
+export type SerializableCallInput = Call & LiveCallPricingFields;
 
 export interface SerializedCall extends Call {
   readonly extraction_valid: boolean;

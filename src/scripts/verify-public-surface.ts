@@ -48,7 +48,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
   const statsRows = await query<{ ranked_creators: string; total_calls: string }>(
     `SELECT COUNT(*) FILTER (WHERE ${leaderboardEligibleSql})::text AS ranked_creators,
-            COALESCE(SUM(total_calls), 0)::text AS total_calls
+            COALESCE(SUM(total_calls) FILTER (WHERE ${leaderboardEligibleSql}), 0)::text AS total_calls
      FROM creator_stats cs
      WHERE cs.period = 'all_time'`,
   );

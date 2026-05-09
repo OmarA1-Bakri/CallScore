@@ -16,23 +16,21 @@ export default async function NotificationsSettingsPage() {
       <SettingsShell
         active="notifications"
         title="Notifications"
-        description="Check email delivery readiness and queue state once the account is signed in on a Pro-capable plan."
+        description="Sign in and upgrade to Pro to manage email notifications and watchlist alerts."
         primaryAction={{
-          label: "Sign in",
-          href: "/api/auth/whop",
-          prefetch: false,
+          label: "View plans",
+          href: "/pricing",
         }}
       >
         <section className="border border-ink-250 bg-ink-50 p-5">
           <p className="font-serif text-[19px] leading-relaxed text-ink-700">
-            Sign in first to inspect notification health, watchlist coverage, and queue status.
+            Notifications require a Pro or Alpha plan. View plans to get access.
           </p>
           <Link
-            href="/api/auth/whop"
-            prefetch={false}
+            href="/pricing"
             className="mt-4 inline-flex min-h-11 items-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0"
           >
-            Sign in
+            View plans
           </Link>
         </section>
       </SettingsShell>

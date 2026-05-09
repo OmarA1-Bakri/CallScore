@@ -195,6 +195,8 @@ test("computeCreatorScoreAverages.total matches the averaged sum of the five com
 });
 
 test("recomputeCreatorStats preserves placeholder rows for below-threshold creators", () => {
+  // Source-inspection regression guard: recompute-stats must keep LEFT JOIN
+  // semantics and avoid HAVING filters that delete below-threshold creators.
   const source = readFileSync(join(root, "src/lib/recompute-stats.ts"), "utf8");
   assert.match(source, /FROM creators cr\s+LEFT JOIN calls c ON c\.creator_id = cr\.id/);
   assert.doesNotMatch(source, /GROUP BY cr\.id\s+HAVING/);

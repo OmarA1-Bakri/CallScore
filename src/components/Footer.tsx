@@ -6,7 +6,7 @@ export default function Footer() {
     <footer className="border-t border-ink-200 bg-ink-0">
       <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-12">
         {/* Top section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+        <div className="grid grid-cols-1 tab:grid-cols-3 gap-8 mb-8">
           {/* Brand */}
           <div>
             <Image
@@ -109,7 +109,7 @@ export default function Footer() {
               making any investment decisions.
             </p>
           </details>
-          <div className="border-t border-ink-150 pt-5">
+          <div className="border-t border-ink-200 pt-5">
             <p className="text-xs text-ink-600">
               &copy; {new Date().getFullYear()} CallScore. All rights
               reserved.

@@ -1,7 +1,11 @@
 import crypto from "crypto";
+import type { LookupAddress } from "node:dns";
 import { lookup } from "node:dns/promises";
 import net from "node:net";
 import { query } from "./db";
+import { createLogger } from "./logger";
+
+const webhookLogger = createLogger({ component: "webhooks" });
 
 export interface WebhookRow {
   readonly id: number;
@@ -50,31 +54,45 @@ const DEFAULT_EVENTS = ["new_call_digest", "consensus_signal"] as const;
 export const WEBHOOK_REVEAL_COOKIE_NAME = "ctr_webhook_reveal";
 export const WEBHOOK_DELIVERY_ATTEMPTS = 3;
 const WEBHOOK_FETCH_TIMEOUT_MS = 5_000;
+const WEBHOOK_DNS_TIMEOUT_MS = 3_000;
 const WEBHOOK_MAX_ERROR_BYTES = 2_048;
 const ENCRYPTED_WEBHOOK_SECRET_PREFIX = "enc:v1";
-const WEBHOOK_SECRET_KEY_ENV_KEYS = [
-  "WEBHOOK_SECRET_ENCRYPTION_KEY",
-  "SESSION_SECRET",
-] as const;
+const WEBHOOK_SECRET_HKDF_SALT = "callscore:webhook-secret:v1";
+const WEBHOOK_SECRET_HKDF_INFO = "webhook-secret-encryption-key";
+const WEBHOOK_SECRET_KEY_ENV_KEYS = ["WEBHOOK_SECRET_ENCRYPTION_KEY"] as const;
 
 function makeSecret(): string {
   return crypto.randomBytes(32).toString("base64url");
 }
 
-function hashSecretKey(source: string): Buffer {
+function deriveWebhookSecretKey(source: string): Buffer {
+  return Buffer.from(crypto.hkdfSync(
+    "sha256",
+    Buffer.from(source, "utf8"),
+    Buffer.from(process.env.WEBHOOK_SECRET_SALT ?? WEBHOOK_SECRET_HKDF_SALT, "utf8"),
+    Buffer.from(WEBHOOK_SECRET_HKDF_INFO, "utf8"),
+    32,
+  ));
+}
+
+function deriveLegacyWebhookSecretKey(source: string): Buffer {
   return crypto.createHash("sha256").update(source).digest();
 }
 
-function getWebhookSecretKey(): Buffer {
+function getWebhookSecretKeyCandidates(): readonly Buffer[] {
   for (const key of WEBHOOK_SECRET_KEY_ENV_KEYS) {
     const value = process.env[key];
     if (value && value.trim().length > 0) {
-      return hashSecretKey(value);
+      return [deriveWebhookSecretKey(value), deriveLegacyWebhookSecretKey(value)];
     }
   }
   throw new Error(
-    `Webhook secret encryption key required. Set ${WEBHOOK_SECRET_KEY_ENV_KEYS.join(" or ")}`,
+    "Webhook secret encryption key required. Set WEBHOOK_SECRET_ENCRYPTION_KEY to a dedicated non-rotating value.",
   );
+}
+
+function getWebhookSecretKey(): Buffer {
+  return getWebhookSecretKeyCandidates()[0];
 }
 
 export function encryptWebhookSecret(secret: string): string {
@@ -96,16 +114,25 @@ export function decryptWebhookSecret(storedSecret: string): string {
   if (!ivText || !authTagText || !ciphertextText) {
     throw new Error("Invalid encrypted webhook secret payload");
   }
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    getWebhookSecretKey(),
-    Buffer.from(ivText, "base64url"),
-  );
-  decipher.setAuthTag(Buffer.from(authTagText, "base64url"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(ciphertextText, "base64url")),
-    decipher.final(),
-  ]).toString("utf8");
+  const iv = Buffer.from(ivText, "base64url");
+  const authTag = Buffer.from(authTagText, "base64url");
+  const ciphertext = Buffer.from(ciphertextText, "base64url");
+  let lastError: unknown;
+
+  for (const key of getWebhookSecretKeyCandidates()) {
+    try {
+      const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(authTag);
+      return Buffer.concat([
+        decipher.update(ciphertext),
+        decipher.final(),
+      ]).toString("utf8");
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Webhook secret decryption failed");
 }
 
 export function createWebhookRevealCookieValue(reveal: WebhookReveal): string {
@@ -165,12 +192,12 @@ export function isPrivateWebhookAddress(address: string): boolean {
       a === 0 ||
       a === 10 ||
       a === 127 ||
-      a === 169 && b === 254 ||
-      a === 172 && b >= 16 && b <= 31 ||
-      a === 192 && b === 168 ||
-      a === 100 && b >= 64 && b <= 127 ||
-      a === 192 && b === 0 ||
-      a === 198 && (b === 18 || b === 19) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 192 && b === 0) ||
+      (a === 198 && (b === 18 || b === 19)) ||
       a >= 224
     );
   }
@@ -209,12 +236,32 @@ async function assertWebhookUrlIsPublic(urlText: string): Promise<void> {
   if (isBlockedWebhookHostname(url.hostname)) {
     throw new Error("webhook URL resolves to a blocked host");
   }
-  const addresses = await lookup(url.hostname, { all: true, verbatim: true });
+  const addresses = await lookupWithTimeout(url.hostname);
   if (
     addresses.length === 0 ||
     addresses.some((address) => isPrivateWebhookAddress(address.address))
   ) {
     throw new Error("webhook URL resolves to a private or reserved address");
+  }
+}
+
+async function lookupWithTimeout(
+  hostname: string,
+  timeoutMs = WEBHOOK_DNS_TIMEOUT_MS,
+): Promise<LookupAddress[]> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      lookup(hostname, { all: true, verbatim: true }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`DNS lookup timed out for webhook host: ${hostname}`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 }
 
@@ -279,8 +326,12 @@ async function maybeEncryptLegacyWebhookSecret(webhook: WebhookSecretRow): Promi
        WHERE id = $2 AND secret = $3`,
       [encryptWebhookSecret(webhook.secret), webhook.id, webhook.secret],
     );
-  } catch {
-    // Delivery should not fail just because best-effort lazy migration failed.
+  } catch (err) {
+    // Best-effort lazy migration; surface the failure but do not block delivery.
+    webhookLogger.warn("webhook_secret_lazy_migration_failed", {
+      webhook_id: webhook.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 

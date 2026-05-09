@@ -13,10 +13,10 @@ export default function CallScoreBrand({
   className = "",
 }: CallScoreBrandProps): ReactElement {
   const lockupSize = compact
-    ? "h-[34px] w-[150px]"
+    ? "h-[34px] w-[84px]"
     : showTagline
-      ? "h-[88px] w-[330px] tab:h-[96px] tab:w-[390px]"
-      : "h-[42px] w-[185px]";
+      ? "h-[88px] w-[217px] tab:h-[96px] tab:w-[237px]"
+      : "h-[42px] w-[104px]";
 
   return (
     <Image
@@ -24,7 +24,7 @@ export default function CallScoreBrand({
       alt="CallScore - Track calls. Score outcomes. Find alpha."
       width={1149}
       height={466}
-      className={`${lockupSize} object-contain object-left ${className}`}
+      className={`${className} ${lockupSize} object-contain object-left`}
       unoptimized
       priority={!compact}
     />

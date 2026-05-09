@@ -1,4 +1,5 @@
 import { throwIfCronDeadlineExceeded } from "@/app/api/cron/deadline";
+import { TRACKED_SYMBOLS } from "./constants";
 import { query } from "./db";
 
 export type PipelineRunStatus =
@@ -56,6 +57,19 @@ export interface PipelineJobEvent {
   readonly created_at: string;
 }
 
+export interface PipelineStuckJob extends PipelineJob {
+  readonly stuck_seconds: number;
+}
+
+export interface CandleFreshness {
+  readonly symbol: string;
+  readonly candle_count: number;
+  readonly latest_open_time_ms: string | null;
+  readonly latest_candle_at: string | null;
+  readonly staleness_seconds: number | null;
+  readonly status: "fresh" | "stale" | "missing";
+}
+
 interface EnqueueJobInput {
   readonly runKey: string;
   readonly runType: string;
@@ -76,9 +90,16 @@ export interface PipelineStatusSnapshot {
   readonly runs: readonly PipelineRun[];
   readonly jobs: readonly PipelineJob[];
   readonly events: readonly PipelineJobEvent[];
+  readonly stuck_jobs: readonly PipelineStuckJob[];
+  readonly candle_freshness: readonly CandleFreshness[];
 }
 
 const DEFAULT_ML_BATCH_SIZE = 250;
+const DEFAULT_MATCH_PRICES_LIMIT = 1000;
+const DEFAULT_MATCH_PRICES_BATCH_SIZE = 200;
+const DEFAULT_STUCK_JOB_SECONDS = 30 * 60;
+const FRESH_CANDLE_SECONDS = 2 * 60 * 60;
+const CANDLE_FRESHNESS_SYMBOLS = Array.from(new Set([...TRACKED_SYMBOLS, "XLMUSDT"]));
 
 function asJsonbParam(value: Record<string, unknown>): string {
   return JSON.stringify(value);
@@ -113,11 +134,27 @@ export function nightlyMlVerifierRunKey(now = new Date()): string {
   return `nightly-ml-verifier:${now.toISOString().slice(0, 10)}`;
 }
 
+function dailyRunKey(prefix: string, now = new Date()): string {
+  return `${prefix}:${now.toISOString().slice(0, 10)}`;
+}
+
+export function candleRefreshRunKey(now = new Date()): string {
+  return dailyRunKey("candle-refresh", now);
+}
+
+export function matchPricesBatchRunKey(now = new Date()): string {
+  return dailyRunKey("match-prices-batch", now);
+}
+
+export function computeScoresRunKey(now = new Date()): string {
+  return dailyRunKey("compute-scores", now);
+}
+
 export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
   readonly run: PipelineRun;
   readonly job: PipelineJob;
 }> {
-  if (input.signal) throwIfCronDeadlineExceeded(input.signal);
+  throwIfCronDeadlineExceeded(input.signal);
   const [run] = await query<PipelineRun>(
     `INSERT INTO pipeline_runs (run_key, type, status, updated_at)
      VALUES ($1, $2, 'queued', NOW())
@@ -129,7 +166,7 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
 
   if (!run) throw new Error("Failed to create or load pipeline run");
 
-  if (input.signal) throwIfCronDeadlineExceeded(input.signal);
+  throwIfCronDeadlineExceeded(input.signal);
   const [job] = await query<PipelineJob>(
     `INSERT INTO pipeline_jobs (
        run_id, type, status, priority, payload, max_attempts, idempotency_key, updated_at
@@ -150,7 +187,7 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
 
   if (!job) throw new Error("Failed to create or load pipeline job");
 
-  if (input.signal) throwIfCronDeadlineExceeded(input.signal);
+  throwIfCronDeadlineExceeded(input.signal);
   await appendPipelineJobEvent({
     runId: run.id,
     jobId: job.id,
@@ -182,6 +219,75 @@ export async function enqueueNightlyMlVerifierJob(input: {
       queued_by: "vercel-cron",
     },
     maxAttempts: 3,
+    signal: input.signal,
+  });
+}
+
+export async function enqueueCandleRefreshJob(input: {
+  readonly symbols?: readonly string[];
+  readonly maxRequestsPerSymbol?: number;
+  readonly now?: Date;
+  readonly signal?: AbortSignal;
+} = {}): Promise<{ readonly run: PipelineRun; readonly job: PipelineJob }> {
+  const runKey = candleRefreshRunKey(input.now);
+  return enqueuePipelineJob({
+    runKey,
+    runType: "candle-refresh",
+    jobType: "candle_refresh",
+    priority: 90,
+    idempotencyKey: runKey,
+    payload: {
+      symbols: input.symbols,
+      max_requests_per_symbol: input.maxRequestsPerSymbol ?? 25,
+      write: true,
+      queued_by: "vercel-cron",
+    },
+    maxAttempts: 3,
+    signal: input.signal,
+  });
+}
+
+export async function enqueueMatchPricesBatchJob(input: {
+  readonly limit?: number;
+  readonly batchSize?: number;
+  readonly startAfterId?: number;
+  readonly now?: Date;
+  readonly signal?: AbortSignal;
+} = {}): Promise<{ readonly run: PipelineRun; readonly job: PipelineJob }> {
+  const runKey = matchPricesBatchRunKey(input.now);
+  return enqueuePipelineJob({
+    runKey,
+    runType: "match-prices-batch",
+    jobType: "match_prices_batch",
+    priority: 80,
+    idempotencyKey: runKey,
+    payload: {
+      limit: input.limit ?? DEFAULT_MATCH_PRICES_LIMIT,
+      batch_size: input.batchSize ?? DEFAULT_MATCH_PRICES_BATCH_SIZE,
+      start_after_id: input.startAfterId ?? 0,
+      rematch_all: false,
+      queued_by: "vercel-cron",
+    },
+    maxAttempts: 3,
+    signal: input.signal,
+  });
+}
+
+export async function enqueueComputeScoresJob(input: {
+  readonly now?: Date;
+  readonly signal?: AbortSignal;
+} = {}): Promise<{ readonly run: PipelineRun; readonly job: PipelineJob }> {
+  const runKey = computeScoresRunKey(input.now);
+  return enqueuePipelineJob({
+    runKey,
+    runType: "compute-scores",
+    jobType: "compute_scores",
+    priority: 70,
+    idempotencyKey: runKey,
+    payload: {
+      queued_by: "vercel-cron",
+    },
+    maxAttempts: 2,
     signal: input.signal,
   });
 }
@@ -343,9 +449,48 @@ export async function retryOrFailPipelineJob(
   return { retrying, backoffSeconds };
 }
 
+interface CandleFreshnessRow {
+  readonly symbol: string;
+  readonly candle_count: number | string;
+  readonly latest_open_time_ms: string | number | null;
+}
+
+function normalizeCandleFreshness(
+  rows: readonly CandleFreshnessRow[],
+  nowMs = Date.now(),
+): readonly CandleFreshness[] {
+  const bySymbol = new Map(rows.map((row) => [row.symbol.toUpperCase(), row]));
+  return CANDLE_FRESHNESS_SYMBOLS.map((symbol) => {
+    const row = bySymbol.get(symbol);
+    const latestOpenTime = row?.latest_open_time_ms === null || row?.latest_open_time_ms === undefined
+      ? null
+      : Number(row.latest_open_time_ms);
+    const stalenessSeconds = latestOpenTime === null || !Number.isFinite(latestOpenTime)
+      ? null
+      : Math.max(0, Math.floor((nowMs - latestOpenTime) / 1000));
+    const status = stalenessSeconds === null
+      ? "missing"
+      : stalenessSeconds <= FRESH_CANDLE_SECONDS
+        ? "fresh"
+        : "stale";
+    return {
+      symbol,
+      candle_count: Number(row?.candle_count ?? 0),
+      latest_open_time_ms: latestOpenTime === null || !Number.isFinite(latestOpenTime)
+        ? null
+        : String(latestOpenTime),
+      latest_candle_at: latestOpenTime === null || !Number.isFinite(latestOpenTime)
+        ? null
+        : new Date(latestOpenTime).toISOString(),
+      staleness_seconds: stalenessSeconds,
+      status,
+    };
+  });
+}
+
 export async function getPipelineStatusSnapshot(limit = 20): Promise<PipelineStatusSnapshot> {
   const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
-  const [runs, jobs, events] = await Promise.all([
+  const [runs, jobs, events, stuckJobs, candleFreshnessRows] = await Promise.all([
     query<PipelineRun>(
       `SELECT * FROM pipeline_runs
        ORDER BY created_at DESC
@@ -364,11 +509,33 @@ export async function getPipelineStatusSnapshot(limit = 20): Promise<PipelineSta
        LIMIT $1`,
       [safeLimit * 3],
     ),
+    query<PipelineStuckJob>(
+      `SELECT *,
+              EXTRACT(EPOCH FROM (NOW() - locked_at))::int AS stuck_seconds
+       FROM pipeline_jobs
+       WHERE status = 'running'
+         AND locked_at IS NOT NULL
+         AND locked_at <= NOW() - ($1::int * INTERVAL '1 second')
+       ORDER BY locked_at ASC
+       LIMIT $2`,
+      [DEFAULT_STUCK_JOB_SECONDS, safeLimit],
+    ),
+    query<CandleFreshnessRow>(
+      `SELECT symbol,
+              COUNT(*)::int AS candle_count,
+              MAX(open_time)::text AS latest_open_time_ms
+       FROM candles
+       WHERE symbol = ANY($1::text[])
+       GROUP BY symbol`,
+      [CANDLE_FRESHNESS_SYMBOLS],
+    ),
   ]);
 
   return {
     runs: runs.map(normalizeRun),
     jobs: jobs.map(normalizeJob),
     events: events.map(normalizeEvent),
+    stuck_jobs: stuckJobs.map((job) => ({ ...normalizeJob(job), stuck_seconds: job.stuck_seconds })),
+    candle_freshness: normalizeCandleFreshness(candleFreshnessRows),
   };
 }

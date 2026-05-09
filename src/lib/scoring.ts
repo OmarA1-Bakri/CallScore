@@ -431,24 +431,25 @@ export function didHitTarget(
 ): boolean {
   if (targetPrice === null || !Number.isFinite(targetPrice)) return false;
   if (stopLoss !== null && !Number.isFinite(stopLoss)) return false;
-  const finiteStopLoss = stopLoss;
 
   if (direction === "bullish" && highBetween !== null && Number.isFinite(highBetween)) {
     const targetHit = highBetween >= targetPrice;
+    if (stopLoss !== null && (lowBetween === null || !Number.isFinite(lowBetween))) return false;
     const stopHit =
-      finiteStopLoss !== null &&
+      stopLoss !== null &&
       lowBetween !== null &&
       Number.isFinite(lowBetween) &&
-      lowBetween <= finiteStopLoss;
+      lowBetween <= stopLoss;
     return targetHit && !stopHit;
   }
   if (direction === "bearish" && lowBetween !== null && Number.isFinite(lowBetween)) {
     const targetHit = lowBetween <= targetPrice;
+    if (stopLoss !== null && (highBetween === null || !Number.isFinite(highBetween))) return false;
     const stopHit =
-      finiteStopLoss !== null &&
+      stopLoss !== null &&
       highBetween !== null &&
       Number.isFinite(highBetween) &&
-      highBetween >= finiteStopLoss;
+      highBetween >= stopLoss;
     return targetHit && !stopHit;
   }
   return false;

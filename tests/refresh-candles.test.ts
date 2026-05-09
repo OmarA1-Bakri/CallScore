@@ -68,5 +68,5 @@ test("candle open_time guard accepts milliseconds and rejects seconds", () => {
 
 test("candle constraint validation audits invalid legacy rows before ALTER VALIDATE", () => {
   assert.match(INVALID_CANDLE_OPEN_TIME_SQL, /COUNT\(\*\)::bigint AS invalid_count/i);
-  assert.match(INVALID_CANDLE_OPEN_TIME_SQL, /open_time <= \$1 OR open_time >= \$2/i);
+  assert.match(INVALID_CANDLE_OPEN_TIME_SQL, /open_time < \$1 OR open_time > \$2/i);
 });

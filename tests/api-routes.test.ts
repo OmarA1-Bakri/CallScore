@@ -7,30 +7,6 @@ const root = join(__dirname, "..");
 
 const apiContracts = [
   {
-    surface: "Header sign-in",
-    file: "src/components/Header.tsx",
-    literal: "/api/auth/whop",
-    route: "src/app/api/auth/whop/route.ts",
-  },
-  {
-    surface: "Header logout",
-    file: "src/components/Header.tsx",
-    literal: "/api/auth/logout",
-    route: "src/app/api/auth/logout/route.ts",
-  },
-  {
-    surface: "Mobile sign-in",
-    file: "src/components/MobileMenu.tsx",
-    literal: "/api/auth/whop",
-    route: "src/app/api/auth/whop/route.ts",
-  },
-  {
-    surface: "Mobile logout",
-    file: "src/components/MobileMenu.tsx",
-    literal: "/api/auth/logout",
-    route: "src/app/api/auth/logout/route.ts",
-  },
-  {
     surface: "Feedback form",
     file: "src/app/feedback/page.tsx",
     literal: "/api/feedback",
@@ -131,6 +107,24 @@ test("frontend API links have matching app routes", () => {
   }
 });
 
+test("Whop app-visible surfaces do not link to standalone auth routes", () => {
+  for (const file of [
+    "src/components/Header.tsx",
+    "src/components/MobileMenu.tsx",
+    "src/app/settings/account/page.tsx",
+    "src/app/settings/billing/page.tsx",
+    "src/app/settings/alerts/page.tsx",
+    "src/app/settings/api/page.tsx",
+    "src/app/settings/webhooks/page.tsx",
+    "src/app/settings/notifications/page.tsx",
+    "src/app/settings/team/page.tsx",
+  ]) {
+    const source = readFileSync(join(root, file), "utf8");
+    assert.doesNotMatch(source, /\/api\/auth\/whop/, `${file} links to local Whop OAuth`);
+    assert.doesNotMatch(source, /\/api\/auth\/logout/, `${file} links to local logout`);
+  }
+});
+
 test("feedback surface and route stay aligned on evidence fields", () => {
   const pageSource = readFileSync(join(root, "src/app/feedback/page.tsx"), "utf8");
   const routeSource = readFileSync(join(root, "src/app/api/feedback/route.ts"), "utf8");
@@ -146,9 +140,9 @@ test("mutable API inputs use Zod safeParse validation", () => {
   const feedbackRoute = readFileSync(join(root, "src/app/api/feedback/route.ts"), "utf8");
   const backtestRoute = readFileSync(join(root, "src/app/api/backtest/route.ts"), "utf8");
 
-  assert.match(feedbackRoute, /from "zod"/);
+  assert.match(feedbackRoute, /from ["']zod["']/);
   assert.match(feedbackRoute, /feedbackPayloadSchema\.safeParse/);
-  assert.match(backtestRoute, /from "zod"/);
+  assert.match(backtestRoute, /from ["']zod["']/);
   assert.match(backtestRoute, /portfolioQuerySchema\.safeParse/);
 });
 
@@ -172,4 +166,10 @@ test("public leaderboard API route preserves documented response envelope", () =
   assert.match(source, /meta:\s*\{/);
   assert.match(source, /period/);
   assert.match(source, /updated_at/);
+});
+
+test("public leaderboard API display ranks are sequential after public filtering", () => {
+  const source = readFileSync(join(root, "src/app/api/leaderboard/route.ts"), "utf8");
+  assert.match(source, /const rank = index \+ 1;/);
+  assert.doesNotMatch(source, /const rank = row\.accuracy_rank \?\? index \+ 1;/);
 });

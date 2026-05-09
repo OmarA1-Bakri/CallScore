@@ -7,21 +7,31 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
+const DEFAULT_BATCH_SIZE = 250;
+
 function positiveInt(value: unknown, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
 async function readBatchSize(request: NextRequest): Promise<number> {
-  const fromQuery = request.nextUrl.searchParams.get("batch_size");
-  if (fromQuery) return positiveInt(fromQuery, 250);
+  const rawBatchSize = getQueryBatchSize(request) ?? await getBodyBatchSize(request);
+  return positiveInt(rawBatchSize, DEFAULT_BATCH_SIZE);
+}
 
-  if (request.method !== "POST") return 250;
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.includes("application/json")) return 250;
+function getQueryBatchSize(request: NextRequest): string | null {
+  return request.nextUrl.searchParams.get("batch_size");
+}
 
+async function getBodyBatchSize(request: NextRequest): Promise<unknown> {
+  if (!hasJsonBody(request)) return null;
   const body = await request.json().catch(() => ({})) as { batch_size?: unknown; batchSize?: unknown };
-  return positiveInt(body.batch_size ?? body.batchSize, 250);
+  return body.batch_size ?? body.batchSize ?? null;
+}
+
+function hasJsonBody(request: NextRequest): boolean {
+  const contentType = request.headers.get("content-type") ?? "";
+  return request.method === "POST" && contentType.includes("application/json");
 }
 
 async function enqueue(request: NextRequest): Promise<NextResponse> {
@@ -29,7 +39,10 @@ async function enqueue(request: NextRequest): Promise<NextResponse> {
 
   const batchSize = await readBatchSize(request);
   const deadlineSignal = createCronDeadlineSignal();
-  const deadlineResult = await withCronDeadline(enqueueNightlyMlVerifierJob({ batchSize, signal: deadlineSignal }), deadlineSignal);
+  const deadlineResult = await withCronDeadline(
+    (signal) => enqueueNightlyMlVerifierJob({ batchSize, signal }),
+    deadlineSignal,
+  );
   if (!deadlineResult.completed) {
     return NextResponse.json(
       { ok: false, deadline_exceeded: true, message: "ML enqueue exceeded cron deadline" },

@@ -88,6 +88,8 @@ test("API row schemas coerce DB numerics and reject malformed enum values", () =
     last_scraped_at: null,
   }, "creator");
   assert.equal(creator.id, 7);
+  // The public API contract uses a stable epoch default when DB rows predate
+  // creator.created_at backfill data.
   assert.equal(creator.created_at, "1970-01-01T00:00:00.000Z");
 
   const leaderboard = parseApiRow(leaderboardQueryRowSchema, {

@@ -129,6 +129,15 @@ interface TransactionCapableDb {
   ): Promise<readonly T[]>;
 }
 
+function isTransactionCapableDb(db: unknown): db is TransactionCapableDb {
+  return Boolean(
+    db &&
+      typeof db === "object" &&
+      "transaction" in db &&
+      typeof (db as { transaction?: unknown }).transaction === "function",
+  );
+}
+
 export async function executeStatementsInTransaction(
   db: TransactionCapableDb,
   statements: readonly SqlStatement[],
@@ -142,8 +151,11 @@ export async function replaceStoredCallsForVideo(
   options: ReplaceVideoCallsOptions,
 ): Promise<void> {
   const db = getDb();
+  if (!isTransactionCapableDb(db)) {
+    throw new Error("Database client does not support transaction(callback)");
+  }
   await executeStatementsInTransaction(
-    db as unknown as TransactionCapableDb,
+    db,
     buildReplaceStoredCallsStatements(options),
   );
 }

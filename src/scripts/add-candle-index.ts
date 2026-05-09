@@ -33,6 +33,18 @@ async function main(): Promise<void> {
     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_candles_lookup ON candles(symbol, open_time DESC)",
   );
 
+  const legacyIndexes = await query<{ indexname: string }>(
+    "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1",
+    ["idx_candles_symbol_time"],
+  );
+  if (legacyIndexes.length > 0) {
+    try {
+      await query("DROP INDEX CONCURRENTLY idx_candles_symbol_time");
+    } catch (err) {
+      console.warn("WARN: drop of legacy idx_candles_symbol_time failed:", err);
+    }
+  }
+
   console.log("Index created successfully!");
   process.exit(0);
 }

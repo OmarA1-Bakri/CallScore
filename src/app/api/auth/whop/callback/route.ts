@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth";
-import { getUserTier } from "@/lib/whop";
+import { getUserTier } from "@/lib/whop-access";
 
 const OAUTH_STATE_COOKIE_NAME = "ctr_oauth_state";
 

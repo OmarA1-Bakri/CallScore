@@ -9,7 +9,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!verifyCronSecret(request)) return cronUnauthorized();
   const batch = Number(request.nextUrl.searchParams.get("batch") ?? process.env.ALERTS_CLAIM_BATCH ?? 500);
   const deadlineSignal = createCronDeadlineSignal();
-  const deadlineResult = await withCronDeadline(runAlertSend(Number.isFinite(batch) ? batch : 500, { signal: deadlineSignal }), deadlineSignal);
+  const deadlineResult = await withCronDeadline(
+    (signal) => runAlertSend(Number.isFinite(batch) ? batch : 500, { signal }),
+    deadlineSignal,
+  );
   if (!deadlineResult.completed) {
     return NextResponse.json(
       { ok: false, deadline_exceeded: true, message: "alert send exceeded cron deadline" },

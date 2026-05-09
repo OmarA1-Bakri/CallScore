@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { query } from "@/lib/db";
 import {
   CONSENSUS_MIN_CREATORS,
@@ -22,6 +23,9 @@ interface CreatorRow {
   readonly last_scraped_at: string | null;
 }
 
+const CREATOR_STALE_THRESHOLD_DAYS = 7;
+const CREATOR_STALE_THRESHOLD_MS = CREATOR_STALE_THRESHOLD_DAYS * 86_400_000;
+
 function verifyCronSecret(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return false;
@@ -29,13 +33,16 @@ function verifyCronSecret(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) return false;
 
-  return authHeader.slice(7) === cronSecret;
+  const provided = Buffer.from(authHeader.slice(7), "utf8");
+  const expected = Buffer.from(cronSecret, "utf8");
+  if (provided.length !== expected.length) return false;
+  return timingSafeEqual(provided, expected);
 }
 
-async function stepCheckNewVideos(signal?: AbortSignal): Promise<StepResult> {
+async function stepCheckStaleCreators(signal?: AbortSignal): Promise<StepResult> {
   const start = Date.now();
 
-  if (signal) throwIfCronDeadlineExceeded(signal);
+  throwIfCronDeadlineExceeded(signal);
   const creators = await query<CreatorRow>(
     `SELECT id, name, youtube_channel_id, last_scraped_at
      FROM creators
@@ -43,28 +50,27 @@ async function stepCheckNewVideos(signal?: AbortSignal): Promise<StepResult> {
      ORDER BY last_scraped_at ASC NULLS FIRST`,
   );
 
-  if (signal) throwIfCronDeadlineExceeded(signal);
+  throwIfCronDeadlineExceeded(signal);
 
   const staleCreators = creators.filter((c) => {
     if (c.last_scraped_at === null) return true;
     const lastScraped = new Date(c.last_scraped_at).getTime();
-    const oneWeekAgo = Date.now() - 7 * 86_400_000;
-    return lastScraped < oneWeekAgo;
+    return lastScraped < Date.now() - CREATOR_STALE_THRESHOLD_MS;
   });
 
   return {
-    step: "check_new_videos",
-    status: "skipped",
-    message: `Found ${staleCreators.length} creators needing scrape. Run scraper script separately.`,
+    step: "check_stale_creators",
+    status: "completed",
+    message: `Detected ${staleCreators.length} stale creators; scraping should be run separately.`,
     duration_ms: Date.now() - start,
   };
 }
 
 async function stepRecomputeStats(signal?: AbortSignal): Promise<StepResult> {
   const start = Date.now();
-  if (signal) throwIfCronDeadlineExceeded(signal);
+  throwIfCronDeadlineExceeded(signal);
   await recomputeAllStats();
-  if (signal) throwIfCronDeadlineExceeded(signal);
+  throwIfCronDeadlineExceeded(signal);
 
   return {
     step: "recompute_stats",
@@ -76,12 +82,12 @@ async function stepRecomputeStats(signal?: AbortSignal): Promise<StepResult> {
 
 async function stepUpdateRankings(signal?: AbortSignal): Promise<StepResult> {
   const start = Date.now();
-  if (signal) throwIfCronDeadlineExceeded(signal);
+  throwIfCronDeadlineExceeded(signal);
 
   return {
     step: "update_rankings",
-    status: "completed",
-    message: "Rankings synced from the shared public methodology pipeline",
+    status: "skipped",
+    message: "No ranking sync implemented in this job; skipped.",
     duration_ms: Date.now() - start,
   };
 }
@@ -89,11 +95,27 @@ async function stepUpdateRankings(signal?: AbortSignal): Promise<StepResult> {
 async function stepDetectConsensus(signal?: AbortSignal): Promise<StepResult> {
   const start = Date.now();
 
-  if (signal) throwIfCronDeadlineExceeded(signal);
+  throwIfCronDeadlineExceeded(signal);
   await query(
     `INSERT INTO consensus_signals (
       symbol, direction, creator_count, creator_ids, call_ids,
       signal_date, price_at_signal, created_at
+    )
+    WITH eligible_calls AS (
+      SELECT cl.id, cl.symbol, cl.direction, cl.creator_id, cl.call_date, cl.price_at_call
+      FROM calls cl
+      JOIN creators c ON c.id = cl.creator_id
+      WHERE cl.call_date >= NOW() - make_interval(days => $1)
+        AND cl.direction IN ('bullish', 'bearish')
+        AND cl.extraction_confidence >= $3
+        AND c.accuracy_rank IS NOT NULL
+        AND c.accuracy_rank <= 10
+    ), latest_prices AS (
+      SELECT DISTINCT ON (symbol, direction)
+        symbol, direction, price_at_call
+      FROM eligible_calls
+      WHERE price_at_call IS NOT NULL
+      ORDER BY symbol, direction, call_date DESC, id DESC
     )
     SELECT
       cl.symbol,
@@ -102,24 +124,22 @@ async function stepDetectConsensus(signal?: AbortSignal): Promise<StepResult> {
       array_agg(DISTINCT cl.creator_id) AS creator_ids,
       array_agg(cl.id) AS call_ids,
       MAX(cl.call_date) AS signal_date,
-      (SELECT cl2.price_at_call FROM calls cl2
-       WHERE cl2.symbol = cl.symbol
-       ORDER BY cl2.call_date DESC LIMIT 1) AS price_at_signal,
+      lp.price_at_call AS price_at_signal,
       NOW() AS created_at
-    FROM calls cl
-    JOIN creators c ON c.id = cl.creator_id
-    WHERE cl.call_date >= NOW() - make_interval(days => $1)
-      AND cl.direction IN ('bullish', 'bearish')
-      AND cl.extraction_confidence >= $3
-      AND c.accuracy_rank IS NOT NULL
-      AND c.accuracy_rank <= 10
-    GROUP BY cl.symbol, cl.direction
+    FROM eligible_calls cl
+    LEFT JOIN latest_prices lp
+      ON lp.symbol = cl.symbol
+     AND lp.direction = cl.direction
+    GROUP BY cl.symbol, cl.direction, lp.price_at_call
     HAVING COUNT(DISTINCT cl.creator_id) >= $2
+    -- consensus_signals has no unique constraint today, so this clause is a
+    -- defensive no-op. Kept for forward-compatibility with a future unique
+    -- index on (symbol, direction, signal_date::date).
     ON CONFLICT DO NOTHING`,
     [CONSENSUS_WINDOW_DAYS, CONSENSUS_MIN_CREATORS, EXTRACTION_CONFIDENCE_THRESHOLD],
   );
 
-  if (signal) throwIfCronDeadlineExceeded(signal);
+  throwIfCronDeadlineExceeded(signal);
 
   return {
     step: "detect_consensus",
@@ -138,11 +158,29 @@ interface WeeklyCronOptions {
 }
 
 const defaultWeeklySteps: readonly WeeklyStep[] = [
-  stepCheckNewVideos,
+  stepCheckStaleCreators,
   stepRecomputeStats,
   stepUpdateRankings,
   stepDetectConsensus,
 ];
+
+function deadlineExceededResponse(
+  stepsCompleted: StepResult[],
+  durationMs: number,
+): NextResponse {
+  return NextResponse.json(
+    {
+      error: "Cron deadline exceeded",
+      data: {
+        success: false,
+        deadline_exceeded: true,
+        steps_completed: stepsCompleted,
+        duration_ms: durationMs,
+      },
+    },
+    { status: 503 },
+  );
+}
 
 export async function runWeeklyCron(
   request: NextRequest,
@@ -165,18 +203,7 @@ export async function runWeeklyCron(
 
     for (const step of steps) {
       if (isCronDeadlineExceeded(deadlineSignal)) {
-        return NextResponse.json(
-          {
-            error: "Cron deadline exceeded",
-            data: {
-              success: false,
-              deadline_exceeded: true,
-              steps_completed: stepsCompleted,
-              duration_ms: now() - startTime,
-            },
-          },
-          { status: 503 },
-        );
+        return deadlineExceededResponse(stepsCompleted, now() - startTime);
       }
 
       stepsCompleted.push(await step(deadlineSignal));
@@ -191,18 +218,7 @@ export async function runWeeklyCron(
     });
   } catch (error: unknown) {
     if (isCronDeadlineExceeded(deadlineSignal)) {
-      return NextResponse.json(
-        {
-          error: "Cron deadline exceeded",
-          data: {
-            success: false,
-            deadline_exceeded: true,
-            steps_completed: stepsCompleted,
-            duration_ms: now() - startTime,
-          },
-        },
-        { status: 503 },
-      );
+      return deadlineExceededResponse(stepsCompleted, now() - startTime);
     }
 
     const message =

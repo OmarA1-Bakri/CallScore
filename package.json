@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/**/*.test.ts",
+    "test:settings": "node --import tsx --test tests/pages-cross-cutting.test.ts tests/components-no-rounded.test.ts tests/components-no-lucide-decoration.test.ts tests/api-routes.test.ts tests/alerts.test.ts",
     "seed": "node --import tsx src/scripts/seed-creators.ts",
     "scrape": "node --import tsx src/scripts/scrape-transcripts-v2.ts",
     "scrape:v2": "node --import tsx src/scripts/scrape-transcripts-v2.ts",
@@ -50,6 +51,7 @@
     "@google/generative-ai": "^0.24.1",
     "@neondatabase/serverless": "^0.10.0",
     "@sentry/node": "^10.51.0",
+    "@whop/sdk": "^0.0.38",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.14.0",
     "next": "^15.5.15",
@@ -65,10 +67,13 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.15",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.10",
     "tailwindcss": "^3.4.16",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   },
   "engines": {
     "node": "20.x"

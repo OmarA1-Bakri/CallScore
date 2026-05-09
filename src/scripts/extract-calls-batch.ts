@@ -15,6 +15,7 @@ export function mapLegacyBatchArgs(argv: readonly string[]): string[] {
     const arg = argv[index];
     if (UNSUPPORTED_LEGACY_VALUE_FLAGS.has(arg)) {
       ignored.push(arg);
+      // Skip the legacy flag and its value; the loop increment handles the next index even if the value is absent.
       index += 1;
       continue;
     }

@@ -33,13 +33,17 @@ test("MobileMenu.tsx is the client island", () => {
   assert.match(mobileMenuSrc, /^\s*["']use client["']/m);
 });
 
-test("header auth redirects use canonical masthead typography", () => {
-  assert.match(headerSrc, />\s*SIGN IN\s*</);
+test("header omits standalone auth redirects in the Whop app surface", () => {
+  assert.doesNotMatch(headerSrc, /\/api\/auth\/whop/);
+  assert.doesNotMatch(headerSrc, /\/api\/auth\/logout/);
+  assert.doesNotMatch(headerSrc, />\s*SIGN IN\s*</);
+  assert.doesNotMatch(headerSrc, />\s*LOGOUT\s*</);
   assert.match(headerSrc, />\s*GET ACCESS\s*</);
   assert.doesNotMatch(headerSrc, />\s*Sign In\s*</);
+  assert.doesNotMatch(headerSrc, />\s*Logout\s*</);
   assert.doesNotMatch(headerSrc, />\s*Get Access\s*</);
   assert.doesNotMatch(headerSrc, /\bh-24\b/);
-  assert.doesNotMatch(headerSrc, /bg-accent\s/);
+  assert.doesNotMatch(headerSrc, /(?:^|\s)bg-accent(?:\s|$)/);
 });
 
 test("paid product surfaces do not sit in the primary desktop nav", () => {
@@ -48,9 +52,13 @@ test("paid product surfaces do not sit in the primary desktop nav", () => {
   assert.doesNotMatch(headerSrc, />\s*BACKTEST LAB\s*</);
 });
 
-test("mobile menu redirect labels match canonical masthead labels", () => {
-  assert.match(mobileMenuSrc, />\s*SIGN IN\s*</);
+test("mobile menu omits standalone auth redirects in the Whop app surface", () => {
+  assert.doesNotMatch(mobileMenuSrc, /\/api\/auth\/whop/);
+  assert.doesNotMatch(mobileMenuSrc, /\/api\/auth\/logout/);
+  assert.doesNotMatch(mobileMenuSrc, />\s*SIGN IN\s*</);
+  assert.doesNotMatch(mobileMenuSrc, />\s*LOGOUT\s*</);
   assert.match(mobileMenuSrc, />\s*GET ACCESS\s*</);
   assert.doesNotMatch(mobileMenuSrc, />\s*Sign In\s*</);
+  assert.doesNotMatch(mobileMenuSrc, />\s*Logout\s*</);
   assert.doesNotMatch(mobileMenuSrc, />\s*Get Access\s*</);
 });

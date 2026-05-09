@@ -163,6 +163,16 @@ export default async function CallDetailPage({ params }: PageProps) {
       : serializedCall.is_live_open
         ? "live return"
         : "30d return";
+  const performanceTitle = serializedCall.return_30d !== null
+    ? <><em className="italic text-accent">Performance</em> over 30 days.</>
+    : showLivePerformance
+      ? <><em className="italic text-accent">Live</em> performance.</>
+      : <><em className="italic text-accent">Performance</em> pending.</>;
+  const performanceMeta = serializedCall.return_30d !== null
+    ? <>price vs BTC benchmark<br />window: call date → +30d</>
+    : showLivePerformance
+      ? <>price vs BTC benchmark<br />window: call date → latest candle</>
+      : <>price vs BTC benchmark<br />window pending</>;
 
   return (
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-12">
@@ -225,20 +235,8 @@ export default async function CallDetailPage({ params }: PageProps) {
       {/* 02 — performance */}
       <EditorialSection
         index="02"
-        title={
-          serializedCall.return_30d !== null
-            ? <><em className="italic text-accent">Performance</em> over 30 days.</>
-            : showLivePerformance
-              ? <><em className="italic text-accent">Live</em> performance.</>
-              : <><em className="italic text-accent">Performance</em> pending.</>
-        }
-        meta={
-          serializedCall.return_30d !== null
-            ? <>price vs BTC benchmark<br />window: call date → +30d</>
-            : showLivePerformance
-              ? <>price vs BTC benchmark<br />window: call date → latest candle</>
-              : <>price vs BTC benchmark<br />window pending</>
-        }
+        title={performanceTitle}
+        meta={performanceMeta}
       >
         {serializedCall.return_30d !== null ? (
           <dl className="grid grid-cols-2 tab:grid-cols-3 gap-[18px]">

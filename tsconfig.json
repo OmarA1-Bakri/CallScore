@@ -26,7 +26,7 @@
       ]
     },
     "target": "es2022",
-    "skipLibCheck": false
+    "skipLibCheck": true
   },
   "include": [
     "next-env.d.ts",

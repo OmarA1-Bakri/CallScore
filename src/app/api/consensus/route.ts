@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { captureApiException } from "@/lib/monitoring";
 import { query } from "@/lib/db";
-import { getUserTier, hasAccess } from "@/lib/whop";
+import { hasAccess } from "@/lib/whop";
+import { getUserTier } from "@/lib/whop-access";
 import { getRequestAuthContext } from "@/lib/auth";
 import type { ConsensusSignal } from "@/lib/types";
 

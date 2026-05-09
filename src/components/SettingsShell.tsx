@@ -185,7 +185,7 @@ export default function SettingsShell({
                 const content = (
                   <>
                     <span>{item.label}</span>
-                    <span className="text-[9px] text-ink-600">{item.meta}</span>
+                    <span className="text-[10px] text-ink-600">{item.meta}</span>
                   </>
                 );
                 return (

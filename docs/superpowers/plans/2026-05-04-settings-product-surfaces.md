@@ -29,7 +29,7 @@
 
 - [ ] Expand settings IA from isolated tabs into a management shell with status summary.
 - [ ] Preserve Alerts/API/Webhooks routing.
-- [ ] Add account, billing, and notifications rows as visible IA, marked planned where no backend route exists.
+- [ ] Add account, billing, and notifications rows as visible IA, marked planned where no backend route exists. Planned rows must use muted/disabled styling plus a `Planned` badge, expose a tooltip or accessible description explaining that no backend route exists, set non-interactive semantics such as `aria-disabled` and `aria-describedby`, and have click/tap handlers early-return before navigation or API work.
 - [ ] Keep mobile horizontal tab behavior and desktop sidebar behavior.
 
 ### Task 3: Alerts / Watchlist UI
@@ -49,7 +49,7 @@
 - Modify: `src/app/settings/api/page.tsx`
 - Modify: `src/app/api/api-keys/route.ts`
 
-- [ ] Replace raw JSON form create response with a redirect carrying one-time secret fields in the URL.
+- [ ] Replace raw JSON form create response with a server-side one-time reveal flow for browser submissions: store the generated secret behind a short-lived, single-use token or httpOnly reveal cookie, redirect only with the token/state, then retrieve and clear the secret on first display. Do not place API keys in query parameters or Referer-visible URLs.
 - [ ] Add first-key reveal panel, copyable text field, endpoint docs, examples, scopes, rate limits, and key activity table.
 - [ ] Preserve JSON create/revoke behavior for programmatic callers.
 
@@ -60,7 +60,7 @@
 - Modify: `src/app/settings/webhooks/page.tsx`
 - Modify: `src/app/api/webhooks/route.ts`
 
-- [ ] Return the signing secret once on create, through redirect params for browser form submissions.
+- [ ] Return the signing secret once on create through the same server-side one-time reveal flow used for API keys. Programmatic JSON callers keep receiving the secret in the response body; browser redirects must never carry webhook signing secrets in the URL.
 - [ ] Add latest delivery rows and last-delivered status.
 - [ ] Add test webhook action that records a test delivery through the existing delivery pipeline.
 - [ ] Show event schema, retry contract, failure state, and event table.
@@ -86,7 +86,7 @@
 
 **Commands:**
 - `npm run typecheck`
-- `node --import tsx --test tests/pages-cross-cutting.test.ts tests/components-no-rounded.test.ts tests/components-no-lucide-decoration.test.ts tests/api-routes.test.ts tests/alerts.test.ts`
+- `npm run test:settings`
 - `npm run build`
 
 - [ ] Run focused tests after edits.

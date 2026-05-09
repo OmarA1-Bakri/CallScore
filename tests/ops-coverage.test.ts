@@ -11,29 +11,34 @@ import { readBootstrapProducts } from "../src/scripts/bootstrap-whop";
 
 const root = join(__dirname, "..");
 
+type NextConfigType = {
+  headers: () => Promise<readonly { source: string; headers: readonly { key: string; value: string }[] }[]>;
+};
+
 function read(relativePath: string): string {
   return readFileSync(join(root, relativePath), "utf8");
 }
 
 test("global security headers include a restrictive CSP", async () => {
-  const nextConfig = (await import("../next.config.js")).default as {
-    headers: () => Promise<readonly { source: string; headers: readonly { key: string; value: string }[] }[]>;
-  };
+  const nextConfig = (await import("../next.config.js")).default as NextConfigType;
   const headersConfig = await nextConfig.headers();
   const globalHeaders = headersConfig.find((entry: { source: string }) => entry.source === "/:path*");
   assert.ok(globalHeaders, "expected global /:path* headers");
   const headers = new Map(
     globalHeaders.headers.map((header: { key: string; value: string }) => [header.key, header.value]),
   );
-  const csp = headers.get("Content-Security-Policy");
+  const middleware = read("middleware.ts");
 
   assert.equal(headers.get("X-Content-Type-Options"), "nosniff");
-  assert.ok(csp, "Content-Security-Policy header is required");
-  assert.match(csp, /default-src 'self'/);
-  assert.match(csp, /object-src 'none'/);
-  assert.match(csp, /frame-ancestors https:\/\/whop\.com https:\/\/\*\.whop\.com/);
-  assert.match(csp, /base-uri 'self'/);
-  assert.doesNotMatch(csp, /\n/);
+  assert.match(middleware, /Content-Security-Policy/);
+  assert.match(middleware, /default-src 'self'/);
+  assert.match(middleware, /object-src 'none'/);
+  assert.match(middleware, /frame-ancestors 'self' https:\/\/whop\.com https:\/\/\*\.whop\.com/);
+  assert.match(middleware, /base-uri 'self'/);
+  assert.match(middleware, /manifest-src 'self'/);
+  assert.match(middleware, /worker-src 'self' blob:/);
+  assert.match(middleware, /media-src 'self' data: blob:/);
+  assert.doesNotMatch(middleware, /script-src[^`\n]*'unsafe-inline'/);
 });
 
 test("CI workflow gates lint, typecheck, tests, and build", () => {
@@ -56,7 +61,7 @@ test("core production pipeline scripts use structured logger instead of console"
   ]) {
     const src = read(file);
     assert.match(src, /createLogger/);
-    assert.doesNotMatch(src, /console\.(log|warn|error)/, `${file} should log through createLogger`);
+    assert.doesNotMatch(src, /\bconsole\.(log|warn|error|info|debug|trace|dir|table)\b/, `${file} should log through createLogger`);
   }
 });
 

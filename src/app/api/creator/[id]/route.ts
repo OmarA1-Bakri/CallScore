@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
+import { getCreatorTier } from "@/lib/creator-tier";
+import { hasAccess } from "@/lib/whop";
+import { getUserTier } from "@/lib/whop-access";
 import { serializeCalls } from "@/lib/public-serializer";
 import { getRequestAuthContext } from "@/lib/auth";
 import { getJudgmentWindowSql } from "@/lib/judgment-window";

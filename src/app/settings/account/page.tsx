@@ -16,7 +16,7 @@ export default async function AccountSettingsPage() {
     <SettingsShell
       active="account"
       title="Account"
-      description="Inspect the active session, confirm the current plan, and jump to access or support actions without exposing secrets."
+      description="Inspect Whop-managed access, confirm the current plan, and jump to billing or support actions without exposing secrets."
       tier={tier}
       primaryAction={{
         label:
@@ -33,15 +33,14 @@ export default async function AccountSettingsPage() {
               : "/api/checkout/pro",
       }}
       secondaryAction={{
-        label: session ? "Billing" : "Sign in",
-        href: session ? "/settings/billing" : "/api/auth/whop",
-        prefetch: session ? undefined : false,
+        label: "Billing",
+        href: "/settings/billing",
       }}
       status={[
         {
-          label: "Session",
-          value: session ? "Signed in" : "Signed out",
-          tone: session ? "good" : "warn",
+          label: "Identity",
+          value: session ? "Whop-Verified" : "Whop-Managed",
+          tone: session ? "good" : "neutral",
         },
         {
           label: "Plan",
@@ -49,9 +48,9 @@ export default async function AccountSettingsPage() {
           tone: tier && tier !== "free" ? "good" : "neutral",
         },
         {
-          label: "Token",
-          value: session ? "Present / redacted" : "None",
-          tone: session ? "good" : "warn",
+          label: "Access",
+          value: session ? "Verified / Redacted" : "Attached by Whop",
+          tone: session ? "good" : "neutral",
         },
       ]}
     >
@@ -64,7 +63,7 @@ export default async function AccountSettingsPage() {
             <dl className="mt-4 space-y-3 font-mono text-[12px]">
               <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
                 <dt className="uppercase tracking-caps text-ink-500">User id</dt>
-                <dd className="text-right text-ink-800">{session?.userId ?? "guest"}</dd>
+                <dd className="text-right text-ink-800">{session?.userId ?? "Whop-Managed"}</dd>
               </div>
               <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
                 <dt className="uppercase tracking-caps text-ink-500">Tier</dt>
@@ -73,13 +72,13 @@ export default async function AccountSettingsPage() {
               <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
                 <dt className="uppercase tracking-caps text-ink-500">Access token</dt>
                 <dd className="text-right text-ink-800">
-                  {session ? "stored in session / redacted" : "not present"}
+                  {session ? "Verified / Redacted" : "Attached by Whop"}
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="uppercase tracking-caps text-ink-500">Expires</dt>
                 <dd className="text-right text-ink-800">
-                  {session ? formatExpiry(session.exp) : "after sign-in"}
+                  {session ? formatExpiry(session.exp) : "per Whop request"}
                 </dd>
               </div>
             </dl>
@@ -93,17 +92,6 @@ export default async function AccountSettingsPage() {
               Free keeps the public research open. Pro adds watchlists and alert delivery.
               Alpha adds backtests, API keys, and signed webhooks.
             </p>
-            <div className="mt-5 grid gap-2 font-mono text-[12px] uppercase tracking-caps">
-              <Link href="/settings/alerts" className="text-ink-600 hover:text-accent">
-                Pro surface / alerts
-              </Link>
-              <Link href="/backtest" className="text-ink-600 hover:text-accent">
-                Alpha surface / backtest lab
-              </Link>
-              <Link href="/settings/api" className="text-ink-600 hover:text-accent">
-                Alpha surface / API keys
-              </Link>
-            </div>
           </div>
         </section>
 
@@ -114,22 +102,6 @@ export default async function AccountSettingsPage() {
             </h2>
           </div>
           <div className="grid gap-3 p-4 tab:grid-cols-2 desk:grid-cols-4">
-            {session ? (
-              <form action="/api/auth/logout" method="post" className="contents">
-                <button className="min-h-11 border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900">
-                  Logout
-                </button>
-              </form>
-            ) : (
-              <Link
-                href="/api/auth/whop"
-                prefetch={false}
-                className="inline-flex min-h-11 items-center justify-center border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900"
-              >
-                Sign in
-              </Link>
-            )}
-
             <Link
               href={
                 tier === "alpha"
@@ -153,6 +125,15 @@ export default async function AccountSettingsPage() {
             >
               Billing
             </Link>
+
+            {tier !== "alpha" && (
+              <Link
+                href="/pricing"
+                className="inline-flex min-h-11 items-center justify-center border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900"
+              >
+                Plans
+              </Link>
+            )}
 
             <Link
               href="/feedback"

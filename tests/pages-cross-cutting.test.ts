@@ -23,6 +23,7 @@ const REBUILT_PAGES: readonly string[] = [
   "src/app/creator/[handle]/page.tsx",
   "src/app/creator/[handle]/backtest/page.tsx",
   "src/app/call/[id]/page.tsx",
+  "src/app/dashboard/[companyId]/page.tsx",
   "src/app/settings/account/page.tsx",
   "src/app/settings/billing/page.tsx",
   "src/app/settings/notifications/page.tsx",
@@ -223,4 +224,11 @@ test("settings shell exposes shared action slots and plan badge", () => {
   assert.match(src, /primaryAction/);
   assert.match(src, /secondaryAction/);
   assert.match(src, /Plan <span/);
+});
+
+test("Whop dashboard view renders directly instead of redirecting", () => {
+  const src = read("src/app/dashboard/[companyId]/page.tsx");
+  assert.doesNotMatch(src, /redirect\(/);
+  assert.match(src, /Whop dashboard view/);
+  assert.match(src, /companyId/);
 });

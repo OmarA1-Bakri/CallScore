@@ -32,7 +32,10 @@ const CATEGORY_ALIASES = new Map<string, string>([
 
 const feedbackPayloadSchema = z.object({
   name: z.string().optional(),
-  email: z.string().optional(),
+  email: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().email().optional(),
+  ),
   category: z.string(),
   issueType: z.string().optional(),
   contextUrl: z.string().optional(),
@@ -67,7 +70,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     const body: unknown = await request.json();
     const parsed = feedbackPayloadSchema.safeParse(body);
 
-    if (!parsed.success || normalizeCategory(parsed.data.category) === null) {
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid feedback. Message and valid category are required." },
+        { status: 400 },
+      );
+    }
+
+    const { data } = parsed;
+    const category = normalizeCategory(data.category);
+
+    if (category === null) {
       return NextResponse.json(
         { success: false, error: "Invalid feedback. Message and valid category are required." },
         { status: 400 },
@@ -75,13 +88,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const feedback: FeedbackPayload = {
-      name: normalizeOptionalString(parsed.data.name),
-      email: normalizeOptionalString(parsed.data.email),
-      category: normalizeCategory(parsed.data.category)!,
-      issueType: normalizeOptionalString(parsed.data.issueType),
-      contextUrl: normalizeOptionalString(parsed.data.contextUrl),
-      sourceUrl: normalizeOptionalString(parsed.data.sourceUrl),
-      message: parsed.data.message,
+      name: normalizeOptionalString(data.name),
+      email: normalizeOptionalString(data.email),
+      category,
+      issueType: normalizeOptionalString(data.issueType),
+      contextUrl: normalizeOptionalString(data.contextUrl),
+      sourceUrl: normalizeOptionalString(data.sourceUrl),
+      message: data.message,
     };
 
     try {

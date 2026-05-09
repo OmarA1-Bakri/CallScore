@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
-import { CLAIM_NEXT_PIPELINE_JOB_SQL, type PipelineJob } from "../src/lib/pipeline";
+import {
+  CLAIM_NEXT_PIPELINE_JOB_SQL,
+  candleRefreshRunKey,
+  computeScoresRunKey,
+  matchPricesBatchRunKey,
+  type PipelineJob,
+} from "../src/lib/pipeline";
+import { candleRefreshArgsFromPayload, matchPricesArgsFromPayload } from "../src/lib/pipeline-jobs";
 import {
   buildMlVerifierCandidateSql,
   parseVerifierOutput,
@@ -10,6 +17,10 @@ import {
   type MlVerifierCandidate,
 } from "../src/lib/ml-verifier";
 import { POST as enqueueMlCron } from "../src/app/api/cron/ml/enqueue/route";
+import { POST as enqueueCandlesCron } from "../src/app/api/cron/candles/enqueue/route";
+import { POST as enqueueMatchCron } from "../src/app/api/cron/match/enqueue/route";
+import { POST as enqueueScoresCron } from "../src/app/api/cron/scores/enqueue/route";
+import { SUPPORTED_JOB_TYPES } from "../src/scripts/hermes-worker";
 
 function candidate(overrides: Partial<MlVerifierCandidate>): MlVerifierCandidate {
   return {
@@ -58,6 +69,39 @@ test("pipeline job claim SQL uses row locks with SKIP LOCKED", () => {
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /FOR UPDATE SKIP LOCKED/i);
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /status = 'pending'/i);
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /attempts < max_attempts/i);
+});
+
+test("Phase 1 automation jobs use deterministic daily idempotency keys", () => {
+  const now = new Date("2026-05-05T12:34:56.000Z");
+  assert.equal(candleRefreshRunKey(now), "candle-refresh:2026-05-05");
+  assert.equal(matchPricesBatchRunKey(now), "match-prices-batch:2026-05-05");
+  assert.equal(computeScoresRunKey(now), "compute-scores:2026-05-05");
+});
+
+test("Hermes worker advertises Phase 1 job types while keeping dry-run smoke support", () => {
+  assert.ok(SUPPORTED_JOB_TYPES.includes("hermes_smoke_test"));
+  assert.ok(SUPPORTED_JOB_TYPES.includes("candle_refresh"));
+  assert.ok(SUPPORTED_JOB_TYPES.includes("match_prices_batch"));
+  assert.ok(SUPPORTED_JOB_TYPES.includes("compute_scores"));
+});
+
+test("Phase 1 job payload parsers keep bounded production-safe defaults", () => {
+  const candleArgs = candleRefreshArgsFromPayload({
+    symbols: "btc, eth, btc",
+    max_requests_per_symbol: 10,
+    dry_run: true,
+  });
+  assert.deepEqual(candleArgs.symbols, ["BTC", "ETH"]);
+  assert.equal(candleArgs.maxRequestsPerSymbol, 10);
+  assert.equal(candleArgs.write, false);
+
+  const matchArgs = matchPricesArgsFromPayload({ limit: 50, batch_size: 10, start_after_id: 123 });
+  assert.deepEqual(matchArgs, {
+    rematchAll: false,
+    limit: 50,
+    batchSize: 10,
+    startAfterId: 123,
+  });
 });
 
 test("verifier parser accepts valid schema and rejects malformed output", () => {
@@ -158,6 +202,29 @@ test("Vercel ML enqueue endpoint rejects missing or invalid CRON_SECRET before D
       headers: { authorization: "Bearer wrong" },
     }));
     assert.equal(invalid.status, 401);
+  } finally {
+    if (previous === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previous;
+  }
+});
+
+test("Phase 1 cron enqueue endpoints reject missing CRON_SECRET before DB work", async () => {
+  const previous = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = "cron-secret";
+
+  try {
+    const routes = [
+      ["candles", enqueueCandlesCron],
+      ["match", enqueueMatchCron],
+      ["scores", enqueueScoresCron],
+    ] as const;
+
+    for (const [name, handler] of routes) {
+      const response = await handler(new NextRequest(`http://localhost/api/cron/${name}/enqueue`, {
+        method: "POST",
+      }));
+      assert.equal(response.status, 401);
+    }
   } finally {
     if (previous === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = previous;

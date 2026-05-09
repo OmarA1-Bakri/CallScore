@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession, getRequestAuthContext, type Session } from "./auth";
 import { recordApiKeyRequest, verifyApiKey, type ApiKeyAuth } from "./api-keys";
-import { getUserTier, hasAccess } from "./whop";
+import { hasAccess } from "./whop";
+import { getUserTier } from "./whop-access";
 import type { Tier } from "./types";
 
 export function unauthorized(): NextResponse {

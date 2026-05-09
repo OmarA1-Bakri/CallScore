@@ -35,15 +35,14 @@ export default async function ApiSettingsPage({
         <section className="border border-ink-250 bg-ink-50 p-5">
           <p className="text-ink-700 mb-4">
             {isGuest
-              ? "Sign in first to inspect API access and key state."
+              ? "Whop attaches account access to this app when opened from a product experience."
               : "Alpha unlocks read-only API keys and Backtest Lab endpoints."}
           </p>
           <Link
-            href={isGuest ? "/api/auth/whop" : "/pricing"}
-            prefetch={isGuest ? false : undefined}
+            href="/pricing"
             className="inline-flex min-h-11 items-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0"
           >
-            {isGuest ? "Sign in" : "Upgrade to Alpha"}
+            {isGuest ? "View plans" : "Upgrade to Alpha"}
           </Link>
         </section>
       </SettingsShell>

@@ -7,6 +7,7 @@ import {
   getSessionFromToken,
   type Session,
 } from "../src/lib/auth";
+import { verifyUserToken, verifyWhopIframeUser } from "../src/lib/whop-iframe";
 
 function buildSession(overrides: Partial<Session> = {}): Session {
   return {
@@ -73,4 +74,26 @@ test("bearer auth overrides the cookie-backed session", () => {
 
   assert.equal(auth.accessToken, "header-token");
   assert.equal(auth.session, null);
+});
+
+test("server sessions reject missing Whop iframe user-token context", async () => {
+  const previousAppId = process.env.WHOP_APP_ID;
+  process.env.WHOP_APP_ID = "app_test";
+  try {
+    const user = await verifyWhopIframeUser({
+      get(name: string) {
+        assert.equal(name, "x-whop-user-token");
+        return null;
+      },
+    });
+    assert.equal(user, null);
+  } finally {
+    if (previousAppId === undefined) delete process.env.WHOP_APP_ID;
+    else process.env.WHOP_APP_ID = previousAppId;
+  }
+});
+
+test("Whop iframe token verifier rejects missing token input", async () => {
+  const result = await verifyUserToken("", { appId: "app_test", dontThrow: true });
+  assert.equal(Boolean(result), false);
 });

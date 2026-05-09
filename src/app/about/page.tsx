@@ -6,6 +6,7 @@ import { EditorialSection, MetaStrip } from "@/components/primitives";
 const TITLE = "About — CallScore";
 const DESCRIPTION =
   "Why CallScore tracks market calls against real prices. No opinions, no sponsorships, no deletion.";
+const LINK_CLASS = "text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -49,7 +50,7 @@ export default function AboutPage(): ReactElement {
               v: (
                 <Link
                   href="mailto:dave.shipsbuilds@proton.me"
-                  className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
+                  className={LINK_CLASS}
                 >
                   contact
                 </Link>
@@ -151,14 +152,14 @@ export default function AboutPage(): ReactElement {
           <p>
             <Link
               href="/methodology"
-              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
+              className={LINK_CLASS}
             >
               Read the full methodology
             </Link>
             {" · "}
             <a
               href="mailto:dave.shipsbuilds@proton.me"
-              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
+              className={LINK_CLASS}
             >
               contact
             </a>

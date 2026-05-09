@@ -17,8 +17,13 @@ function getTier(rank: number): { label: string; color: string } {
   return { label: "T3", color: "bg-ink-500/20 text-ink-600 border-ink-300/30" };
 }
 
+if (MIN_PUBLIC_LEADERBOARD_CALLS > LOW_N_WARNING_CALLS) {
+  throw new Error("MIN_PUBLIC_LEADERBOARD_CALLS must be <= LOW_N_WARNING_CALLS");
+}
+
 export default function RankTierBadge({ rank, totalCalls, wilsonLb }: RankTierBadgeProps) {
   const tier = getTier(rank);
+  // Ordering invariant: obsoleteData is the stricter floor, lowData covers the visible low-N band above it.
   const obsoleteData = totalCalls < MIN_PUBLIC_LEADERBOARD_CALLS;
   const lowData = !obsoleteData && totalCalls < LOW_N_WARNING_CALLS;
 

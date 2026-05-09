@@ -36,15 +36,14 @@ export default async function WebhookSettingsPage({
         <section className="border border-ink-250 bg-ink-50 p-5">
           <p className="text-ink-700 mb-4">
             {isGuest
-              ? "Sign in first to inspect webhook endpoints and delivery logs."
+              ? "Subscribe to an Alpha plan to access webhook features."
               : "Alpha unlocks signed webhook notifications and delivery logs."}
           </p>
           <Link
-            href={isGuest ? "/api/auth/whop" : "/pricing"}
-            prefetch={isGuest ? false : undefined}
+            href="/pricing"
             className="inline-flex min-h-11 items-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0"
           >
-            {isGuest ? "Sign in" : "Upgrade to Alpha"}
+            {isGuest ? "View plans" : "Upgrade to Alpha"}
           </Link>
         </section>
       </SettingsShell>

@@ -54,12 +54,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
        c.alpha_30d,
        live_coin.close::float8 AS live_price,
        CASE
-         WHEN c.price_at_call IS NOT NULL AND live_coin.close IS NOT NULL
+         WHEN c.price_at_call IS NOT NULL
+          AND c.price_at_call <> 0
+          AND live_coin.close IS NOT NULL
          THEN ((live_coin.close - c.price_at_call) / c.price_at_call) * 100
        END AS live_return,
        CASE
          WHEN c.price_at_call IS NOT NULL
+          AND c.price_at_call <> 0
           AND c.btc_price_at_call IS NOT NULL
+          AND c.btc_price_at_call <> 0
           AND live_coin.close IS NOT NULL
           AND live_btc.close IS NOT NULL
          THEN (((live_coin.close - c.price_at_call) / c.price_at_call) * 100)

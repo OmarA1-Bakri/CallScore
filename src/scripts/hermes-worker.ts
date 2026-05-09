@@ -11,9 +11,20 @@ import { runMlVerifierBatch } from "../lib/ml-verifier";
 import { query } from "../lib/db";
 import { createLogger } from "../lib/logger";
 import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
+import {
+  runCandleRefreshJob,
+  runComputeScoresJob,
+  runMatchPricesJob,
+} from "../lib/pipeline-jobs";
 import { loadEnv, sleep, timestamp } from "./script-helpers";
 
-const SUPPORTED_JOB_TYPES = ["ml_verifier_batch", "hermes_smoke_test"] as const;
+export const SUPPORTED_JOB_TYPES = [
+  "ml_verifier_batch",
+  "hermes_smoke_test",
+  "candle_refresh",
+  "match_prices_batch",
+  "compute_scores",
+] as const;
 const DEFAULT_POLL_MS = 15_000;
 
 interface WorkerArgs {
@@ -84,6 +95,9 @@ async function runSmokeJob(job: PipelineJob): Promise<Record<string, unknown>> {
 async function executeJob(job: PipelineJob): Promise<Record<string, unknown>> {
   if (job.type === "hermes_smoke_test") return runSmokeJob(job);
   if (job.type === "ml_verifier_batch") return runMlVerifierBatch(job) as Promise<Record<string, unknown>>;
+  if (job.type === "candle_refresh") return runCandleRefreshJob(job);
+  if (job.type === "match_prices_batch") return runMatchPricesJob(job);
+  if (job.type === "compute_scores") return runComputeScoresJob();
   throw new Error(`Unsupported pipeline job type: ${job.type}`);
 }
 
@@ -170,6 +184,13 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   logger.info("worker_stopped", { processed });
+  try {
+    await flushMonitoring();
+  } catch (err) {
+    logger.error("monitoring_flush_failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 if (require.main === module) {
@@ -179,6 +200,7 @@ if (require.main === module) {
     logger.error("fatal_error", { error: message });
     try {
       loadEnv();
+      await initMonitoring({ serviceName: "hermes-worker" });
       await captureException(error, {
         serviceName: "hermes-worker",
         tags: { component: "hermes-worker", fatal: true },
@@ -186,7 +208,7 @@ if (require.main === module) {
       await flushMonitoring();
     } catch (monitoringError) {
       const monitoringMessage = monitoringError instanceof Error ? monitoringError.message : String(monitoringError);
-      logger.error("monitoring_flush_failed", { error: monitoringMessage });
+      logger.error("fatal_monitoring_error", { error: monitoringMessage });
     }
     process.exit(1);
   });

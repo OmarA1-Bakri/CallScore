@@ -20,7 +20,6 @@ interface CountsRow {
   readonly missing_price_calls: string;
   readonly missing_30d_calls: string;
   readonly missing_target_calls: string;
-  readonly target_pending_calls: string;
   readonly excluded_low_confidence_calls: string;
   readonly ranked_creators: string;
   readonly beat_btc_creators: string;
@@ -137,16 +136,6 @@ export async function getPublicCounts(): Promise<PublicCounts> {
           AND c.call_date <= NOW() - INTERVAL '90 days'
           AND (c.price_90d IS NULL OR c.hit_target IS NULL)
       )::text AS missing_target_calls,
-      COUNT(c.id) FILTER (
-        WHERE ${judgmentWindowSql}
-          AND c.extraction_confidence >= $1
-          AND c.price_at_call IS NOT NULL
-          AND c.call_date <= NOW() - INTERVAL '30 days'
-          AND c.price_30d IS NOT NULL
-          AND c.return_30d IS NOT NULL
-          AND c.target_price IS NOT NULL
-          AND c.call_date > NOW() - INTERVAL '90 days'
-      )::text AS target_pending_calls,
       COUNT(c.id) FILTER (WHERE ${judgmentWindowSql} AND c.extraction_confidence < $1)::text AS excluded_low_confidence_calls,
       (SELECT COUNT(*)::text FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql}) AS ranked_creators,
       (SELECT COUNT(*)::text FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql} AND cs.avg_alpha_30d > 0) AS beat_btc_creators
@@ -165,9 +154,11 @@ export async function getPublicCounts(): Promise<PublicCounts> {
     scoredCalls: publicScoredCalls,
     publicScoredCalls,
     beatBtcCreators: Number(row.beat_btc_creators),
+    // Backward-compatibility aliases for the same confidence-passing count.
     llmValidatedCalls: Number(row.confidence_pass_calls),
     confidencePassCalls: Number(row.confidence_pass_calls),
     pendingPublicScoringCalls: Number(row.pending_public_scoring_calls),
+    // Backward-compatibility aliases for calls still inside the 30-day horizon.
     liveOpenCalls: Number(row.pending_30d_calls),
     pendingHorizonCalls: Number(row.pending_horizon_calls),
     pending30dCalls: Number(row.pending_30d_calls),
@@ -175,7 +166,7 @@ export async function getPublicCounts(): Promise<PublicCounts> {
     missingPriceCalls: Number(row.missing_price_calls),
     missing30dCalls: Number(row.missing_30d_calls),
     missingTargetCalls: Number(row.missing_target_calls),
-    targetPendingCalls: Number(row.target_pending_calls),
+    targetPendingCalls: Number(row.pending_target_90d_calls),
     excludedLowConfidenceCalls: Number(row.excluded_low_confidence_calls),
   };
 }

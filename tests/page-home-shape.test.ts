@@ -34,3 +34,8 @@ test("home public funnel labels reconcile confidence and scoring gates", () => {
   assert.match(src, /live\/open/);
   assert.doesNotMatch(src, /LLM validated/);
 });
+
+test("home leaderboard display ranks are sequential after public filtering", () => {
+  assert.match(src, /const rank = index \+ 1;/);
+  assert.doesNotMatch(src, /const rank = row\.accuracy_rank \?\? index \+ 1;/);
+});

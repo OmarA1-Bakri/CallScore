@@ -12,17 +12,17 @@ interface WatchPayload {
 }
 
 function unauthorized(): NextResponse {
-  return NextResponse.json(
+  return withNoStore(NextResponse.json(
     { error: "unauthorized" },
-    { status: 401, headers: { "cache-control": "no-store" } },
-  );
+    { status: 401 },
+  ));
 }
 
 function upgradeRequired(): NextResponse {
-  return NextResponse.json(
+  return withNoStore(NextResponse.json(
     { error: "upgrade_required", upgrade_url: "/pricing" },
-    { status: 402, headers: { "cache-control": "no-store" } },
-  );
+    { status: 402 },
+  ));
 }
 
 function buildSettingsRedirect(
@@ -58,10 +58,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const creatorId = parseCreatorId(form.get("creatorId"));
     const q = form.get("q");
     if (creatorId === null) {
-      return NextResponse.json(
+      return withNoStore(NextResponse.json(
         { error: "invalid_creator_id" },
-        { status: 400, headers: { "cache-control": "no-store" } },
-      );
+        { status: 400 },
+      ));
     }
 
     if (form.get("_action") === "remove") {
@@ -93,40 +93,40 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     body = (await request.json()) as WatchPayload;
   } catch {
-    return NextResponse.json(
+    return withNoStore(NextResponse.json(
       { error: "invalid_json" },
-      { status: 400, headers: { "cache-control": "no-store" } },
-    );
+      { status: 400 },
+    ));
   }
 
   const creatorId = parseCreatorId(body.creatorId);
   if (creatorId === null) {
-    return NextResponse.json(
+    return withNoStore(NextResponse.json(
       { error: "invalid_creator_id" },
-      { status: 400, headers: { "cache-control": "no-store" } },
-    );
+      { status: 400 },
+    ));
   }
 
   try {
     const watch = await addWatch(session.userId, creatorId);
-    return NextResponse.json(
+    return withNoStore(NextResponse.json(
       { success: true, watch },
-      { status: 200, headers: { "cache-control": "no-store" } },
-    );
+      { status: 200 },
+    ));
   } catch (error: unknown) {
     if (isForeignKeyViolation(error)) {
-      return NextResponse.json(
+      return withNoStore(NextResponse.json(
         { error: "creator_not_found" },
-        { status: 400, headers: { "cache-control": "no-store" } },
-      );
+        { status: 400 },
+      ));
     }
     const message =
       error instanceof Error ? error.message : "internal_error";
     console.error("[alerts.watch.POST]", message);
-    return NextResponse.json(
+    return withNoStore(NextResponse.json(
       { error: "internal_error" },
-      { status: 500, headers: { "cache-control": "no-store" } },
-    );
+      { status: 500 },
+    ));
   }
 }
 
@@ -141,25 +141,25 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   const url = new URL(request.url);
   const creatorId = parseCreatorId(url.searchParams.get("creatorId"));
   if (creatorId === null) {
-    return NextResponse.json(
+    return withNoStore(NextResponse.json(
       { error: "invalid_creator_id" },
-      { status: 400, headers: { "cache-control": "no-store" } },
-    );
+      { status: 400 },
+    ));
   }
 
   try {
     await removeWatch(session.userId, creatorId);
-    return NextResponse.json(
+    return withNoStore(NextResponse.json(
       { success: true },
-      { status: 200, headers: { "cache-control": "no-store" } },
-    );
+      { status: 200 },
+    ));
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "internal_error";
     console.error("[alerts.watch.DELETE]", message);
-    return NextResponse.json(
+    return withNoStore(NextResponse.json(
       { error: "internal_error" },
-      { status: 500, headers: { "cache-control": "no-store" } },
-    );
+      { status: 500 },
+    ));
   }
 }

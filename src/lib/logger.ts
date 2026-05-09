@@ -8,6 +8,45 @@ export interface Logger {
   readonly error: (event: string, fields?: LogFields) => void;
 }
 
+const RESERVED_LOG_KEYS = new Set(["ts", "level", "event"]);
+
+function stripReservedKeys(fields: LogFields): LogFields {
+  const safe: LogFields = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (RESERVED_LOG_KEYS.has(key)) continue;
+    safe[key] = value;
+  }
+  return safe;
+}
+
+function safeStringify(record: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(record);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const timestamp = coerceLogTimestamp(record.ts);
+    const level = coerceLogLevel(record.level);
+    return JSON.stringify({
+      ts: timestamp,
+      level,
+      event: "log_serialize_failed",
+      error: message,
+    });
+  }
+}
+
+function coerceLogTimestamp(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number" || value instanceof Date) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function coerceLogLevel(value: unknown): LogLevel {
+  return value === "info" || value === "warn" || value === "error" ? value : "error";
+}
+
 function writeLog(
   level: LogLevel,
   event: string,
@@ -18,10 +57,10 @@ function writeLog(
     ts: new Date().toISOString(),
     level,
     event,
-    ...baseFields,
-    ...fields,
+    ...stripReservedKeys(baseFields),
+    ...stripReservedKeys(fields),
   };
-  const line = JSON.stringify(record);
+  const line = safeStringify(record);
   if (level === "error") console.error(line);
   else if (level === "warn") console.warn(line);
   else console.log(line);

@@ -4,14 +4,15 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
+import type { Tier } from "@/lib/types";
 
 interface MobileMenuProps {
-  readonly loggedIn: boolean;
-  readonly tier: string;
+  readonly authenticated: boolean;
+  readonly tier: Tier;
 }
 
 export default function MobileMenu({
-  loggedIn,
+  authenticated,
   tier,
 }: MobileMenuProps): ReactElement {
   const [open, setOpen] = useState(false);
@@ -51,6 +52,27 @@ export default function MobileMenu({
             LEADERBOARD
           </Link>
           <Link
+            href="/backtest"
+            onClick={() => setOpen(false)}
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+          >
+            BACKTEST
+          </Link>
+          <Link
+            href="/settings/alerts"
+            onClick={() => setOpen(false)}
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+          >
+            ALERTS
+          </Link>
+          <Link
+            href="/settings/webhooks"
+            onClick={() => setOpen(false)}
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+          >
+            WEBHOOKS
+          </Link>
+          <Link
             href="/methodology"
             onClick={() => setOpen(false)}
             className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
@@ -64,55 +86,26 @@ export default function MobileMenu({
           >
             PRICING
           </Link>
-          {loggedIn ? (
-            <>
-              <div className="border-b border-ink-150 py-3 font-mono text-mono-xs uppercase tracking-kicker text-accent">
-                TIER · {tier}
-              </div>
-              <Link
-                href="/settings"
-                onClick={() => setOpen(false)}
-                className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
-              >
-                ACCOUNT
-              </Link>
-              {tier === "alpha" && (
-                <Link
-                  href="/backtest"
-                  onClick={() => setOpen(false)}
-                  className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
-                >
-                  ALPHA LAB
-                </Link>
-              )}
-              <form action="/api/auth/logout" method="post">
-                <button
-                  type="submit"
-                  onClick={() => setOpen(false)}
-                  className="block w-full py-3 text-left font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
-                >
-                  LOGOUT
-                </button>
-              </form>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/api/auth/whop"
-                prefetch={false}
-                onClick={() => setOpen(false)}
-                className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
-              >
-                SIGN IN
-              </Link>
-              <Link
-                href="/pricing"
-                onClick={() => setOpen(false)}
-                className="mt-3 inline-flex min-h-10 items-center border border-accent/60 bg-transparent px-3.5 font-mono text-mono-sm uppercase tracking-caps text-accent transition-colors hover:border-accent hover:bg-accent-low"
-              >
-                GET ACCESS
-              </Link>
-            </>
+          <div className="border-b border-ink-150 py-3 font-mono text-mono-xs uppercase tracking-kicker text-accent">
+            TIER · {tier}
+          </div>
+          {authenticated && (
+            <Link
+              href="/settings"
+              onClick={() => setOpen(false)}
+              className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+            >
+              ACCOUNT
+            </Link>
+          )}
+          {tier === "free" && (
+            <Link
+              href="/pricing"
+              onClick={() => setOpen(false)}
+              className="mt-3 inline-flex min-h-10 items-center border border-accent/60 bg-transparent px-3.5 font-mono text-mono-sm uppercase tracking-caps text-accent transition-colors hover:border-accent hover:bg-accent-low"
+            >
+              GET ACCESS
+            </Link>
           )}
         </nav>
       )}

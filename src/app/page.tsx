@@ -10,7 +10,8 @@ import { query } from "@/lib/db";
 import { getPublicCounts } from "@/lib/public-counts";
 import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
 import { CREATOR_JUDGMENT_WINDOW_SHORT_LABEL } from "@/lib/judgment-window";
-import { getCreatorTier, hasAccess } from "@/lib/whop";
+import { getCreatorTier } from "@/lib/creator-tier";
+import { hasAccess } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
 import type {
@@ -213,7 +214,7 @@ export default async function HomePage({
     );
 
     leaderboard = rows.map((row, index) => {
-      const rank = row.accuracy_rank ?? index + 1;
+      const rank = index + 1;
       const prev = prevScoreMap.get(row.creator_id);
       const trend = prev !== undefined ? computeTrend(row.alpha_score, prev) : ("stable" as const);
       const selfCorrection = selfCorrectionMap.get(row.creator_id);
@@ -686,15 +687,15 @@ function MarketCallPreview({
             <span>30 Days</span>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <div className="min-w-[560px]">
-            <div className="grid grid-cols-[50px_minmax(150px,1fr)_92px_76px_78px_72px] gap-4 pb-2 font-mono text-[10px] text-ink-500 tracking-caps uppercase">
+        <div className="overflow-hidden">
+          <div className="min-w-0">
+            <div className="grid grid-cols-[32px_minmax(88px,1fr)_58px_52px_50px_42px] gap-2 pb-2 font-mono text-[10px] text-ink-500 tracking-caps uppercase">
               <span>rank</span>
               <span>creator</span>
               <span>alpha</span>
               <span>30d Δ</span>
               <span>win %</span>
-              <span>last call</span>
+              <span>call</span>
             </div>
             {previewRows.length > 0 ? (
               previewRows.map((row) => {
@@ -709,7 +710,7 @@ function MarketCallPreview({
                 return (
                   <div
                     key={row.creator.id}
-                    className="grid grid-cols-[50px_minmax(150px,1fr)_92px_76px_78px_72px] gap-4 border-t border-ink-200 py-3 font-mono text-[13px] items-center"
+                    className="grid grid-cols-[32px_minmax(88px,1fr)_58px_52px_50px_42px] gap-2 border-t border-ink-200 py-3 font-mono text-[13px] items-center"
                   >
                     <span className="text-accent">{String(row.rank).padStart(2, "0")}</span>
                     <span className="flex items-center gap-3 min-w-0 text-ink-900">
@@ -737,7 +738,7 @@ function MarketCallPreview({
                     <span className="text-ink-800 tabular-nums">
                       {formatPercent(row.stats.win_rate)}
                     </span>
-                    <span className="text-ink-800">
+                    <span className="min-w-0 truncate text-ink-800">
                       {lastCall?.symbol?.replace("USDT", "") ?? "—"}
                     </span>
                   </div>

@@ -26,17 +26,28 @@ function loadEnv(): void {
   }
 }
 
+export async function runComputeScores(): Promise<Record<string, unknown>> {
+  const startedAt = Date.now();
+  const metrics = await recomputeAllStats();
+  return {
+    ...metrics,
+    elapsed_ms: Date.now() - startedAt,
+  };
+}
+
 async function main(): Promise<void> {
   loadEnv();
 
   logger.info("public_score_recompute_start");
-  await recomputeAllStats();
-  logger.info("public_score_recompute_complete");
+  const metrics = await runComputeScores();
+  logger.info("public_score_recompute_complete", metrics);
 }
 
-main().catch((err) => {
-  logger.error("fatal_error", {
-    error: err instanceof Error ? err.stack ?? err.message : String(err),
+if (require.main === module) {
+  main().catch((err) => {
+    logger.error("fatal_error", {
+      error: err instanceof Error ? err.stack ?? err.message : String(err),
+    });
+    process.exit(1);
   });
-  process.exit(1);
-});
+}

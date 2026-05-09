@@ -44,6 +44,10 @@ import {
   summarizeAuditResults,
 } from "../src/scripts/audit-recompute";
 
+function toPosixPath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
 test("data pipeline defaults to safe local dry-run for top creators", () => {
   const args = parseDataPipelineArgs([]);
 
@@ -322,19 +326,19 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
   assert.ok(commands["shadow-extract"][0].includes("1"));
   assert.ok(
     commands["shadow-extract"][0].some((part) =>
-      part.endsWith("shadow-run-meta-A.json"),
+      toPosixPath(part).endsWith("shadow-run-meta-A.json"),
     ),
   );
   assert.ok(
     commands["shadow-extract"][1].some((part) =>
-      part.endsWith("shadow-run-meta-B.json"),
+      toPosixPath(part).endsWith("shadow-run-meta-B.json"),
     ),
   );
   assert.equal(commands["shadow-extract"][0].includes("--execute"), false);
   assert.equal(commands["shadow-promote"][0].includes("--audit-out"), true);
   assert.ok(
     commands["shadow-promote"][0].some((part) =>
-      part.endsWith("shadow-promote.jsonl"),
+      toPosixPath(part).endsWith("shadow-promote.jsonl"),
     ),
   );
   assert.equal(commands["shadow-promote"][0].includes("--write"), false);
@@ -347,7 +351,7 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
   assert.ok(commands["shadow-validate"][0].includes("--require-records"));
   assert.ok(
     commands["shadow-validate"][0].some((part) =>
-      part.endsWith("shadow-validation/A.json"),
+      toPosixPath(part).endsWith("shadow-validation/A.json"),
     ),
   );
   assert.ok(
@@ -496,17 +500,18 @@ test("match-prices LRU helper caps caches and refreshes recently used keys", () 
   assert.equal(HIGH_LOW_CACHE_MAX_ENTRIES, 50_000);
 
   const cache = new Map<string, number>();
-  setLruCacheEntry(cache, "oldest", 1, 3);
-  setLruCacheEntry(cache, "middle", 2, 3);
-  setLruCacheEntry(cache, "newest", 3, 3);
-  setLruCacheEntry(cache, "middle", 22, 3);
-  setLruCacheEntry(cache, "overflow", 4, 3);
+  assert.equal(setLruCacheEntry(cache, "oldest", 1, 3), true);
+  assert.equal(setLruCacheEntry(cache, "middle", 2, 3), true);
+  assert.equal(setLruCacheEntry(cache, "newest", 3, 3), true);
+  assert.equal(setLruCacheEntry(cache, "middle", 22, 3), true);
+  assert.equal(setLruCacheEntry(cache, "overflow", 4, 3), true);
 
   assert.deepEqual(Array.from(cache.entries()), [
     ["newest", 3],
     ["middle", 22],
     ["overflow", 4],
   ]);
+  assert.equal(setLruCacheEntry(cache, "ignored", 5, 0), false);
 });
 
 test("replaceStoredCallsForVideo statements preserve transactional SQL order", async () => {
@@ -617,4 +622,6 @@ test("scoring helpers return safe values for NaN and Infinity inputs", () => {
   assert.equal(didHitTarget("bullish", 110, Number.NaN, 120, 90), false);
   assert.equal(didHitTarget("bullish", 110, null, Number.POSITIVE_INFINITY, 90), false);
   assert.equal(didHitTarget("bearish", 90, null, 120, Number.NEGATIVE_INFINITY), false);
+  assert.equal(didHitTarget("bullish", 110, 95, 120, null), false);
+  assert.equal(didHitTarget("bearish", 90, 105, null, 80), false);
 });

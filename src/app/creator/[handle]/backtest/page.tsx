@@ -185,7 +185,7 @@ function BacktestForm({
   return (
     <form
       method="GET"
-      action={`/creator/${encodeURIComponent(handle)}/backtest`}
+      action={`/creator/${creatorHandlePath(handle)}/backtest`}
       className="grid gap-3 tab:grid-cols-2 desk:grid-cols-4"
     >
       <label className="space-y-1">

@@ -46,7 +46,7 @@ export default function PeriodFilter({ value, canUseRecent = true }: PeriodFilte
               active
                 ? "border-accent text-ink-900"
                 : !canUseRecent && p.value !== "all_time"
-                  ? "border-transparent text-ink-600"
+                  ? "border-transparent text-ink-400"
                   : "border-transparent text-ink-500 hover:text-ink-700"
             }`}
           >

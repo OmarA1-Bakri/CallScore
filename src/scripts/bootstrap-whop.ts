@@ -56,7 +56,6 @@ export function readBootstrapProducts(env: NodeJS.ProcessEnv = process.env): {
 }
 
 async function main(): Promise<void> {
-  requiredEnv("WHOP_API_KEY");
   const products = readBootstrapProducts();
   const companyId = process.env.WHOP_COMPANY_ID ?? (await discoverCompanyIdFromProduct(products.pro));
 

@@ -41,7 +41,7 @@ function loadEnv(): void {
   }
 }
 
-interface MatchPricesArgs {
+export interface MatchPricesArgs {
   readonly rematchAll: boolean;
   readonly limit: number;
   readonly batchSize: number;
@@ -111,10 +111,10 @@ export function setLruCacheEntry<K, V>(
   key: K,
   value: V,
   maxEntries: number,
-): void {
+): boolean {
   if (!Number.isFinite(maxEntries) || maxEntries < 1) {
-    cache.clear();
-    return;
+    logger.warn("lru_cache_invalid_max_entries", { max_entries: maxEntries });
+    return false;
   }
 
   if (cache.has(key)) cache.delete(key);
@@ -125,6 +125,7 @@ export function setLruCacheEntry<K, V>(
     if (oldestKey === undefined) break;
     cache.delete(oldestKey);
   }
+  return true;
 }
 
 function getLruCacheEntry<K, V>(cache: Map<K, V>, key: K): V | undefined {
@@ -367,18 +368,35 @@ export async function withMatchPricesAdvisoryLock<T>(
 ): Promise<{ readonly locked: false } | { readonly locked: true; readonly result: T }> {
   const locked = await acquireMatchPricesLock(queryFn);
   if (!locked) return { locked: false };
+  let workError: unknown;
+  let result: T | undefined;
   try {
-    return { locked: true, result: await work() };
-  } finally {
-    await releaseMatchPricesLock(queryFn);
+    result = await work();
+  } catch (error) {
+    workError = error;
   }
+  try {
+    await releaseMatchPricesLock(queryFn);
+  } catch (releaseError) {
+    if (workError === undefined) throw releaseError;
+    logger.warn("price_matching_unlock_failed", {
+      error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+    });
+  }
+  if (workError !== undefined) throw workError;
+  return { locked: true, result: result as T };
 }
 
-// ── Main ──────────────────────────────────────────────────────────
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  loadEnv();
-  const args = parseMatchPricesArgs(argv);
+export interface MatchPricesMetrics {
+  readonly locked: boolean;
+  readonly considered: number;
+  readonly matched: number;
+  readonly skipped: number;
+  readonly price_cache_size: number;
+  readonly high_low_cache_size: number;
+}
 
+export async function runMatchPrices(args: MatchPricesArgs): Promise<MatchPricesMetrics> {
   logger.info("price_matching_start", {
     mode: args.rematchAll ? "full_recompute" : "incomplete_market_data",
     cache: true,
@@ -386,7 +404,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     batch_size: args.batchSize,
     start_after_id: args.startAfterId,
   });
-  const lockResult = await withMatchPricesAdvisoryLock(async () => {
+  const lockResult = await withMatchPricesAdvisoryLock(async (): Promise<MatchPricesMetrics> => {
+    if (args.rematchAll) clearMatchPricesCaches();
     let totalMatched = 0;
     let totalSkipped = 0;
     let totalSeen = 0;
@@ -420,8 +439,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
       const worker = async (): Promise<void> => {
         while (nextIndex < batch.length) {
-          const call = batch[nextIndex];
-          nextIndex++;
+          const index = nextIndex++;
+          const call = batch[index];
           if (!call) return;
           try {
             const matched = await processCall(call);
@@ -460,13 +479,37 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       price_cache_size: priceCache.size,
       high_low_cache_size: highLowCache.size,
     });
+    return {
+      locked: true,
+      considered: totalSeen,
+      matched: totalMatched,
+      skipped: totalSkipped,
+      price_cache_size: priceCache.size,
+      high_low_cache_size: highLowCache.size,
+    };
   });
 
   if (!lockResult.locked) {
     logger.warn("price_matching_lock_busy", {
       advisory_lock_id: MATCH_PRICES_ADVISORY_LOCK_ID,
     });
+    return {
+      locked: false,
+      considered: 0,
+      matched: 0,
+      skipped: 0,
+      price_cache_size: priceCache.size,
+      high_low_cache_size: highLowCache.size,
+    };
   }
+  return lockResult.result;
+}
+
+// ── Main ──────────────────────────────────────────────────────────
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  loadEnv();
+  const args = parseMatchPricesArgs(argv);
+  await runMatchPrices(args);
 }
 
 if (require.main === module) {

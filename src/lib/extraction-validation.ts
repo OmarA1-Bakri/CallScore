@@ -1,6 +1,11 @@
 import { SYMBOL_NAMES, SYMBOL_TICKERS } from "./constants";
 import type { Direction } from "./types";
 
+const BULLISH_PERFORMER_PATTERN =
+  /\b(best performers?|top performers?|outperform(?:ed|ing)?|perform(?:s|ing)? really well)\b/i;
+const BULLISH_STRENGTH_PATTERN = /\b(do(?:ing)? pretty good|pretty strong|ripping)\b/i;
+const BULLISH_BOUNCE_PATTERN = /\bbounce(?:d|s|ing)? (?:pretty )?hard\b/i;
+
 const BULLISH_PATTERNS = [
   /\b(buy|buying|long|accumulate|accumulating|bullish|best buy|strong buy|great buy)\b/i,
   /\b(go(?:ing)? up|push up|move up|rip higher|heading higher|upside|next leg up)\b/i,
@@ -10,7 +15,9 @@ const BULLISH_PATTERNS = [
   /\b(best time to be positioned|positioned in|positioning in)\b/i,
   /\b(all[-\s]?time high|all[-\s]?time highs|record high|record highs|new high|new highs)\b/i,
   /\b(load(?:ing)? up on|loaded up on|big bag|high conviction)\b/i,
-  /\b(best performers?|top performers?|outperform(?:ed|ing)?|perform(?:s|ing)? really well|do(?:ing)? pretty good|pretty strong|bounce(?:d|s|ing)? (?:pretty )?hard|ripping)\b/i,
+  BULLISH_PERFORMER_PATTERN,
+  BULLISH_STRENGTH_PATTERN,
+  BULLISH_BOUNCE_PATTERN,
   /\b(recover(?:y|ed|ing)?|rebound(?:ed|ing)?|brought up)\b/i,
 ];
 

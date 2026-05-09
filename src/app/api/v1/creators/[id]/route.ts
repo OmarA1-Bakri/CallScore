@@ -5,7 +5,6 @@ import { requireAlphaApiAccess } from "@/lib/premium";
 import { creatorRowSchema, parseApiRow } from "@/lib/api-schemas";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,

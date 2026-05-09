@@ -78,7 +78,7 @@ async function main(): Promise<void> {
   const periodStats = await query<{ period: string; creator_count: string; avg_alpha: number }>(
     `SELECT period, COUNT(*)::text as creator_count, AVG(alpha_score) as avg_alpha
      FROM creator_stats cs
-     WHERE ${getLeaderboardEligibilitySql("cs")}
+     WHERE ${leaderboardEligibleSql}
      GROUP BY period
      ORDER BY period`,
   );

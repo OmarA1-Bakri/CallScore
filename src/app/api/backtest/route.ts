@@ -22,15 +22,27 @@ import {
 } from "@/lib/portfolio-backtest";
 
 const DEFAULT_CAPITAL = 1000;
+const ISO_DATE_PARAM = /^\d{4}-\d{2}-\d{2}$/;
+const CAPITAL_PARAM = /^\d+(?:\.\d+)?$/;
+const BACKTEST_STRATEGIES = ["equal_weight", "direction_only"] as const;
+
+const nullableParam = (schema: z.ZodString) =>
+  z.preprocess((value) => (value === "" ? null : value), schema.nullable());
 
 const portfolioQuerySchema = z.object({
   creatorIds: z.array(z.number().int().positive()).min(1),
-  start: z.string().nullable(),
-  end: z.string().nullable(),
-  capital: z.string().nullable(),
-  strategy: z.string().nullable(),
-  weighting: z.string().nullable(),
-  benchmark: z.string().nullable(),
+  start: nullableParam(z.string().regex(ISO_DATE_PARAM)),
+  end: nullableParam(z.string().regex(ISO_DATE_PARAM)),
+  capital: nullableParam(z.string().regex(CAPITAL_PARAM)),
+  strategy: z.preprocess((value) => (value === "" ? null : value), z.enum(BACKTEST_STRATEGIES).nullable()),
+  weighting: z.preprocess(
+    (value) => (value === "" ? null : value),
+    z.enum(["equal_call", "equal_creator", "alpha_score", "rank_tier"]).nullable(),
+  ),
+  benchmark: z.preprocess(
+    (value) => (value === "" ? null : value),
+    z.enum(["btc", "eth", "btc_eth_50"]).nullable(),
+  ),
 });
 
 interface ParsedPortfolioParams {
@@ -80,7 +92,16 @@ function parseParams(
     benchmark: searchParams.get("benchmark"),
   });
 
-  if (!raw.success) return { error: "invalid_creator" };
+  if (!raw.success) {
+    const field = raw.error.issues[0]?.path[0];
+    if (field === "start") return { error: "invalid_start" };
+    if (field === "end") return { error: "invalid_end" };
+    if (field === "capital") return { error: "invalid_capital" };
+    if (field === "strategy") return { error: "invalid_strategy" };
+    if (field === "weighting") return { error: "invalid_weighting" };
+    if (field === "benchmark") return { error: "invalid_benchmark" };
+    return { error: "invalid_creator" };
+  }
 
   const defaults = defaultBacktestRange(now);
   const { creatorIds } = raw.data;
@@ -106,12 +127,7 @@ function parseParams(
     return { error: "invalid_capital" };
   }
 
-  const strategyRaw = raw.data.strategy ?? "equal_weight";
-  const strategy =
-    strategyRaw === "equal_weight" || strategyRaw === "direction_only"
-      ? strategyRaw
-      : null;
-  if (!strategy) return { error: "invalid_strategy" };
+  const strategy = raw.data.strategy ?? "equal_weight";
 
   const weightingRaw = raw.data.weighting ?? "equal_creator";
   const weighting = PORTFOLIO_WEIGHTING_MODES.includes(

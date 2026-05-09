@@ -9,7 +9,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!verifyCronSecret(request)) return cronUnauthorized();
   const hours = Number(request.nextUrl.searchParams.get("hours") ?? 6);
   const deadlineSignal = createCronDeadlineSignal();
-  const deadlineResult = await withCronDeadline(runAlertScan(Number.isFinite(hours) ? hours : 6, { signal: deadlineSignal }), deadlineSignal);
+  const deadlineResult = await withCronDeadline(
+    (signal) => runAlertScan(Number.isFinite(hours) ? hours : 6, { signal }),
+    deadlineSignal,
+  );
   if (!deadlineResult.completed) {
     return NextResponse.json(
       { ok: false, deadline_exceeded: true, message: "alert scan exceeded cron deadline" },

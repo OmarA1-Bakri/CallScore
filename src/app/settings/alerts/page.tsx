@@ -108,15 +108,14 @@ export default async function AlertSettingsPage({
         <section className="border border-ink-250 bg-ink-50 p-5">
           <p className="font-serif text-[19px] text-ink-700">
             {isGuest
-              ? "Sign in first to manage creator watchlists and alert delivery."
+              ? "Alerts require a Pro or Alpha plan."
               : "Pro unlocks creator watchlists and email alert delivery."}
           </p>
           <Link
-            href={isGuest ? "/api/auth/whop" : "/pricing"}
-            prefetch={isGuest ? false : undefined}
+            href="/pricing"
             className="mt-4 inline-flex min-h-11 items-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0"
           >
-            {isGuest ? "Sign in" : "Upgrade"}
+            {isGuest ? "View plans" : "Upgrade"}
           </Link>
         </section>
       </SettingsShell>

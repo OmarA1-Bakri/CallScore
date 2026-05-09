@@ -7,7 +7,6 @@ import MobileMenu from "./MobileMenu";
 
 export default async function Header(): Promise<ReactElement> {
   const session = await getSession();
-  const loggedIn = session !== null;
   const tier = session?.tier ?? "free";
 
   return (
@@ -15,19 +14,17 @@ export default async function Header(): Promise<ReactElement> {
       <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
         <div className="flex h-16 items-center justify-between tab:h-[72px]">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="flex items-center gap-2.5 group"
-              aria-label="CallScore home"
-            >
-              <CallScoreBrand />
-            </Link>
-          </div>
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 group"
+            aria-label="CallScore home"
+          >
+            <CallScoreBrand />
+          </Link>
 
           {/* Desktop nav */}
           <nav
-            className="hidden desk:flex items-center gap-6 font-mono text-mono-sm uppercase tracking-caps"
+            className="hidden desk:flex items-center gap-5 font-mono text-mono-sm uppercase tracking-caps"
             aria-label="Primary navigation"
           >
             <Link
@@ -35,6 +32,24 @@ export default async function Header(): Promise<ReactElement> {
               className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
             >
               LEADERBOARD
+            </Link>
+            <Link
+              href="/backtest"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
+            >
+              BACKTEST
+            </Link>
+            <Link
+              href="/settings/alerts"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
+            >
+              ALERTS
+            </Link>
+            <Link
+              href="/settings/webhooks"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
+            >
+              WEBHOOKS
             </Link>
             <Link
               href="/methodology"
@@ -49,45 +64,29 @@ export default async function Header(): Promise<ReactElement> {
               PRICING
             </Link>
 
-            {loggedIn ? (
-              <div className="flex items-center gap-6 border-l border-ink-250 pl-8">
-                <TierBadge tier={tier} />
+            <div className="flex items-center gap-5 border-l border-ink-250 pl-6">
+              <TierBadge tier={tier} />
+              {session && (
                 <Link
                   href="/settings"
                   className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
                 >
                   ACCOUNT
                 </Link>
-                <form action="/api/auth/logout" method="post">
-                  <button
-                    type="submit"
-                    className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
-                  >
-                    <span className="hidden desk:inline">LOGOUT</span>
-                  </button>
-                </form>
-              </div>
-            ) : (
-              <div className="flex items-center gap-8 border-l border-ink-250 pl-8">
-                <Link
-                  href="/api/auth/whop"
-                  prefetch={false}
-                  className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
-                >
-                  SIGN IN
-                </Link>
+              )}
+              {tier === "free" && (
                 <Link
                   href="/pricing"
                   className="border border-accent/60 bg-transparent px-3.5 py-2 text-accent transition-colors hover:border-accent hover:bg-accent-low focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   GET ACCESS
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
           </nav>
 
           {/* Mobile menu (client island) */}
-          <MobileMenu loggedIn={loggedIn} tier={tier} />
+          <MobileMenu authenticated={Boolean(session)} tier={tier} />
         </div>
       </div>
     </header>
