@@ -39,6 +39,7 @@ export interface PipelineJob {
   readonly max_attempts: number;
   readonly locked_by: string | null;
   readonly locked_at: string | null;
+  readonly heartbeat_at: string | null;
   readonly run_after: string;
   readonly idempotency_key: string | null;
   readonly error: string | null;
@@ -148,6 +149,10 @@ export function matchPricesBatchRunKey(now = new Date()): string {
 
 export function computeScoresRunKey(now = new Date()): string {
   return dailyRunKey("compute-scores", now);
+}
+
+export function mlPromotionRunKey(now = new Date()): string {
+  return dailyRunKey("ml-promotion", now);
 }
 
 export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
@@ -297,6 +302,7 @@ SET
   status = 'running',
   locked_by = $1,
   locked_at = NOW(),
+  heartbeat_at = NOW(),
   attempts = attempts + 1,
   updated_at = NOW()
 WHERE id = (
@@ -311,6 +317,72 @@ WHERE id = (
   LIMIT 1
 )
 RETURNING *`;
+
+export async function updatePipelineJobHeartbeat(
+  job: Pick<PipelineJob, "id" | "run_id" | "locked_by">,
+  payload: Record<string, unknown> = {},
+): Promise<void> {
+  await query(
+    `UPDATE pipeline_jobs
+     SET heartbeat_at = NOW(),
+         updated_at = NOW()
+     WHERE id = `,
+    [job.id],
+  );
+
+  await appendPipelineJobEvent({
+    runId: job.run_id,
+    jobId: job.id,
+    eventType: "heartbeat",
+    status: "running",
+    message: "Worker heartbeat",
+    payload,
+  });
+}
+
+export async function resetStalePipelineJobs(input: {
+  readonly staleSeconds?: number;
+  readonly workerId?: string;
+} = {}): Promise<readonly PipelineJob[]> {
+  const staleSeconds = Math.max(60, Math.floor(input.staleSeconds ?? DEFAULT_STUCK_JOB_SECONDS));
+  const resetJobs = await query<PipelineJob>(
+    `UPDATE pipeline_jobs
+     SET status = 'pending',
+         locked_by = NULL,
+         locked_at = NULL,
+         heartbeat_at = NULL,
+         run_after = NOW(),
+         updated_at = NOW()
+     WHERE id IN (
+       SELECT id
+       FROM pipeline_jobs
+       WHERE status = 'running'
+         AND (
+           (heartbeat_at IS NOT NULL AND heartbeat_at < NOW() - ($1::int * INTERVAL '1 second'))
+           OR (heartbeat_at IS NULL AND locked_at IS NOT NULL AND locked_at < NOW() - ($1::int * INTERVAL '1 second'))
+         )
+       FOR UPDATE SKIP LOCKED
+     )
+     RETURNING *`,
+    [staleSeconds],
+  );
+
+  await Promise.all(
+    resetJobs.map((staleJob) => appendPipelineJobEvent({
+      runId: staleJob.run_id,
+      jobId: staleJob.id,
+      eventType: "stale_reset",
+      status: "pending",
+      message: "Recovered stale running job",
+      payload: {
+        stale_seconds: staleSeconds,
+        reset_by: input.workerId ?? null,
+      },
+    })),
+  );
+
+  return resetJobs.map(normalizeJob);
+}
 
 export async function claimNextPipelineJob(input: ClaimNextJobInput): Promise<PipelineJob | null> {
   if (input.types.length === 0) return null;

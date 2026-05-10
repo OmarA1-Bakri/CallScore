@@ -7,6 +7,19 @@ import {
   DEFAULT_OLLAMA_BAKEOFF_MODELS,
   parseOllamaBakeoffArgs,
 } from "../src/scripts/bakeoff-ollama-cloud-models";
+import {
+  calculateClassificationMetrics,
+  classifyFalsePositive,
+  scoreExtractionSet,
+} from "../src/lib/llm-eval";
+import {
+  buildKeywordWindows,
+  scoreTranscriptForExtraction,
+} from "../src/lib/extraction-triage";
+import {
+  buildLowConfidenceReextractArgs,
+  parseLowConfidenceReextractArgs,
+} from "../src/scripts/reextract-low-confidence-videos";
 
 function toPosixPath(value: string): string {
   return value.replace(/\\/g, "/");
@@ -97,4 +110,90 @@ test("ollama bakeoff wires each model through shadow extract and shadow diff", (
   assert.ok(diff.includes(paths.shadowOut));
   assert.ok(diff.includes("--diff-out"));
   assert.ok(diff.includes(paths.diffOut));
+});
+
+test("LLM gold-set metrics compute precision recall F1 and false-positive buckets", () => {
+  const metrics = scoreExtractionSet(
+    [
+      { symbol: "BTCUSDT", direction: "bullish", raw_quote: "Bitcoin can break resistance" },
+      { symbol: "ETHUSDT", direction: "bullish", raw_quote: "Join my sponsor link below" },
+    ],
+    [{ symbol: "BTCUSDT", direction: "bullish" }],
+  );
+
+  assert.deepEqual(calculateClassificationMetrics({
+    truePositives: 1,
+    falsePositives: 1,
+    falseNegatives: 0,
+  }), metrics);
+  assert.equal(metrics.precision, 0.5);
+  assert.equal(metrics.recall, 1);
+  assert.ok(Math.abs(metrics.f1 - 0.667) <= 1e-3, `F1 ${metrics.f1} should be approximately 0.667`);
+  assert.equal(classifyFalsePositive({ symbol: "ETHUSDT", direction: "bullish", raw_quote: "Join my sponsor link below" }), "sponsor_or_link");
+});
+
+test("triage builds keyword windows around actionable transcript snippets", () => {
+  const KEYWORD_WINDOW_SIZE = 160;  // Character window size for keyword extraction
+  const MAX_KEYWORD_WINDOWS = 3;    // Maximum number of windows to extract
+  const transcript = "Intro. ".repeat(100) + "Bitcoin is near support and I would buy BTC for a breakout target.";
+  assert.ok(scoreTranscriptForExtraction(transcript) > 0);
+  const windows = buildKeywordWindows(transcript, KEYWORD_WINDOW_SIZE, MAX_KEYWORD_WINDOWS);
+  assert.equal(windows[0].symbol, "BTCUSDT");
+  assert.match(windows[0].text, /buy BTC|Bitcoin/i);
+});
+
+test("extraction scoring handles false negatives", () => {
+  const metrics = scoreExtractionSet(
+    [{ symbol: "BTCUSDT", direction: "bullish", raw_quote: "Bitcoin will rise" }],
+    [
+      { symbol: "BTCUSDT", direction: "bullish" },
+      { symbol: "ETHUSDT", direction: "bearish" },
+    ],
+  );
+  assert.ok(metrics.falseNegatives > 0, "Should have false negatives for missing predictions");
+  assert.ok(metrics.recall < 1, "Recall should be less than 1 when predictions are incomplete");
+});
+
+test("extraction scoring handles empty predictions", () => {
+  const metrics = scoreExtractionSet(
+    [],
+    [{ symbol: "BTCUSDT", direction: "bullish" }],
+  );
+  assert.equal(metrics.precision, 0, "Precision should be 0 with no predictions");
+  assert.equal(metrics.recall, 0, "Recall should be 0 with no predictions");
+});
+
+test("extraction scoring handles empty gold set", () => {
+  const metrics = scoreExtractionSet(
+    [{ symbol: "BTCUSDT", direction: "bullish", raw_quote: "Bitcoin" }],
+    [],
+  );
+  assert.equal(metrics.recall, 0, "Recall should be 0 when there are no gold standard items");
+});
+
+test("extraction scoring handles all incorrect predictions", () => {
+  const metrics = scoreExtractionSet(
+    [
+      { symbol: "DOGEUSDT", direction: "neutral", raw_quote: "Random text" },
+      { symbol: "ADAUSDT", direction: "bearish", raw_quote: "More text" },
+    ],
+    [{ symbol: "BTCUSDT", direction: "bullish" }],
+  );
+  assert.equal(metrics.truePositives, 0, "Should have no true positives");
+  assert.ok(metrics.falsePositives > 0, "Should have false positives");
+  assert.equal(metrics.precision, 0, "Precision should be 0 when all predictions are wrong");
+  assert.equal(metrics.f1, 0, "F1 should be 0 when precision is 0");
+});
+
+test("low-confidence re-extraction routes through stronger chunked extractor", () => {
+  const args = parseLowConfidenceReextractArgs(["--write", "--provider", "ollama", "--model", "kimi-k2.6", "--chunk-chars", "6000"]);
+  const mapped = buildLowConfidenceReextractArgs(args, [11, 12]);
+  const maxChunksIndex = mapped.indexOf("--max-chunks");
+  assert.ok(mapped.includes("--include-extracted"));
+  assert.ok(mapped.includes("--chunk-chars"));
+  assert.ok(mapped.includes("6000"));
+  assert.ok(maxChunksIndex >= 0);
+  assert.equal(mapped[maxChunksIndex + 1], String(args.maxChunks));
+  assert.ok(mapped.includes("--write"));
+  assert.equal(mapped.includes("--dry-run"), false);
 });

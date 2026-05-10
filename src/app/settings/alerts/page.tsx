@@ -10,12 +10,12 @@ import { creatorHandlePath } from "@/lib/creator-handles";
 import { query } from "@/lib/db";
 
 interface PageProps {
-  readonly searchParams?: Promise<{
+  readonly searchParams?: {
     readonly added?: string;
     readonly removed?: string;
     readonly error?: string;
     readonly q?: string;
-  }>;
+  };
 }
 
 interface CreatorOption {
@@ -93,9 +93,8 @@ function StatusNotice({
 }
 
 export default async function AlertSettingsPage({
-  searchParams: searchParamsPromise,
+  searchParams,
 }: PageProps) {
-  const searchParams = await searchParamsPromise;
   const session = await requireSessionAccess("pro");
   if (session instanceof Response) {
     const isGuest = session.status === 401;
@@ -108,7 +107,7 @@ export default async function AlertSettingsPage({
         <section className="border border-ink-250 bg-ink-50 p-5">
           <p className="font-serif text-[19px] text-ink-700">
             {isGuest
-              ? "Alerts require a Pro or Alpha plan."
+              ? "Open this app from your Whop product to access alerts."
               : "Pro unlocks creator watchlists and email alert delivery."}
           </p>
           <Link

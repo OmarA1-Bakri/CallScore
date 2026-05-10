@@ -24,7 +24,7 @@ export default async function NotificationsSettingsPage() {
       >
         <section className="border border-ink-250 bg-ink-50 p-5">
           <p className="font-serif text-[19px] leading-relaxed text-ink-700">
-            Notifications require a Pro or Alpha plan. View plans to get access.
+            Notifications require a Pro or Alpha plan. Open this app from your Whop product after upgrading to enable alerts.
           </p>
           <Link
             href="/pricing"

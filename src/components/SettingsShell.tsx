@@ -177,17 +177,38 @@ export default function SettingsShell({
             <div className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto border-b border-ink-250 pb-2 tab:block tab:space-y-1 tab:overflow-visible tab:border-b-0 tab:pb-0">
               {SETTINGS_TABS.map((item) => {
                 const selected = item.id === active;
-                const className = `flex min-h-10 min-w-fit items-center justify-between gap-4 border-b px-3 py-2 font-mono text-mono-sm uppercase tracking-caps transition-colors tab:border-b-0 tab:border-l-2 ${
-                  selected
-                    ? "border-accent bg-ink-50 text-ink-900"
-                    : "border-transparent text-ink-600 hover:text-ink-800"
-                }`;
+                const isPlanned = item.meta === "Planned";
+                const baseClassName = `flex min-h-10 min-w-fit items-center justify-between gap-4 border-b px-3 py-2 font-mono text-mono-sm uppercase tracking-caps transition-colors tab:border-b-0 tab:border-l-2`;
+                const className = isPlanned
+                  ? `${baseClassName} border-transparent cursor-not-allowed text-ink-400 opacity-60`
+                  : `${baseClassName} ${
+                      selected
+                        ? "border-accent bg-ink-50 text-ink-900"
+                        : "border-transparent text-ink-600 hover:text-ink-800"
+                    }`;
                 const content = (
                   <>
                     <span>{item.label}</span>
-                    <span className="text-[10px] text-ink-600">{item.meta}</span>
+                    <span className={`text-[10px] ${isPlanned ? "text-ink-350" : "text-ink-600"}`}>
+                      {item.meta}
+                    </span>
                   </>
                 );
+                
+                if (isPlanned) {
+                  return (
+                    <div
+                      key={item.id}
+                      className={className}
+                    >
+                      {content}
+                      <span className="sr-only">
+                        Planned - this feature is planned but not yet available.
+                      </span>
+                    </div>
+                  );
+                }
+                
                 return (
                   <Link
                     key={item.id}

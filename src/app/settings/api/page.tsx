@@ -35,7 +35,7 @@ export default async function ApiSettingsPage({
         <section className="border border-ink-250 bg-ink-50 p-5">
           <p className="text-ink-700 mb-4">
             {isGuest
-              ? "Whop attaches account access to this app when opened from a product experience."
+              ? "API access is attached when this app is opened from your Whop product."
               : "Alpha unlocks read-only API keys and Backtest Lab endpoints."}
           </p>
           <Link

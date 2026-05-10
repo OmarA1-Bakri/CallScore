@@ -13,17 +13,16 @@ import {
 const WEBHOOKS_ROUTE = "/api/webhooks";
 
 interface PageProps {
-  readonly searchParams?: Promise<{
+  readonly searchParams?: {
     readonly disabled?: string;
     readonly error?: string;
     readonly tested?: string;
-  }>;
+  };
 }
 
 export default async function WebhookSettingsPage({
-  searchParams: searchParamsPromise,
+  searchParams,
 }: PageProps) {
-  const searchParams = await searchParamsPromise;
   const session = await requireSessionAccess("alpha");
   if (session instanceof Response) {
     const isGuest = session.status === 401;
@@ -36,7 +35,7 @@ export default async function WebhookSettingsPage({
         <section className="border border-ink-250 bg-ink-50 p-5">
           <p className="text-ink-700 mb-4">
             {isGuest
-              ? "Subscribe to an Alpha plan to access webhook features."
+              ? "Sign in through Whop to access webhook features."
               : "Alpha unlocks signed webhook notifications and delivery logs."}
           </p>
           <Link

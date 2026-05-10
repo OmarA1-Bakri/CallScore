@@ -30,7 +30,7 @@ export default function MobileMenu({
     <div className="relative desk:hidden">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex h-[44px] w-[44px] items-center justify-center text-ink-600 hover:text-ink-900"
+        className="inline-flex h-11 w-11 items-center justify-center text-ink-600 hover:text-ink-900"
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         aria-controls="mobile-nav"

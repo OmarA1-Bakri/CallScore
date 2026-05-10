@@ -4,18 +4,24 @@ import {
   claimNextPipelineJob,
   completePipelineJob,
   enqueuePipelineJob,
+  resetStalePipelineJobs,
   retryOrFailPipelineJob,
+  updatePipelineJobHeartbeat,
   type PipelineJob,
 } from "../lib/pipeline";
-import { runMlVerifierBatch } from "../lib/ml-verifier";
-import { query } from "../lib/db";
-import { createLogger } from "../lib/logger";
-import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
 import {
   runCandleRefreshJob,
   runComputeScoresJob,
   runMatchPricesJob,
 } from "../lib/pipeline-jobs";
+import { runMlVerifierBatch } from "../lib/ml-verifier";
+import {
+  PROMOTE_ML_VERIFIED_JOB_TYPE,
+  runMlPromotionJob,
+} from "../lib/ml-promotion";
+import { query } from "../lib/db";
+import { createLogger } from "../lib/logger";
+import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
 import { loadEnv, sleep, timestamp } from "./script-helpers";
 
 export const SUPPORTED_JOB_TYPES = [
@@ -24,8 +30,10 @@ export const SUPPORTED_JOB_TYPES = [
   "candle_refresh",
   "match_prices_batch",
   "compute_scores",
+  PROMOTE_ML_VERIFIED_JOB_TYPE,
 ] as const;
 const DEFAULT_POLL_MS = 15_000;
+const HEARTBEAT_INTERVAL_MS = 30_000;
 
 interface WorkerArgs {
   readonly once: boolean;
@@ -98,7 +106,32 @@ async function executeJob(job: PipelineJob): Promise<Record<string, unknown>> {
   if (job.type === "candle_refresh") return runCandleRefreshJob(job);
   if (job.type === "match_prices_batch") return runMatchPricesJob(job);
   if (job.type === "compute_scores") return runComputeScoresJob();
+  if (job.type === PROMOTE_ML_VERIFIED_JOB_TYPE) return runMlPromotionJob(job);
   throw new Error(`Unsupported pipeline job type: ${job.type}`);
+}
+
+export async function executeJobWithKeepalive(
+  job: PipelineJob,
+  logger: ReturnType<typeof createLogger>,
+): Promise<Record<string, unknown>> {
+  await updatePipelineJobHeartbeat(job, { worker_id: job.locked_by, phase: "start" });
+
+  const heartbeat = setInterval(() => {
+    void updatePipelineJobHeartbeat(job, { worker_id: job.locked_by }).catch((error) => {
+      logger.warn("job_heartbeat_failed", {
+        job_id: job.id,
+        run_id: job.run_id,
+        job_type: job.type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }, HEARTBEAT_INTERVAL_MS);
+
+  try {
+    return await executeJob(job);
+  } finally {
+    clearInterval(heartbeat);
+  }
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -128,6 +161,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   while (!stopping && processed < args.maxJobs) {
+    const resetJobs = await resetStalePipelineJobs({ workerId: args.workerId });
+    if (resetJobs.length > 0) {
+      logger.warn("stale_jobs_reset", {
+        job_ids: resetJobs.map((job) => job.id),
+        count: resetJobs.length,
+      });
+    }
+
     const job = await claimNextPipelineJob({ workerId: args.workerId, types: claimTypes });
     if (!job) {
       if (args.once) {
@@ -146,7 +187,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       max_attempts: job.max_attempts,
     });
     try {
-      const metrics = await executeJob(job);
+      const metrics = await executeJobWithKeepalive(job, logger);
       await completePipelineJob(job, metrics);
       logger.info("job_completed", {
         job_id: job.id,

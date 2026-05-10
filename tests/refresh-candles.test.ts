@@ -7,6 +7,12 @@ import {
   parseCandleRefreshArgs,
 } from "../src/scripts/refresh-candles";
 import { INVALID_CANDLE_OPEN_TIME_SQL } from "../src/scripts/validate-candle-open-time-constraint";
+import {
+  buildDataVisionMonthlyUrl,
+  enumerateMonths,
+  parseBulkBackfillArgs,
+  parseDataVisionCsv,
+} from "../src/scripts/backfill-candles-data-vision";
 
 const MINUTE = 60_000;
 
@@ -69,4 +75,37 @@ test("candle open_time guard accepts milliseconds and rejects seconds", () => {
 test("candle constraint validation audits invalid legacy rows before ALTER VALIDATE", () => {
   assert.match(INVALID_CANDLE_OPEN_TIME_SQL, /COUNT\(\*\)::bigint AS invalid_count/i);
   assert.match(INVALID_CANDLE_OPEN_TIME_SQL, /open_time < \$1 OR open_time > \$2/i);
+});
+
+test("Binance data.vision bulk backfill is bounded and dry-run by default", () => {
+  const args = parseBulkBackfillArgs([
+    "--symbols",
+    "btcusdt,ethusdt",
+    "--start-month",
+    "2026-01",
+    "--end-month",
+    "2026-03",
+    "--max-files-per-symbol",
+    "2",
+  ]);
+
+  assert.equal(args.write, false);
+  assert.deepEqual(args.symbols, ["BTCUSDT", "ETHUSDT"]);
+  assert.deepEqual(enumerateMonths(args.startMonth, args.endMonth, args.maxFilesPerSymbol), ["2026-01", "2026-02"]);
+  assert.equal(
+    buildDataVisionMonthlyUrl("btcusdt", "2026-01"),
+    "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2026-01.zip",
+  );
+});
+
+test("Binance data.vision CSV parser keeps valid millisecond candles", () => {
+  const rows = parseDataVisionCsv([
+    "open_time,open,high,low,close,volume",
+    "1767225600000,100,110,90,105,123",
+    "1767225660,100,110,90,105,123",
+  ].join("\n"));
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].open_time, 1767225600000);
+  assert.equal(rows[0].close, 105);
 });

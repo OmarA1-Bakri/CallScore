@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { join, normalize, relative } from "node:path";
+import { fileURLToPath, URL } from "node:url";
+import { normalize, relative } from "node:path";
 import { getMigrationFiles, splitSqlStatements } from "../src/scripts/migrate";
 
-const root = join(__dirname, "..");
+const root = fileURLToPath(new URL("..", import.meta.url));
 
 test("migration plan applies schema then numbered migrations in order", () => {
   const labels = getMigrationFiles(root).map((file) => normalize(relative(root, file.filePath)));
@@ -19,6 +20,11 @@ test("migration plan applies schema then numbered migrations in order", () => {
     normalize("migrations/007-product-surface-observability.sql"),
     normalize("migrations/008-candles-guardrails.sql"),
     normalize("migrations/009-validate-candles-open-time.sql"),
+    normalize("migrations/010-pipeline-heartbeats.sql"),
+    normalize("migrations/011-candle-daily-closes.sql"),
+    normalize("migrations/012-video-transcript-status.sql"),
+    normalize("migrations/013-llm-gold-examples.sql"),
+    normalize("migrations/014-ml-promotion-audit.sql"),
   ]);
 });
 

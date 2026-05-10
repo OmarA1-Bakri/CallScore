@@ -43,9 +43,23 @@ import {
   shouldProcessInBatches,
   summarizeAuditResults,
 } from "../src/scripts/audit-recompute";
+import {
+  parseRssApiDiscoveryArgs,
+  parseYouTubeRss,
+  upsertVideo,
+} from "../src/scripts/discover-videos-rss-api";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { splitSqlStatements } from "../src/scripts/migrate";
 
 function toPosixPath(value: string): string {
   return value.replace(/\\/g, "/");
+}
+
+const root = join(__dirname, "..");
+
+function read(relativePath: string): string {
+  return readFileSync(join(root, relativePath), "utf8");
 }
 
 test("data pipeline defaults to safe local dry-run for top creators", () => {
@@ -184,6 +198,69 @@ test("match-prices defaults to incomplete market data and parses full recompute 
 test("match-prices exposes a stable advisory lock id for single-run idempotency", () => {
   assert.equal(Number.isInteger(MATCH_PRICES_ADVISORY_LOCK_ID), true);
   assert.ok(MATCH_PRICES_ADVISORY_LOCK_ID > 0);
+});
+
+test("RSS/API video discovery is dry-run by default and parses YouTube RSS", () => {
+  const args = parseRssApiDiscoveryArgs([
+    "--source",
+    "auto",
+    "--limit-creators",
+    "2",
+    "--limit-videos",
+    "10",
+  ]);
+  assert.equal(args.write, false);
+  assert.equal(args.source, "auto");
+  assert.equal(args.limitCreators, 2);
+  assert.equal(args.limitVideos, 10);
+
+  const videos = parseYouTubeRss(`
+    <feed xmlns:yt="http://www.youtube.com/xml/schemas/2015">
+      <entry><yt:videoId>abc123</yt:videoId><title>A &amp; B</title><published>2026-05-01T00:00:00+00:00</published></entry>
+      <entry><yt:videoId>def456</yt:videoId><title>Second</title><published>2026-05-02T00:00:00+00:00</published></entry>
+      <entry><yt:videoId>ghi789</yt:videoId><title>Third</title><published>2026-05-03T00:00:00+00:00</published></entry>
+      <entry><yt:videoId>jkl012</yt:videoId><title>Fourth</title><published>2026-05-04T00:00:00+00:00</published></entry>
+      <entry><yt:videoId>mno345</yt:videoId><title>Fifth</title><published>2026-05-05T00:00:00+00:00</published></entry>
+      <entry><yt:videoId>pqr678</yt:videoId><title>Sixth</title><published>2026-05-06T00:00:00+00:00</published></entry>
+    </feed>
+  `, 5);
+  assert.equal(videos.length, 5);
+  assert.deepEqual(videos[0], {
+    youtube_video_id: "abc123",
+    title: "A & B",
+    published_at: "2026-05-01T00:00:00+00:00",
+    source: "rss",
+  });
+  assert.equal(videos[4]?.youtube_video_id, "mno345");
+});
+
+test("transcript status migration gates provider waterfall state", async () => {
+  const statements = splitSqlStatements(read("migrations/012-video-transcript-status.sql"));
+  const normalizedStatements = statements.map((statement) => statement.replace(/\s+/g, " ").trim());
+  assert.ok(normalizedStatements.some((statement) => statement.includes("transcript_status TEXT")));
+  assert.ok(normalizedStatements.some((statement) => statement.includes("transcript_attempts INTEGER")));
+  assert.ok(normalizedStatements.some((statement) => statement.includes("transcript_provider TEXT")));
+  assert.ok(normalizedStatements.some((statement) => statement.includes("idx_videos_transcript_status")));
+
+  const queries: string[] = [];
+  await upsertVideo(
+    { id: 7 } as never,
+    {
+      youtube_video_id: "abc123",
+      title: "Example",
+      published_at: "2026-05-01T00:00:00+00:00",
+      source: "rss",
+    },
+    async <T>(text: string): Promise<T[]> => {
+      queries.push(text.replace(/\s+/g, " ").trim());
+      return [] as T[];
+    },
+  );
+
+  assert.equal(queries.length, 1);
+  assert.match(queries[0] ?? "", /transcript_status, transcript_attempts, transcript_provider/);
+  assert.match(queries[0] ?? "", /WHEN videos\.transcript IS NOT NULL AND videos\.transcript <> '' THEN 'available'/);
+  assert.match(queries[0] ?? "", /ELSE COALESCE\(videos\.transcript_status, 'pending'\)/);
 });
 
 test("match-prices skips work under advisory-lock contention", async () => {

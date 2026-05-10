@@ -5,8 +5,6 @@ import { addWatch, removeWatch } from "@/lib/alerts";
 import { withNoStore } from "@/lib/http-cache";
 import { parseCreatorId, isForeignKeyViolation } from "./helpers";
 
-export const dynamic = "force-dynamic";
-
 interface WatchPayload {
   readonly creatorId?: unknown;
 }

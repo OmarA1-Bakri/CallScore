@@ -1,11 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { NextRequest } from "next/server";
 import {
   CLAIM_NEXT_PIPELINE_JOB_SQL,
   candleRefreshRunKey,
   computeScoresRunKey,
   matchPricesBatchRunKey,
+  mlPromotionRunKey,
+  resetStalePipelineJobs,
+  updatePipelineJobHeartbeat,
   type PipelineJob,
 } from "../src/lib/pipeline";
 import { candleRefreshArgsFromPayload, matchPricesArgsFromPayload } from "../src/lib/pipeline-jobs";
@@ -16,11 +21,27 @@ import {
   sortAndDedupeVerifierCandidates,
   type MlVerifierCandidate,
 } from "../src/lib/ml-verifier";
+import {
+  PROMOTE_ML_VERIFIED_JOB_TYPE,
+  buildMlPromotionCandidateSql,
+  runMlPromotionJob,
+  validateMlPromotionGates,
+} from "../src/lib/ml-promotion";
 import { POST as enqueueMlCron } from "../src/app/api/cron/ml/enqueue/route";
 import { POST as enqueueCandlesCron } from "../src/app/api/cron/candles/enqueue/route";
 import { POST as enqueueMatchCron } from "../src/app/api/cron/match/enqueue/route";
 import { POST as enqueueScoresCron } from "../src/app/api/cron/scores/enqueue/route";
-import { SUPPORTED_JOB_TYPES } from "../src/scripts/hermes-worker";
+import {
+  SUPPORTED_JOB_TYPES,
+  executeJobWithKeepalive,
+} from "../src/scripts/hermes-worker";
+import { buildSetBasedMatchSql } from "../src/scripts/match-prices-set-based";
+
+const root = join(__dirname, "..");
+
+function read(relativePath: string): string {
+  return readFileSync(join(root, relativePath), "utf8");
+}
 
 function candidate(overrides: Partial<MlVerifierCandidate>): MlVerifierCandidate {
   return {
@@ -57,6 +78,7 @@ function job(payload: Record<string, unknown> = { batch_size: 1 }): PipelineJob 
     max_attempts: 3,
     locked_by: "test-worker",
     locked_at: "2026-01-01T00:00:00.000Z",
+    heartbeat_at: "2026-01-01T00:00:00.000Z",
     run_after: "2026-01-01T00:00:00.000Z",
     idempotency_key: "test-key",
     error: null,
@@ -69,6 +91,30 @@ test("pipeline job claim SQL uses row locks with SKIP LOCKED", () => {
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /FOR UPDATE SKIP LOCKED/i);
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /status = 'pending'/i);
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /attempts < max_attempts/i);
+  assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /heartbeat_at = NOW\(\)/i);
+});
+
+test("Phase 2 pipeline recovery adds heartbeats, keepalive, and stale reset semantics", () => {
+  const migration = read("migrations/010-pipeline-heartbeats.sql");
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ/i);
+  assert.match(migration, /idx_pipeline_jobs_stale_running/i);
+  assert.equal(typeof updatePipelineJobHeartbeat, "function");
+  assert.equal(typeof resetStalePipelineJobs, "function");
+  assert.equal(typeof executeJobWithKeepalive, "function");
+  assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /FOR UPDATE SKIP LOCKED/i);
+});
+
+test("Phase 3 set-based matcher uses lateral candle lookups and SQL batch update", () => {
+  const sql = buildSetBasedMatchSql(false);
+  assert.match(sql, /WITH candidates AS/i);
+  assert.match(sql, /LEFT JOIN LATERAL/i);
+  assert.match(sql, /UPDATE calls c/i);
+  assert.match(sql, /RETURNING c\.id/i);
+  assert.match(sql, /price_at_call IS NULL/i);
+
+  const migration = read("migrations/011-candle-daily-closes.sql");
+  assert.match(migration, /CREATE MATERIALIZED VIEW IF NOT EXISTS candle_daily_closes/i);
+  assert.match(migration, /uniq_candle_daily_closes_symbol_day/i);
 });
 
 test("Phase 1 automation jobs use deterministic daily idempotency keys", () => {
@@ -76,6 +122,7 @@ test("Phase 1 automation jobs use deterministic daily idempotency keys", () => {
   assert.equal(candleRefreshRunKey(now), "candle-refresh:2026-05-05");
   assert.equal(matchPricesBatchRunKey(now), "match-prices-batch:2026-05-05");
   assert.equal(computeScoresRunKey(now), "compute-scores:2026-05-05");
+  assert.equal(mlPromotionRunKey(now), "ml-promotion:2026-05-05");
 });
 
 test("Hermes worker advertises Phase 1 job types while keeping dry-run smoke support", () => {
@@ -83,6 +130,7 @@ test("Hermes worker advertises Phase 1 job types while keeping dry-run smoke sup
   assert.ok(SUPPORTED_JOB_TYPES.includes("candle_refresh"));
   assert.ok(SUPPORTED_JOB_TYPES.includes("match_prices_batch"));
   assert.ok(SUPPORTED_JOB_TYPES.includes("compute_scores"));
+  assert.ok(SUPPORTED_JOB_TYPES.includes(PROMOTE_ML_VERIFIED_JOB_TYPE));
 });
 
 test("Phase 1 job payload parsers keep bounded production-safe defaults", () => {
@@ -187,6 +235,122 @@ test("provider failures record a retryable verifier event", async () => {
 
   assert.ok(eventParams.some((params) => params.includes("ml_verifier_provider_error")));
   assert.ok(eventParams.some((params) => params.includes("retryable_error")));
+});
+
+test("Phase 6 ML promotion gates are disabled by default and require review, shadow diff, and gold set pass", () => {
+  const blocked = validateMlPromotionGates({
+    manualReviewApproved: false,
+    manualReviewedBy: null,
+    manualReviewTicket: null,
+    shadowDiffPassed: false,
+    goldSetPassed: false,
+  }, {});
+
+  assert.equal(blocked.passed, false);
+  assert.deepEqual(blocked.blockers, [
+    "ml_promotion_disabled",
+    "manual_review_required",
+    "shadow_diff_required",
+    "gold_set_required",
+  ]);
+  assert.equal(blocked.preserves_public_confidence_threshold, true);
+
+  const passed = validateMlPromotionGates({
+    manualReviewApproved: true,
+    manualReviewedBy: "ops",
+    manualReviewTicket: "review-123",
+    shadowDiffPassed: true,
+    goldSetPassed: true,
+  }, { ML_PROMOTION_ENABLED: "true" });
+
+  assert.equal(passed.passed, true);
+});
+
+test("Phase 6 ML promotion SQL only selects approved verifier rows below public threshold", () => {
+  const sql = buildMlPromotionCandidateSql();
+  assert.match(sql, /decision = 'approve'/);
+  assert.match(sql, /recommended_extraction_confidence >= \$3/);
+  assert.match(sql, /c\.extraction_confidence < \$3/);
+  assert.doesNotMatch(sql, /recommended_extraction_confidence >= \$2/);
+  assert.match(read("migrations/014-ml-promotion-audit.sql"), /CREATE TABLE IF NOT EXISTS ml_promotion_audit/);
+});
+
+test("Phase 6 dry-run promotion writes audit events and does not update calls", async () => {
+  const statements: string[] = [];
+  const params: unknown[][] = [];
+  const promotionJob = job({
+    batch_size: 1,
+    limit: 10,
+    write: false,
+    prompt_version: "ml-verifier-v1",
+  });
+  const queryFn = async <T>(text: string, queryParams: unknown[] = []): Promise<T[]> => {
+    statements.push(text);
+    params.push(queryParams);
+    if (text.includes("FROM latest_verification")) {
+      return [{
+        call_id: 123,
+        current_extraction_confidence: 0.4,
+        recommended_extraction_confidence: 0.91,
+        verifier_confidence: 0.93,
+        verification_run_id: 456,
+      }] as T[];
+    }
+    if (text.includes("INSERT INTO ml_promotion_audit")) return [{ id: 9 }] as T[];
+    return [] as T[];
+  };
+
+  const metrics = await runMlPromotionJob(promotionJob, { queryFn, env: {} });
+
+  assert.equal(metrics.dry_run, true);
+  assert.equal(metrics.selected, 1);
+  assert.equal(metrics.promoted, 0);
+  assert.ok(statements.some((statement) => /INSERT INTO ml_promotion_audit/i.test(statement)));
+  assert.ok(params.some((paramSet) => paramSet.includes("ml_promotion_dry_run")));
+  assert.equal(
+    statements.some((statement) => /\bUPDATE\s+calls\b/i.test(statement)),
+    false,
+  );
+});
+
+test("Phase 6 write promotion preserves the public confidence threshold floor", async () => {
+  const statements: string[] = [];
+  const promotionJob = job({
+    limit: 10,
+    write: true,
+    prompt_version: "ml-verifier-v1",
+    manual_review_approved: true,
+    manual_reviewed_by: "ops",
+    manual_review_ticket: "review-123",
+    shadow_diff_passed: true,
+    gold_set_passed: true,
+  });
+  const queryFn = async <T>(text: string, queryParams: unknown[] = []): Promise<T[]> => {
+    statements.push(text);
+    if (text.includes("WITH selected(call_id)")) {
+      return [{ promoted_count: 1, promoted_call_ids: [123] }] as T[];
+    }
+    if (text.includes("FROM latest_verification")) {
+      return [{
+        call_id: 123,
+        current_extraction_confidence: 0.4,
+        recommended_extraction_confidence: 0.91,
+        verifier_confidence: 0.93,
+        verification_run_id: 456,
+      }] as T[];
+    }
+    if (text.includes("INSERT INTO ml_promotion_audit")) return [{ id: 9 }] as T[];
+    return [] as T[];
+  };
+
+  const metrics = await runMlPromotionJob(promotionJob, {
+    queryFn,
+    env: { ML_PROMOTION_ENABLED: "true" },
+  });
+
+  assert.equal(metrics.promoted, 1);
+  assert.ok(statements.some((statement) => /SET extraction_confidence = GREATEST/i.test(statement)));
+  assert.ok(statements.some((statement) => /recommended_extraction_confidence >= \$4/i.test(statement)));
 });
 
 test("Vercel ML enqueue endpoint rejects missing or invalid CRON_SECRET before DB work", async () => {
