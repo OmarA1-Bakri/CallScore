@@ -30,7 +30,7 @@ export function mapLegacyBatchArgs(argv: readonly string[]): string[] {
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   logger.warn("legacy_entrypoint_redirect", {
     from: "src/scripts/extract-calls-batch.ts",
-    to: "src/scripts/extract-calls-openrouter.ts",
+    to: "src/scripts/extract-calls-llm.ts",
   });
   await openRouterExtractionMain(mapLegacyBatchArgs(argv));
 }

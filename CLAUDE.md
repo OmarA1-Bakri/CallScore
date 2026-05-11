@@ -23,7 +23,7 @@ Always require confirmation:
 - `rm -rf`, `DROP TABLE`, `TRUNCATE`, or any migration that destroys/rewrites rows in Neon
 - Re-running pipeline scripts that overwrite production data: `compute-scores`, `match-prices`, `audit-recompute`, `backfill-*`, `reextract-low-confidence-videos`, `promote-creator-candidates` against the prod `DATABASE_URL`
 - Anything touching production: Vercel deploys/promotes, environment-variable changes, Neon branch deletes, DNS, Resend sender setup
-- Spending API quota on third parties (Gemini, OpenRouter, Firecrawl, SerpAPI, Whop, Resend) when the run is large or open-ended
+- Spending API quota on third parties (Gemini, Ollama Cloud, Firecrawl, SerpAPI, Whop, Resend) when the run is large or open-ended
 - Publishing packages, posting to GitHub/Slack/email, or anything visible to others
 
 Safe by default: read-only commands (`git status`, `git diff`, `git log`), local builds, `npm test`, `npm run lint`, `npm run typecheck`, and edits inside the working tree.
@@ -179,13 +179,13 @@ Standard flows:
 - **Dev server**: `npm run dev` (Next.js on `localhost:3000`)
 - **Typecheck / lint / test / build**: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`
 - **DB migrate**: `npm run db:migrate` (reads files from [migrations/](migrations/))
-- **Pipeline**: use the current entrypoint guide in [docs/current-pipeline-entrypoints.md](docs/current-pipeline-entrypoints.md). Prefer `discover:videos → scrape:v2 → extract:openrouter → match → score → consensus`; `npm run scrape` / `npm run extract` are legacy compatibility paths.
+- **Pipeline**: use the current entrypoint guide in [docs/current-pipeline-entrypoints.md](docs/current-pipeline-entrypoints.md). Prefer `discover:videos → scrape:v2 → extract:llm → match → score → consensus`; `npm run scrape` / `npm run extract` are legacy compatibility paths.
 - **Audits**: `npm run audit:recompute`, `npm run audit:coverage`, `npm run audit:global`.
 
 Required environment (read from `.env.local` for dev; from Vercel env in prod):
 
 - `DATABASE_URL` — Neon Postgres connection string. Pipeline scripts will hit whichever DB this points at; double-check before running anything mutating.
-- `GEMINI_API_KEY` / `OPENROUTER_API_KEY` — used by `extract-calls*` scripts.
+- `GEMINI_API_KEY` / `OLLAMA_API_KEY` (or `OLLAMA_TOKEN`) — used by `extract-calls*` scripts (Ollama Cloud is the default provider; OpenRouter has been removed).
 - `RESEND_API_KEY` — alerts and feedback emails.
 - Optional integrations: Whop (`WHOP_*`), Firecrawl, SerpAPI for global creator discovery.
 

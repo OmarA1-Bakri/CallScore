@@ -23,12 +23,12 @@ function withoutOllamaHost<T>(fn: () => T): T {
   }
 }
 
-test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback", () => {
+test("CLI extraction defaults to Ollama Cloud with cloud model", () => {
   const args = withoutOllamaHost(() => parseOpenRouterExtractionArgs([]));
 
-  assert.equal(args.provider, "openrouter");
-  assert.equal(args.model, "google/gemma-4-31b-it:free");
-  assert.equal(args.fallbackModel, "google/gemma-4-31b-it");
+  assert.equal(args.provider, "ollama");
+  assert.equal(args.model, "kimi-k2.6:cloud");
+  assert.equal(args.fallbackModel, null);
   assert.equal(args.ollamaHost, "https://ollama.com");
   assert.equal(args.limit, 10);
   assert.equal(args.dryRun, true);
@@ -38,7 +38,7 @@ test("OpenRouter extraction defaults to Gemma 4 31B free with paid 31B fallback"
   assert.equal(args.chunkOverlap, 500);
   assert.equal(args.maxChunks, 100);
   assert.equal(args.chunkAgents, 1);
-  assert.equal(args.requestTimeoutMs, 60_000);
+  assert.equal(args.requestTimeoutMs, 180_000);
 });
 
 test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
@@ -72,7 +72,7 @@ test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
   assert.equal(explicitTimeout.requestTimeoutMs, 120_000);
 
   const invalidTimeout = parseOpenRouterExtractionArgs(["--request-timeout-ms", "0"]);
-  assert.equal(invalidTimeout.requestTimeoutMs, 60_000);
+  assert.equal(invalidTimeout.requestTimeoutMs, 180_000);
 });
 
 test("Ollama provider defaults to direct Ollama Cloud host and cloud model", () => {

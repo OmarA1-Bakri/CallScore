@@ -7,7 +7,7 @@ page to avoid accidentally choosing a superseded path.
 
 1. `npm run discover:videos`
 2. `npm run scrape:v2`
-3. `npm run extract:openrouter`
+3. `npm run extract:llm`
 4. `npm run match`
 5. `npm run score`
 6. `npm run consensus`
@@ -37,11 +37,11 @@ These compatibility wrappers remain so old runbooks fail safe while directing
 operators to the canonical implementations:
 
 - `src/scripts/scrape-transcripts.ts` redirects to `src/scripts/scrape-transcripts-v2.ts`
-- `src/scripts/extract-calls.ts` redirects to `src/scripts/extract-calls-openrouter.ts`
-- `src/scripts/extract-calls-batch.ts` redirects to `src/scripts/extract-calls-openrouter.ts` and ignores legacy cooldown flags
+- `src/scripts/extract-calls.ts` redirects to `src/scripts/extract-calls-llm.ts`
+- `src/scripts/extract-calls-batch.ts` redirects to `src/scripts/extract-calls-llm.ts` and ignores legacy cooldown flags
 
 `npm run scrape`, `npm run extract`, and `npm run pipeline` now point at the
-canonical v2/OpenRouter/data-pipeline paths directly.
+canonical v2/LLM/data-pipeline paths directly.
 
 ## Superseded design artifact
 

@@ -15,8 +15,7 @@
     "scrape:v2": "node --import tsx src/scripts/scrape-transcripts-v2.ts",
     "discover:videos": "node --import tsx src/scripts/discover-videos-365.ts",
     "discover:videos:rss-api": "node --import tsx src/scripts/discover-videos-rss-api.ts",
-    "extract": "node --import tsx src/scripts/extract-calls-openrouter.ts",
-    "extract:openrouter": "node --import tsx src/scripts/extract-calls-openrouter.ts",
+    "extract": "node --import tsx src/scripts/extract-calls-llm.ts",
     "extract:local": "node --import tsx src/scripts/extract-calls-local.ts",
     "match": "node --import tsx src/scripts/match-prices.ts",
     "score": "node --import tsx src/scripts/compute-scores.ts",
@@ -49,7 +48,8 @@
     "bakeoff:ollama": "node --import tsx src/scripts/bakeoff-ollama-cloud-models.ts",
     "eval:llm-gold": "node --import tsx src/scripts/evaluate-llm-gold-set.ts",
     "shadow:validate": "node --import tsx src/scripts/validate-shadow-extractions.ts",
-    "extract:batch": "node --import tsx src/scripts/extract-calls-batch.ts"
+    "extract:batch": "node --import tsx src/scripts/extract-calls-batch.ts",
+    "extract:llm": "node --import tsx src/scripts/extract-calls-llm.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

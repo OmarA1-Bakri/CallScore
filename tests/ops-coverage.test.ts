@@ -55,7 +55,7 @@ test("core production pipeline scripts use structured logger instead of console"
   for (const file of [
     "src/scripts/match-prices.ts",
     "src/scripts/detect-consensus.ts",
-    "src/scripts/extract-calls-openrouter.ts",
+    "src/scripts/extract-calls-llm.ts",
     "src/scripts/compute-scores.ts",
     "src/scripts/hermes-worker.ts",
   ]) {
@@ -150,12 +150,12 @@ test("legacy pipeline package scripts point at canonical entrypoints", () => {
 
   assert.match(pkg.scripts.scrape, /scrape-transcripts-v2\.ts/);
   assert.doesNotMatch(pkg.scripts.scrape, /scrape-transcripts\.ts/);
-  assert.match(pkg.scripts.extract, /extract-calls-openrouter\.ts/);
+  assert.match(pkg.scripts.extract, /extract-calls-llm\.ts/);
   assert.doesNotMatch(pkg.scripts.extract, /extract-calls\.ts(?:\s|$)/);
   assert.match(pkg.scripts.pipeline, /pipeline:data/);
 });
 
-test("legacy extractor wrappers redirect to canonical OpenRouter implementation", () => {
+test("legacy extractor wrappers redirect to canonical LLM extraction implementation", () => {
   assert.match(read("src/scripts/extract-calls.ts"), /extract-calls-openrouter/);
   assert.match(read("src/scripts/extract-calls-batch.ts"), /extract-calls-openrouter/);
   assert.match(read("src/scripts/scrape-transcripts.ts"), /scrape-transcripts-v2/);
