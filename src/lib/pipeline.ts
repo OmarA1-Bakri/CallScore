@@ -326,7 +326,7 @@ export async function updatePipelineJobHeartbeat(
     `UPDATE pipeline_jobs
      SET heartbeat_at = NOW(),
          updated_at = NOW()
-     WHERE id = `,
+     WHERE id = $1`,
     [job.id],
   );
 
