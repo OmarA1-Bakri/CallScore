@@ -121,13 +121,56 @@ function stripJsonFence(text: string): string {
 
 export function extractJsonObjectText(text: string): string {
   const trimmed = stripJsonFence(text);
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed;
+  // Strategy 1: whole string is already a JSON object
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      JSON.parse(trimmed);
+      return trimmed;
+    } catch {
+      // Not valid JSON, keep trying
+    }
+  }
 
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start >= 0 && end > start) return trimmed.slice(start, end + 1).trim();
+  // Strategy 2: find first '{' and last '}' with balanced braces
+  let start = -1;
+  let end = -1;
+  let depth = 0;
+  for (let i = 0; i < trimmed.length; i++) {
+    if (trimmed[i] === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (trimmed[i] === "}") {
+      depth--;
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+    }
+  }
+  if (start >= 0 && end > start) {
+    try {
+      const candidate = trimmed.slice(start, end + 1).trim();
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // keep trying
+    }
+  }
 
-  throw new Error("Verifier response did not contain a JSON object");
+  // Strategy 3: brute force indexOf {/lastIndexOf } — tolerate trailing comma etc
+  start = trimmed.indexOf("{");
+  end = trimmed.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      const candidate = trimmed.slice(start, end + 1).trim();
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // keep trying
+    }
+  }
+
+  throw new Error(`Response does not contain valid JSON object. Received: ${trimmed.slice(0, 300)}${trimmed.length > 300 ? " ..." : ""}`);
 }
 
 export function parseVerifierOutput(text: string): ParsedVerifierOutput {
@@ -605,12 +648,25 @@ export async function runMlVerifierBatch(
       await writeVerifierEvent({
         job,
         eventType: "ml_verifier_provider_error",
-        status: "retryable_error",
+        status: "review",
         message,
-        payload: { call_id: candidate.id, symbol: candidate.symbol },
+        payload: { call_id: candidate.id, symbol: candidate.symbol, error: message },
         queryFn,
       });
-      throw error;
+      // Degrade gracefully: mark candidate as "review" and continue.
+      // Do NOT throw — one bad LLM response must not abort 249 other candidates.
+      output = {
+        decision: "review",
+        reason_code: "unclear",
+        confidence: 0,
+        evidence_span: "",
+        recommended_extraction_confidence: 0,
+        reason: `LLM parse error: ${message.slice(0, 200)}`,
+      };
+      review += 1;
+      processed += 1;
+      await insertVerificationRun({ job, candidate, config, output, queryFn });
+      continue;
     }
 
     await insertVerificationRun({ job, candidate, config, output, queryFn });
