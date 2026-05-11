@@ -146,20 +146,17 @@ export function parseVerifierOutput(text: string): ParsedVerifierOutput {
   const evidenceSpan = typeof record.evidence_span === "string"
     ? record.evidence_span.trim()
     : "";
-  if (evidenceSpan.length === 0) {
-    throw new Error("Verifier evidence_span is required");
-  }
-
+  // evidence_span is optional — LLMs may omit or return empty
   return {
     decision: record.decision,
     reason_code: record.reason_code,
     confidence: zeroToOne(record.confidence, "confidence"),
-    evidence_span: evidenceSpan.slice(0, 4000),
+    evidence_span: evidenceSpan.slice(0, 4000) || "",
     recommended_extraction_confidence: zeroToOne(
       record.recommended_extraction_confidence,
       "recommended_extraction_confidence",
     ),
-    reason: typeof record.reason === "string" ? record.reason.trim().slice(0, 2000) : "",
+    reason: typeof record.reason === "string" ? record.reason : "",
   };
 }
 
