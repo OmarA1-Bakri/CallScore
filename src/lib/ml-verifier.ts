@@ -401,7 +401,7 @@ function fuzzyQuoteInTranscript(quote: string, transcript: string): {
 }
 
 /** Deterministic pre-checks before paying for an LLM call. */
-function deterministicPreCheck(candidate: MlVerifierCandidate): {
+export function deterministicPreCheck(candidate: MlVerifierCandidate): {
   readonly skipLLM: boolean;
   readonly output?: ParsedVerifierOutput;
 } {
@@ -446,7 +446,7 @@ function deterministicPreCheck(candidate: MlVerifierCandidate): {
   return { skipLLM: false };
 }
 
-function transcriptContext(candidate: MlVerifierCandidate, maxChars = 12_000): string {
+export function transcriptContext(candidate: MlVerifierCandidate, maxChars = 12_000): string {
   const transcript = candidate.transcript ?? "";
   const quote = sanitizeWhitespace(candidate.raw_quote ?? "");
   const lowerTranscript = transcript.toLowerCase();
