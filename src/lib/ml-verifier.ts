@@ -8,7 +8,7 @@ export const DEFAULT_ML_VERIFIER_PROVIDER = "ollama";
 export const DEFAULT_ML_VERIFIER_MODEL = "kimi-k2.6";
 export const DEFAULT_OLLAMA_HOST = "https://ollama.com";
 export const DEFAULT_ML_VERIFIER_TIMEOUT_MS = 180_000;
-export const DEFAULT_ML_VERIFIER_BATCH_SIZE = 250;
+export const DEFAULT_ML_VERIFIER_BATCH_SIZE = 50;
 
 const AMBIGUOUS_TICKER_SYMBOLS = [
   "LINKUSDT",
@@ -26,10 +26,12 @@ const REASON_CODES = [
   "non_actionable",
   "quote_not_in_transcript",
   "unclear",
+  "missing_evidence",
 ] as const;
 
 export type MlVerifierDecision = (typeof DECISIONS)[number];
 export type MlVerifierReasonCode = (typeof REASON_CODES)[number];
+export type ParseStrategy = "direct" | "brace_count" | "index_brace" | "failed" | "deterministic_precheck";
 
 type QueryFn = <T>(text: string, params?: unknown[]) => Promise<T[]>;
 
@@ -60,6 +62,8 @@ export interface ParsedVerifierOutput {
   readonly evidence_span: string;
   readonly recommended_extraction_confidence: number;
   readonly reason: string;
+  readonly parse_strategy?: ParseStrategy;
+  readonly raw_llm_response?: string;
 }
 
 export interface MlVerifierConfig {
@@ -119,13 +123,14 @@ function stripJsonFence(text: string): string {
   return text.trim().replace(/^```json?\s*/i, "").replace(/\s*```$/i, "").trim();
 }
 
-export function extractJsonObjectText(text: string): string {
+export function extractJsonObjectText(text: string): { readonly json: string; readonly strategy: ParseStrategy } {
   const trimmed = stripJsonFence(text);
+
   // Strategy 1: whole string is already a JSON object
   if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
     try {
       JSON.parse(trimmed);
-      return trimmed;
+      return { json: trimmed, strategy: "direct" };
     } catch {
       // Not valid JSON, keep trying
     }
@@ -151,7 +156,7 @@ export function extractJsonObjectText(text: string): string {
     try {
       const candidate = trimmed.slice(start, end + 1).trim();
       JSON.parse(candidate);
-      return candidate;
+      return { json: candidate, strategy: "brace_count" };
     } catch {
       // keep trying
     }
@@ -164,7 +169,7 @@ export function extractJsonObjectText(text: string): string {
     try {
       const candidate = trimmed.slice(start, end + 1).trim();
       JSON.parse(candidate);
-      return candidate;
+      return { json: candidate, strategy: "index_brace" };
     } catch {
       // keep trying
     }
@@ -173,8 +178,9 @@ export function extractJsonObjectText(text: string): string {
   throw new Error(`Response does not contain valid JSON object. Received: ${trimmed.slice(0, 300)}${trimmed.length > 300 ? " ..." : ""}`);
 }
 
-export function parseVerifierOutput(text: string): ParsedVerifierOutput {
-  const parsed: unknown = JSON.parse(extractJsonObjectText(text));
+export function parseVerifierOutput(text: string, rawResponse?: string): ParsedVerifierOutput {
+  const { json, strategy } = extractJsonObjectText(text);
+  const parsed: unknown = JSON.parse(json);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("Verifier response must be a JSON object");
   }
@@ -189,10 +195,13 @@ export function parseVerifierOutput(text: string): ParsedVerifierOutput {
   const evidenceSpan = typeof record.evidence_span === "string"
     ? record.evidence_span.trim()
     : "";
-  // evidence_span is optional — LLMs may omit or return empty
+  // evidence_span is optional — LLMs may omit or return empty.
+  // If empty, classify as missing_evidence rather than whatever the model said.
+  const reasonCode: MlVerifierReasonCode =
+    evidenceSpan.length === 0 ? "missing_evidence" : (record.reason_code as MlVerifierReasonCode);
   return {
     decision: record.decision,
-    reason_code: record.reason_code,
+    reason_code: reasonCode,
     confidence: zeroToOne(record.confidence, "confidence"),
     evidence_span: evidenceSpan.slice(0, 4000) || "",
     recommended_extraction_confidence: zeroToOne(
@@ -200,6 +209,8 @@ export function parseVerifierOutput(text: string): ParsedVerifierOutput {
       "recommended_extraction_confidence",
     ),
     reason: typeof record.reason === "string" ? record.reason : "",
+    parse_strategy: strategy,
+    raw_llm_response: rawResponse ?? json,
   };
 }
 
@@ -363,6 +374,78 @@ function sanitizeWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+/** Normalize text for fuzzy matching: lower, strip punctuation, collapse spaces. */
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Fuzzy quote-in-transcript check. Returns exact match, fuzzy match, or none. */
+function fuzzyQuoteInTranscript(quote: string, transcript: string): {
+  readonly exact: boolean;
+  readonly fuzzy: boolean;
+  readonly normalizedQuote: string;
+  readonly normalizedTranscript: string;
+} {
+  const nq = normalizeForMatch(quote);
+  const nt = normalizeForMatch(transcript);
+  return {
+    exact: transcript.toLowerCase().includes(quote.toLowerCase()),
+    fuzzy: nt.includes(nq),
+    normalizedQuote: nq,
+    normalizedTranscript: nt,
+  };
+}
+
+/** Deterministic pre-checks before paying for an LLM call. */
+function deterministicPreCheck(candidate: MlVerifierCandidate): {
+  readonly skipLLM: boolean;
+  readonly output?: ParsedVerifierOutput;
+} {
+  const quote = sanitizeWhitespace(candidate.raw_quote ?? "");
+  const transcript = candidate.transcript ?? "";
+
+  // 1. Quote not in transcript at all
+  if (quote.length > 0) {
+    const match = fuzzyQuoteInTranscript(quote, transcript);
+    if (!match.exact && !match.fuzzy) {
+      return {
+        skipLLM: true,
+        output: {
+          decision: "review",
+          reason_code: "quote_not_in_transcript",
+          confidence: 0,
+          evidence_span: "",
+          recommended_extraction_confidence: 0,
+          reason: `Quote not found in transcript (exact=${match.exact}, fuzzy=${match.fuzzy})`,
+          parse_strategy: "deterministic_precheck",
+        },
+      };
+    }
+  }
+
+  // 2. Missing evidence — empty or very short quote
+  if (!quote || quote.length < 4) {
+    return {
+      skipLLM: true,
+      output: {
+        decision: "review",
+        reason_code: "missing_evidence",
+        confidence: 0,
+        evidence_span: "",
+        recommended_extraction_confidence: 0,
+        reason: "raw_quote is missing or too short for deterministic verification",
+        parse_strategy: "deterministic_precheck",
+      },
+    };
+  }
+
+  return { skipLLM: false };
+}
+
 function transcriptContext(candidate: MlVerifierCandidate, maxChars = 12_000): string {
   const transcript = candidate.transcript ?? "";
   const quote = sanitizeWhitespace(candidate.raw_quote ?? "");
@@ -505,7 +588,7 @@ export async function verifyCandidateWithOllama(
   if (typeof content !== "string") {
     throw new Error(`Ollama verifier response missing message content: ${body.slice(0, 500)}`);
   }
-  return parseVerifierOutput(content);
+  return parseVerifierOutput(content, body);
 }
 
 function payloadNumber(payload: Record<string, unknown>, key: string, fallback: number): number {
@@ -520,6 +603,15 @@ async function insertVerificationRun(input: {
   readonly output: ParsedVerifierOutput;
   readonly queryFn: QueryFn;
 }): Promise<void> {
+  // Defensive: if the DB hasn't been migrated to accept "missing_evidence",
+  // fall back to "unclear" so the row still inserts. The true reason is preserved
+  // in the text `reason` field.
+  const safeReasonCode: MlVerifierReasonCode = REASON_CODES.includes(
+    input.output.reason_code,
+  )
+    ? input.output.reason_code
+    : "unclear";
+
   await input.queryFn(
     `INSERT INTO ml_verification_runs (
        run_id,
@@ -568,7 +660,7 @@ async function insertVerificationRun(input: {
       input.config.promptVersion,
       input.candidate.candidate_bucket,
       input.output.decision,
-      input.output.reason_code,
+      safeReasonCode,
       input.output.confidence,
       input.output.evidence_span,
       input.output.recommended_extraction_confidence,
@@ -617,6 +709,44 @@ export async function runMlVerifierBatch(
   const queryFn = deps.queryFn ?? defaultQuery;
   const config = resolveMlVerifierConfig();
   const batchSize = payloadNumber(job.payload, "batch_size", DEFAULT_ML_VERIFIER_BATCH_SIZE);
+
+  // Preflight diagnostics: queue depth and data-quality warnings
+  const totalUnverified = await queryFn<{ count: string }>(
+    `SELECT COUNT(*)::text as count
+     FROM calls c
+     JOIN videos v ON v.id = c.video_id
+     WHERE v.transcript IS NOT NULL AND v.transcript <> ''
+       AND NOT EXISTS (
+         SELECT 1 FROM ml_verification_runs r
+         WHERE r.call_id = c.id AND r.prompt_version = $1
+       )`,
+    [config.promptVersion],
+  );
+  const missingQuote = await queryFn<{ count: string }>(
+    `SELECT COUNT(*)::text as count
+     FROM calls c
+     JOIN videos v ON v.id = c.video_id
+     WHERE v.transcript IS NOT NULL AND v.transcript <> ''
+       AND (c.raw_quote IS NULL OR TRIM(c.raw_quote) = '')
+       AND NOT EXISTS (
+         SELECT 1 FROM ml_verification_runs r
+         WHERE r.call_id = c.id AND r.prompt_version = $1
+       )`,
+    [config.promptVersion],
+  );
+
+  await writeVerifierEvent({
+    job,
+    eventType: "ml_verifier_preflight",
+    status: "running",
+    message: `Preflight: total_unverified=${totalUnverified[0]?.count ?? "0"}, missing_quote=${missingQuote[0]?.count ?? "0"}`,
+    payload: {
+      total_unverified: Number(totalUnverified[0]?.count ?? 0),
+      missing_quote: Number(missingQuote[0]?.count ?? 0),
+    },
+    queryFn,
+  });
+
   const candidates = await selectMlVerifierCandidates({
     limit: batchSize,
     promptVersion: config.promptVersion,
@@ -639,6 +769,17 @@ export async function runMlVerifierBatch(
 
   for (const candidate of candidates) {
     let output: ParsedVerifierOutput;
+
+    // Deterministic pre-checks before paying for LLM
+    const preCheck = deterministicPreCheck(candidate);
+    if (preCheck.skipLLM && preCheck.output) {
+      output = preCheck.output;
+      await insertVerificationRun({ job, candidate, config, output, queryFn });
+      processed += 1;
+      if (output.decision === "review") review += 1;
+      continue;
+    }
+
     try {
       output = deps.verifyCandidate
         ? await deps.verifyCandidate(candidate, config)
@@ -662,6 +803,7 @@ export async function runMlVerifierBatch(
         evidence_span: "",
         recommended_extraction_confidence: 0,
         reason: `LLM parse error: ${message.slice(0, 200)}`,
+        parse_strategy: "failed",
       };
       review += 1;
       processed += 1;
