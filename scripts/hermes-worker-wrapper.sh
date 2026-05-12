@@ -6,9 +6,9 @@ mkdir -p .tmp
 while true; do
 # Load .env.local into the current shell
 # Use eval to handle values with spaces safely (we know our env file format)
-cd /mnt/c/Users/albak/xdev/crypto-tuber-ranked || { echo "Cannot cd to project dir"; exit 1; }
+cd /srv/whop-auto/workspace/crypto-tuber-ranked || { echo "Cannot cd to project dir"; exit 1; }
 set -o allexport
-source /mnt/c/Users/albak/xdev/crypto-tuber-ranked/.env.local
+source /srv/whop-auto/workspace/crypto-tuber-ranked/.env.local
 set +o allexport
 
 # Fix DNS on WSL2

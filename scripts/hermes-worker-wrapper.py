@@ -10,7 +10,7 @@ Safe wrapper for the pipeline worker.
 
 import os, sys, subprocess, time
 
-PROJECT_DIR = "/mnt/c/Users/albak/xdev/crypto-tuber-ranked"
+PROJECT_DIR = "/srv/whop-auto/workspace/crypto-tuber-ranked"
 LOG_PATH = os.path.join(PROJECT_DIR, ".tmp", "hermes-worker.log")
 
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)

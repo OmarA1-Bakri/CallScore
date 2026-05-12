@@ -14,7 +14,7 @@ const DEFAULT_CREATORS = [
 ] as const;
 
 const DEFAULT_SHADOW_PROVIDER = "ollama";
-const DEFAULT_SHADOW_MODEL = "kimi-k2.6";
+const DEFAULT_SHADOW_MODEL = "kimi-k2.6:cloud";
 const DEFAULT_SHADOW_REQUEST_TIMEOUT_MS = 180_000;
 const DEFAULT_SHADOW_AGENTS = 1;
 const MAX_SHADOW_AGENTS = 3;
