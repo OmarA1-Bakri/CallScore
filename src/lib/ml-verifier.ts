@@ -477,7 +477,7 @@ Pay special attention to ambiguous tickers:
 Return ONLY one JSON object:
 {
   "decision": "approve|reject|review",
-  "reason_code": "valid_call|generic_word|asset_not_supported|direction_not_supported|non_actionable|quote_not_in_transcript|unclear",
+  "reason_code": "valid_call|generic_word|asset_not_supported|direction_not_supported|non_actionable|quote_not_in_transcript|unclear|missing_evidence",
   "confidence": 0.0,
   "evidence_span": "short exact transcript span supporting your decision",
   "recommended_extraction_confidence": 0.0,
