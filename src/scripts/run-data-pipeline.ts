@@ -7,10 +7,10 @@ import { loadEnv, timestamp } from "./script-helpers";
 
 const DEFAULT_CREATORS = [
   "@AltcoinDaily",
-  "@DiscoverCrypto",
-  "@CryptoBanter",
+  "@DiscoverCrypto_",
+  "@CryptoBanterGroup",
   "@CryptosRUs",
-  "@AlexBecker",
+  "@AlexBeckersChannel",
 ] as const;
 
 const DEFAULT_SHADOW_PROVIDER = "ollama";
