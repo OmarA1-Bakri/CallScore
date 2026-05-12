@@ -15,6 +15,7 @@ const DEFAULT_CREATORS = [
 
 const DEFAULT_SHADOW_PROVIDER = "ollama";
 const DEFAULT_SHADOW_MODEL = "kimi-k2.6:cloud";
+const DEFAULT_SHADOW_FALLBACK_MODEL = "glm-5.1";
 const DEFAULT_SHADOW_REQUEST_TIMEOUT_MS = 180_000;
 const DEFAULT_SHADOW_AGENTS = 1;
 const MAX_SHADOW_AGENTS = 3;
@@ -55,6 +56,7 @@ interface DataPipelineArgs {
   readonly shadowRunId: string;
   readonly shadowProvider: string | null;
   readonly shadowModel: string | null;
+  readonly shadowFallbackModel: string | null;
   readonly shadowRequestTimeoutMs: number;
   readonly shadowAgents: number;
   readonly shadowVideoAgents: number;
@@ -159,6 +161,7 @@ export function parseDataPipelineArgs(
     shadowProvider:
       argValue(argv, "--shadow-provider") ?? DEFAULT_SHADOW_PROVIDER,
     shadowModel: argValue(argv, "--shadow-model") ?? DEFAULT_SHADOW_MODEL,
+    shadowFallbackModel: argValue(argv, "--shadow-fallback-model") ?? DEFAULT_SHADOW_FALLBACK_MODEL,
     shadowRequestTimeoutMs: positiveInt(
       argValue(argv, "--shadow-request-timeout-ms"),
       DEFAULT_SHADOW_REQUEST_TIMEOUT_MS,
@@ -424,6 +427,7 @@ export function buildDataPipelineStageCommands(
     ? ["--provider", args.shadowProvider]
     : [];
   const shadowModelArgs = args.shadowModel ? ["--model", args.shadowModel] : [];
+  const shadowFallbackModelArgs = args.shadowFallbackModel ? ["--fallback-model", args.shadowFallbackModel] : [];
   const shadowRequestTimeoutArgs = [
     "--request-timeout-ms",
     String(args.shadowRequestTimeoutMs),
@@ -510,6 +514,7 @@ export function buildDataPipelineStageCommands(
         ),
         ...shadowProviderArgs,
         ...shadowModelArgs,
+        ...shadowFallbackModelArgs,
         ...shadowRequestTimeoutArgs,
         ...shadowVideoAgentsArgs,
         ...shadowChunkAgentsArgs,
