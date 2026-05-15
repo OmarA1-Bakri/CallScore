@@ -17,7 +17,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
   const rawRows = await query(
-    `SELECT cs.*, c.name, c.youtube_handle
+    `SELECT cs.*,
+            c.name,
+            c.youtube_handle,
+            c.youtube_channel_id,
+            c.subscribers,
+            c.focus,
+            c.tier,
+            c.alpha_score AS creator_alpha_score,
+            c.total_calls AS creator_total_calls,
+            c.win_rate AS creator_win_rate,
+            c.avg_return AS creator_avg_return,
+            c.accuracy_rank AS creator_accuracy_rank,
+            c.last_scraped_at AS creator_last_scraped_at,
+            c.created_at AS creator_created_at
      FROM creator_stats cs
      JOIN creators c ON c.id = cs.creator_id
      WHERE cs.period = $1
