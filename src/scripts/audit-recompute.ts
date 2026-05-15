@@ -4,7 +4,24 @@ import { fileURLToPath } from "url";
 import { auditExtraction } from "../lib/extraction-validation";
 import { query } from "../lib/db";
 import { recomputeAllStats } from "../lib/recompute-stats";
-import { getCallScoreStatus } from "../lib/public-methodology";
+import {
+  EXTRACTION_CONFIDENCE_THRESHOLD,
+  getCallScoreStatus,
+  getScoreReadyIgnoringConfidenceSql,
+} from "../lib/public-methodology";
+
+export interface AuditRecomputeArgs {
+  readonly callId: number | null;
+  readonly creatorHandle: string | null;
+  readonly allLegacy: boolean;
+  readonly scoreReadyLowConfidence: boolean;
+  readonly validOnly: boolean;
+  readonly write: boolean;
+  readonly json: boolean;
+  readonly summary: boolean;
+  readonly limit: number | null;
+  readonly startAfterId: number | null;
+}
 
 interface AuditRow {
   readonly id: number;
@@ -17,6 +34,7 @@ interface AuditRow {
   readonly extraction_confidence: number;
   readonly confidence: string | null;
   readonly call_date: string;
+  readonly price_at_call: number | null;
   readonly price_30d: number | null;
   readonly price_90d: number | null;
   readonly return_30d: number | null;
@@ -46,6 +64,8 @@ interface AuditResult {
   readonly reasons: readonly string[];
 }
 
+const LOW_CONFIDENCE_READY_BATCH_SIZE = 500;
+
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
   const root = path.resolve(__dirname, "../..");
@@ -64,18 +84,23 @@ function loadEnv(): void {
   }
 }
 
-function parseArgs(argv: readonly string[]): {
-  readonly callId: number | null;
-  readonly creatorHandle: string | null;
-  readonly allLegacy: boolean;
-  readonly write: boolean;
-  readonly json: boolean;
-} {
+function positiveInt(value: string | undefined): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : null;
+}
+
+export function parseArgs(argv: readonly string[]): AuditRecomputeArgs {
   let callId: number | null = null;
   let creatorHandle: string | null = null;
   let allLegacy = false;
+  let scoreReadyLowConfidence = false;
+  let validOnly = false;
   let write = false;
   let json = false;
+  let summary = false;
+  let limit: number | null = null;
+  let startAfterId: number | null = null;
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -87,14 +112,37 @@ function parseArgs(argv: readonly string[]): {
       index++;
     } else if (arg === "--all-legacy") {
       allLegacy = true;
+    } else if (arg === "--score-ready-low-confidence") {
+      scoreReadyLowConfidence = true;
+    } else if (arg === "--valid-only") {
+      validOnly = true;
     } else if (arg === "--write") {
       write = true;
     } else if (arg === "--json") {
       json = true;
+    } else if (arg === "--summary") {
+      summary = true;
+    } else if (arg === "--limit") {
+      limit = positiveInt(argv[index + 1]);
+      index++;
+    } else if (arg === "--start-after-id") {
+      startAfterId = positiveInt(argv[index + 1]);
+      index++;
     }
   }
 
-  return { callId, creatorHandle, allLegacy, write, json };
+  return {
+    callId,
+    creatorHandle,
+    allLegacy,
+    scoreReadyLowConfidence,
+    validOnly,
+    write,
+    json,
+    summary,
+    limit,
+    startAfterId,
+  };
 }
 
 function toConfidenceLabel(value: number): "high" | "medium" | "low" {
@@ -103,24 +151,44 @@ function toConfidenceLabel(value: number): "high" | "medium" | "low" {
   return "low";
 }
 
-function buildWhereClause(args: ReturnType<typeof parseArgs>): {
+export function buildWhereClause(args: AuditRecomputeArgs): {
   readonly sql: string;
   readonly params: readonly unknown[];
 } {
+  let sql: string;
+  const params: unknown[] = [];
+
   if (args.callId !== null) {
-    return { sql: "c.id = $1", params: [args.callId] };
+    params.push(args.callId);
+    sql = `c.id = $${params.length}`;
+  } else if (args.creatorHandle !== null) {
+    params.push(args.creatorHandle);
+    sql = `cr.youtube_handle = $${params.length}`;
+  } else if (args.scoreReadyLowConfidence) {
+    sql = [
+      `c.extraction_confidence < ${EXTRACTION_CONFIDENCE_THRESHOLD}`,
+      getScoreReadyIgnoringConfidenceSql("c"),
+    ].join(" AND ");
+  } else if (args.allLegacy) {
+    sql = "c.extraction_confidence = 0.6";
+  } else {
+    throw new Error("Specify --call <id>, --creator <handle>, --all-legacy, or --score-ready-low-confidence");
   }
-  if (args.creatorHandle !== null) {
-    return { sql: "cr.youtube_handle = $1", params: [args.creatorHandle] };
+
+  if (args.startAfterId !== null) {
+    params.push(args.startAfterId);
+    sql = `(${sql}) AND c.id > $${params.length}`;
   }
-  if (args.allLegacy) {
-    return { sql: "c.extraction_confidence = 0.6", params: [] };
-  }
-  throw new Error("Specify --call <id>, --creator <handle>, or --all-legacy");
+
+  return { sql, params };
 }
 
-async function loadAuditRows(args: ReturnType<typeof parseArgs>): Promise<AuditRow[]> {
+async function loadAuditRows(args: AuditRecomputeArgs): Promise<AuditRow[]> {
   const where = buildWhereClause(args);
+  const params = [...where.params];
+  const limitClause = args.limit !== null
+    ? `LIMIT $${params.push(args.limit)}`
+    : "";
   return query<AuditRow>(
     `SELECT
       c.id,
@@ -133,6 +201,7 @@ async function loadAuditRows(args: ReturnType<typeof parseArgs>): Promise<AuditR
       c.extraction_confidence,
       c.confidence,
       c.call_date::text AS call_date,
+      c.price_at_call,
       c.price_30d,
       c.price_90d,
       c.return_30d,
@@ -144,8 +213,9 @@ async function loadAuditRows(args: ReturnType<typeof parseArgs>): Promise<AuditR
      JOIN videos v ON v.id = c.video_id
      JOIN creators cr ON cr.id = c.creator_id
      WHERE ${where.sql}
-     ORDER BY c.id ASC`,
-    [...where.params],
+     ORDER BY c.id ASC
+     ${limitClause}`,
+    params,
   );
 }
 
@@ -154,6 +224,7 @@ export function analyzeAuditRows(rows: readonly AuditRow[]): AuditResult[] {
     const beforeStatus = getCallScoreStatus({
       extraction_confidence: row.extraction_confidence,
       call_date: row.call_date,
+      price_at_call: row.price_at_call,
       target_price: row.target_price,
       price_30d: row.price_30d,
       price_90d: row.price_90d,
@@ -173,6 +244,7 @@ export function analyzeAuditRows(rows: readonly AuditRow[]): AuditResult[] {
     const afterStatus = getCallScoreStatus({
       extraction_confidence: audit.normalizedConfidence,
       call_date: row.call_date,
+      price_at_call: row.price_at_call,
       target_price: audit.targetPrice,
       price_30d: row.price_30d,
       price_90d: row.price_90d,
@@ -236,6 +308,43 @@ export async function applyAuditResults(results: readonly AuditResult[]): Promis
   }
 }
 
+export function filterWritableResults(
+  results: readonly AuditResult[],
+  args: Pick<AuditRecomputeArgs, "validOnly">,
+): AuditResult[] {
+  if (!args.validOnly) return [...results];
+  return results.filter((result) => result.reasons.length === 0);
+}
+
+export function summarizeAuditResults(results: readonly AuditResult[]): {
+  readonly total: number;
+  readonly valid: number;
+  readonly invalid: number;
+  readonly wouldBecomeScored: number;
+  readonly byAfterConfidence: Record<string, number>;
+} {
+  const byAfterConfidence: Record<string, number> = {};
+  let valid = 0;
+  let wouldBecomeScored = 0;
+  for (const result of results) {
+    if (result.reasons.length === 0) valid += 1;
+    if (result.after.score_status === "scored") wouldBecomeScored += 1;
+    const key = result.after.extraction_confidence.toFixed(2);
+    byAfterConfidence[key] = (byAfterConfidence[key] ?? 0) + 1;
+  }
+  return {
+    total: results.length,
+    valid,
+    invalid: results.length - valid,
+    wouldBecomeScored,
+    byAfterConfidence,
+  };
+}
+
+export function shouldProcessInBatches(args: AuditRecomputeArgs): boolean {
+  return args.scoreReadyLowConfidence && args.limit === null;
+}
+
 function printHuman(results: readonly AuditResult[]): void {
   for (const result of results) {
     console.log(
@@ -258,12 +367,54 @@ function printHuman(results: readonly AuditResult[]): void {
 async function main(): Promise<void> {
   loadEnv();
   const args = parseArgs(process.argv.slice(2));
-  const rows = await loadAuditRows(args);
-  const results = analyzeAuditRows(rows);
+  if (args.write && args.scoreReadyLowConfidence && !args.validOnly) {
+    throw new Error("--score-ready-low-confidence --write requires --valid-only");
+  }
 
-  if (args.write && results.length > 0) {
-    await applyAuditResults(results);
+  const results: AuditResult[] = [];
+  const writableResults: AuditResult[] = [];
+  if (shouldProcessInBatches(args)) {
+    let startAfterId = args.startAfterId;
+    while (true) {
+      const batchArgs: AuditRecomputeArgs = {
+        ...args,
+        limit: LOW_CONFIDENCE_READY_BATCH_SIZE,
+        startAfterId,
+      };
+      const rows = await loadAuditRows(batchArgs);
+      if (rows.length === 0) break;
+      const batchResults = analyzeAuditRows(rows);
+      const batchWritableResults = filterWritableResults(batchResults, args);
+      results.push(...batchResults);
+      writableResults.push(...batchWritableResults);
+      if (args.write && batchWritableResults.length > 0) {
+        await applyAuditResults(batchWritableResults);
+      }
+      startAfterId = rows.at(-1)?.id ?? startAfterId;
+      if (rows.length < LOW_CONFIDENCE_READY_BATCH_SIZE) break;
+    }
+  } else {
+    const rows = await loadAuditRows(args);
+    results.push(...analyzeAuditRows(rows));
+    writableResults.push(...filterWritableResults(results, args));
+    if (args.write && writableResults.length > 0) {
+      await applyAuditResults(writableResults);
+    }
+  }
+
+  if (args.write && writableResults.length > 0) {
     await recomputeAllStats();
+  }
+
+  if (args.summary) {
+    console.log(JSON.stringify({
+      ...summarizeAuditResults(results),
+      write: args.write,
+      writable: writableResults.length,
+      start_after_id: args.startAfterId,
+      limit: args.limit,
+    }, null, 2));
+    return;
   }
 
   if (args.json) {

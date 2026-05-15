@@ -1,4 +1,5 @@
 import { auditExtraction } from "./extraction-validation";
+import { computeAlpha, computeReturn } from "./scoring";
 import {
   computePublicScoreComponents,
   getCallScoreStatus,
@@ -7,7 +8,10 @@ import {
   type HorizonStatus,
   type PublicScoreComponents,
 } from "./public-methodology";
+import type { LiveCallPricingFields } from "./live-call-pricing";
 import type { Call } from "./types";
+
+export type SerializableCallInput = Call & LiveCallPricingFields;
 
 export interface SerializedCall extends Call {
   readonly extraction_valid: boolean;
@@ -19,6 +23,13 @@ export interface SerializedCall extends Call {
   readonly horizon_status_30d: HorizonStatus;
   readonly horizon_status_90d: HorizonStatus;
   readonly target_status: HorizonStatus;
+  readonly is_live_open: boolean;
+  readonly live_price: number | null;
+  readonly live_price_at: string | null;
+  readonly live_return: number | null;
+  readonly live_alpha: number | null;
+  readonly btc_live_price: number | null;
+  readonly btc_live_price_at: string | null;
 }
 
 export interface CreatorScoreAverages {
@@ -32,7 +43,7 @@ export interface CreatorScoreAverages {
 }
 
 export function serializeCall(
-  call: Call,
+  call: SerializableCallInput,
   now: Date = new Date(),
 ): SerializedCall {
   const extraction = auditExtraction(call);
@@ -40,6 +51,7 @@ export function serializeCall(
     {
       extraction_confidence: call.extraction_confidence,
       call_date: call.call_date,
+      price_at_call: call.price_at_call,
       target_price: call.target_price,
       price_30d: call.price_30d,
       price_90d: call.price_90d,
@@ -50,6 +62,26 @@ export function serializeCall(
   );
   const components =
     scoreStatus === "scored" ? computePublicScoreComponents(call) : null;
+  const livePrice = call.live_price ?? null;
+  const btcLivePrice = call.btc_live_price ?? null;
+  const liveReturn =
+    call.price_at_call !== null && livePrice !== null
+      ? computeReturn(call.price_at_call, livePrice)
+      : null;
+  const btcLiveReturn =
+    call.btc_price_at_call !== null && btcLivePrice !== null
+      ? computeReturn(call.btc_price_at_call, btcLivePrice)
+      : null;
+  const liveAlpha =
+    liveReturn !== null && btcLiveReturn !== null
+      ? computeAlpha(liveReturn, btcLiveReturn)
+      : null;
+  const horizonStatus30d = getHorizonStatus(
+    call.call_date,
+    "30d",
+    call.price_30d !== null && call.return_30d !== null,
+    now,
+  );
 
   return {
     ...call,
@@ -64,12 +96,7 @@ export function serializeCall(
       call.price_7d !== null && call.return_7d !== null,
       now,
     ),
-    horizon_status_30d: getHorizonStatus(
-      call.call_date,
-      "30d",
-      call.price_30d !== null && call.return_30d !== null,
-      now,
-    ),
+    horizon_status_30d: horizonStatus30d,
     horizon_status_90d: getHorizonStatus(
       call.call_date,
       "90d",
@@ -82,11 +109,21 @@ export function serializeCall(
       call.target_price === null || call.hit_target !== null,
       now,
     ),
+    is_live_open:
+      scoreStatus === "pending_horizon" &&
+      call.price_at_call !== null &&
+      horizonStatus30d === "pending",
+    live_price: livePrice,
+    live_price_at: call.live_price_at ?? null,
+    live_return: liveReturn,
+    live_alpha: liveAlpha,
+    btc_live_price: btcLivePrice,
+    btc_live_price_at: call.btc_live_price_at ?? null,
   };
 }
 
 export function serializeCalls(
-  calls: readonly Call[],
+  calls: readonly SerializableCallInput[],
   now: Date = new Date(),
 ): SerializedCall[] {
   return calls.map((call) => serializeCall(call, now));

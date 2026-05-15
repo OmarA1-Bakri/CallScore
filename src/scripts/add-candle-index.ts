@@ -26,12 +26,24 @@ function loadEnv(): void {
 async function main(): Promise<void> {
   loadEnv();
 
-  console.log("Creating composite index on candles(symbol, open_time)...");
+  console.log("Creating composite index on candles(symbol, open_time DESC)...");
   console.log("This may take a few minutes for 18.7M rows...");
 
   await query(
-    "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_candles_symbol_time ON candles(symbol, open_time DESC)"
+    "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_candles_lookup ON candles(symbol, open_time DESC)",
   );
+
+  const legacyIndexes = await query<{ indexname: string }>(
+    "SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1",
+    ["idx_candles_symbol_time"],
+  );
+  if (legacyIndexes.length > 0) {
+    try {
+      await query("DROP INDEX CONCURRENTLY idx_candles_symbol_time");
+    } catch (err) {
+      console.warn("WARN: drop of legacy idx_candles_symbol_time failed:", err);
+    }
+  }
 
   console.log("Index created successfully!");
   process.exit(0);

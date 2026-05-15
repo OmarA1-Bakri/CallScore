@@ -1,17 +1,15 @@
-import { createGeminiModel, extractCallsFromTranscript } from "../lib/ai-extraction";
 import { query } from "../lib/db";
-import { recomputeDerivedFields } from "./rescore-derived";
-import { recomputeAllStats } from "../lib/recompute-stats";
 import {
   loadEnv,
-  replaceStoredCallsForVideo,
-  sleep,
   timestamp,
 } from "./script-helpers";
+import { main as chunkedExtractorMain } from "./extract-calls-openrouter";
 
 const REQUEST_GAP_MS = 4_000;
-const BATCH_COOLDOWN_VIDEOS = 50;
-const BATCH_COOLDOWN_MS = 30_000;
+const STRONGER_PROVIDER = "ollama";
+const STRONGER_MODEL = "kimi-k2.6";
+const STRONGER_CHUNK_CHARS = 6_000;
+const STRONGER_MAX_CHUNKS = 100;
 
 interface LowConfidenceVideo {
   readonly id: number;
@@ -25,32 +23,45 @@ interface LowConfidenceVideo {
   readonly low_conf_call_count: number;
 }
 
-function parseArgValue(flag: string): string | null {
-  const index = process.argv.indexOf(flag);
-  if (index < 0 || !process.argv[index + 1]) return null;
-  return process.argv[index + 1];
+function parseArgValue(argv: readonly string[], flag: string): string | null {
+  const index = argv.indexOf(flag);
+  if (index < 0 || !argv[index + 1]) return null;
+  const candidate = argv[index + 1];
+  // Only treat as a value if it doesn't start with "--" (not another flag)
+  if (candidate.startsWith("--")) return null;
+  return candidate;
 }
 
-function parseArgs(): {
+export function parseLowConfidenceReextractArgs(argv = process.argv.slice(2)): {
   readonly write: boolean;
   readonly limit: number;
   readonly creatorHandle: string | null;
   readonly videoId: number | null;
+  readonly provider: string;
+  readonly model: string;
+  readonly chunkChars: number;
+  readonly maxChunks: number;
 } {
-  const write = process.argv.includes("--write");
-  const limit = Number(parseArgValue("--limit") ?? "50");
-  const creatorHandle = parseArgValue("--creator");
-  const videoIdValue = parseArgValue("--video");
+  const write = argv.includes("--write");
+  const limit = Number(parseArgValue(argv, "--limit") ?? "50");
+  const creatorHandle = parseArgValue(argv, "--creator");
+  const videoIdValue = parseArgValue(argv, "--video");
   const videoId = videoIdValue ? parseInt(videoIdValue, 10) : null;
+  const chunkCharsValue = Number(parseArgValue(argv, "--chunk-chars") ?? STRONGER_CHUNK_CHARS);
+  const maxChunksValue = Number(parseArgValue(argv, "--max-chunks") ?? STRONGER_MAX_CHUNKS);
   return {
     write,
     limit: Number.isFinite(limit) && limit > 0 ? limit : 50,
     creatorHandle,
     videoId,
+    provider: parseArgValue(argv, "--provider") ?? STRONGER_PROVIDER,
+    model: parseArgValue(argv, "--model") ?? STRONGER_MODEL,
+    chunkChars: Number.isFinite(chunkCharsValue) && chunkCharsValue > 0 ? chunkCharsValue : STRONGER_CHUNK_CHARS,
+    maxChunks: Number.isFinite(maxChunksValue) && maxChunksValue > 0 ? maxChunksValue : STRONGER_MAX_CHUNKS,
   };
 }
 
-async function loadVideos(args: ReturnType<typeof parseArgs>): Promise<LowConfidenceVideo[]> {
+async function loadVideos(args: ReturnType<typeof parseLowConfidenceReextractArgs>): Promise<LowConfidenceVideo[]> {
   if (args.videoId !== null) {
     return query<LowConfidenceVideo>(
       `SELECT
@@ -103,73 +114,48 @@ async function loadVideos(args: ReturnType<typeof parseArgs>): Promise<LowConfid
   );
 }
 
-async function replaceVideoCallsWithModel(
-  model: ReturnType<typeof createGeminiModel>,
-  video: LowConfidenceVideo,
-): Promise<number> {
-  if (!video.transcript || video.transcript.trim().length === 0) {
-    return 0;
-  }
-
-  const extractedCalls = await extractCallsFromTranscript(model, video.transcript);
-  await replaceStoredCallsForVideo({
-    creatorId: video.creator_id,
-    videoId: video.id,
-    callDate: video.published_at ?? video.created_at,
-    calls: extractedCalls,
-  });
-
-  return extractedCalls.length;
+export function buildLowConfidenceReextractArgs(args: ReturnType<typeof parseLowConfidenceReextractArgs>, videoIds: readonly number[]): string[] {
+  return [
+    "--provider",
+    args.provider,
+    "--model",
+    args.model,
+    "--video-ids",
+    videoIds.join(","),
+    "--limit",
+    String(videoIds.length),
+    "--include-extracted",
+    "--chunk-chars",
+    String(args.chunkChars),
+    "--max-chunks",
+    String(args.maxChunks),
+    "--gap-ms",
+    String(REQUEST_GAP_MS),
+    ...(args.write ? ["--write"] : ["--dry-run"]),
+  ];
 }
 
-async function main(): Promise<void> {
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
-  const args = parseArgs();
+  const args = parseLowConfidenceReextractArgs(argv);
   const videos = await loadVideos(args);
 
   console.log(
     `[${timestamp()}] Loaded ${videos.length} low-confidence videos for re-extraction`,
   );
 
-  if (!args.write) {
-    for (const video of videos) {
-      console.log(
-        `video=${video.id} creator=${video.creator_name} low_conf_calls=${video.low_conf_call_count} title=${video.title ?? "--"}`,
-      );
-    }
-    return;
-  }
-
-  let processed = 0;
-  const touchedVideoIds: number[] = [];
-  const model = createGeminiModel();
-  for (const video of videos) {
-    const inserted = await replaceVideoCallsWithModel(model, video);
-    touchedVideoIds.push(video.id);
-    processed++;
-    console.log(
-      `[${timestamp()}] [${processed}/${videos.length}] ${video.creator_name} video ${video.id}: ${video.low_conf_call_count} legacy -> ${inserted} normalized calls`,
-    );
-    await sleep(REQUEST_GAP_MS);
-    if (processed % BATCH_COOLDOWN_VIDEOS === 0) {
-      console.log(`[${timestamp()}] cooldown ${BATCH_COOLDOWN_MS / 1000}s`);
-      await sleep(BATCH_COOLDOWN_MS);
-    }
-  }
-
-  const touchedCallRows = await query<{ id: number }>(
-    `SELECT id FROM calls WHERE video_id = ANY($1::int[])`,
-    [touchedVideoIds],
-  );
-  await recomputeDerivedFields(touchedCallRows.map((row) => row.id));
-  await recomputeAllStats();
-
+  const videoIds = videos.filter((video) => video.transcript?.trim()).map((video) => video.id);
+  const extractorArgs = buildLowConfidenceReextractArgs(args, videoIds);
+  console.log(`[${timestamp()}] Routing ${videoIds.length} low-confidence videos through chunked extractor provider=${args.provider} model=${args.model}`);
+  await chunkedExtractorMain(extractorArgs);
   console.log(
-    `[${timestamp()}] Re-extraction and rebuild complete for ${videos.length} videos`,
+    `[${timestamp()}] Re-extraction route complete for ${videoIds.length} videos`,
   );
 }
 
-main().catch((error) => {
-  console.error(`[${timestamp()}] Fatal error:`, error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(`[${timestamp()}] Fatal error:`, error);
+    process.exit(1);
+  });
+}

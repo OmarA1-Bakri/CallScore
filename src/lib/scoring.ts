@@ -376,6 +376,7 @@ export function computeReturn(
   priceAtCall: number,
   priceAfter: number,
 ): number {
+  if (!Number.isFinite(priceAtCall) || !Number.isFinite(priceAfter)) return 0;
   if (priceAtCall === 0) return 0;
   return ((priceAfter - priceAtCall) / priceAtCall) * 100;
 }
@@ -388,6 +389,7 @@ export function computeAlpha(
   coinReturn: number,
   btcReturn: number,
 ): number {
+  if (!Number.isFinite(coinReturn) || !Number.isFinite(btcReturn)) return 0;
   return coinReturn - btcReturn;
 }
 
@@ -404,6 +406,7 @@ export function isDirectionCorrect(
   direction: Direction,
   return30d: number,
 ): boolean {
+  if (!Number.isFinite(return30d)) return false;
   if (direction === "neutral") return Math.abs(return30d) < 10;
   if (direction === "bullish") return return30d > 2;
   return return30d < -2; // bearish
@@ -426,18 +429,27 @@ export function didHitTarget(
   highBetween: number | null,
   lowBetween: number | null,
 ): boolean {
-  if (targetPrice === null) return false;
+  if (targetPrice === null || !Number.isFinite(targetPrice)) return false;
+  if (stopLoss !== null && !Number.isFinite(stopLoss)) return false;
 
-  if (direction === "bullish" && highBetween !== null) {
+  if (direction === "bullish" && highBetween !== null && Number.isFinite(highBetween)) {
     const targetHit = highBetween >= targetPrice;
+    if (stopLoss !== null && (lowBetween === null || !Number.isFinite(lowBetween))) return false;
     const stopHit =
-      stopLoss !== null && lowBetween !== null && lowBetween <= stopLoss;
+      stopLoss !== null &&
+      lowBetween !== null &&
+      Number.isFinite(lowBetween) &&
+      lowBetween <= stopLoss;
     return targetHit && !stopHit;
   }
-  if (direction === "bearish" && lowBetween !== null) {
+  if (direction === "bearish" && lowBetween !== null && Number.isFinite(lowBetween)) {
     const targetHit = lowBetween <= targetPrice;
+    if (stopLoss !== null && (highBetween === null || !Number.isFinite(highBetween))) return false;
     const stopHit =
-      stopLoss !== null && highBetween !== null && highBetween >= stopLoss;
+      stopLoss !== null &&
+      highBetween !== null &&
+      Number.isFinite(highBetween) &&
+      highBetween >= stopLoss;
     return targetHit && !stopHit;
   }
   return false;

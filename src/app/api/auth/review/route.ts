@@ -4,13 +4,13 @@ import { REVIEWABLE_TIERS, getReviewTier, normalizeNextPath } from "./helpers";
 
 export const dynamic = "force-dynamic";
 
-function baseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    (process.env.NODE_ENV === "production"
-      ? "https://call-score.com"
-      : "http://localhost:3000")
-  );
+function trustedBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_BASE_URL ?? "https://www.call-score.com";
+  try {
+    return new URL(configured).origin;
+  } catch {
+    return "https://www.call-score.com";
+  }
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -38,5 +38,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   await createSession(`review-${tier}`, tier, `review:${tier}`);
 
   const nextPath = normalizeNextPath(searchParams.get("next"));
-  return NextResponse.redirect(`${baseUrl()}${nextPath}`, 303);
+  return NextResponse.redirect(new URL(nextPath, trustedBaseUrl()), 303);
 }

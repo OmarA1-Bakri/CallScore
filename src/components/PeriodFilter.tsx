@@ -2,10 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ReactElement } from "react";
+import { CREATOR_JUDGMENT_WINDOW_SHORT_LABEL } from "@/lib/judgment-window";
 import type { Period } from "@/lib/types";
 
 const PERIODS: ReadonlyArray<{ readonly value: Period; readonly label: string }> = [
-  { value: "all_time", label: "All time" },
+  { value: "all_time", label: CREATOR_JUDGMENT_WINDOW_SHORT_LABEL },
   { value: "90d", label: "90 days" },
   { value: "30d", label: "30 days" },
 ];

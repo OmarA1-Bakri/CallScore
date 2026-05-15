@@ -16,11 +16,11 @@ export default function MetaStrip({ cells }: MetaStripProps): ReactElement {
       aria-label="Section metadata"
     >
       {cells.map((cell) => (
-        <div key={cell.k} className="border-t border-ink-250 pt-3.5">
+        <div key={cell.k} className="min-w-0 border-t border-ink-250 pt-3.5">
           <dt className="font-mono text-[9.5px] text-ink-500 tracking-caps uppercase mb-1.5">
             {cell.k}
           </dt>
-          <dd className="font-serif text-[25px] text-ink-900 font-medium tracking-tight">
+          <dd className="break-words font-serif text-[25px] font-medium tracking-normal text-ink-900">
             {cell.v}
           </dd>
         </div>

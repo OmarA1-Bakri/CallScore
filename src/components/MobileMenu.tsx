@@ -4,14 +4,15 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
+import type { Tier } from "@/lib/types";
 
 interface MobileMenuProps {
-  readonly loggedIn: boolean;
-  readonly tier: string;
+  readonly authenticated: boolean;
+  readonly tier: Tier;
 }
 
 export default function MobileMenu({
-  loggedIn,
+  authenticated,
   tier,
 }: MobileMenuProps): ReactElement {
   const [open, setOpen] = useState(false);
@@ -26,10 +27,10 @@ export default function MobileMenu({
   }, [open]);
 
   return (
-    <>
+    <div className="relative desk:hidden">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="tab:hidden text-ink-600 hover:text-ink-900"
+        className="inline-flex h-11 w-11 items-center justify-center text-ink-600 hover:text-ink-900"
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         aria-controls="mobile-nav"
@@ -40,91 +41,74 @@ export default function MobileMenu({
       {open && (
         <nav
           id="mobile-nav"
-          className="tab:hidden pb-4 space-y-2"
+          className="absolute right-0 top-11 z-popover w-[min(82vw,280px)] border border-ink-250 bg-ink-0 p-3 shadow-popover"
           aria-label="Mobile navigation"
         >
           <Link
-            href="/"
+            href="/#leaderboard"
             onClick={() => setOpen(false)}
-            className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
           >
-            Leaderboard
+            LEADERBOARD
+          </Link>
+          <Link
+            href="/backtest"
+            onClick={() => setOpen(false)}
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+          >
+            BACKTEST
+          </Link>
+          <Link
+            href="/settings/alerts"
+            onClick={() => setOpen(false)}
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+          >
+            ALERTS
+          </Link>
+          <Link
+            href="/settings/webhooks"
+            onClick={() => setOpen(false)}
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+          >
+            WEBHOOKS
           </Link>
           <Link
             href="/methodology"
             onClick={() => setOpen(false)}
-            className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
           >
-            Methodology
+            METHODOLOGY
           </Link>
           <Link
             href="/pricing"
             onClick={() => setOpen(false)}
-            className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
+            className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
           >
-            Pricing
+            PRICING
           </Link>
-          {loggedIn ? (
-            <>
-              <div className="py-2 text-xs text-ink-500 uppercase tracking-caps">
-                Tier · {tier}
-              </div>
-              <Link
-                href="/settings/alerts"
-                onClick={() => setOpen(false)}
-                className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
-              >
-                Alerts
-              </Link>
-              {tier === "alpha" && (
-                <>
-                  <Link
-                    href="/settings/api"
-                    onClick={() => setOpen(false)}
-                    className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
-                  >
-                    API
-                  </Link>
-                  <Link
-                    href="/settings/webhooks"
-                    onClick={() => setOpen(false)}
-                    className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
-                  >
-                    Webhooks
-                  </Link>
-                </>
-              )}
-              <form action="/api/auth/logout" method="post">
-                <button
-                  type="submit"
-                  onClick={() => setOpen(false)}
-                  className="block text-ink-600 hover:text-ink-900 transition-colors text-sm font-medium py-2"
-                >
-                  Logout
-                </button>
-              </form>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/api/auth/whop"
-                prefetch={false}
-                onClick={() => setOpen(false)}
-                className="block text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium py-2"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/pricing"
-                onClick={() => setOpen(false)}
-                className="inline-block bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-4 py-2 transition-colors"
-              >
-                Get Access
-              </Link>
-            </>
+          <div className="border-b border-ink-150 py-3 font-mono text-mono-xs uppercase tracking-kicker text-accent">
+            TIER · {tier}
+          </div>
+          {authenticated && (
+            <Link
+              href="/settings"
+              onClick={() => setOpen(false)}
+              className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
+            >
+              ACCOUNT
+            </Link>
+          )}
+          {tier === "free" && (
+            <Link
+              href="/pricing"
+              onClick={() => setOpen(false)}
+              className="mt-3 inline-flex min-h-10 items-center border border-accent/60 bg-transparent px-3.5 font-mono text-mono-sm uppercase tracking-caps text-accent transition-colors hover:border-accent hover:bg-accent-low"
+            >
+              GET ACCESS
+            </Link>
           )}
         </nav>
       )}
-    </>
+    </div>
   );
 }

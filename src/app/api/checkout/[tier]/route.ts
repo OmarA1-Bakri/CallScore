@@ -24,13 +24,31 @@ function envKey(tier: Tier, interval: Interval): string {
   return `WHOP_CHECKOUT_URL_${tier.toUpperCase()}_${interval.toUpperCase()}`;
 }
 
+/**
+ * Whop checkout session URLs are transient; forwarding a stale `session` query
+ * can produce dead checkout pages. Absolute checkout URLs are normalized after
+ * `URL.searchParams.delete("session")`; relative/non-absolute values are
+ * returned trimmed and unchanged for local fallback compatibility.
+ */
+function sanitizeCheckoutUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+
+  try {
+    const url = new URL(trimmed);
+    url.searchParams.delete("session");
+    return url.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
 export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tier: string } },
+  { params }: { params: Promise<{ tier: string }> },
 ): Promise<NextResponse> {
-  const { tier: rawTier } = params;
+  const { tier: rawTier } = await params;
   const tier = rawTier.toLowerCase();
 
   if (!isTier(tier)) {
@@ -55,7 +73,7 @@ export async function GET(
   const url = process.env[key];
 
   if (url && url.trim().length > 0) {
-    const redirect = NextResponse.redirect(url, 303);
+    const redirect = NextResponse.redirect(sanitizeCheckoutUrl(url), 303);
     redirect.headers.set("cache-control", "no-store");
     return redirect;
   }

@@ -18,6 +18,22 @@
     {
       "path": "/api/cron/alerts/send",
       "schedule": "15 */6 * * *"
+    },
+    {
+      "path": "/api/cron/ml/enqueue",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/candles/enqueue",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/cron/match/enqueue",
+      "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/scores/enqueue",
+      "schedule": "45 3 * * *"
     }
   ]
 }

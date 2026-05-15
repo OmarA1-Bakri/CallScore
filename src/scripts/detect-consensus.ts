@@ -13,6 +13,9 @@ import {
 } from "../lib/constants";
 import { EXTRACTION_CONFIDENCE_THRESHOLD } from "../lib/public-methodology";
 import { computeReturn } from "../lib/scoring";
+import { createLogger } from "../lib/logger";
+
+const logger = createLogger({ component: "detect-consensus" });
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
@@ -33,10 +36,6 @@ function loadEnv(): void {
       process.env[key] = value;
     }
   }
-}
-
-function timestamp(): string {
-  return new Date().toISOString();
 }
 
 interface CallGroup {
@@ -67,6 +66,18 @@ async function getPriceAt(symbol: string, dateMs: number): Promise<number | null
     [symbol, dateMs],
   );
   return rows.length > 0 ? rows[0].close : null;
+}
+
+export function getNextConsensusWindowStart(
+  calls: readonly { readonly call_date: string }[],
+  currentStart: number,
+  windowEndMs: number,
+): number {
+  for (let index = currentStart + 1; index < calls.length; index++) {
+    const callDateMs = new Date(calls[index].call_date).getTime();
+    if (callDateMs > windowEndMs) return index;
+  }
+  return calls.length;
 }
 
 /**
@@ -249,13 +260,17 @@ async function detectNewSignals(): Promise<number> {
             );
 
             newSignals++;
-            console.log(
-              `[${timestamp()}] New signal: ${symbol} ${direction} (${uniqueCreators.length} creators)`,
-            );
+            logger.info("new_signal", {
+              symbol,
+              direction,
+              creator_count: uniqueCreators.length,
+            });
           }
 
-          // Skip past this window to avoid duplicates
-          windowStart += uniqueCreators.length;
+          // Skip past the full anchored window to avoid duplicates. Advancing by
+          // unique creator count can leave duplicate-creator calls inside the
+          // same window and emit overlapping consensus clusters.
+          windowStart = getNextConsensusWindowStart(calls, windowStart, windowEnd);
         } else {
           windowStart++;
         }
@@ -324,26 +339,26 @@ async function updateExistingSignals(): Promise<number> {
 async function main(): Promise<void> {
   loadEnv();
 
-  console.log(`[${timestamp()}] Starting consensus detection...`);
-  console.log(
-    `[${timestamp()}] Parameters: min_creators=${CONSENSUS_MIN_CREATORS}, window=${CONSENSUS_WINDOW_DAYS}d`,
-  );
+  logger.info("consensus_detection_start", {
+    min_creators: CONSENSUS_MIN_CREATORS,
+    window_days: CONSENSUS_WINDOW_DAYS,
+  });
 
   // Rebuild from scratch: clear all existing signals since scoring rules changed.
   // This ensures correctness thresholds and quality filters are applied uniformly.
   const rebuild = process.argv.includes("--rebuild");
   if (rebuild) {
     await query("DELETE FROM consensus_signals");
-    console.log(`[${timestamp()}] Cleared all existing consensus signals for rebuild`);
+    logger.warn("consensus_signals_rebuilt");
   }
 
   // Detect new consensus signals
   const newSignals = await detectNewSignals();
-  console.log(`[${timestamp()}] Detected ${newSignals} new consensus signals`);
+  logger.info("new_signals_detected", { new_signals: newSignals });
 
   // Update existing signals with price outcomes
   const updatedSignals = await updateExistingSignals();
-  console.log(`[${timestamp()}] Updated ${updatedSignals} existing signals with new price data`);
+  logger.info("signals_updated", { updated_signals: updatedSignals });
 
   // Summary
   const totalSignals = await query<{ count: string }>(
@@ -356,13 +371,18 @@ async function main(): Promise<void> {
   const correctCount = parseInt(correctSignals[0]?.count ?? "0", 10);
   const accuracy = total > 0 ? ((correctCount / total) * 100).toFixed(1) : "N/A";
 
-  console.log(
-    `[${timestamp()}] Total signals: ${total}, Correct: ${correctCount}, Accuracy: ${accuracy}%`,
-  );
-  console.log(`[${timestamp()}] Consensus detection complete`);
+  logger.info("consensus_detection_complete", {
+    total_signals: total,
+    correct_signals: correctCount,
+    accuracy_pct: accuracy,
+  });
 }
 
-main().catch((err) => {
-  console.error(`[${new Date().toISOString()}] Fatal error:`, err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    logger.error("fatal_error", {
+      error: err instanceof Error ? err.stack ?? err.message : String(err),
+    });
+    process.exit(1);
+  });
+}

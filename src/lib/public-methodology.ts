@@ -48,7 +48,7 @@ type ScoreInput = Pick<
 interface ScoreStatusInput {
   readonly extraction_confidence: number;
   readonly call_date: string;
-  readonly price_at_call?: number | null;
+  readonly price_at_call: number | null;
   readonly target_price: number | null;
   readonly price_30d: number | null;
   readonly price_90d: number | null;
@@ -146,10 +146,16 @@ export function getCallScoreStatus(
 
 export function getCallEligibilitySql(alias = "c"): string {
   return [
+    `${alias}.extraction_confidence >= ${EXTRACTION_CONFIDENCE_THRESHOLD}`,
+    getScoreReadyIgnoringConfidenceSql(alias),
+  ].join(" AND ");
+}
+
+export function getScoreReadyIgnoringConfidenceSql(alias = "c"): string {
+  return [
     `${alias}.price_at_call IS NOT NULL`,
     `${alias}.return_30d IS NOT NULL`,
     `${alias}.price_30d IS NOT NULL`,
-    `${alias}.extraction_confidence >= ${EXTRACTION_CONFIDENCE_THRESHOLD}`,
     `${alias}.call_date <= NOW() - INTERVAL '30 days'`,
     `(${alias}.target_price IS NULL OR (${alias}.call_date <= NOW() - INTERVAL '90 days' AND ${alias}.price_90d IS NOT NULL AND ${alias}.hit_target IS NOT NULL))`,
   ].join(" AND ");

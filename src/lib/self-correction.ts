@@ -31,6 +31,7 @@ import {
   shortTicker,
 } from "./ticker-normalize";
 import type { Call, Direction } from "./types";
+import { EXTRACTION_CONFIDENCE_THRESHOLD } from "./public-methodology";
 
 export type RevisionType =
   | "updated_target"
@@ -545,7 +546,7 @@ export async function computeSelfCorrectionScore(
        FROM calls
       WHERE creator_id = $1
         AND return_30d IS NOT NULL
-        AND extraction_confidence >= 0.6`,
+        AND extraction_confidence >= ${EXTRACTION_CONFIDENCE_THRESHOLD}`,
     [creatorId],
   );
 
@@ -588,7 +589,7 @@ function pointsForRevision(row: RevisionScoringRow): number {
       return POINTS.retracted;
 
     case "confirmed_miss": {
-      if (row.original_extraction_confidence < 0.6) return 0;
+      if (row.original_extraction_confidence < EXTRACTION_CONFIDENCE_THRESHOLD) return 0;
       if (row.original_return_30d === null) return 0;
       const directionSign =
         row.original_direction === "bullish"
@@ -609,7 +610,7 @@ function pointsForRevision(row: RevisionScoringRow): number {
       //   - Revised call is PENDING (return_30d == null) -> 0.25
       //   - Revised call is SCORED + correct_direction=true -> 0.5
       //   - Revised call is SCORED + correct_direction=false -> 0 (whipsaw)
-      //   - Revised call low-confidence (<0.6) scored -> 0 (align with
+      //   - Revised call low-confidence (<EXTRACTION_CONFIDENCE_THRESHOLD) scored -> 0 (align with
       //     extraction-confidence floor used for the rest of scoring)
       //   - Revised call missing entirely (null join) -> 0 (no evidence)
       if (row.revised_return_30d === null) {
@@ -623,7 +624,7 @@ function pointsForRevision(row: RevisionScoringRow): number {
       // direction flag.
       if (
         row.revised_extraction_confidence === null ||
-        row.revised_extraction_confidence < 0.6
+        row.revised_extraction_confidence < EXTRACTION_CONFIDENCE_THRESHOLD
       ) {
         return 0;
       }
@@ -663,7 +664,7 @@ export async function computeAllSelfCorrectionAggregates(): Promise<
          COUNT(*)::text AS scored_calls
        FROM calls
        WHERE return_30d IS NOT NULL
-         AND extraction_confidence >= 0.6
+         AND extraction_confidence >= ${EXTRACTION_CONFIDENCE_THRESHOLD}
        GROUP BY creator_id
      ),
      revision_points AS (
@@ -676,7 +677,7 @@ export async function computeAllSelfCorrectionAggregates(): Promise<
              WHEN r.revision_type = 'retracted' THEN ${POINTS.retracted}
              WHEN r.revision_type = 'confirmed_miss'
                AND oc.return_30d IS NOT NULL
-               AND oc.extraction_confidence >= 0.6
+               AND oc.extraction_confidence >= ${EXTRACTION_CONFIDENCE_THRESHOLD}
                AND (
                  (oc.direction = 'bullish' AND oc.return_30d <= 0) OR
                  (oc.direction = 'bearish' AND oc.return_30d >= 0)
@@ -689,7 +690,7 @@ export async function computeAllSelfCorrectionAggregates(): Promise<
              WHEN r.revision_type = 'reversed_direction'
                AND rc.return_30d IS NOT NULL
                AND rc.extraction_confidence IS NOT NULL
-               AND rc.extraction_confidence >= 0.6
+               AND rc.extraction_confidence >= ${EXTRACTION_CONFIDENCE_THRESHOLD}
                AND rc.correct_direction = true
                THEN ${POINTS.reversed_direction_full}
              WHEN r.revision_type = 'reversed_direction'

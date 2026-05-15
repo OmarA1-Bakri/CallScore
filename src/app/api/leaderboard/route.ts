@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { captureApiException } from "@/lib/monitoring";
 import { query } from "@/lib/db";
-import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
+import { getCreatorTier } from "@/lib/creator-tier";
+import { hasAccess } from "@/lib/whop";
+import { getUserTier } from "@/lib/whop-access";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
+import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
 import { getRequestAuthContext } from "@/lib/auth";
+import { leaderboardQueryRowSchema, parseApiRows, type LeaderboardQueryRow } from "@/lib/api-schemas";
 import type {
   Creator,
   CreatorStats,
@@ -14,56 +19,6 @@ import type {
 } from "@/lib/types";
 
 const VALID_PERIODS: readonly Period[] = ["all_time", "90d", "30d"] as const;
-
-interface LeaderboardQueryRow {
-  readonly id: number;
-  readonly creator_id: number;
-  readonly period: Period;
-  readonly total_calls: number;
-  readonly win_rate: number;
-  readonly avg_return_7d: number;
-  readonly avg_return_30d: number;
-  readonly avg_return_90d: number;
-  readonly avg_alpha_30d: number;
-  readonly best_call_id: number | null;
-  readonly worst_call_id: number | null;
-  readonly hit_rate: number;
-  readonly most_called_symbol: string | null;
-  readonly strategy_consistency: number;
-  readonly specificity_avg: number;
-  readonly alpha_score: number;
-  readonly accuracy_rank: number | null;
-  readonly effective_n: number;
-  readonly wilson_lb: number;
-  readonly bullish_win_rate: number;
-  readonly bearish_win_rate: number;
-  readonly bullish_pct: number;
-  readonly sharpe_ratio: number;
-  readonly updated_at: string;
-  readonly name: string;
-  readonly youtube_handle: string;
-  readonly youtube_channel_id: string | null;
-  readonly subscribers: string | null;
-  readonly focus: string | null;
-  readonly tier: Tier;
-  readonly creator_alpha_score: number;
-  readonly creator_total_calls: number;
-  readonly creator_win_rate: number;
-  readonly creator_avg_return: number;
-  readonly creator_accuracy_rank: number | null;
-  readonly creator_last_scraped_at: string | null;
-  readonly creator_created_at: string;
-  readonly best_call_symbol: string | null;
-  readonly best_call_return: number | null;
-  readonly best_call_score: number | null;
-  readonly best_call_date: string | null;
-  readonly best_call_direction: string | null;
-  readonly worst_call_symbol: string | null;
-  readonly worst_call_return: number | null;
-  readonly worst_call_score: number | null;
-  readonly worst_call_date: string | null;
-  readonly worst_call_direction: string | null;
-}
 
 interface PrevScoreRow {
   readonly creator_id: number;
@@ -142,9 +97,11 @@ function buildCallSummary(
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  let periodForMonitoring: string | null = null;
   try {
     const { searchParams } = request.nextUrl;
     const periodParam = searchParams.get("period") ?? "all_time";
+    periodForMonitoring = periodParam;
 
     if (!isValidPeriod(periodParam)) {
       return NextResponse.json(
@@ -156,6 +113,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const period: Period = periodParam;
+    const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
     if (period !== "all_time") {
       const auth = getRequestAuthContext(request);
       const userTier = auth.session?.tier ?? (await getUserTier(auth.accessToken, auth.session?.userId));
@@ -167,7 +125,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    const rows = await query<LeaderboardQueryRow>(
+    const rawRows = await query<LeaderboardQueryRow>(
       `SELECT
         cs.*,
         c.name,
@@ -198,10 +156,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       LEFT JOIN calls bc ON bc.id = cs.best_call_id
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
-        AND cs.total_calls > 0
+        AND ${leaderboardEligibleSql}
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );
+
+    const rows = parseApiRows(leaderboardQueryRowSchema, rawRows, "leaderboard");
 
     // Fetch previous period scores for trend calculation
     const prevPeriod: Period = period === "30d" ? "90d" : "all_time";
@@ -227,7 +187,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
 
     const leaderboard: LeaderboardRow[] = rows.map((row, index) => {
-      const rank = row.accuracy_rank ?? index + 1;
+      const rank = index + 1;
       const previousScore = prevScoreMap.get(row.creator_id);
       const trend =
         previousScore !== undefined
@@ -277,6 +237,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     });
   } catch (error: unknown) {
+    void captureApiException(error, "/api/leaderboard", { period: periodForMonitoring });
     const message =
       error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });

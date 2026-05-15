@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import Link from "next/link";
-import { ArrowRight, LockKeyhole, Scale, ShieldCheck, Target, Trophy, TrendingUp } from "lucide-react";
 import Leaderboard from "@/components/Leaderboard";
 import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
-import { EditorialSection } from "@/components/primitives";
+import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { getPublicCounts } from "@/lib/public-counts";
-import { getCreatorTier, hasAccess } from "@/lib/whop";
+import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
+import { CREATOR_JUDGMENT_WINDOW_SHORT_LABEL } from "@/lib/judgment-window";
+import { getCreatorTier } from "@/lib/creator-tier";
+import { hasAccess } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
 import type {
@@ -23,9 +25,9 @@ import type {
 } from "@/lib/types";
 
 export const metadata: Metadata = {
-  title: "CallScore — Market Calls, Measured",
+  title: "CallScore — Track Calls. Score Outcomes. Find Alpha.",
   description:
-    "Market calls scored against real price data, with every Alpha Score tied to the published methodology.",
+    "Crypto creator market calls scored against real price data, with every Alpha Score tied to the published methodology.",
   alternates: { canonical: "/" },
 };
 
@@ -136,12 +138,13 @@ function buildStats(row: LeaderboardQueryRow): CreatorStats {
 }
 
 interface PageProps {
-  readonly searchParams: { period?: string };
+  readonly searchParams: Promise<{ period?: string }>;
 }
 
 export default async function HomePage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: PageProps): Promise<ReactElement> {
+  const searchParams = await searchParamsPromise;
   const periodParam = searchParams.period ?? "all_time";
   const requestedPeriod: Period = (VALID_PERIODS as readonly string[]).includes(periodParam)
     ? (periodParam as Period)
@@ -149,6 +152,8 @@ export default async function HomePage({
   const currentTier = await getCurrentTier();
   const canUseRecent = hasAccess(currentTier, "pro");
   const period: Period = canUseRecent ? requestedPeriod : "all_time";
+
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
 
   // Fetch leaderboard from DB
   let leaderboard: LeaderboardRow[] = [];
@@ -184,7 +189,7 @@ export default async function HomePage({
       LEFT JOIN calls bc ON bc.id = cs.best_call_id
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
-        AND cs.total_calls > 0
+        AND ${leaderboardEligibleSql}
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );
@@ -209,7 +214,7 @@ export default async function HomePage({
     );
 
     leaderboard = rows.map((row, index) => {
-      const rank = row.accuracy_rank ?? index + 1;
+      const rank = index + 1;
       const prev = prevScoreMap.get(row.creator_id);
       const trend = prev !== undefined ? computeTrend(row.alpha_score, prev) : ("stable" as const);
       const selfCorrection = selfCorrectionMap.get(row.creator_id);
@@ -263,7 +268,7 @@ export default async function HomePage({
     }
   }
 
-  let publicCounts = await getPublicCounts().catch(() => null);
+  let publicCounts: Awaited<ReturnType<typeof getPublicCounts>> | null = await getPublicCounts().catch(() => null);
   if (!publicCounts) {
     publicCounts = {
       trackedCreators: 20,
@@ -271,6 +276,19 @@ export default async function HomePage({
       trackedCalls: 0,
       scoredCalls: 0,
       beatBtcCreators: 0,
+      llmValidatedCalls: 0,
+      confidencePassCalls: 0,
+      publicScoredCalls: 0,
+      pendingPublicScoringCalls: 0,
+      liveOpenCalls: 0,
+      pendingHorizonCalls: 0,
+      pending30dCalls: 0,
+      pendingTarget90dCalls: 0,
+      missingPriceCalls: 0,
+      missing30dCalls: 0,
+      missingTargetCalls: 0,
+      targetPendingCalls: 0,
+      excludedLowConfidenceCalls: 0,
     };
   }
 
@@ -281,8 +299,8 @@ export default async function HomePage({
       `SELECT
         COALESCE(SUM(total_calls), 0)::text AS total_calls,
         CASE WHEN COUNT(*) > 0 THEN ROUND((AVG(win_rate) * 100)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
-        COUNT(DISTINCT creator_id) FILTER (WHERE total_calls > 0)::text AS creator_count
-      FROM creator_stats WHERE period = 'all_time'`,
+        COUNT(DISTINCT creator_id)::text AS creator_count
+      FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql}`,
     );
     if (statsRows.length > 0) {
       totalCalls = Number(statsRows[0].total_calls) > 0 ? statsRows[0].total_calls : "0";
@@ -305,13 +323,13 @@ export default async function HomePage({
           }}
           aria-hidden="true"
         />
-        <div className="relative grid grid-cols-1 desk:grid-cols-[minmax(520px,0.82fr)_minmax(760px,1.18fr)] gap-10 desk:gap-16 items-center pt-10 tab:pt-14 desk:pt-8">
+        <div className="relative grid grid-cols-1 desk:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-10 desk:gap-14 items-center pt-10 tab:pt-14 desk:pt-8">
           <div className="desk:pt-6">
             <p
               className="inline-flex items-center gap-2 border border-accent/30 bg-accent/5 px-3 py-2 font-mono text-[12px] text-accent tracking-caps uppercase mb-6"
-              style={{ borderRadius: 999 }}
+              style={{ borderRadius: 2 }}
             >
-              <span className="h-1.5 w-1.5 bg-accent" style={{ borderRadius: 999 }} aria-hidden="true" />
+              <span className="h-1.5 w-1.5 bg-accent" style={{ borderRadius: 2 }} aria-hidden="true" />
               The standard for crypto calls
             </p>
             <h1 className="font-serif text-[65px] tab:text-[97px] desk:text-[119px] text-ink-900 font-normal tracking-tight leading-[0.88] text-balance max-w-[880px] mb-7">
@@ -325,15 +343,15 @@ export default async function HomePage({
               <Link
                 href="#leaderboard"
                 className="inline-flex items-center justify-center gap-3 bg-accent hover:bg-accent-dim text-ink-0 font-mono text-[13px] tracking-caps uppercase px-7 py-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
-                style={{ borderRadius: 4 }}
+                style={{ borderRadius: 2 }}
               >
                 View leaderboard
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <span aria-hidden="true">→</span>
               </Link>
               <Link
                 href="/methodology"
                 className="inline-flex justify-center border border-ink-300 text-ink-900 hover:border-accent/60 hover:text-accent font-mono text-[13px] tracking-caps uppercase px-7 py-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
-                style={{ borderRadius: 4 }}
+                style={{ borderRadius: 2 }}
               >
                 Explore methodology
               </Link>
@@ -343,6 +361,18 @@ export default async function HomePage({
               <HeroTrustItem label="Evidence-based" />
               <HeroTrustItem label="Unbiased" />
             </div>
+            <p className="mt-4 max-w-[620px] font-mono text-[11px] uppercase tracking-caps text-ink-500">
+              Every eligible score ties back to source calls, timestamped evidence,
+              and the published price-window methodology.
+            </p>
+            <MetaStrip
+              cells={[
+                { k: "raw calls", v: publicCounts.trackedCalls.toLocaleString() },
+                { k: "confidence pass", v: publicCounts.confidencePassCalls.toLocaleString() },
+                { k: "public scored", v: publicCounts.publicScoredCalls.toLocaleString() },
+                { k: "low-conf excluded", v: publicCounts.excludedLowConfidenceCalls.toLocaleString() },
+              ]}
+            />
           </div>
 
           <MarketCallPreview
@@ -350,6 +380,9 @@ export default async function HomePage({
             creatorCount={publicCounts.trackedCreators}
             beatBtcCreators={publicCounts.beatBtcCreators}
             rankedCreators={publicCounts.rankedCreators}
+            liveOpenCalls={publicCounts.liveOpenCalls}
+            excludedLowConfidenceCalls={publicCounts.excludedLowConfidenceCalls}
+            confidencePassCalls={publicCounts.confidencePassCalls}
             rows={leaderboard}
           />
         </div>
@@ -408,7 +441,7 @@ export default async function HomePage({
         }
         meta={
           <>
-            {publicCounts.rankedCreators} ranked creators · {totalCalls} scored calls
+            {publicCounts.rankedCreators} ranked creators · {totalCalls} public-scored calls
             <br />
             tier S/A/B/C · low-N flagged
           </>
@@ -455,7 +488,7 @@ interface PremiseRowProps {
 function HeroTrustItem({ label }: { readonly label: string }): ReactElement {
   return (
     <span className="inline-flex items-center gap-2">
-      <ShieldCheck className="h-4 w-4 text-ink-500" aria-hidden="true" />
+      <span className="font-mono text-[11px] text-accent" aria-hidden="true">✓</span>
       {label}
     </span>
   );
@@ -463,55 +496,34 @@ function HeroTrustItem({ label }: { readonly label: string }): ReactElement {
 
 function HeroFeatureRail(): ReactElement {
   const features = [
-    {
-      icon: Target,
-      title: "Track Every Eligible Call",
-      body: "We extract market calls from creator videos.",
-    },
-    {
-      icon: Scale,
-      title: "Score with Evidence",
-      body: "Objective scoring based on real market outcomes.",
-    },
-    {
-      icon: Trophy,
-      title: "Rank by Signal, Not Noise",
-      body: "Creators ranked by alpha, consistency and accuracy.",
-    },
-    {
-      icon: TrendingUp,
-      title: "See Who Adapts",
-      body: "We score corrections and course changes.",
-    },
-    {
-      icon: LockKeyhole,
-      title: "Unlock More Power",
-      body: "Alerts, exports, backtests, API access and webhooks.",
-    },
+    { mark: "01", title: "Track Every Eligible Call", body: "We extract market calls from creator videos." },
+    { mark: "02", title: "Score with Evidence", body: "Objective scoring based on real market outcomes." },
+    { mark: "03", title: "Rank by Signal, Not Noise", body: "Creators ranked by alpha, consistency and accuracy." },
+    { mark: "04", title: "See Who Adapts", body: "We score corrections and course changes." },
+    { mark: "05", title: "Unlock More Power", body: "Alerts, exports, backtests, API access and webhooks." },
   ] as const;
 
   return (
     <div
       className="relative mt-10 desk:mt-4 border border-ink-250 bg-ink-50/70 shadow-popover"
-      style={{ borderRadius: 8 }}
+      style={{ borderRadius: 2 }}
     >
       <div className="absolute inset-x-8 top-0 h-px bg-accent/70" aria-hidden="true" />
       <div className="grid grid-cols-1 tab:grid-cols-2 desk:grid-cols-5">
-        {features.map((feature) => {
-          const Icon = feature.icon;
-          return (
-            <div
-              key={feature.title}
-              className="min-w-0 border-b tab:border-r desk:border-b-0 border-ink-200 last:border-b-0 desk:last:border-r-0 px-5 py-6"
-            >
-              <Icon className="h-7 w-7 text-accent mb-4" strokeWidth={1.7} aria-hidden="true" />
-              <h2 className="font-sans text-[17px] text-ink-900 font-medium leading-tight mb-2">
-                {feature.title}
-              </h2>
-              <p className="text-[14px] text-ink-600 leading-relaxed">{feature.body}</p>
-            </div>
-          );
-        })}
+        {features.map((feature) => (
+          <div
+            key={feature.title}
+            className="min-w-0 border-b tab:border-r desk:border-b-0 border-ink-200 last:border-b-0 desk:last:border-r-0 px-5 py-6"
+          >
+            <p className="font-mono text-[11px] text-accent tracking-caps uppercase mb-4">
+              {feature.mark}
+            </p>
+            <h2 className="font-sans text-[17px] text-ink-900 font-medium leading-tight mb-2">
+              {feature.title}
+            </h2>
+            <p className="text-[14px] text-ink-600 leading-relaxed">{feature.body}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -533,6 +545,9 @@ interface MarketCallPreviewProps {
   readonly creatorCount: number;
   readonly beatBtcCreators: number;
   readonly rankedCreators: number;
+  readonly liveOpenCalls: number;
+  readonly excludedLowConfidenceCalls: number;
+  readonly confidencePassCalls: number;
   readonly rows: readonly LeaderboardRow[];
 }
 
@@ -541,6 +556,9 @@ function MarketCallPreview({
   creatorCount,
   beatBtcCreators,
   rankedCreators,
+  liveOpenCalls,
+  excludedLowConfidenceCalls,
+  confidencePassCalls,
   rows,
 }: MarketCallPreviewProps): ReactElement {
   const previewRows = rows.slice(0, 5);
@@ -555,11 +573,12 @@ function MarketCallPreview({
   const missedShare = Math.max(0, Math.round((1 - hitRate) * 100));
   const hitShare = Math.max(0, Math.round(hitRate * 100));
   const neutralShare = Math.max(0, 100 - missedShare - hitShare);
+  const topCreator = previewRows[0];
 
   return (
     <div
-      className="relative w-full desk:rotate-[-1deg] border border-ink-250 bg-ink-0/80 p-4 tab:p-5 shadow-popover overflow-hidden"
-      style={{ borderRadius: 10 }}
+      className="relative mx-auto w-full max-w-[1040px] border border-ink-250 bg-ink-0/85 p-4 tab:p-5 shadow-popover overflow-hidden"
+      style={{ borderRadius: 2 }}
       aria-label="CallScore product preview"
     >
       <div
@@ -572,24 +591,58 @@ function MarketCallPreview({
       />
       <div
         className="relative border border-ink-200 bg-ink-50/70 p-4 mb-4"
-        style={{ borderRadius: 8 }}
+        style={{ borderRadius: 2 }}
       >
         <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-3">
           Call Summary
         </p>
-        <div className="grid grid-cols-2 tab:grid-cols-4 gap-0">
+        <div className="grid grid-cols-2 tab:grid-cols-4 gap-y-4 tab:gap-y-0">
           <PreviewMetric label="creators tracked" value={String(creatorCount)} />
           <PreviewMetric label="ranked creators" value={String(rankedCreators)} />
-          <PreviewMetric label="scored calls" value={totalCalls} />
+          <PreviewMetric label="public-scored" value={totalCalls} />
           <PreviewMetric
             label="beating BTC"
             value={`${beatBtcCreators}/${Math.max(rankedCreators, beatBtcCreators)}`}
           />
         </div>
+        <div className="mt-4 grid grid-cols-3 gap-y-4 border-t border-ink-200 pt-4">
+          <PreviewMetric label="confidence pass" value={String(confidencePassCalls)} />
+          <PreviewMetric label="live/open" value={String(liveOpenCalls)} />
+          <PreviewMetric label="low-conf excluded" value={String(excludedLowConfidenceCalls)} />
+        </div>
       </div>
 
-      <div className="relative grid grid-cols-1 tab:grid-cols-[minmax(0,1fr)_156px] gap-4 mb-4">
-        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 8 }}>
+      {topCreator && (
+        <div
+          className="relative tab:hidden border border-ink-200 bg-ink-50/70 p-4 mb-4"
+          style={{ borderRadius: 2 }}
+        >
+          <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-3">
+            Current leader
+          </p>
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <p className="truncate font-serif text-[27px] leading-none text-ink-900">
+                {topCreator.creator.name}
+              </p>
+              <p className="mt-2 truncate font-mono text-[11px] text-ink-500">
+                {topCreator.creator.youtube_handle}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="font-serif text-[36px] leading-none text-pos">
+                {topCreator.stats.alpha_score.toFixed(1)}
+              </p>
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-caps text-ink-500">
+                alpha
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative hidden tab:grid tab:grid-cols-[minmax(0,1fr)_156px] gap-4 mb-4">
+        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 2 }}>
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-4">
             Score Distribution
           </p>
@@ -609,7 +662,7 @@ function MarketCallPreview({
             <span><b className="text-pos font-normal">{hitShare}%</b><br />Hit</span>
           </div>
         </div>
-        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 8 }}>
+        <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 2 }}>
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-2">
             Avg 30d Delta
           </p>
@@ -621,28 +674,28 @@ function MarketCallPreview({
       </div>
 
       <div
-        className="relative border border-ink-200 bg-ink-50/70 p-4"
-        style={{ borderRadius: 8 }}
+        className="relative hidden tab:block border border-ink-200 bg-ink-50/70 p-4"
+        style={{ borderRadius: 2 }}
       >
         <div className="flex items-center justify-between gap-4 border-b border-ink-200 pb-3 mb-3">
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase">
             Top Creators
           </p>
           <div className="hidden tab:flex items-center gap-6 font-mono text-[11px] text-ink-500 tracking-caps uppercase">
-            <span className="text-ink-900 border-b border-accent pb-1">All Time</span>
+            <span className="text-ink-900 border-b border-accent pb-1">{CREATOR_JUDGMENT_WINDOW_SHORT_LABEL}</span>
             <span>90 Days</span>
             <span>30 Days</span>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <div className="min-w-[560px]">
-            <div className="grid grid-cols-[50px_minmax(150px,1fr)_92px_76px_78px_72px] gap-4 pb-2 font-mono text-[10px] text-ink-500 tracking-caps uppercase">
+        <div className="overflow-hidden">
+          <div className="min-w-0">
+            <div className="grid grid-cols-[32px_minmax(88px,1fr)_58px_52px_50px_42px] gap-2 pb-2 font-mono text-[10px] text-ink-500 tracking-caps uppercase">
               <span>rank</span>
               <span>creator</span>
               <span>alpha</span>
               <span>30d Δ</span>
               <span>win %</span>
-              <span>last call</span>
+              <span>call</span>
             </div>
             {previewRows.length > 0 ? (
               previewRows.map((row) => {
@@ -657,13 +710,13 @@ function MarketCallPreview({
                 return (
                   <div
                     key={row.creator.id}
-                    className="grid grid-cols-[50px_minmax(150px,1fr)_92px_76px_78px_72px] gap-4 border-t border-ink-200 py-3 font-mono text-[13px] items-center"
+                    className="grid grid-cols-[32px_minmax(88px,1fr)_58px_52px_50px_42px] gap-2 border-t border-ink-200 py-3 font-mono text-[13px] items-center"
                   >
                     <span className="text-accent">{String(row.rank).padStart(2, "0")}</span>
                     <span className="flex items-center gap-3 min-w-0 text-ink-900">
                       <span
                         className="grid h-7 w-7 shrink-0 place-items-center border border-ink-300 bg-ink-100 text-[12px] text-ink-800"
-                        style={{ borderRadius: 4 }}
+                        style={{ borderRadius: 2 }}
                         aria-hidden="true"
                       >
                         {getInitials(row.creator.name)}
@@ -685,7 +738,7 @@ function MarketCallPreview({
                     <span className="text-ink-800 tabular-nums">
                       {formatPercent(row.stats.win_rate)}
                     </span>
-                    <span className="text-ink-800">
+                    <span className="min-w-0 truncate text-ink-800">
                       {lastCall?.symbol?.replace("USDT", "") ?? "—"}
                     </span>
                   </div>
@@ -716,7 +769,7 @@ function PreviewMetric({
   readonly value: string;
 }): ReactElement {
   return (
-    <div className="min-w-0 border-r border-ink-200 last:border-r-0 px-3 first:pl-0 last:pr-0 py-1">
+    <div className="min-w-0 border-r border-ink-150 last:border-r-0 px-4 first:pl-0 last:pr-0 py-1">
       <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-1 truncate">
         {label}
       </p>

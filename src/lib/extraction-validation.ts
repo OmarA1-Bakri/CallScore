@@ -1,11 +1,24 @@
 import { SYMBOL_NAMES, SYMBOL_TICKERS } from "./constants";
 import type { Direction } from "./types";
 
+const BULLISH_PERFORMER_PATTERN =
+  /\b(best performers?|top performers?|outperform(?:ed|ing)?|perform(?:s|ing)? really well)\b/i;
+const BULLISH_STRENGTH_PATTERN = /\b(do(?:ing)? pretty good|pretty strong|ripping)\b/i;
+const BULLISH_BOUNCE_PATTERN = /\bbounce(?:d|s|ing)? (?:pretty )?hard\b/i;
+
 const BULLISH_PATTERNS = [
   /\b(buy|buying|long|accumulate|accumulating|bullish|best buy|strong buy|great buy)\b/i,
-  /\b(go(?:ing)? up|push up|move up|rip higher|heading higher|upside)\b/i,
+  /\b(go(?:ing)? up|push up|move up|rip higher|heading higher|upside|next leg up)\b/i,
   /\b(target|targets|hit|reach|go to|get to|towards)\b/i,
   /\b(undervalued|break(?:ing)?\s*out|breakout|rally|pump|moon|higher high)\b/i,
+  /\b(make|makes|making|made)\s+(?:a\s+)?(?:massive\s+)?comeback\b/i,
+  /\b(best time to be positioned|positioned in|positioning in)\b/i,
+  /\b(all[-\s]?time high|all[-\s]?time highs|record high|record highs|new high|new highs)\b/i,
+  /\b(load(?:ing)? up on|loaded up on|big bag|high conviction)\b/i,
+  BULLISH_PERFORMER_PATTERN,
+  BULLISH_STRENGTH_PATTERN,
+  BULLISH_BOUNCE_PATTERN,
+  /\b(recover(?:y|ed|ing)?|rebound(?:ed|ing)?|brought up)\b/i,
 ];
 
 const AMBIGUOUS_SYMBOL_SUPPORT: Partial<Record<string, RegExp>> = {
@@ -17,8 +30,10 @@ const AMBIGUOUS_SYMBOL_SUPPORT: Partial<Record<string, RegExp>> = {
 
 const BEARISH_PATTERNS = [
   /\b(sell|selling|short|shorting|bearish|avoid|stay away)\b/i,
-  /\b(go(?:ing)? down|break down|heading lower|drop|dump|collapse|crash)\b/i,
+  /\b(go(?:ing)? down|break down|heading lower|drop|dropped|dropping|dump|collapse|crash)\b/i,
   /\b(overvalued|dead coin|dead project|rug)\b/i,
+  /\b(decline|declines|declining|capitulatory|at risk|shooting star|sell pressure|bear market|downside)\b/i,
+  /\b(dead|underperform(?:ed|ing)?|weakness)\b/i,
 ];
 
 const ACTIONABLE_WATCH_PATTERNS = [

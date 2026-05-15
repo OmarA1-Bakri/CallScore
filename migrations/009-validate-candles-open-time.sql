@@ -1,0 +1,11 @@
+-- Validate the millisecond timestamp guard added in 008.
+--
+-- Preflight before applying in production:
+--   SELECT COUNT(*) AS invalid_count
+--   FROM candles
+--   WHERE open_time <= 946684800000 OR open_time >= 4102444800000;
+--
+-- The migration intentionally fails if legacy data contains seconds-based or
+-- otherwise out-of-range candle timestamps, preventing the constraint from
+-- being marked valid until the rows are repaired.
+ALTER TABLE candles VALIDATE CONSTRAINT candles_open_time_ms_check;

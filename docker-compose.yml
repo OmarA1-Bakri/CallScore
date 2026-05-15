@@ -1,0 +1,21 @@
+services:
+  hermes-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    image: crypto-tuber-ranked-hermes-worker:latest
+    restart: unless-stopped
+    env_file:
+      - .env.hermes
+    command: ["npm", "run", "pipeline:worker", "--", "--poll-ms", "15000"]
+
+  hermes-worker-once:
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    image: crypto-tuber-ranked-hermes-worker:latest
+    profiles: ["debug"]
+    env_file:
+      - .env.hermes
+    entrypoint: ["npm", "run", "pipeline:worker:once", "--"]
+    command: ["--dry-run"]

@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  LOW_N_WARNING_CALLS,
+  MIN_PUBLIC_LEADERBOARD_CALLS,
+} from "@/lib/leaderboard-eligibility";
+
 interface RankTierBadgeProps {
   readonly rank: number;
   readonly totalCalls: number;
@@ -12,9 +17,15 @@ function getTier(rank: number): { label: string; color: string } {
   return { label: "T3", color: "bg-ink-500/20 text-ink-600 border-ink-300/30" };
 }
 
+if (MIN_PUBLIC_LEADERBOARD_CALLS > LOW_N_WARNING_CALLS) {
+  throw new Error("MIN_PUBLIC_LEADERBOARD_CALLS must be <= LOW_N_WARNING_CALLS");
+}
+
 export default function RankTierBadge({ rank, totalCalls, wilsonLb }: RankTierBadgeProps) {
   const tier = getTier(rank);
-  const lowData = totalCalls < 50;
+  // Ordering invariant: obsoleteData is the stricter floor, lowData covers the visible low-N band above it.
+  const obsoleteData = totalCalls < MIN_PUBLIC_LEADERBOARD_CALLS;
+  const lowData = !obsoleteData && totalCalls < LOW_N_WARNING_CALLS;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -23,10 +34,18 @@ export default function RankTierBadge({ rank, totalCalls, wilsonLb }: RankTierBa
       >
         {tier.label}
       </span>
+      {obsoleteData && (
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-ink-100 text-ink-600 border border-ink-300/70"
+          title={`Only ${totalCalls} scored calls — below the ${MIN_PUBLIC_LEADERBOARD_CALLS}-call leaderboard floor`}
+        >
+          Obsolete
+        </span>
+      )}
       {lowData && (
         <span
           className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-accent/10 text-accent border border-accent/20"
-          title={`Only ${totalCalls} scored calls — ranking may shift with more data`}
+          title={`Only ${totalCalls} scored calls — visible but still a low-N sample`}
         >
           Low N
         </span>

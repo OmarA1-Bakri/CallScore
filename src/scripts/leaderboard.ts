@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { query } from "../lib/db";
+import { getLeaderboardEligibilitySql } from "../lib/leaderboard-eligibility";
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
@@ -36,15 +37,17 @@ interface Row {
 
 async function main(): Promise<void> {
   loadEnv();
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
   const rows = await query<Row>(
     `SELECT cr.name, cr.tier, cs.accuracy_rank, cs.alpha_score, cs.win_rate,
             cs.avg_alpha_30d, cs.avg_return_30d, cs.total_calls,
             cs.effective_n, cs.wilson_lb, cs.strategy_consistency, cs.sharpe_ratio
      FROM creators cr
      JOIN creator_stats cs ON cs.creator_id = cr.id AND cs.period = 'all_time'
-     WHERE EXISTS (
-       SELECT 1 FROM calls c WHERE c.creator_id = cr.id AND c.price_at_call IS NOT NULL
-     )
+     WHERE ${leaderboardEligibleSql}
+       AND EXISTS (
+         SELECT 1 FROM calls c WHERE c.creator_id = cr.id AND c.price_at_call IS NOT NULL
+       )
      ORDER BY cs.accuracy_rank ASC NULLS LAST`,
   );
 
@@ -74,7 +77,8 @@ async function main(): Promise<void> {
   // Period comparison
   const periodStats = await query<{ period: string; creator_count: string; avg_alpha: number }>(
     `SELECT period, COUNT(*)::text as creator_count, AVG(alpha_score) as avg_alpha
-     FROM creator_stats
+     FROM creator_stats cs
+     WHERE ${leaderboardEligibleSql}
      GROUP BY period
      ORDER BY period`,
   );

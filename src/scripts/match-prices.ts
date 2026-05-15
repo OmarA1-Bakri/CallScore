@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { query } from "../lib/db";
 import { MS_7D, MS_30D, MS_90D } from "../lib/constants";
+import { createLogger } from "../lib/logger";
 import {
   computeReturn,
   computeAlpha,
@@ -11,6 +12,13 @@ import {
 } from "../lib/scoring";
 import { hasHorizonElapsed } from "../lib/public-methodology";
 import type { Direction } from "../lib/types";
+
+type QueryFn = <T = Record<string, unknown>>(
+  text: string,
+  params?: unknown[],
+) => Promise<T[]>;
+
+const logger = createLogger({ component: "match-prices" });
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
@@ -33,14 +41,61 @@ function loadEnv(): void {
   }
 }
 
-function timestamp(): string {
-  return new Date().toISOString();
+export interface MatchPricesArgs {
+  readonly rematchAll: boolean;
+  readonly limit: number;
+  readonly batchSize: number;
+  readonly startAfterId: number;
+}
+
+function argValue(argv: readonly string[], flag: string): string | null {
+  const index = argv.indexOf(flag);
+  if (index < 0 || !argv[index + 1]) return null;
+  return argv[index + 1];
+}
+
+function positiveInt(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function nonNegativeInt(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
+export function parseMatchPricesArgs(argv = process.argv.slice(2)): MatchPricesArgs {
+  return {
+    rematchAll: argv.includes("--all") || argv.includes("--full") || argv.includes("--recompute"),
+    limit: positiveInt(argValue(argv, "--limit"), Number.MAX_SAFE_INTEGER),
+    batchSize: positiveInt(argValue(argv, "--batch-size"), 200),
+    startAfterId: nonNegativeInt(argValue(argv, "--start-after-id"), 0),
+  };
+}
+
+export function getCallSelectionPredicate(args: Pick<MatchPricesArgs, "rematchAll">): string {
+  if (args.rematchAll) return "id > $1";
+  return [
+    "id > $1",
+    `(
+         price_at_call IS NULL
+      OR btc_price_at_call IS NULL
+      OR (call_date <= NOW() - INTERVAL '7 days' AND (price_7d IS NULL OR btc_price_7d IS NULL OR return_7d IS NULL))
+      OR (call_date <= NOW() - INTERVAL '30 days' AND (price_30d IS NULL OR btc_price_30d IS NULL OR return_30d IS NULL))
+      OR (call_date <= NOW() - INTERVAL '90 days' AND (price_90d IS NULL OR btc_price_90d IS NULL OR return_90d IS NULL))
+      OR (target_price IS NOT NULL AND call_date <= NOW() - INTERVAL '90 days' AND hit_target IS NULL)
+    )`,
+  ].join(" AND ");
 }
 
 // ── In-memory price cache ─────────────────────────────────────────
 // Key: `${symbol}:${roundedMs}` → { close, regime }
 // Rounds timestamps to 5-min intervals to maximize cache hits.
 const ROUND_MS = 5 * 60 * 1000; // 5 min
+const MATCH_CONCURRENCY = 12;
+export const MATCH_PRICES_ADVISORY_LOCK_ID = 4_297_231_001;
+export const MATCH_PRICE_CACHE_MAX_ENTRIES = 50_000;
+export const HIGH_LOW_CACHE_MAX_ENTRIES = 50_000;
 const priceCache = new Map<string, { close: number; regime: number | null } | null>();
 
 function roundTime(ms: number): number {
@@ -49,6 +104,45 @@ function roundTime(ms: number): number {
 
 function cacheKey(symbol: string, ms: number): string {
   return `${symbol}:${roundTime(ms)}`;
+}
+
+export function setLruCacheEntry<K, V>(
+  cache: Map<K, V>,
+  key: K,
+  value: V,
+  maxEntries: number,
+): boolean {
+  if (!Number.isFinite(maxEntries) || maxEntries < 1) {
+    logger.warn("lru_cache_invalid_max_entries", { max_entries: maxEntries });
+    return false;
+  }
+
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+
+  while (cache.size > maxEntries) {
+    const oldestKey = cache.keys().next().value as K | undefined;
+    if (oldestKey === undefined) break;
+    cache.delete(oldestKey);
+  }
+  return true;
+}
+
+function getLruCacheEntry<K, V>(cache: Map<K, V>, key: K): V | undefined {
+  if (!cache.has(key)) return undefined;
+  const value = cache.get(key)!;
+  cache.delete(key);
+  cache.set(key, value);
+  return value;
+}
+
+export function clearMatchPricesCaches(): void {
+  priceCache.clear();
+  highLowCache.clear();
+}
+
+export function getMatchPricesCacheSizes(): { readonly priceCacheSize: number; readonly highLowCacheSize: number } {
+  return { priceCacheSize: priceCache.size, highLowCacheSize: highLowCache.size };
 }
 
 interface CandleResult {
@@ -62,8 +156,9 @@ const MAX_STALENESS_MS = 24 * 60 * 60 * 1000;
 
 async function getCandleAt(symbol: string, dateMs: number): Promise<CandleResult | null> {
   const key = cacheKey(symbol, dateMs);
-  if (priceCache.has(key)) {
-    return priceCache.get(key) ?? null;
+  const cached = getLruCacheEntry(priceCache, key);
+  if (cached !== undefined) {
+    return cached ?? null;
   }
 
   const rows = await query<{ close: number; regime: number | null; open_time: string }>(
@@ -72,7 +167,7 @@ async function getCandleAt(symbol: string, dateMs: number): Promise<CandleResult
   );
 
   if (rows.length === 0) {
-    priceCache.set(key, null);
+    setLruCacheEntry(priceCache, key, null, MATCH_PRICE_CACHE_MAX_ENTRIES);
     return null;
   }
 
@@ -83,12 +178,12 @@ async function getCandleAt(symbol: string, dateMs: number): Promise<CandleResult
 
   if (staleness > MAX_STALENESS_MS) {
     // Candle is too old — data gap, don't trust this price
-    priceCache.set(key, null);
+    setLruCacheEntry(priceCache, key, null, MATCH_PRICE_CACHE_MAX_ENTRIES);
     return null;
   }
 
   const result: CandleResult = { close: rows[0].close, regime: rows[0].regime };
-  priceCache.set(key, result);
+  setLruCacheEntry(priceCache, key, result, MATCH_PRICE_CACHE_MAX_ENTRIES);
   return result;
 }
 
@@ -101,8 +196,9 @@ async function getHighLowBetween(
   toMs: number,
 ): Promise<{ maxHigh: number | null; minLow: number | null }> {
   const key = `${symbol}:${roundTime(fromMs)}:${roundTime(toMs)}`;
-  if (highLowCache.has(key)) {
-    return highLowCache.get(key)!;
+  const cached = getLruCacheEntry(highLowCache, key);
+  if (cached !== undefined) {
+    return cached;
   }
 
   const rows = await query<{ max_high: number | null; min_low: number | null }>(
@@ -114,7 +210,7 @@ async function getHighLowBetween(
     ? { maxHigh: null, minLow: null }
     : { maxHigh: rows[0].max_high, minLow: rows[0].min_low };
 
-  highLowCache.set(key, result);
+  setLruCacheEntry(highLowCache, key, result, HIGH_LOW_CACHE_MAX_ENTRIES);
   return result;
 }
 
@@ -254,62 +350,173 @@ async function processCall(call: UnmatchedCall): Promise<boolean> {
   return true;
 }
 
-// ── Main ──────────────────────────────────────────────────────────
-async function main(): Promise<void> {
-  loadEnv();
-
-  console.log(`[${timestamp()}] Starting price matching (with cache)...`);
-
-  const BATCH_SIZE = 200;
-  let totalMatched = 0;
-  let totalSkipped = 0;
-  let lastId = 0;
-
-  while (true) {
-    // Use cursor-based pagination (faster than OFFSET for large datasets)
-    const batch = await query<UnmatchedCall>(
-      `SELECT id, symbol, direction, target_price, stop_loss, call_date
-       FROM calls
-       WHERE price_at_call IS NULL AND id > $1
-       ORDER BY id ASC
-       LIMIT $2`,
-      [lastId, BATCH_SIZE],
-    );
-
-    if (batch.length === 0) break;
-
-    console.log(
-      `[${timestamp()}] Processing batch of ${batch.length} (from id ${batch[0].id}, cache size: ${priceCache.size})`,
-    );
-
-    for (const call of batch) {
-      try {
-        const matched = await processCall(call);
-        if (matched) {
-          totalMatched++;
-        } else {
-          totalSkipped++;
-        }
-      } catch (error: unknown) {
-        totalSkipped++;
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[${timestamp()}]   Error matching call ${call.id}: ${msg}`);
-      }
-      lastId = call.id;
-    }
-
-    console.log(
-      `[${timestamp()}] Batch done: ${totalMatched} matched, ${totalSkipped} skipped (total)`,
-    );
-  }
-
-  console.log(
-    `[${timestamp()}] Price matching complete: ${totalMatched} matched, ${totalSkipped} skipped`,
+export async function acquireMatchPricesLock(queryFn: QueryFn = query): Promise<boolean> {
+  const rows = await queryFn<{ locked: boolean }>(
+    "SELECT pg_try_advisory_lock($1::bigint) AS locked",
+    [MATCH_PRICES_ADVISORY_LOCK_ID],
   );
-  console.log(`[${timestamp()}] Cache stats: ${priceCache.size} price entries, ${highLowCache.size} high/low entries`);
+  return rows[0]?.locked === true;
 }
 
-main().catch((err) => {
-  console.error(`[${new Date().toISOString()}] Fatal error:`, err);
-  process.exit(1);
-});
+export async function releaseMatchPricesLock(queryFn: QueryFn = query): Promise<void> {
+  await queryFn("SELECT pg_advisory_unlock($1::bigint)", [MATCH_PRICES_ADVISORY_LOCK_ID]);
+}
+
+export async function withMatchPricesAdvisoryLock<T>(
+  work: () => Promise<T>,
+  queryFn: QueryFn = query,
+): Promise<{ readonly locked: false } | { readonly locked: true; readonly result: T }> {
+  const locked = await acquireMatchPricesLock(queryFn);
+  if (!locked) return { locked: false };
+  let workError: unknown;
+  let result: T | undefined;
+  try {
+    result = await work();
+  } catch (error) {
+    workError = error;
+  }
+  try {
+    await releaseMatchPricesLock(queryFn);
+  } catch (releaseError) {
+    if (workError === undefined) throw releaseError;
+    logger.warn("price_matching_unlock_failed", {
+      error: releaseError instanceof Error ? releaseError.message : String(releaseError),
+    });
+  }
+  if (workError !== undefined) throw workError;
+  return { locked: true, result: result as T };
+}
+
+export interface MatchPricesMetrics {
+  readonly locked: boolean;
+  readonly considered: number;
+  readonly matched: number;
+  readonly skipped: number;
+  readonly price_cache_size: number;
+  readonly high_low_cache_size: number;
+}
+
+export async function runMatchPrices(args: MatchPricesArgs): Promise<MatchPricesMetrics> {
+  logger.info("price_matching_start", {
+    mode: args.rematchAll ? "full_recompute" : "incomplete_market_data",
+    cache: true,
+    limit: args.limit,
+    batch_size: args.batchSize,
+    start_after_id: args.startAfterId,
+  });
+  const lockResult = await withMatchPricesAdvisoryLock(async (): Promise<MatchPricesMetrics> => {
+    if (args.rematchAll) clearMatchPricesCaches();
+    let totalMatched = 0;
+    let totalSkipped = 0;
+    let totalSeen = 0;
+    let lastId = args.startAfterId;
+
+    while (true) {
+      const remaining = args.limit - totalSeen;
+      if (remaining <= 0) break;
+
+      // Use cursor-based pagination (faster than OFFSET for large datasets)
+      const batch = await query<UnmatchedCall>(
+        `SELECT id, symbol, direction, target_price, stop_loss, call_date
+         FROM calls
+         WHERE ${getCallSelectionPredicate(args)}
+         ORDER BY id ASC
+         LIMIT $2`,
+        [lastId, Math.min(args.batchSize, remaining)],
+      );
+
+      if (batch.length === 0) break;
+
+      logger.info("batch_start", {
+        batch_size: batch.length,
+        from_call_id: batch[0].id,
+        price_cache_size: priceCache.size,
+      });
+
+      let nextIndex = 0;
+      let batchMatched = 0;
+      let batchSkipped = 0;
+
+      const worker = async (): Promise<void> => {
+        while (nextIndex < batch.length) {
+          const index = nextIndex++;
+          const call = batch[index];
+          if (!call) return;
+          try {
+            const matched = await processCall(call);
+            if (matched) {
+              batchMatched++;
+            } else {
+              batchSkipped++;
+            }
+          } catch (error: unknown) {
+            batchSkipped++;
+            const msg = error instanceof Error ? error.message : String(error);
+            logger.error("call_match_failed", { call_id: call.id, error: msg });
+          }
+        }
+      };
+
+      await Promise.all(
+        Array.from({ length: Math.min(MATCH_CONCURRENCY, batch.length) }, () => worker()),
+      );
+
+      totalSeen += batch.length;
+      totalMatched += batchMatched;
+      totalSkipped += batchSkipped;
+      lastId = batch[batch.length - 1].id;
+
+      logger.info("batch_complete", {
+        total_matched: totalMatched,
+        total_skipped: totalSkipped,
+      });
+    }
+
+    logger.info("price_matching_complete", {
+      considered: totalSeen,
+      matched: totalMatched,
+      skipped: totalSkipped,
+      price_cache_size: priceCache.size,
+      high_low_cache_size: highLowCache.size,
+    });
+    return {
+      locked: true,
+      considered: totalSeen,
+      matched: totalMatched,
+      skipped: totalSkipped,
+      price_cache_size: priceCache.size,
+      high_low_cache_size: highLowCache.size,
+    };
+  });
+
+  if (!lockResult.locked) {
+    logger.warn("price_matching_lock_busy", {
+      advisory_lock_id: MATCH_PRICES_ADVISORY_LOCK_ID,
+    });
+    return {
+      locked: false,
+      considered: 0,
+      matched: 0,
+      skipped: 0,
+      price_cache_size: priceCache.size,
+      high_low_cache_size: highLowCache.size,
+    };
+  }
+  return lockResult.result;
+}
+
+// ── Main ──────────────────────────────────────────────────────────
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  loadEnv();
+  const args = parseMatchPricesArgs(argv);
+  await runMatchPrices(args);
+}
+
+if (require.main === module) {
+  main().catch((err) => {
+    logger.error("fatal_error", {
+      error: err instanceof Error ? err.stack ?? err.message : String(err),
+    });
+    process.exit(1);
+  });
+}

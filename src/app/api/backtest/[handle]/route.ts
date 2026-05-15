@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { findCreatorByHandle } from "@/lib/creator-handles";
 import { requireSessionAccess } from "@/lib/premium";
 import {
   BACKTEST_STRATEGIES,
@@ -80,13 +81,13 @@ function parseQuery(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { handle: string } },
+  { params }: { params: Promise<{ handle: string }> },
 ): Promise<NextResponse> {
   const session = await requireSessionAccess("alpha");
   if (session instanceof NextResponse) return session;
 
   try {
-    const { handle: rawHandle } = params;
+    const { handle: rawHandle } = await params;
     const handle = decodeURIComponent(rawHandle);
     if (handle.length === 0) {
       return NextResponse.json(
@@ -100,11 +101,8 @@ export async function GET(
       return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
-    const creators = await query<Creator>(
-      `SELECT * FROM creators WHERE youtube_handle = $1 LIMIT 1`,
-      [handle],
-    );
-    if (creators.length === 0) {
+    const creator = await findCreatorByHandle<Creator>(handle);
+    if (!creator) {
       return NextResponse.json(
         { error: "creator_not_found" },
         { status: 404 },
@@ -112,7 +110,7 @@ export async function GET(
     }
 
     const result = await runBacktest({
-      creatorId: creators[0].id,
+      creatorId: creator.id,
       startDate: parsed.startDate,
       endDate: parsed.endDate,
       initialCapital: parsed.capital,

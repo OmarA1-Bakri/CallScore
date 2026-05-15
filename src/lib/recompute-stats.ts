@@ -4,6 +4,8 @@ import {
   getCallEligibilitySql,
   getCallScoreStatus,
 } from "./public-methodology";
+import { getLeaderboardEligibilitySql } from "./leaderboard-eligibility";
+import { getPeriodFilterSql } from "./judgment-window";
 import type { Call, Period } from "./types";
 
 interface ScoreRow {
@@ -21,12 +23,6 @@ interface ScoreRow {
   readonly regime_difficulty: number;
   readonly hit_target: boolean | null;
 }
-
-const PERIOD_FILTERS: Record<Period, string> = {
-  all_time: "",
-  "90d": "AND c.call_date >= NOW() - INTERVAL '90 days'",
-  "30d": "AND c.call_date >= NOW() - INTERVAL '30 days'",
-};
 
 function toScoreInput(row: ScoreRow): Call {
   return {
@@ -122,8 +118,10 @@ export async function recomputeCallScores(): Promise<number> {
 }
 
 export async function recomputeCreatorStats(period: Period): Promise<void> {
-  const periodFilter = PERIOD_FILTERS[period];
+  const periodFilter = getPeriodFilterSql("c", period);
+  const subqueryPeriodFilter = getPeriodFilterSql("cl", period);
   const eligibleSql = getCallEligibilitySql("c");
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("creator_stats");
 
   await query(
     `DELETE FROM creator_stats WHERE period = $1`,
@@ -153,7 +151,7 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
         FROM calls cl
         WHERE cl.creator_id = cr.id
           AND ${getCallEligibilitySql("cl")}
-          ${period === "all_time" ? "" : `AND cl.call_date >= NOW() - INTERVAL '${period.slice(0, 2)} days'`}
+          ${subqueryPeriodFilter}
         ORDER BY cl.score DESC, cl.id ASC
         LIMIT 1
       ) AS best_call_id,
@@ -162,7 +160,7 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
         FROM calls cl
         WHERE cl.creator_id = cr.id
           AND ${getCallEligibilitySql("cl")}
-          ${period === "all_time" ? "" : `AND cl.call_date >= NOW() - INTERVAL '${period.slice(0, 2)} days'`}
+          ${subqueryPeriodFilter}
         ORDER BY cl.score ASC, cl.id ASC
         LIMIT 1
       ) AS worst_call_id,
@@ -172,7 +170,7 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
         FROM calls cl
         WHERE cl.creator_id = cr.id
           AND ${getCallEligibilitySql("cl")}
-          ${period === "all_time" ? "" : `AND cl.call_date >= NOW() - INTERVAL '${period.slice(0, 2)} days'`}
+          ${subqueryPeriodFilter}
         GROUP BY cl.symbol
         ORDER BY COUNT(*) DESC, cl.symbol ASC
         LIMIT 1
@@ -207,6 +205,9 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
         0
       ) AS sharpe_ratio,
       NOW() AS updated_at
+    -- Keep one row per creator even when the period has too few eligible calls.
+    -- Eligibility is applied to ranking, not row existence, so low-N creators
+    -- do not disappear from snapshots after a recompute.
     FROM creators cr
     LEFT JOIN calls c ON c.creator_id = cr.id
     GROUP BY cr.id`,
@@ -224,7 +225,7 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
            ORDER BY alpha_score DESC, win_rate DESC, total_calls DESC, creator_id ASC
          ) AS rank
        FROM creator_stats
-       WHERE period = $1 AND total_calls > 0
+       WHERE period = $1 AND ${leaderboardEligibleSql}
      ) ranked
      WHERE cs.id = ranked.id`,
     [period],
@@ -246,10 +247,15 @@ export async function syncCreatorSnapshots(): Promise<void> {
   );
 }
 
-export async function recomputeAllStats(): Promise<void> {
-  await recomputeCallScores();
+export interface RecomputeAllStatsMetrics {
+  readonly scored_calls: number;
+}
+
+export async function recomputeAllStats(): Promise<RecomputeAllStatsMetrics> {
+  const scoredCalls = await recomputeCallScores();
   await recomputeCreatorStats("all_time");
   await recomputeCreatorStats("90d");
   await recomputeCreatorStats("30d");
   await syncCreatorSnapshots();
+  return { scored_calls: scoredCalls };
 }

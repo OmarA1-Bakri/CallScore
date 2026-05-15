@@ -34,7 +34,7 @@ export default function ConsensusSignals({ signals, locked = false }: ConsensusS
           </p>
           <a
             href="/pricing"
-            className="inline-block mt-3 font-mono text-[12px] tracking-caps uppercase text-accent hover:underline"
+            className="mt-3 inline-flex min-h-10 items-center font-mono text-[12px] uppercase tracking-caps text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
           >
             Upgrade to Alpha
           </a>

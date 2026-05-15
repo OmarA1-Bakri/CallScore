@@ -3,22 +3,28 @@ import type { ReactElement } from "react";
 
 interface CallScoreBrandProps {
   readonly compact?: boolean;
+  readonly showTagline?: boolean;
+  readonly className?: string;
 }
 
 export default function CallScoreBrand({
   compact = false,
+  showTagline = false,
+  className = "",
 }: CallScoreBrandProps): ReactElement {
+  const lockupSize = compact
+    ? "h-[34px] w-[84px]"
+    : showTagline
+      ? "h-[88px] w-[217px] tab:h-[96px] tab:w-[237px]"
+      : "h-[42px] w-[104px]";
+
   return (
     <Image
-      src="/brand/callscore-exact-transparent.svg"
-      alt="CallScore - Market calls, measured."
-      width={2000}
-      height={2000}
-      className={
-        compact
-          ? "h-[82px] w-[82px] object-contain"
-          : "h-[76px] w-[76px] object-contain tab:h-[88px] tab:w-[88px]"
-      }
+      src="/brand/callscore-lockup-transparent.png"
+      alt="CallScore - Track calls. Score outcomes. Find alpha."
+      width={1149}
+      height={466}
+      className={`${className} ${lockupSize} object-contain object-left`}
       unoptimized
       priority={!compact}
     />

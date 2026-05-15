@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactElement } from "react";
+import { creatorHandlePath } from "@/lib/creator-handles";
 import type { LeaderboardRow as Row } from "@/lib/types";
 import RankTierBadge from "./RankTierBadge";
 
@@ -34,7 +35,7 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
       {/* Creator — initial-letter avatar + name + handle (matches dev-pack) */}
       <td className="py-3 pr-4 align-baseline">
         <Link
-          href={`/creator/${row.creator.youtube_handle}`}
+          href={`/creator/${creatorHandlePath(row.creator.youtube_handle)}`}
           className="flex items-baseline gap-2.5 group focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
         >
           <span

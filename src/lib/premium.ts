@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession, getRequestAuthContext, type Session } from "./auth";
-import { verifyApiKey, type ApiKeyAuth } from "./api-keys";
-import { getUserTier, hasAccess } from "./whop";
+import { recordApiKeyRequest, verifyApiKey, type ApiKeyAuth } from "./api-keys";
+import { hasAccess } from "./whop";
+import { getUserTier } from "./whop-access";
 import type { Tier } from "./types";
 
 export function unauthorized(): NextResponse {
@@ -27,11 +28,20 @@ export async function requireSessionAccess(
 export async function requireAlphaApiAccess(request: {
   readonly headers: Headers;
   readonly cookies: { get(name: string): { readonly value: string } | undefined };
+  readonly method?: string;
+  readonly url?: string;
 }): Promise<ApiKeyAuth | Session | NextResponse> {
   const authHeader = request.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ctr_alpha_")) {
     const apiAuth = await verifyApiKey(authHeader.slice(7));
     if (!apiAuth) return unauthorized();
+    const path = request.url ? new URL(request.url).pathname : "unknown";
+    await recordApiKeyRequest(
+      apiAuth.userId,
+      apiAuth.apiKeyId,
+      request.method ?? "GET",
+      path,
+    );
     return apiAuth;
   }
 

@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   computeCreatorAvgAlpha30d,
   computeCreatorHitRate,
@@ -12,6 +14,7 @@ import type { Call } from "../src/lib/types";
 // data populated. We pin "now" forward in time so calls dated 2025-01-01
 // comfortably cross the 30d (and 90d when target_price is set) horizons.
 const NOW = new Date("2025-06-01T00:00:00.000Z");
+const root = join(__dirname, "..");
 
 function buildCall(overrides: Partial<Call> = {}): Call {
   return {
@@ -189,4 +192,12 @@ test("computeCreatorScoreAverages.total matches the averaged sum of the five com
     `expected total (${averages.total}) to equal sum of components (${componentSum})`,
   );
   assert.equal(averages.scoredCount, 3);
+});
+
+test("recomputeCreatorStats preserves placeholder rows for below-threshold creators", () => {
+  // Source-inspection regression guard: recompute-stats must keep LEFT JOIN
+  // semantics and avoid HAVING filters that delete below-threshold creators.
+  const source = readFileSync(join(root, "src/lib/recompute-stats.ts"), "utf8");
+  assert.match(source, /FROM creators cr\s+LEFT JOIN calls c ON c\.creator_id = cr\.id/);
+  assert.doesNotMatch(source, /GROUP BY cr\.id\s+HAVING/);
 });

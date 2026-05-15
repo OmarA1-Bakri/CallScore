@@ -13,6 +13,7 @@
  */
 import { query } from "../lib/db";
 import { enqueueNewCallAlert } from "../lib/alerts";
+import { EXTRACTION_CONFIDENCE_THRESHOLD } from "../lib/public-methodology";
 import { loadEnv, timestamp } from "./_shared";
 
 function parseHoursArg(argv: readonly string[]): number {
@@ -38,14 +39,14 @@ async function main(): Promise<void> {
   );
 
   // Join new calls with watchlists in SQL so we only round-trip once.
-  // Filter to extraction_confidence above 0.6 so garbage calls don't
+  // Filter to extraction_confidence above the floor so garbage calls don't
   // flood every watcher's inbox.
   const pairs = await query<NewCallRow>(
     `SELECT c.id AS call_id, c.creator_id, w.user_id
      FROM calls c
      JOIN watchlists w ON w.creator_id = c.creator_id
      WHERE c.created_at >= NOW() - ($1 || ' hours')::interval
-       AND c.extraction_confidence >= 0.6
+       AND c.extraction_confidence >= ${EXTRACTION_CONFIDENCE_THRESHOLD}
      ORDER BY c.created_at ASC`,
     [String(hours)],
   );

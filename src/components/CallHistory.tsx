@@ -26,6 +26,10 @@ function getScoreLabel(call: SerializedCall): string {
   return "Pending";
 }
 
+function formatSignedPercent(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+}
+
 export default function CallHistory({
   calls,
   totalCount,
@@ -41,10 +45,14 @@ export default function CallHistory({
       const aVal =
         sortKey === "score"
           ? (a.public_score ?? -1)
+          : sortKey === "return_30d"
+            ? (a.return_30d ?? a.live_return ?? 0)
           : (a[sortKey] ?? 0);
       const bVal =
         sortKey === "score"
           ? (b.public_score ?? -1)
+          : sortKey === "return_30d"
+            ? (b.return_30d ?? b.live_return ?? 0)
           : (b[sortKey] ?? 0);
       if (typeof aVal === "string" && typeof bVal === "string") {
         return sortDir === "asc"
@@ -91,7 +99,11 @@ export default function CallHistory({
         </p>
       </div>
 
-      <div className="overflow-x-auto">
+      <div
+        className="overflow-x-auto focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
+        tabIndex={0}
+        aria-label="Creator call history table"
+      >
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink-200">
@@ -174,8 +186,21 @@ export default function CallHistory({
                     </span>
                   </td>
                   <td className="px-4 py-3 tabular-nums">
-                    {call.horizon_status_30d === "pending" ? (
-                      <span className="text-ink-400 text-xs uppercase tracking-wider">
+                    {call.horizon_status_30d === "pending" && call.live_return !== null ? (
+                      <span
+                        className={
+                          call.live_return >= 0
+                            ? "value-positive"
+                            : "value-negative"
+                        }
+                      >
+                        {formatSignedPercent(call.live_return)}
+                        <span className="ml-1 text-[10px] uppercase tracking-wider text-ink-600">
+                          live
+                        </span>
+                      </span>
+                    ) : call.horizon_status_30d === "pending" ? (
+                      <span className="text-xs uppercase tracking-wider text-ink-600">
                         Pending
                       </span>
                     ) : call.return_30d !== null ? (
@@ -186,16 +211,28 @@ export default function CallHistory({
                             : "value-negative"
                         }
                       >
-                        {call.return_30d >= 0 ? "+" : ""}
-                        {call.return_30d.toFixed(1)}%
+                        {formatSignedPercent(call.return_30d)}
                       </span>
                     ) : (
-                      <span className="text-ink-400">--</span>
+                      <span className="text-ink-600">--</span>
                     )}
                   </td>
                   <td className="px-4 py-3 tabular-nums hidden lg:table-cell">
-                    {call.horizon_status_30d === "pending" ? (
-                      <span className="text-ink-400 text-xs uppercase tracking-wider">
+                    {call.horizon_status_30d === "pending" && call.live_alpha !== null ? (
+                      <span
+                        className={
+                          call.live_alpha >= 0
+                            ? "value-positive"
+                            : "value-negative"
+                        }
+                      >
+                        {formatSignedPercent(call.live_alpha)}
+                        <span className="ml-1 text-[10px] uppercase tracking-wider text-ink-600">
+                          live
+                        </span>
+                      </span>
+                    ) : call.horizon_status_30d === "pending" ? (
+                      <span className="text-xs uppercase tracking-wider text-ink-600">
                         Pending
                       </span>
                     ) : call.alpha_30d !== null ? (
@@ -206,16 +243,15 @@ export default function CallHistory({
                             : "value-negative"
                         }
                       >
-                        {call.alpha_30d >= 0 ? "+" : ""}
-                        {call.alpha_30d.toFixed(1)}%
+                        {formatSignedPercent(call.alpha_30d)}
                       </span>
                     ) : (
-                      <span className="text-ink-400">--</span>
+                      <span className="text-ink-600">--</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center hidden md:table-cell">
                     {call.target_status === "pending" ? (
-                      <span className="text-ink-400 text-xs uppercase tracking-wider">
+                      <span className="text-xs uppercase tracking-wider text-ink-600">
                         Pending
                       </span>
                     ) : call.hit_target === true ? (
@@ -223,7 +259,7 @@ export default function CallHistory({
                     ) : call.hit_target === false ? (
                       <X className="w-4 h-4 text-neg mx-auto" />
                     ) : (
-                      <span className="text-ink-400">--</span>
+                      <span className="text-ink-600">--</span>
                     )}
                   </td>
                 </tr>
@@ -289,7 +325,7 @@ function SortableHeader({
         {label}
         <span
           aria-hidden="true"
-          className={isActive ? "text-accent" : "text-ink-400"}
+          className={isActive ? "text-accent" : "text-ink-600"}
         >
           ⇅
         </span>

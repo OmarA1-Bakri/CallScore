@@ -9,6 +9,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as path from "node:path";
 import type { Call } from "../src/lib/types";
+import { EXTRACTION_CONFIDENCE_THRESHOLD } from "../src/lib/public-methodology";
 
 process.env.SESSION_SECRET =
   process.env.SESSION_SECRET ?? "test-session-secret-1234567890-abc";
@@ -85,7 +86,7 @@ async function fakeQuery<T>(text: string, params: unknown[] = []): Promise<T[]> 
 
   // computeSelfCorrectionScore denominator
   if (
-    /FROM calls WHERE creator_id = \$1 AND return_30d IS NOT NULL AND extraction_confidence >= 0\.6/i.test(
+    /FROM calls WHERE creator_id = \$1 AND return_30d IS NOT NULL AND extraction_confidence >= 0\.7/i.test(
       sql,
     )
   ) {
@@ -94,7 +95,7 @@ async function fakeQuery<T>(text: string, params: unknown[] = []): Promise<T[]> 
       (c) =>
         c.creator_id === creatorId &&
         c.return_30d !== null &&
-        c.extraction_confidence >= 0.6,
+        c.extraction_confidence >= EXTRACTION_CONFIDENCE_THRESHOLD,
     );
     return [{ scored_count: String(scored.length) }] as unknown as T[];
   }
@@ -103,7 +104,7 @@ async function fakeQuery<T>(text: string, params: unknown[] = []): Promise<T[]> 
   if (/WITH scored AS/i.test(sql)) {
     const scoredByCreator = new Map<number, number>();
     for (const c of fakeDb.calls) {
-      if (c.return_30d !== null && c.extraction_confidence >= 0.6) {
+      if (c.return_30d !== null && c.extraction_confidence >= EXTRACTION_CONFIDENCE_THRESHOLD) {
         scoredByCreator.set(
           c.creator_id,
           (scoredByCreator.get(c.creator_id) ?? 0) + 1,
@@ -132,7 +133,7 @@ async function fakeQuery<T>(text: string, params: unknown[] = []): Promise<T[]> 
       } else if (
         r.revision_type === "confirmed_miss" &&
         oc.return_30d !== null &&
-        oc.extraction_confidence >= 0.6 &&
+        oc.extraction_confidence >= EXTRACTION_CONFIDENCE_THRESHOLD &&
         ((oc.direction === "bullish" && oc.return_30d <= 0) ||
           (oc.direction === "bearish" && oc.return_30d >= 0))
       ) {
@@ -146,7 +147,7 @@ async function fakeQuery<T>(text: string, params: unknown[] = []): Promise<T[]> 
         if (
           rc &&
           rc.return_30d !== null &&
-          rc.extraction_confidence >= 0.6 &&
+          rc.extraction_confidence >= EXTRACTION_CONFIDENCE_THRESHOLD &&
           rc.correct_direction === true
         ) {
           existing.numerator += 0.5;
@@ -1082,7 +1083,7 @@ test("M-partial: low-confidence scored reversal awards 0, not 0.25", async () =>
     });
   }
   // Revised call id 2: SCORED with correct direction but confidence 0.55
-  // (below the 0.6 floor used across the scoring pipeline). Should be
+  // (below the EXTRACTION_CONFIDENCE_THRESHOLD floor used across the scoring pipeline). Should be
   // treated as not-trusted -> 0.
   fakeDb.calls[1].correct_direction = true;
   fakeDb.calls[1].return_30d = 10;
@@ -1097,7 +1098,7 @@ test("M-partial: low-confidence scored reversal awards 0, not 0.25", async () =>
   assert.equal(
     result.score,
     0,
-    "low-confidence scored reversal must score 0 (align with 0.6 floor)",
+    "low-confidence scored reversal must score 0 (align with EXTRACTION_CONFIDENCE_THRESHOLD floor)",
   );
 });
 

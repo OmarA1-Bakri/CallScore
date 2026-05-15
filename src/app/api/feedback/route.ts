@@ -1,44 +1,86 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+import { query } from "@/lib/db";
+import { captureApiException } from "@/lib/monitoring";
 
 interface FeedbackPayload {
   readonly name?: string;
   readonly email?: string;
   readonly category: string;
+  readonly issueType?: string;
+  readonly contextUrl?: string;
+  readonly sourceUrl?: string;
   readonly message: string;
 }
 
-const VALID_CATEGORIES = new Set([
-  "Scoring Methodology",
-  "Creator Suggestion",
-  "Feature Request",
-  "Bug Report",
-  "Other",
+const FEEDBACK_CATEGORIES = [
+  "Scoring Evidence",
+  "Creator Data",
+  "Call Source",
+  "Product Issue",
+  "Billing / Refund",
+] as const;
+const VALID_CATEGORIES = new Set<string>(FEEDBACK_CATEGORIES);
+const CATEGORY_ALIASES = new Map<string, string>([
+  ["Scoring Methodology", "Scoring Evidence"],
+  ["Creator Suggestion", "Creator Data"],
+  ["Feature Request", "Product Issue"],
+  ["Bug Report", "Product Issue"],
+  ["Other", "Product Issue"],
+  ["Billing Access", "Billing / Refund"],
 ]);
 
-function isValidPayload(body: unknown): body is FeedbackPayload {
-  if (typeof body !== "object" || body === null) return false;
+const feedbackPayloadSchema = z.object({
+  name: z.string().optional(),
+  email: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().email().optional(),
+  ),
+  category: z.string(),
+  issueType: z.string().optional(),
+  contextUrl: z.string().optional(),
+  sourceUrl: z.string().optional(),
+  message: z.string().trim().min(1),
+});
 
-  const obj = body as Record<string, unknown>;
+function normalizeCategory(value: string): string | null {
+  if (VALID_CATEGORIES.has(value)) return value;
+  return CATEGORY_ALIASES.get(value) ?? null;
+}
 
-  if (typeof obj.message !== "string" || obj.message.trim().length === 0) {
-    return false;
-  }
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value.trim() || undefined : undefined;
+}
 
-  if (typeof obj.category !== "string" || !VALID_CATEGORIES.has(obj.category)) {
-    return false;
-  }
+function composePersistedMessage(feedback: FeedbackPayload): string {
+  const rows = [
+    feedback.issueType ? `Issue type: ${feedback.issueType}` : null,
+    feedback.contextUrl ? `Context URL: ${feedback.contextUrl}` : null,
+    feedback.sourceUrl ? `Evidence URL: ${feedback.sourceUrl}` : null,
+    "",
+    "Evidence:",
+    feedback.message.trim(),
+  ].filter((row): row is string => row !== null);
 
-  if (obj.name !== undefined && typeof obj.name !== "string") return false;
-  if (obj.email !== undefined && typeof obj.email !== "string") return false;
-
-  return true;
+  return rows.join("\n");
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body: unknown = await request.json();
+    const parsed = feedbackPayloadSchema.safeParse(body);
 
-    if (!isValidPayload(body)) {
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid feedback. Message and valid category are required." },
+        { status: 400 },
+      );
+    }
+
+    const { data } = parsed;
+    const category = normalizeCategory(data.category);
+
+    if (category === null) {
       return NextResponse.json(
         { success: false, error: "Invalid feedback. Message and valid category are required." },
         { status: 400 },
@@ -46,24 +88,32 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const feedback: FeedbackPayload = {
-      name: body.name,
-      email: body.email,
-      category: body.category,
-      message: body.message,
+      name: normalizeOptionalString(data.name),
+      email: normalizeOptionalString(data.email),
+      category,
+      issueType: normalizeOptionalString(data.issueType),
+      contextUrl: normalizeOptionalString(data.contextUrl),
+      sourceUrl: normalizeOptionalString(data.sourceUrl),
+      message: data.message,
     };
 
-    // Log feedback to server console for now.
-    // TODO: Persist to database or forward via email in a future iteration.
-    console.info("[FEEDBACK]", {
-      timestamp: new Date().toISOString(),
-      category: feedback.category,
-      name_provided: Boolean(feedback.name?.trim()),
-      email_provided: Boolean(feedback.email?.trim()),
-      message_chars: feedback.message.trim().length,
-    });
+    try {
+      await query(
+        `INSERT INTO feedback_reports (category, email, message)
+         VALUES ($1, $2, $3)`,
+        [
+          feedback.category,
+          feedback.email ?? null,
+          composePersistedMessage(feedback),
+        ],
+      );
+    } catch (error: unknown) {
+      void captureApiException(error, "/api/feedback", { stage: "persist" });
+    }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error: unknown) {
+    void captureApiException(error, "/api/feedback", { stage: "request" });
     return NextResponse.json(
       { success: false, error: "Failed to process feedback." },
       { status: 500 },

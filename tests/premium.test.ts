@@ -5,6 +5,8 @@ import { hasAccess, normalizeTier } from "../src/lib/whop";
 
 test("normalizeTier maps legacy elite sessions to alpha", () => {
   assert.equal(normalizeTier("elite"), "alpha");
+  assert.equal(normalizeTier("Alpha"), "alpha");
+  assert.equal(normalizeTier(" PRO "), "pro");
   assert.equal(normalizeTier("alpha"), "alpha");
   assert.equal(normalizeTier("pro"), "pro");
   assert.equal(normalizeTier("unknown"), "free");

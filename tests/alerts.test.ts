@@ -47,6 +47,7 @@ interface CallRow {
 interface CreatorRow {
   id: number;
   name: string;
+  youtube_handle?: string;
 }
 
 interface UserRow {
@@ -164,7 +165,7 @@ async function fakeQuery<T>(
   }
 
   if (
-    /^SELECT .* FROM alerts_queue WHERE user_id = \$1 ORDER BY created_at DESC/i.test(
+    /^SELECT[\s\S]*FROM alerts_queue(?:\s+aq)?[\s\S]*WHERE (?:aq\.)?user_id = \$1[\s\S]*ORDER BY (?:aq\.)?created_at DESC/i.test(
       sql,
     )
   ) {
@@ -172,6 +173,14 @@ async function fakeQuery<T>(
     const limit = Number(params[1]);
     return db.alerts
       .filter((a) => a.user_id === userId)
+      .map((alert) => {
+        const creator = db.creators.find((c) => c.id === alert.creator_id);
+        return {
+          ...alert,
+          creator_name: creator?.name ?? null,
+          youtube_handle: creator?.youtube_handle ?? null,
+        };
+      })
       .slice()
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
       .slice(0, limit) as unknown as T[];
@@ -429,6 +438,25 @@ test("POST /api/alerts/watch returns 200 for pro-tier session", async () => {
   const list = await alerts.listWatches("user_pro");
   assert.equal(list.length, 1);
   assert.equal(list[0].creator_id, 7);
+});
+
+test("POST /api/alerts/watch form redirect preserves creator search", async () => {
+  resetDb();
+  stubbedSession = {
+    userId: "user_pro",
+    tier: "pro",
+    accessToken: "x",
+    exp: Date.now() + 60_000,
+  };
+  const req = new Request("http://x/api/alerts/watch", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ creatorId: "7", q: "Crypto Rover" }),
+  });
+  const res = await watchRoute.POST(req as never);
+  assert.equal(res.status, 303);
+  const location = res.headers.get("location") ?? "";
+  assert.match(location, /\/settings\/alerts\?added=1&q=Crypto\+Rover$/);
 });
 
 test("POST /api/alerts/watch accepts alpha tier", async () => {

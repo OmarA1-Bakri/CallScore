@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "authMode": "app-key",
+  "whopAppId": "app_xAovzIphKgXtmM",
+  "whopCompanyId": "biz_Dpn6837r2Qp6Pp",
+  "vercelProjectId": "prj_sZ9Lv4zBINiQupt8WqBHisFU0nB4",
+  "vercelTeamId": "team_bGqFKQr7Q4LAO7GfXITsoA55",
+  "gitRemote": "git@github.com:OmarA1-Bakri/crypto-tuber-ranked.git",
+  "envVarPolicy": "merge",
+  "syncedAt": {
+    "binding": "2026-05-06T16:11:25.187Z"
+  }
+}

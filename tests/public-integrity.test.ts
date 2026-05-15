@@ -6,8 +6,21 @@ import {
   EXTRACTION_CONFIDENCE_THRESHOLD,
   getCallScoreStatus,
   getHorizonStatus,
+  getScoreReadyIgnoringConfidenceSql,
   SCORE_WEIGHTS,
 } from "../src/lib/public-methodology";
+import {
+  getLeaderboardEligibilitySql,
+  LOW_N_WARNING_CALLS,
+  MIN_PUBLIC_LEADERBOARD_CALLS,
+  OBSOLETE_LEADERBOARD_CALL_THRESHOLD,
+} from "../src/lib/leaderboard-eligibility";
+import {
+  CREATOR_JUDGMENT_WINDOW_DAYS,
+  CREATOR_JUDGMENT_WINDOW_LABEL,
+  getJudgmentWindowSql,
+  getPeriodFilterSql,
+} from "../src/lib/judgment-window";
 import {
   computeCreatorScoreAverages,
   serializeCall,
@@ -92,6 +105,7 @@ test("low-confidence calls are excluded instead of scored", () => {
     {
       extraction_confidence: EXTRACTION_CONFIDENCE_THRESHOLD - 0.01,
       call_date: "2025-10-11T10:43:22.000Z",
+      price_at_call: 100,
       target_price: null,
       price_30d: 110,
       price_90d: 120,
@@ -132,6 +146,33 @@ test("future horizons remain pending until they elapse", () => {
     getHorizonStatus("2026-04-05T17:11:39.000Z", "90d", true, now),
     "pending",
   );
+});
+
+test("pending 30d calls serialize as live/open when latest candle data is attached", () => {
+  const liveCall = serializeCall(
+    {
+      ...buildCall({
+        call_date: "2026-04-05T17:11:39.000Z",
+        price_at_call: 100,
+        btc_price_at_call: 100,
+        price_30d: null,
+        return_30d: null,
+        alpha_30d: null,
+        correct_direction: null,
+        hit_target: null,
+      }),
+      live_price: 112,
+      btc_live_price: 103,
+      live_price_at: "2026-04-12 00:00:00",
+      btc_live_price_at: "2026-04-12 00:00:00",
+    },
+    new Date("2026-04-12T00:00:00.000Z"),
+  );
+
+  assert.equal(liveCall.score_status, "pending_horizon");
+  assert.equal(liveCall.is_live_open, true);
+  assert.equal(liveCall.live_return, 12);
+  assert.equal(liveCall.live_alpha, 9);
 });
 
 test("target parsing rejects macro figures like $12 trillion", () => {
@@ -232,4 +273,27 @@ test("creator score averages reconcile with the per-call public components", () 
     ),
   );
   assert.equal(averages.scoredCount, 2);
+});
+
+test("leaderboard requires a minimum public scored call sample", () => {
+  assert.equal(OBSOLETE_LEADERBOARD_CALL_THRESHOLD, 5);
+  assert.equal(MIN_PUBLIC_LEADERBOARD_CALLS, 5);
+  assert.equal(LOW_N_WARNING_CALLS, 15);
+  assert.equal(getLeaderboardEligibilitySql("cs"), "cs.total_calls >= 5");
+});
+
+test("score-ready SQL can be reused without lowering the confidence gate", () => {
+  const sql = getScoreReadyIgnoringConfidenceSql("c");
+  assert.match(sql, /c\.price_at_call IS NOT NULL/);
+  assert.match(sql, /c\.return_30d IS NOT NULL/);
+  assert.doesNotMatch(sql, /extraction_confidence/);
+});
+
+test("creator judgment window is a rolling 12-month period", () => {
+  assert.equal(CREATOR_JUDGMENT_WINDOW_DAYS, 365);
+  assert.equal(CREATOR_JUDGMENT_WINDOW_LABEL, "Last 12 months");
+  assert.equal(getJudgmentWindowSql("c"), "c.call_date >= NOW() - INTERVAL '365 days'");
+  assert.equal(getPeriodFilterSql("c", "all_time"), "AND c.call_date >= NOW() - INTERVAL '365 days'");
+  assert.equal(getPeriodFilterSql("c", "90d"), "AND c.call_date >= NOW() - INTERVAL '90 days'");
+  assert.equal(getPeriodFilterSql("c", "30d"), "AND c.call_date >= NOW() - INTERVAL '30 days'");
 });

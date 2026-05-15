@@ -1,25 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { findCreatorByHandle } from "@/lib/creator-handles";
 import { runBacktest } from "@/lib/backtest";
 import { defaultBacktestRange, parseIsoDateAsEndOfDay, parseIsoDateAsStartOfDay } from "@/lib/backtest-params";
+import { noStoreHeaders } from "@/lib/http-cache";
 import { requireAlphaApiAccess } from "@/lib/premium";
 import type { Creator } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const auth = await requireAlphaApiAccess(request);
   if (auth instanceof NextResponse) return auth;
 
   const handle = request.nextUrl.searchParams.get("handle");
-  if (!handle) return NextResponse.json({ error: "handle_required" }, { status: 400 });
+  if (!handle) return NextResponse.json({ error: "handle_required" }, { status: 400, headers: noStoreHeaders() });
 
-  const creators = await query<Creator>(
-    `SELECT * FROM creators WHERE youtube_handle = $1 LIMIT 1`,
-    [handle],
-  );
-  const creator = creators[0];
-  if (!creator) return NextResponse.json({ error: "creator_not_found" }, { status: 404 });
+  const creator = await findCreatorByHandle<Creator>(handle);
+  if (!creator) return NextResponse.json({ error: "creator_not_found" }, { status: 404, headers: noStoreHeaders() });
 
   const now = new Date();
   const defaults = defaultBacktestRange(now);
@@ -35,5 +33,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     strategy: "equal_weight",
   });
 
-  return NextResponse.json({ data: result });
+  return NextResponse.json({ data: result }, { headers: noStoreHeaders() });
 }

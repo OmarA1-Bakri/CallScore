@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { getCurrentTier } from "@/lib/auth";
-import { query } from "@/lib/db";
+import { creatorHandlePath, findCreatorByHandle } from "@/lib/creator-handles";
 import { hasAccess } from "@/lib/whop";
 import {
   BACKTEST_STRATEGIES,
@@ -22,47 +23,40 @@ import {
 import type { Creator } from "@/lib/types";
 
 interface PageProps {
-  readonly params: { handle: string };
-  readonly searchParams: {
+  readonly params: Promise<{ handle: string }>;
+  readonly searchParams: Promise<{
     readonly start?: string;
     readonly end?: string;
     readonly capital?: string;
     readonly strategy?: string;
-  };
+  }>;
 }
-
-// Terminal aesthetic palette (DESIGN-LOCK.md v2 — 2026-04-19).
-const COLOR_PHOSPHOR = "#3FD67A";
-const COLOR_TERMINAL_RED = "#FF5B5B";
-const COLOR_BG = "#0B0F0E";
-const COLOR_DIM = "#4A6A55";
-const COLOR_MID = "#7AA68A";
 
 const DEFAULT_CAPITAL = 1000;
 const DEFAULT_STRATEGY: BacktestStrategy = "equal_weight";
 
-// Block glyphs used for the ASCII sparkline. Lowest bar first.
-const SPARK_BLOCKS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"] as const;
-
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const handle = decodeURIComponent(params.handle);
+  const { handle: rawHandle } = await params;
+  const handle = decodeURIComponent(rawHandle);
   try {
-    const creators = await query<Creator>(
-      `SELECT name FROM creators WHERE youtube_handle = $1 LIMIT 1`,
-      [handle],
+    const creator = await findCreatorByHandle<Pick<Creator, "name" | "youtube_handle">>(
+      handle,
+      "name, youtube_handle",
     );
-    if (creators.length === 0) {
-      return { title: "Backtest — Creator Not Found | CryptoTubers Ranked" };
+    if (!creator) {
+      return { title: "Backtest - Creator Not Found | CallScore" };
     }
     return {
-      title: `${creators[0].name} — Simulate Returns | CryptoTubers Ranked`,
-      description: `Backtest ${creators[0].name}'s scored crypto calls against BTC. See what $1,000 would have become.`,
-      alternates: { canonical: `/creator/${handle}/backtest` },
+      title: `${creator.name} - Backtest | CallScore`,
+      description: `Backtest ${creator.name}'s scored crypto calls against BTC.`,
+      alternates: {
+        canonical: `/creator/${creatorHandlePath(creator.youtube_handle ?? handle)}/backtest`,
+      },
     };
   } catch {
-    return { title: "Backtest | CryptoTubers Ranked" };
+    return { title: "Backtest | CallScore" };
   }
 }
 
@@ -99,82 +93,76 @@ function toIsoDateInput(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-type SparklineSeriesKey = "portfolioValue" | "btcValue";
-
-function buildSparkline(
-  series: readonly BacktestMonthlyPoint[],
-  key: SparklineSeriesKey,
-): string {
-  if (series.length === 0) return "";
-  const values = series.map((p) => p[key]);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min;
-  if (span === 0) return SPARK_BLOCKS[3].repeat(series.length);
-  return values
-    .map((v) => {
-      const normalized = (v - min) / span;
-      const bucket = Math.min(
-        SPARK_BLOCKS.length - 1,
-        Math.max(0, Math.round(normalized * (SPARK_BLOCKS.length - 1))),
-      );
-      return SPARK_BLOCKS[bucket];
-    })
-    .join("");
+function labelize(value: string): string {
+  return value.replaceAll("_", " ").toUpperCase();
 }
 
-function padRight(value: string, width: number): string {
-  if (value.length >= width) return value.slice(0, width);
-  return value + " ".repeat(width - value.length);
+function toneClass(value: number): string {
+  if (value > 0) return "text-pos";
+  if (value < 0) return "text-neg";
+  return "text-ink-900";
 }
 
-function padLeft(value: string, width: number): string {
-  if (value.length >= width) return value.slice(-width);
-  return " ".repeat(width - value.length) + value;
-}
-
-function renderStatRow(label: string, value: string, width = 40): string {
-  const left = label;
-  const right = value;
-  const dots = Math.max(1, width - left.length - right.length);
-  return `${left}${".".repeat(dots)}${right}`;
-}
-
-interface LedgerRowProps {
-  readonly call: BacktestCall;
-}
-
-function LedgerRow({ call }: LedgerRowProps) {
-  // Direction-aware hit flag supplied by the engine — a correct short
-  // (return_30d < 0) renders HIT, matching how direction_only pays out.
-  const hit = call.isHit;
-  const color = hit ? COLOR_PHOSPHOR : COLOR_TERMINAL_RED;
-  const date = call.callDate.slice(0, 10);
-  const ticker = padRight(call.ticker, 10);
-  const direction = padRight(call.direction, 5);
-  const entry = padLeft(
-    call.entryPrice !== null ? `$${call.entryPrice.toFixed(4)}` : "—",
-    10,
-  );
-  const exit = padLeft(
-    call.exitPrice !== null ? `$${call.exitPrice.toFixed(4)}` : "—",
-    10,
-  );
-  const ret = padLeft(
-    call.returnPct !== null ? formatPct(call.returnPct) : "—",
-    8,
-  );
-  const alpha = padLeft(
-    call.alphaOverBtc !== null ? formatPct(call.alphaOverBtc) : "—",
-    8,
-  );
-  const verdict = hit ? "HIT " : "MISS";
+function PageTitle({ children }: { readonly children: ReactNode }) {
   return (
-    <div
-      className="font-mono text-[12px] sm:text-xs whitespace-pre"
-      style={{ color }}
+    <h1 className="mt-3 font-serif text-h1 font-medium leading-tight text-ink-900">
+      {children}
+    </h1>
+  );
+}
+
+function BackLink({
+  creator,
+}: {
+  readonly creator: Pick<Creator, "name" | "youtube_handle">;
+}) {
+  return (
+    <Link
+      href={`/creator/${creatorHandlePath(creator.youtube_handle)}`}
+      className="inline-flex items-center gap-1.5 font-mono text-mono-sm uppercase tracking-caps text-ink-500 transition-colors hover:text-accent"
     >
-      {`${date}  ${ticker} ${direction} ${entry} ${exit} ${ret} ${alpha}  ${verdict}`}
+      <span aria-hidden="true">&larr;</span>
+      Back to {creator.name}
+    </Link>
+  );
+}
+
+function AlphaLocked({
+  creator,
+}: {
+  readonly creator: Pick<Creator, "name" | "youtube_handle">;
+}) {
+  return (
+    <div className="mx-auto max-w-page px-[14px] py-8 tab:px-6 tab:py-10 desk:px-8 desk:py-12">
+      <BackLink creator={creator} />
+      <section className="mt-6 max-w-5xl border border-ink-250 bg-ink-50 p-5 tab:p-6">
+        <p className="flex items-center gap-2 font-mono text-mono-sm uppercase tracking-caps text-accent">
+          <span aria-hidden="true" className="inline-block h-2 w-2 bg-accent" />
+          Alpha lab required
+        </p>
+        <PageTitle>
+          Historical backtests are an{" "}
+          <em className="italic text-accent">Alpha</em> feature.
+        </PageTitle>
+        <p className="mt-4 max-w-2xl font-serif text-body-lg leading-relaxed text-ink-700">
+          Single-creator simulations use the same scored-call engine as the
+          Backtest Lab, then compare resolved calls against BTC.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Link
+            href="/pricing"
+            className="inline-flex min-h-11 items-center bg-accent px-4 font-mono text-mono-lg font-semibold uppercase tracking-caps text-ink-0 transition-colors hover:bg-accent-dim"
+          >
+            Upgrade to Alpha
+          </Link>
+          <Link
+            href="/backtest"
+            className="inline-flex min-h-11 items-center border border-ink-250 px-4 font-mono text-mono-lg uppercase tracking-caps text-ink-700 transition-colors hover:border-accent hover:text-accent"
+          >
+            View Lab
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }
@@ -197,31 +185,35 @@ function BacktestForm({
   return (
     <form
       method="GET"
-      action={`/creator/${encodeURIComponent(handle)}/backtest`}
-      className="grid grid-cols-1 sm:grid-cols-4 gap-3 font-mono text-xs"
+      action={`/creator/${creatorHandlePath(handle)}/backtest`}
+      className="grid gap-3 tab:grid-cols-2 desk:grid-cols-4"
     >
-      <label className="flex flex-col gap-1">
-        <span style={{ color: COLOR_MID }}>start</span>
+      <label className="space-y-1">
+        <span className="block font-mono text-mono-sm uppercase tracking-caps text-ink-500">
+          Start
+        </span>
         <input
           type="date"
           name="start"
           defaultValue={toIsoDateInput(start)}
-          className="bg-transparent border px-2 py-1 rounded"
-          style={{ borderColor: COLOR_DIM, color: COLOR_PHOSPHOR }}
+          className="min-h-11 w-full border border-ink-250 bg-ink-0 px-3 py-2 font-mono text-body text-ink-800"
         />
       </label>
-      <label className="flex flex-col gap-1">
-        <span style={{ color: COLOR_MID }}>end</span>
+      <label className="space-y-1">
+        <span className="block font-mono text-mono-sm uppercase tracking-caps text-ink-500">
+          End
+        </span>
         <input
           type="date"
           name="end"
           defaultValue={toIsoDateInput(end)}
-          className="bg-transparent border px-2 py-1 rounded"
-          style={{ borderColor: COLOR_DIM, color: COLOR_PHOSPHOR }}
+          className="min-h-11 w-full border border-ink-250 bg-ink-0 px-3 py-2 font-mono text-body text-ink-800"
         />
       </label>
-      <label className="flex flex-col gap-1">
-        <span style={{ color: COLOR_MID }}>capital ($)</span>
+      <label className="space-y-1">
+        <span className="block font-mono text-mono-sm uppercase tracking-caps text-ink-500">
+          Capital
+        </span>
         <input
           type="number"
           name="capital"
@@ -229,35 +221,173 @@ function BacktestForm({
           max={MAX_BACKTEST_CAPITAL}
           step="1"
           defaultValue={capital}
-          className="bg-transparent border px-2 py-1 rounded"
-          style={{ borderColor: COLOR_DIM, color: COLOR_PHOSPHOR }}
+          className="min-h-11 w-full border border-ink-250 bg-ink-0 px-3 py-2 font-mono text-body text-ink-800"
         />
       </label>
-      <label className="flex flex-col gap-1">
-        <span style={{ color: COLOR_MID }}>strategy</span>
+      <label className="space-y-1">
+        <span className="block font-mono text-mono-sm uppercase tracking-caps text-ink-500">
+          Strategy
+        </span>
         <select
           name="strategy"
           defaultValue={strategy}
-          className="bg-transparent border px-2 py-1 rounded"
-          style={{ borderColor: COLOR_DIM, color: COLOR_PHOSPHOR }}
+          className="min-h-11 w-full border border-ink-250 bg-ink-0 px-3 py-2 font-mono text-body text-ink-800"
         >
-          {BACKTEST_STRATEGIES.map((s) => (
-            <option key={s} value={s} style={{ backgroundColor: COLOR_BG }}>
-              {s}
+          {BACKTEST_STRATEGIES.map((item) => (
+            <option key={item} value={item}>
+              {labelize(item)}
             </option>
           ))}
         </select>
       </label>
-      <div className="sm:col-span-4">
+      <div className="tab:col-span-2 desk:col-span-4">
         <button
           type="submit"
-          className="border px-3 py-1 rounded font-mono text-xs hover:brightness-125 transition"
-          style={{ borderColor: COLOR_PHOSPHOR, color: COLOR_PHOSPHOR }}
+          className="min-h-11 bg-accent px-4 font-mono text-mono-lg font-semibold uppercase tracking-caps text-ink-0 transition-colors hover:bg-accent-dim"
         >
-          :: run
+          Run Backtest
         </button>
       </div>
     </form>
+  );
+}
+
+function Summary({ result }: { readonly result: BacktestResult }) {
+  const hitRate = result.callCount > 0 ? (result.hitCount / result.callCount) * 100 : 0;
+  const stats = [
+    { label: "Final capital", value: formatCurrency(result.finalCapital), tone: result.finalCapital - result.initialCapital },
+    { label: "Return", value: formatPct(result.totalReturnPct), tone: result.totalReturnPct },
+    { label: "Vs BTC", value: formatPct(result.totalReturnVsBtcPct), tone: result.totalReturnVsBtcPct },
+    { label: "Hit rate", value: `${result.hitCount}/${result.callCount} (${hitRate.toFixed(0)}%)`, tone: 0 },
+  ] as const;
+
+  return (
+    <section className="grid grid-cols-2 border border-ink-250 bg-ink-50 desk:grid-cols-4">
+      {stats.map((stat) => (
+        <div key={stat.label} className="border-b border-r border-ink-200 p-4 last:border-r-0">
+          <p className="flex items-center gap-2 font-mono text-mono-sm uppercase tracking-caps text-ink-500">
+            <span aria-hidden="true" className="inline-block h-1.5 w-1.5 bg-accent" />
+            {stat.label}
+          </p>
+          <p className={`mt-2 break-words font-serif text-2xl tabular-nums tab:text-metric-card ${toneClass(stat.tone)}`}>
+            {stat.value}
+          </p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function MonthlyBars({
+  series,
+}: {
+  readonly series: readonly BacktestMonthlyPoint[];
+}) {
+  const values = series.flatMap((point) => [point.portfolioValue, point.btcValue]);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(1, max - min);
+
+  return (
+    <section className="border border-ink-250 bg-ink-50 p-4 tab:p-5">
+      <div className="flex flex-col gap-3 tab:flex-row tab:items-start tab:justify-between">
+        <div>
+          <p className="flex items-center gap-2 font-mono text-mono-sm uppercase tracking-caps text-accent">
+            <span aria-hidden="true" className="inline-block h-2 w-2 bg-accent" />
+            Equity path
+          </p>
+          <h2 className="mt-2 font-serif text-h3 text-ink-900">
+            Portfolio vs BTC
+          </h2>
+        </div>
+        <div className="grid gap-1 font-mono text-mono-sm uppercase tracking-caps text-ink-500">
+          <span className="flex items-center gap-2">
+            <span aria-hidden="true" className="inline-block h-2 w-2 bg-accent" />
+            Portfolio
+          </span>
+          <span className="flex items-center gap-2">
+            <span aria-hidden="true" className="inline-block h-2 w-2 bg-new" />
+            BTC
+          </span>
+        </div>
+      </div>
+      <div className="mt-6 flex h-[220px] items-end gap-2 overflow-x-auto border-b border-ink-250 pb-3">
+        {series.map((point) => {
+          const portfolioHeight = 18 + ((point.portfolioValue - min) / span) * 82;
+          const btcHeight = 18 + ((point.btcValue - min) / span) * 82;
+          return (
+            <div key={point.month} className="flex min-w-[34px] flex-1 flex-col items-center gap-2">
+              <div className="flex h-[178px] items-end gap-1">
+                <div
+                  className="w-3 bg-accent"
+                  style={{ height: `${portfolioHeight}%` }}
+                  title={`${point.month} portfolio ${formatCurrency(point.portfolioValue)}`}
+                />
+                <div
+                  className="w-3 bg-new"
+                  style={{ height: `${btcHeight}%` }}
+                  title={`${point.month} BTC ${formatCurrency(point.btcValue)}`}
+                />
+              </div>
+              <span className="font-mono text-[10px] text-ink-500">
+                {point.month.slice(5)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function Ledger({ calls }: { readonly calls: readonly BacktestCall[] }) {
+  return (
+    <section className="max-w-full overflow-x-auto border border-ink-250 bg-ink-50">
+      <table className="w-full min-w-[820px] text-sm">
+        <thead className="font-mono text-[11px] uppercase tracking-caps text-ink-500">
+          <tr className="border-b border-ink-250">
+            <th className="px-3 py-2 text-left">Date</th>
+            <th className="px-3 py-2 text-left">Asset</th>
+            <th className="px-3 py-2 text-right">Entry</th>
+            <th className="px-3 py-2 text-right">Exit</th>
+            <th className="px-3 py-2 text-right">Return</th>
+            <th className="px-3 py-2 text-right">Alpha vs BTC</th>
+            <th className="px-3 py-2 text-right">PnL</th>
+            <th className="px-3 py-2 text-right">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {calls.map((call) => (
+            <tr key={call.callId} className="border-b border-ink-200 last:border-b-0">
+              <td className="px-3 py-2 font-mono text-[12px] text-ink-600">
+                {call.callDate.slice(0, 10)}
+              </td>
+              <td className="px-3 py-2 font-mono text-[12px] text-ink-700">
+                {call.ticker} / {call.direction}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {call.entryPrice === null ? "-" : formatCurrency(call.entryPrice)}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {call.exitPrice === null ? "-" : formatCurrency(call.exitPrice)}
+              </td>
+              <td className={`px-3 py-2 text-right tabular-nums ${toneClass(call.returnPct ?? 0)}`}>
+                {call.returnPct === null ? "-" : formatPct(call.returnPct)}
+              </td>
+              <td className={`px-3 py-2 text-right tabular-nums ${toneClass(call.alphaOverBtc ?? 0)}`}>
+                {call.alphaOverBtc === null ? "-" : formatPct(call.alphaOverBtc)}
+              </td>
+              <td className={`px-3 py-2 text-right tabular-nums ${toneClass(call.pnlDollars)}`}>
+                {formatCurrency(call.pnlDollars)}
+              </td>
+              <td className="px-3 py-2 text-right font-mono text-[11px] uppercase tracking-caps">
+                {call.isHit ? "Hit" : "Miss"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 
@@ -265,64 +395,33 @@ export default async function BacktestPage({
   params,
   searchParams,
 }: PageProps) {
-  const handle = decodeURIComponent(params.handle);
+  const [resolvedParams, resolvedSearchParams] = await Promise.all([
+    params,
+    searchParams,
+  ]);
+  const handle = decodeURIComponent(resolvedParams.handle);
   const currentTier = await getCurrentTier();
 
   let creator: Creator;
   try {
-    const creators = await query<Creator>(
-      `SELECT * FROM creators WHERE youtube_handle = $1 LIMIT 1`,
-      [handle],
-    );
-    if (creators.length === 0) notFound();
-    creator = creators[0];
+    const resolvedCreator = await findCreatorByHandle<Creator>(handle);
+    if (!resolvedCreator) notFound();
+    creator = resolvedCreator;
   } catch {
     notFound();
   }
 
   if (!hasAccess(currentTier, "alpha")) {
-    return (
-      <div
-        className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-mono"
-        style={{ color: COLOR_PHOSPHOR }}
-      >
-        <Link
-          href={`/creator/${encodeURIComponent(handle)}`}
-          className="text-xs hover:underline"
-          style={{ color: COLOR_MID }}
-        >
-          ← back to {creator.name}
-        </Link>
-        <section className="mt-8 border p-6 rounded" style={{ borderColor: COLOR_DIM }}>
-          <p className="text-xs mb-2" style={{ color: COLOR_MID }}>
-            alpha required
-          </p>
-          <h1 className="text-3xl font-bold">
-            Historical backtests are an Alpha feature.
-          </h1>
-          <Link
-            href="/pricing"
-            className="inline-block mt-5 border px-3 py-2 text-xs"
-            style={{ borderColor: COLOR_PHOSPHOR }}
-          >
-            Upgrade to Alpha
-          </Link>
-        </section>
-      </div>
-    );
+    return <AlphaLocked creator={creator} />;
   }
 
   const now = new Date();
   const { start: defaultStart, end: defaultEnd } = defaultBacktestRange(now);
-
   const startDate =
-    parseIsoDateAsStartOfDay(searchParams.start) ?? defaultStart;
-  const endDate = parseIsoDateAsEndOfDay(searchParams.end) ?? defaultEnd;
-  const capital = parseCapitalParam(searchParams.capital);
-  const strategy = parseStrategyParam(searchParams.strategy);
-
-  // Guard against an invalid user range server-side. Fall back to the
-  // defaults rather than 500'ing so the form remains usable.
+    parseIsoDateAsStartOfDay(resolvedSearchParams.start) ?? defaultStart;
+  const endDate = parseIsoDateAsEndOfDay(resolvedSearchParams.end) ?? defaultEnd;
+  const capital = parseCapitalParam(resolvedSearchParams.capital);
+  const strategy = parseStrategyParam(resolvedSearchParams.strategy);
   const safeStart =
     endDate.getTime() > startDate.getTime() ? startDate : defaultStart;
   const safeEnd =
@@ -339,76 +438,29 @@ export default async function BacktestPage({
       strategy,
     });
   } catch (error: unknown) {
-    // Never surface the underlying error text publicly — it may contain
-    // DB connection fragments or internal detail. Log for operators.
-    // eslint-disable-next-line no-console
     console.error("[backtest:page] unhandled error:", error);
     hasError = true;
   }
 
-  const profitable = result ? result.finalCapital >= result.initialCapital : true;
-  const heroColor = profitable ? COLOR_PHOSPHOR : COLOR_TERMINAL_RED;
-
-  const sparkline = result
-    ? buildSparkline(result.monthlySeries, "portfolioValue")
-    : "";
-  const btcSparkline = result
-    ? buildSparkline(result.monthlySeries, "btcValue")
-    : "";
-
-  const hitRate =
-    result && result.callCount > 0
-      ? (result.hitCount / result.callCount) * 100
-      : 0;
-
-  const ledger = result ? result.pnlByCall : [];
-
   return (
-    <div
-      className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-mono"
-      style={{ color: COLOR_PHOSPHOR }}
-    >
-      <div
-        className="border-b pb-3 mb-6 text-xs"
-        style={{ borderColor: COLOR_DIM, color: COLOR_MID }}
-      >
-        {`// creator/${handle}/backtest :: v1 :: cache 5m swr 1m`}
-      </div>
+    <div className="mx-auto max-w-page px-[14px] py-8 tab:px-6 tab:py-10 desk:px-8 desk:py-12">
+      <BackLink creator={creator} />
 
-      <div className="mb-4">
-        <Link
-          href={`/creator/${encodeURIComponent(handle)}`}
-          className="text-xs hover:underline"
-          style={{ color: COLOR_MID }}
-        >
-          ← back to {creator.name}
-        </Link>
-      </div>
-
-      <section className="mb-8">
-        <p className="text-xs mb-1" style={{ color: COLOR_MID }}>
-          simulated portfolio
+      <div className="mt-8 border-b border-ink-250 pb-8">
+        <p className="flex items-center gap-2 font-mono text-mono-sm uppercase tracking-caps text-accent">
+          <span aria-hidden="true" className="inline-block h-2 w-2 bg-accent" />
+          Single creator backtest
         </p>
-        {result ? (
-          <h1
-            className="text-3xl sm:text-5xl font-bold tabular-nums"
-            style={{ color: heroColor }}
-          >
-            {`${formatCurrency(result.initialCapital)} → ${formatCurrency(result.finalCapital)}`}
-          </h1>
-        ) : (
-          <h1 className="text-2xl" style={{ color: COLOR_TERMINAL_RED }}>
-            {hasError
-              ? "Backtest unavailable right now"
-              : "Backtest unavailable"}
-          </h1>
-        )}
-      </section>
+        <PageTitle>
+          {creator.name} <em className="italic text-accent">simulated</em>.
+        </PageTitle>
+        <p className="mt-4 max-w-3xl font-serif text-body-lg leading-relaxed text-ink-700">
+          Run resolved calls through a capital-weighted scenario
+          and compare the result against BTC over the same period.
+        </p>
+      </div>
 
-      <section
-        className="mb-8 border p-4 rounded"
-        style={{ borderColor: COLOR_DIM }}
-      >
+      <section className="mt-6 border border-ink-250 bg-ink-50 p-4 tab:p-5">
         <BacktestForm
           handle={handle}
           start={safeStart}
@@ -418,100 +470,29 @@ export default async function BacktestPage({
         />
       </section>
 
-      {result && (
-        <>
-          <section className="mb-8 text-xs sm:text-sm space-y-1">
-            <div className="whitespace-pre">
-              {renderStatRow("TOTAL RETURN", formatPct(result.totalReturnPct))}
-            </div>
-            <div className="whitespace-pre">
-              {renderStatRow("VS BTC", formatPct(result.totalReturnVsBtcPct))}
-            </div>
-            <div className="whitespace-pre">
-              {renderStatRow(
-                "HIT RATE",
-                `${result.hitCount}/${result.callCount} (${hitRate.toFixed(0)}%)`,
-              )}
-            </div>
-            <div className="whitespace-pre">
-              {renderStatRow("CALL COUNT", String(result.callCount))}
-            </div>
-            <div className="whitespace-pre">
-              {renderStatRow(
-                "PERIOD",
-                `${result.startDate.slice(0, 10)} → ${result.endDate.slice(0, 10)}`,
-              )}
-            </div>
-            <div className="whitespace-pre">
-              {renderStatRow("STRATEGY", strategy)}
-            </div>
+      <div className="mt-6 space-y-6">
+        {hasError || !result ? (
+          <section className="border border-neg bg-neg/10 p-5 text-ink-800">
+            Backtest unavailable. Check the date range and try again.
           </section>
-
-          <section
-            className="mb-8 border p-4 rounded"
-            style={{ borderColor: COLOR_DIM }}
-          >
-            <p className="text-xs mb-2" style={{ color: COLOR_MID }}>
-              portfolio (phosphor) vs btc (dim)
-            </p>
-            <div
-              className="text-2xl tabular-nums whitespace-pre leading-none"
-              style={{ color: COLOR_PHOSPHOR }}
-              aria-hidden="true"
-            >
-              {sparkline.length > 0 ? sparkline : "—"}
-            </div>
-            <div
-              className="text-2xl tabular-nums whitespace-pre leading-none mt-1 opacity-70"
-              style={{ color: COLOR_MID }}
-              aria-hidden="true"
-            >
-              {btcSparkline.length > 0 ? btcSparkline : "—"}
-            </div>
-            <div className="sr-only">
-              Portfolio chart over {result.monthlySeries.length} months,
-              ending at {formatCurrency(result.finalCapital)} versus BTC
-              benchmark.
-            </div>
-          </section>
-
-          <section className="mb-8">
-            <p className="text-xs mb-2" style={{ color: COLOR_MID }}>
-              ledger ({ledger.length} calls)
-            </p>
-            {ledger.length > 0 ? (
-              <div
-                className="border p-3 rounded overflow-x-auto"
-                style={{ borderColor: COLOR_DIM }}
-              >
-                <div
-                  className="font-mono text-[12px] sm:text-xs whitespace-pre mb-2"
-                  style={{ color: COLOR_MID }}
-                >
-                  {`DATE        TICKER     DIR   ENTRY      EXIT       RET%     ALPHA     HIT/MISS`}
-                </div>
-                {ledger.map((call) => (
-                  <LedgerRow key={call.callId} call={call} />
-                ))}
-              </div>
-            ) : (
-              <div
-                className="border p-4 rounded text-xs"
-                style={{ borderColor: COLOR_DIM, color: COLOR_MID }}
-              >
-                no scored calls in this window. try expanding the date range.
-              </div>
+        ) : (
+          <>
+            <Summary result={result} />
+            {result.monthlySeries.length > 0 && (
+              <MonthlyBars series={result.monthlySeries} />
             )}
-          </section>
-        </>
-      )}
-
-      <footer
-        className="pt-4 border-t text-[12px]"
-        style={{ borderColor: COLOR_DIM, color: COLOR_MID }}
-      >
-        {`// scoring: return_30d (close-to-close) :: benchmark: BTCUSDT :: source: CryptoTubers Ranked`}
-      </footer>
+            {result.pnlByCall.length > 0 ? (
+              <Ledger calls={result.pnlByCall} />
+            ) : (
+              <section className="border border-ink-250 bg-ink-50 p-5">
+                <p className="font-mono text-mono-sm uppercase tracking-caps text-ink-500">
+                  No scored calls in this window. Try expanding the date range.
+                </p>
+              </section>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -39,11 +39,102 @@ export function stripSqlCommentLines(sql: string): string {
     .join("\n");
 }
 
+function readDollarQuoteTag(sql: string, offset: number): string | null {
+  const match = sql.slice(offset).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/);
+  return match?.[0] ?? null;
+}
+
 export function splitSqlStatements(sql: string): string[] {
-  return stripSqlCommentLines(sql)
-    .split(";")
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0);
+  const source = stripSqlCommentLines(sql);
+  const statements: string[] = [];
+  let current = "";
+  let index = 0;
+  let dollarQuoteTag: string | null = null;
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+
+  while (index < source.length) {
+    if (dollarQuoteTag) {
+      if (source.startsWith(dollarQuoteTag, index)) {
+        current += dollarQuoteTag;
+        index += dollarQuoteTag.length;
+        dollarQuoteTag = null;
+        continue;
+      }
+      current += source[index];
+      index += 1;
+      continue;
+    }
+
+    const char = source[index];
+
+    if (inSingleQuote) {
+      current += char;
+      if (char === "'" && source[index + 1] === "'") {
+        current += source[index + 1];
+        index += 2;
+        continue;
+      }
+      if (char === "'") {
+        inSingleQuote = false;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (inDoubleQuote) {
+      current += char;
+      if (char === '"' && source[index + 1] === '"') {
+        current += source[index + 1];
+        index += 2;
+        continue;
+      }
+      if (char === '"') {
+        inDoubleQuote = false;
+      }
+      index += 1;
+      continue;
+    }
+
+    if (char === "$") {
+      const tag = readDollarQuoteTag(source, index);
+      if (tag) {
+        current += tag;
+        index += tag.length;
+        dollarQuoteTag = tag;
+        continue;
+      }
+    }
+
+    if (char === "'") {
+      inSingleQuote = true;
+      current += char;
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inDoubleQuote = true;
+      current += char;
+      index += 1;
+      continue;
+    }
+
+    if (char === ";") {
+      const statement = current.trim();
+      if (statement.length > 0) statements.push(statement);
+      current = "";
+      index += 1;
+      continue;
+    }
+
+    current += char;
+    index += 1;
+  }
+
+  const finalStatement = current.trim();
+  if (finalStatement.length > 0) statements.push(finalStatement);
+  return statements;
 }
 
 export function getMigrationFiles(root: string): MigrationFile[] {

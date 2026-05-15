@@ -1,6 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
+import { createLogger } from "../lib/logger";
 import { recomputeAllStats } from "../lib/recompute-stats";
+
+const logger = createLogger({ component: "compute-scores" });
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
@@ -23,19 +26,28 @@ function loadEnv(): void {
   }
 }
 
-function timestamp(): string {
-  return new Date().toISOString();
+export async function runComputeScores(): Promise<Record<string, unknown>> {
+  const startedAt = Date.now();
+  const metrics = await recomputeAllStats();
+  return {
+    ...metrics,
+    elapsed_ms: Date.now() - startedAt,
+  };
 }
 
 async function main(): Promise<void> {
   loadEnv();
 
-  console.log(`[${timestamp()}] Starting public score recomputation...`);
-  await recomputeAllStats();
-  console.log(`[${timestamp()}] Public score recomputation complete`);
+  logger.info("public_score_recompute_start");
+  const metrics = await runComputeScores();
+  logger.info("public_score_recompute_complete", metrics);
 }
 
-main().catch((err) => {
-  console.error(`[${new Date().toISOString()}] Fatal error:`, err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    logger.error("fatal_error", {
+      error: err instanceof Error ? err.stack ?? err.message : String(err),
+    });
+    process.exit(1);
+  });
+}

@@ -7,13 +7,12 @@ import MobileMenu from "./MobileMenu";
 
 export default async function Header(): Promise<ReactElement> {
   const session = await getSession();
-  const loggedIn = session !== null;
   const tier = session?.tier ?? "free";
 
   return (
     <header className="sticky top-0 z-masthead bg-ink-0/90 backdrop-blur-bar border-b border-ink-250">
       <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
-        <div className="flex items-center justify-between h-24">
+        <div className="flex h-16 items-center justify-between tab:h-[72px]">
           {/* Logo */}
           <Link
             href="/"
@@ -25,75 +24,69 @@ export default async function Header(): Promise<ReactElement> {
 
           {/* Desktop nav */}
           <nav
-            className="hidden tab:flex items-center gap-8"
+            className="hidden desk:flex items-center gap-5 font-mono text-mono-sm uppercase tracking-caps"
             aria-label="Primary navigation"
           >
             <Link
-              href="/"
-              className="text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium"
+              href="/#leaderboard"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
             >
-              Leaderboard
+              LEADERBOARD
+            </Link>
+            <Link
+              href="/backtest"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
+            >
+              BACKTEST
+            </Link>
+            <Link
+              href="/settings/alerts"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
+            >
+              ALERTS
+            </Link>
+            <Link
+              href="/settings/webhooks"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
+            >
+              WEBHOOKS
             </Link>
             <Link
               href="/methodology"
-              className="text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
             >
-              Methodology
+              METHODOLOGY
             </Link>
             <Link
               href="/pricing"
-              className="text-ink-700 hover:text-ink-900 transition-colors text-sm font-medium"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
             >
-              Pricing
+              PRICING
             </Link>
 
-            {loggedIn ? (
-              <div className="flex items-center gap-3">
+            <div className="flex items-center gap-5 border-l border-ink-250 pl-6">
+              <TierBadge tier={tier} />
+              {session && (
                 <Link
-                  href="/settings/alerts"
-                  className="text-ink-700 hover:text-ink-900 transition-colors text-sm"
+                  href="/settings"
+                  className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
                 >
-                  Alerts
+                  ACCOUNT
                 </Link>
-                {tier === "alpha" && (
-                  <Link
-                    href="/settings/api"
-                    className="text-ink-700 hover:text-ink-900 transition-colors text-sm"
-                  >
-                    API
-                  </Link>
-                )}
-                <TierBadge tier={tier} />
-                <form action="/api/auth/logout" method="post">
-                  <button
-                    type="submit"
-                    className="text-ink-600 hover:text-ink-900 transition-colors text-sm"
-                  >
-                    <span className="hidden desk:inline">Logout</span>
-                  </button>
-                </form>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/api/auth/whop"
-                  prefetch={false}
-                  className="text-ink-700 hover:text-ink-900 transition-colors text-sm"
-                >
-                  Sign In
-                </Link>
+              )}
+              {tier === "free" && (
                 <Link
                   href="/pricing"
-                  className="bg-accent hover:bg-accent-dim text-ink-0 font-semibold text-sm px-4 py-2 transition-colors"
+                  className="border border-accent/60 bg-transparent px-3.5 py-2 text-accent transition-colors hover:border-accent hover:bg-accent-low focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  Get Access
+                  GET ACCESS
                 </Link>
-              </div>
-            )}
+              )}
+            </div>
           </nav>
 
           {/* Mobile menu (client island) */}
-          <MobileMenu loggedIn={loggedIn} tier={tier} />
+          <MobileMenu authenticated={Boolean(session)} tier={tier} />
         </div>
       </div>
     </header>
@@ -107,25 +100,25 @@ export default async function Header(): Promise<ReactElement> {
 function TierBadge({ tier }: { readonly tier: string }): ReactElement {
   if (tier === "alpha") {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-accent/20 text-accent border border-accent/30">
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap border border-accent/30 bg-accent/20 px-2.5 py-1 font-mono text-mono-sm font-semibold uppercase tracking-caps text-accent">
         <Crown className="w-3 h-3" />
-        Alpha
+        ALPHA
       </span>
     );
   }
 
   if (tier === "pro") {
     return (
-      <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-new/20 text-new border border-new/30">
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap border border-new/30 bg-new/20 px-2.5 py-1 font-mono text-mono-sm font-semibold uppercase tracking-caps text-new">
         <span aria-hidden="true">★</span>
-        Pro
+        PRO
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-ink-100 text-ink-600 border border-ink-300">
-      Free
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap border border-ink-300 bg-ink-100 px-2.5 py-1 font-mono text-mono-sm font-medium uppercase tracking-caps text-ink-600">
+      FREE
     </span>
   );
 }

@@ -1,48 +1,93 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
+import ApiKeyManager from "@/components/ApiKeyManager";
+import SettingsShell from "@/components/SettingsShell";
 import { requireSessionAccess } from "@/lib/premium";
-import { listApiKeys } from "@/lib/api-keys";
+import {
+  API_KEY_REVEAL_COOKIE_NAME,
+  listApiKeyRequests,
+  listApiKeys,
+  parseApiKeyRevealCookieValue,
+} from "@/lib/api-keys";
 
-export default async function ApiSettingsPage() {
+const API_KEYS_ROUTE = "/api/api-keys";
+
+interface PageProps {
+  readonly searchParams?: Promise<{
+    readonly created?: string;
+    readonly revoked?: string;
+  }>;
+}
+
+export default async function ApiSettingsPage({
+  searchParams: searchParamsPromise,
+}: PageProps) {
+  const searchParams = await searchParamsPromise;
   const session = await requireSessionAccess("alpha");
   if (session instanceof Response) {
+    const isGuest = session.status === 401;
     return (
-      <main className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-10">
-        <h1 className="font-serif text-[35px] text-ink-900 font-medium mb-4">API Access</h1>
-        <p className="text-ink-700 mb-4">Alpha unlocks read-only API keys.</p>
-        <Link href="/pricing" className="text-accent font-mono text-[12px] tracking-caps uppercase">Upgrade to Alpha</Link>
-      </main>
+      <SettingsShell
+        active="api"
+        title="API Access"
+        description="Create read-only keys for programmatic access."
+      >
+        <section className="border border-ink-250 bg-ink-50 p-5">
+          <p className="text-ink-700 mb-4">
+            {isGuest
+              ? "API access is attached when this app is opened from your Whop product."
+              : "Alpha unlocks read-only API keys and Backtest Lab endpoints."}
+          </p>
+          <Link
+            href="/pricing"
+            className="inline-flex min-h-11 items-center bg-accent px-4 font-mono text-mono-sm font-semibold uppercase tracking-caps text-ink-0"
+          >
+            {isGuest ? "View plans" : "Upgrade to Alpha"}
+          </Link>
+        </section>
+      </SettingsShell>
     );
   }
 
-  const keys = await listApiKeys(session.userId);
+  const [keys, requestLogs] = await Promise.all([
+    listApiKeys(session.userId),
+    listApiKeyRequests(session.userId, 20),
+  ]);
+  const activeKeys = keys.filter((key) => !key.revoked_at).length;
+  const cookieStore = await cookies();
+  const createdReveal = parseApiKeyRevealCookieValue(
+    cookieStore.get(API_KEY_REVEAL_COOKIE_NAME)?.value,
+  );
 
   return (
-    <main className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-10">
-      <h1 className="font-serif text-[35px] text-ink-900 font-medium mb-6">API Access</h1>
-      <Link href="/settings/webhooks" className="inline-block mb-6 text-accent font-mono text-[12px] tracking-caps uppercase">
-        Manage webhooks
-      </Link>
-      <form action="/api/api-keys" method="post" className="flex gap-2 mb-6">
-        <input name="name" placeholder="Key name" className="border border-ink-250 px-3 py-2 text-sm" />
-        <button className="bg-accent text-ink-0 px-4 py-2 font-mono text-[12px] tracking-caps uppercase">Create key</button>
-      </form>
-      <div className="border-y border-ink-150 divide-y divide-ink-150">
-        {keys.map((key) => (
-          <div key={key.id} className="py-3 flex items-center justify-between gap-4">
-            <div>
-              <p className="font-mono text-[13px] text-ink-900">{key.name}</p>
-              <p className="font-mono text-[12px] text-ink-500">{key.prefix}... · {key.revoked_at ? "revoked" : "active"}</p>
-            </div>
-            {!key.revoked_at && (
-              <form action="/api/api-keys" method="post">
-                <input type="hidden" name="_action" value="revoke" />
-                <input type="hidden" name="id" value={key.id} />
-                <button className="text-ink-600 hover:text-ink-900 font-mono text-[12px]">Revoke</button>
-              </form>
-            )}
-          </div>
-        ))}
-      </div>
-    </main>
+    <SettingsShell
+      active="api"
+      title="API Access"
+      description="Manage read-only keys, inspect request activity, and copy integration examples."
+      tier={session.tier}
+      status={[
+        {
+          label: "Keys",
+          value: `${activeKeys} active`,
+          tone: activeKeys > 0 ? "good" : "warn",
+        },
+        { label: "Scope", value: "Read-only", tone: "neutral" },
+        { label: "Rate limit", value: "Published in docs", tone: "neutral" },
+      ]}
+    >
+      <ApiKeyManager
+        // API key forms post to API_KEYS_ROUTE via the client manager.
+        initialKeys={keys}
+        initialRequestLogs={requestLogs}
+        initialCreated={createdReveal}
+        initialStatus={
+          searchParams?.revoked
+            ? "Key revoked."
+            : searchParams?.created && !createdReveal
+              ? "Key created. The secret can only be shown during the redirect handoff."
+              : ""
+        }
+      />
+    </SettingsShell>
   );
 }

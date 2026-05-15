@@ -8,6 +8,10 @@ const src = readFileSync(
   join(__dirname, "..", "src/components/Leaderboard.tsx"),
   "utf8",
 );
+const rankTierSrc = readFileSync(
+  join(__dirname, "..", "src/components/RankTierBadge.tsx"),
+  "utf8",
+);
 
 test("Leaderboard exposes the 8-column spec subset", () => {
   // Spec headers (case-insensitive match on the rendered text).
@@ -34,4 +38,12 @@ test("Leaderboard renders score-Tier column distinct from auth-tier grouping", (
   // group wrapper. Both must coexist.
   assert.match(src, /tier_required/, "auth-tier grouping must be preserved");
   assert.match(src, /score.*tier|tier.*score|RankTierBadge/i, "score-Tier column must render");
+});
+
+test("RankTierBadge separates obsolete rows from low-N warning rows", () => {
+  assert.match(rankTierSrc, /MIN_PUBLIC_LEADERBOARD_CALLS/);
+  assert.match(rankTierSrc, /LOW_N_WARNING_CALLS/);
+  assert.match(rankTierSrc, /Obsolete/);
+  assert.match(rankTierSrc, /Low N/);
+  assert.doesNotMatch(rankTierSrc, /totalCalls\s*<\s*50/);
 });

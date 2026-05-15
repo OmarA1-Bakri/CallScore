@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { getUserTier, hasAccess, getCreatorTier } from "@/lib/whop";
+import { getCreatorTier } from "@/lib/creator-tier";
+import { hasAccess } from "@/lib/whop";
+import { getUserTier } from "@/lib/whop-access";
 import { serializeCalls } from "@/lib/public-serializer";
 import { getRequestAuthContext } from "@/lib/auth";
+import { getJudgmentWindowSql } from "@/lib/judgment-window";
+import { callRowSchema, creatorRowSchema, creatorStatsRowSchema, parseApiRow, parseApiRows } from "@/lib/api-schemas";
+import { getLiveCallPriceJoinSql, getLiveCallPriceSelectSql } from "@/lib/live-call-pricing";
 import type { Creator, CreatorStats, Call, Tier } from "@/lib/types";
 
 const VALID_SORT_FIELDS = ["date", "score", "return"] as const;
@@ -39,10 +44,10 @@ interface CountRow {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   try {
-    const { id: idParam } = params;
+    const { id: idParam } = await params;
     const creatorId = parseInt(idParam, 10);
 
     if (isNaN(creatorId) || creatorId < 1) {
@@ -53,19 +58,19 @@ export async function GET(
     }
 
     // Fetch creator
-    const creators = await query<Creator>(
+    const rawCreators = await query<Creator>(
       `SELECT * FROM creators WHERE id = $1`,
       [creatorId],
     );
 
-    if (creators.length === 0) {
+    if (rawCreators.length === 0) {
       return NextResponse.json(
         { error: "Creator not found" },
         { status: 404 },
       );
     }
 
-    const creator = creators[0];
+    const creator = parseApiRow(creatorRowSchema, rawCreators[0], "creator");
 
     // Determine tier requirement based on rank
     const rank = creator.accuracy_rank ?? Infinity;
@@ -119,21 +124,28 @@ export async function GET(
         [creatorId],
       ),
       query<Call>(
-        `SELECT * FROM calls
-         WHERE creator_id = $1
+        `SELECT c.*, ${getLiveCallPriceSelectSql()}
+         FROM calls c
+         ${getLiveCallPriceJoinSql("c")}
+         WHERE c.creator_id = $1
+           AND ${getJudgmentWindowSql("c")}
          ORDER BY ${orderClause}
          LIMIT $2 OFFSET $3`,
         [creatorId, limit, offset],
       ),
       query<CountRow>(
-        `SELECT COUNT(*)::text AS count FROM calls WHERE creator_id = $1`,
+        `SELECT COUNT(*)::text AS count
+         FROM calls
+         WHERE creator_id = $1
+           AND ${getJudgmentWindowSql("calls")}`,
         [creatorId],
       ),
     ]);
 
-    const stats = statsRows.length > 0 ? statsRows[0] : null;
+    const stats = statsRows.length > 0 ? parseApiRow(creatorStatsRowSchema, statsRows[0], "creator stats") : null;
     const total = parseInt(countRows[0]?.count ?? "0", 10);
-    const serializedCalls = serializeCalls(callRows);
+    const parsedCalls = parseApiRows(callRowSchema, callRows, "creator calls");
+    const serializedCalls = serializeCalls(parsedCalls);
 
     return NextResponse.json({
       data: {
