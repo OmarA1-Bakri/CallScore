@@ -20,7 +20,7 @@ export async function GET(
   }
 
   const rows = await query(
-    `SELECT id, name, youtube_handle, youtube_channel_id, subscribers, focus,
+    `SELECT id, name, youtube_handle, youtube_channel_id, subscribers, focus, tier,
             total_calls, win_rate, avg_return, alpha_score, accuracy_rank, last_scraped_at
      FROM creators
      WHERE id = $1
