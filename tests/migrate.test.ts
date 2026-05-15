@@ -42,3 +42,34 @@ test("SQL splitter ignores standalone comments and keeps statements", () => {
     "CREATE INDEX IF NOT EXISTS idx_example_id ON example(id)",
   ]);
 });
+
+test("SQL splitter keeps dollar-quoted blocks intact", () => {
+  const statements = splitSqlStatements(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'example_check') THEN
+        ALTER TABLE example ADD CONSTRAINT example_check CHECK (status IN ('ready', 'failed'));
+      END IF;
+    END $$;
+
+    CREATE INDEX IF NOT EXISTS idx_example_status ON example(status);
+  `);
+
+  assert.equal(statements.length, 2);
+  assert.match(statements[0], /^DO \$\$/);
+  assert.match(statements[0], /ALTER TABLE example ADD CONSTRAINT example_check/);
+  assert.match(statements[0], /END \$\$$/);
+  assert.equal(statements[1], "CREATE INDEX IF NOT EXISTS idx_example_status ON example(status)");
+});
+
+test("SQL splitter does not split semicolons inside quoted strings", () => {
+  const statements = splitSqlStatements(`
+    INSERT INTO example(message) VALUES ('first;second');
+    SELECT "semi;colon" FROM example;
+  `);
+
+  assert.deepEqual(statements, [
+    "INSERT INTO example(message) VALUES ('first;second')",
+    'SELECT "semi;colon" FROM example',
+  ]);
+});
