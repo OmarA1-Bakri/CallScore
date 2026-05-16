@@ -282,6 +282,11 @@ export async function createWebhook(
 ): Promise<CreatedWebhookRow | null> {
   const url = validateWebhookUrl(rawUrl);
   if (!url) return null;
+  try {
+    await assertWebhookUrlIsPublic(url);
+  } catch {
+    return null;
+  }
   const secret = makeSecret();
   const rows = await query<WebhookRow>(
     `INSERT INTO alpha_webhooks (user_id, url, event_types, secret)

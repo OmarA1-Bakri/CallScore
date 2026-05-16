@@ -109,6 +109,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     } catch (error: unknown) {
       void captureApiException(error, "/api/feedback", { stage: "persist" });
+      return NextResponse.json(
+        { success: false, error: "Failed to persist feedback." },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });

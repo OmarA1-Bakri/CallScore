@@ -13,6 +13,8 @@ import {
   scoreExtractionSet,
 } from "../src/lib/llm-eval";
 import {
+  DEFAULT_KEYWORD_WINDOW_CHARS,
+  DEFAULT_MAX_KEYWORD_WINDOWS,
   buildKeywordWindows,
   scoreTranscriptForExtraction,
 } from "../src/lib/extraction-triage";
@@ -133,8 +135,8 @@ test("LLM gold-set metrics compute precision recall F1 and false-positive bucket
 });
 
 test("triage builds keyword windows around actionable transcript snippets", () => {
-  const KEYWORD_WINDOW_SIZE = 160;  // Character window size for keyword extraction
-  const MAX_KEYWORD_WINDOWS = 3;    // Maximum number of windows to extract
+  const KEYWORD_WINDOW_SIZE = Math.min(DEFAULT_KEYWORD_WINDOW_CHARS, 160);
+  const MAX_KEYWORD_WINDOWS = Math.min(DEFAULT_MAX_KEYWORD_WINDOWS, 3);
   const transcript = "Intro. ".repeat(100) + "Bitcoin is near support and I would buy BTC for a breakout target.";
   assert.ok(scoreTranscriptForExtraction(transcript) > 0);
   const windows = buildKeywordWindows(transcript, KEYWORD_WINDOW_SIZE, MAX_KEYWORD_WINDOWS);
@@ -168,6 +170,7 @@ test("extraction scoring handles empty gold set", () => {
     [{ symbol: "BTCUSDT", direction: "bullish", raw_quote: "Bitcoin" }],
     [],
   );
+  assert.equal(metrics.precision, 0, "Precision should be 0 when there are no gold standard items");
   assert.equal(metrics.recall, 0, "Recall should be 0 when there are no gold standard items");
 });
 

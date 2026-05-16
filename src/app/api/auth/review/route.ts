@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { createSession } from "@/lib/auth";
 import { REVIEWABLE_TIERS, getReviewTier, normalizeNextPath } from "./helpers";
 
 export const dynamic = "force-dynamic";
+
+function timingSafeTokenEqual(provided: string | null, expected: string): boolean {
+  if (provided === null) return false;
+  const expectedBuffer = Buffer.from(expected);
+  const providedBuffer = Buffer.from(provided);
+  const comparable = providedBuffer.length === expectedBuffer.length
+    ? providedBuffer
+    : Buffer.alloc(expectedBuffer.length);
+  if (providedBuffer.length === expectedBuffer.length) {
+    providedBuffer.copy(comparable);
+  }
+  return crypto.timingSafeEqual(comparable, expectedBuffer) && providedBuffer.length === expectedBuffer.length;
+}
 
 function trustedBaseUrl(): string {
   const configured = process.env.NEXT_PUBLIC_BASE_URL ?? "https://www.call-score.com";
@@ -24,7 +38,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const token = searchParams.get("token");
   const tier = getReviewTier(searchParams.get("tier"));
 
-  if (token !== reviewToken) {
+  if (!timingSafeTokenEqual(token, reviewToken)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

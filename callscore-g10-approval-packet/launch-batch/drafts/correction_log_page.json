@@ -1,0 +1,17 @@
+{
+  "workflow_id": "correction_log_agent",
+  "side_effect_level": "draft_only",
+  "artifact": {
+    "artifact_id": "correction_log_page",
+    "type": "correction_log_page",
+    "status": "draft",
+    "body_ref": "docs/callscore-growth-os/trust-assets/CORRECTION_POLICY.md",
+    "body_hash": "sha256:34d253eeea2484b63a48ff17b59f507de53aef2db72607605fc50f6ce69c614f",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "PUBLISH_GATE"
+    ]
+  },
+  "body": "# Correction Policy Draft\n\nDisputes freeze amplification, trigger evidence review, require versioned correction-log entries, and require Workplane gates plus exact Hermes approval before public correction updates.\n"
+}

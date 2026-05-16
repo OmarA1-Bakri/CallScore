@@ -9,7 +9,6 @@ import {
 const logger = createLogger({ component: "evaluate-llm-gold-set" });
 
 interface GoldRow {
-  readonly id?: string | number;
   readonly expected: readonly ExtractionLike[];
   readonly predicted: readonly ExtractionLike[];
 }
@@ -20,7 +19,7 @@ interface Args {
 
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
-  if (index < 0 || !argv[index + 1]) return null;
+  if (index < 0 || index + 1 >= argv.length) return null;
   return argv[index + 1];
 }
 
@@ -33,7 +32,24 @@ function readRows(input: string): readonly GoldRow[] {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => JSON.parse(line) as GoldRow);
+    .map((line, index) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(line);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Invalid JSON in ${input} at line ${index + 1}: ${message}`);
+      }
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        !Array.isArray((parsed as { expected?: unknown }).expected) ||
+        !Array.isArray((parsed as { predicted?: unknown }).predicted)
+      ) {
+        throw new Error(`Invalid gold row in ${input} at line ${index + 1}: expected and predicted arrays are required`);
+      }
+      return parsed as GoldRow;
+    });
 }
 
 export function evaluateGoldRows(rows: readonly GoldRow[]): Record<string, unknown> {
@@ -46,7 +62,7 @@ export function evaluateGoldRows(rows: readonly GoldRow[]): Record<string, unkno
       for (const predicted of row.predicted) {
         const expectedMatch = row.expected.some((expected) => (
           expected.symbol.toUpperCase() === predicted.symbol.toUpperCase() &&
-          expected.direction.toLowerCase() === predicted.direction.toLowerCase()
+          expected.direction.toUpperCase() === predicted.direction.toUpperCase()
         ));
         if (!expectedMatch) {
           const bucket = classifyFalsePositive(predicted);
@@ -62,18 +78,21 @@ export function evaluateGoldRows(rows: readonly GoldRow[]): Record<string, unkno
       falsePositiveBuckets: {} as Record<string, number>,
     },
   );
+  const precision = totals.truePositives + totals.falsePositives === 0
+    ? 0
+    : totals.truePositives / (totals.truePositives + totals.falsePositives);
+  const recall = totals.truePositives + totals.falseNegatives === 0
+    ? 0
+    : totals.truePositives / (totals.truePositives + totals.falseNegatives);
+  const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
   return {
     examples: rows.length,
-    ...scoreExtractionSet(
-      Array.from({ length: totals.truePositives + totals.falsePositives }, (_, index) => ({
-        symbol: index < totals.truePositives ? `TP${index}USDT` : `FP${index}USDT`,
-        direction: "bullish",
-      })),
-      Array.from({ length: totals.truePositives + totals.falseNegatives }, (_, index) => ({
-        symbol: `TP${index}USDT`,
-        direction: "bullish",
-      })),
-    ),
+    truePositives: totals.truePositives,
+    falsePositives: totals.falsePositives,
+    falseNegatives: totals.falseNegatives,
+    precision,
+    recall,
+    f1,
     false_positive_buckets: totals.falsePositiveBuckets,
   };
 }

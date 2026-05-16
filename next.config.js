@@ -39,6 +39,15 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "call-score.com" }],
+        destination: "https://www.call-score.com/:path*",
+      },
+    ];
+  },
   experimental: {},
 };
 

@@ -61,7 +61,11 @@ get_latest_version() {
         auth_header=(--header "Authorization: Bearer ${GH_TOKEN}")
     fi
 
-    response=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 "${auth_header[@]}" "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest")
+    if [ "${#auth_header[@]}" -gt 0 ]; then
+        response=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 "${auth_header[@]}" "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest")
+    else
+        response=$(curl --silent --show-error --location --connect-timeout 10 --max-time 30 "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest")
+    fi
     handle_rate_limit "$response"
 
     local version
@@ -79,7 +83,7 @@ get_latest_version() {
 handle_rate_limit() {
     local response="$1"
     if echo "$response" | grep -q "API rate limit exceeded"; then
-          fatal "Error: GitHub API rate limit exceeded. Please try again later"
+          fatal "GitHub API rate limit exceeded. Please try again later"
     fi
 }
 
@@ -90,10 +94,37 @@ download_file() {
     if command -v curl > /dev/null 2>&1; then
         curl --fail --location --show-error --progress-bar --connect-timeout 10 --max-time 120 "$url" -O
     elif command -v wget > /dev/null 2>&1; then
-        wget --timeout=30 --tries=3 "$url"
+        wget --timeout=120 --tries=3 "$url"
     else
-        fatal "Error: Could not find curl or wget, please install one."
+        fatal "Could not find curl or wget, please install one."
     fi
+}
+
+verify_archive_checksum() {
+    local checksum_path="$1"
+    local archive_name="$2"
+    local archive_dir="$3"
+    local match_file="${archive_dir}/${archive_name}.sha256"
+
+    grep "[[:space:]]${archive_name}$" "$checksum_path" > "$match_file" || \
+        fatal "failed to locate checksum for ${archive_name} in ${checksum_path}"
+
+    if command -v sha256sum > /dev/null 2>&1; then
+        ( cd "$archive_dir" && sha256sum -c "$(basename "$match_file")" ) || \
+            fatal "checksum verification failed for ${archive_name}"
+    elif command -v shasum > /dev/null 2>&1; then
+        ( cd "$archive_dir" && shasum -a 256 -c "$(basename "$match_file")" ) || \
+            fatal "checksum verification failed for ${archive_name}"
+    else
+        fatal "sha256 checksum verifier not found; install sha256sum or shasum"
+    fi
+
+    rm -f "$match_file"
+}
+
+archive_has_safe_paths() {
+    local archive_path="$1"
+    tar -tzf "$archive_path" | grep -Eq '(^/|(^|/)\.\.(/|$))'
 }
 
 download() {
@@ -105,6 +136,7 @@ download() {
 
 download_cli() {
     # OS name lower case
+    local suffix
     suffix=$(echo "$os_name" | tr '[:upper:]' '[:lower:]')
 
     local bin_folder="$1"
@@ -114,21 +146,39 @@ download_cli() {
     if [ ! -f "$bin_path" ]; then
         echo "📥 Downloading CLI version $version..."
 
-        remote_file="codacy-cli-v2_${version}_${suffix}_${arch}.tar.gz"
-        url="https://github.com/codacy/codacy-cli-v2/releases/download/${version}/${remote_file}"
+        local remote_file="codacy-cli-v2_${version}_${suffix}_${arch}.tar.gz"
+        local checksum_file="checksums.txt"
+        local url="https://github.com/codacy/codacy-cli-v2/releases/download/${version}/${remote_file}"
+        local checksum_url="https://github.com/codacy/codacy-cli-v2/releases/download/${version}/${checksum_file}"
+        local archive_path="${bin_folder}/${remote_file}"
+        local checksum_path="${bin_folder}/${checksum_file}"
+        local abs_bin_folder
+
+        abs_bin_folder=$(cd "$bin_folder" && pwd -P) || fatal "failed to resolve absolute path for ${bin_folder}"
 
         download "$url" "$bin_folder"
-        if [ ! -s "${bin_folder}/${remote_file}" ]; then
-            fatal "Error: Codacy CLI archive was not downloaded or is empty"
+        download "$checksum_url" "$bin_folder"
+        if [ ! -s "$archive_path" ]; then
+            fatal "Codacy CLI archive was not downloaded or is empty"
         fi
+        if [ ! -s "$checksum_path" ]; then
+            rm -f "$archive_path"
+            fatal "Codacy CLI checksum file was not downloaded or is empty"
+        fi
+        verify_archive_checksum "$checksum_path" "$remote_file" "$bin_folder"
         if ! command -v tar > /dev/null 2>&1; then
-            fatal "Error: tar not found; please install tar"
+            rm -f "$archive_path" "$checksum_path"
+            fatal "tar not found; please install tar"
         fi
-          tar xzf "${bin_folder}/${remote_file}" -C "${bin_folder}" || {
-            rm -f "${bin_folder}/${remote_file}"
+        if archive_has_safe_paths "$archive_path"; then
+            rm -f "$archive_path" "$checksum_path"
+            fatal "Codacy CLI archive contains unsafe paths"
+        fi
+          tar xzf "$archive_path" --no-absolute-names --warning=no-unknown-keyword -C "$abs_bin_folder" || {
+            rm -f "$archive_path" "$checksum_path"
             fatal "failed to extract Codacy CLI archive"
         }
-        rm -f "${bin_folder}/${remote_file}"
+        rm -f "$archive_path" "$checksum_path"
     fi
 }
 

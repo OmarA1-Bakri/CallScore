@@ -8,26 +8,27 @@ import { serif, sans, mono } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CallScore — Market Calls, Measured",
+  title: "CallScore — Crypto Market Calls Tracker | Score Alpha. Find Edge.",
   description:
-    "Market calls scored against real price data. Public methodology, auditable history, no sponsorships.",
+    "CallScore is the crypto market calls tracker that scores every prediction against real price data. Transparent methodology. Ranked alpha. No noise.",
   metadataBase: new URL(SITE_URL),
+  alternates: { canonical: "/" },
   icons: {
     icon: "/favicon.ico",
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "CallScore — Market Calls, Measured",
+    title: "CallScore — Crypto Market Calls Tracker | Score Alpha. Find Edge.",
     description:
-      "Market calls scored against real price data. Public methodology, auditable history, no sponsorships.",
+      "CallScore is the crypto market calls tracker that scores every prediction against real price data. Transparent methodology. Ranked alpha. No noise.",
     type: "website",
     images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "CallScore",
+    title: "CallScore — Crypto Market Calls Tracker",
     description:
-      "Market calls scored against real price data. Public methodology, no sponsorships.",
+      "The crypto market calls tracker that scores every prediction against real price data. Transparent methodology. Ranked alpha.",
     images: ["/opengraph-image"],
   },
 };

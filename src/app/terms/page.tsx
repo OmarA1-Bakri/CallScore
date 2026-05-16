@@ -3,9 +3,10 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Terms of Service - CallScore",
+  title: "Terms of Service — CallScore",
   description:
     "Terms of service for CallScore. Important disclaimers about financial information, data accuracy, and use of this platform.",
+  alternates: { canonical: "/terms" },
 };
 
 /* ------------------------------------------------------------------ */

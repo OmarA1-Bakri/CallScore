@@ -25,9 +25,9 @@ import type {
 } from "@/lib/types";
 
 export const metadata: Metadata = {
-  title: "CallScore — Track Calls. Score Outcomes. Find Alpha.",
+  title: "Crypto Market Calls Tracker | Score Alpha. Find Edge — CallScore",
   description:
-    "Crypto creator market calls scored against real price data, with every Alpha Score tied to the published methodology.",
+    "CallScore is the crypto market calls tracker that scores every prediction against real price data. Ranked alpha. Transparent methodology. No noise.",
   alternates: { canonical: "/" },
 };
 
@@ -332,9 +332,12 @@ export default async function HomePage({
               <span className="h-1.5 w-1.5 bg-accent" style={{ borderRadius: 2 }} aria-hidden="true" />
               The standard for crypto calls
             </p>
-            <h1 className="font-serif text-[65px] tab:text-[97px] desk:text-[119px] text-ink-900 font-normal tracking-tight leading-[0.88] text-balance max-w-[880px] mb-7">
+            <h1 className="font-serif text-[65px] tab:text-[97px] desk:text-[119px] text-ink-900 font-normal tracking-tight leading-[0.88] text-balance max-w-[880px] mb-3">
               Market calls, <em className="italic font-normal text-accent">measured.</em>
             </h1>
+            <h2 className="font-sans text-[16px] tab:text-[18px] text-ink-600 font-medium leading-relaxed max-w-[760px] mb-8">
+              The crypto market calls tracker that scores alpha against real price data.
+            </h2>
             <p className="font-serif text-[21px] tab:text-[24px] text-ink-700 leading-relaxed max-w-[760px] mb-8">
               Track crypto creators&apos; market calls against real price data.
               Score every eligible call. Rank signal, not noise.

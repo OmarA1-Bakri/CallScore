@@ -3,8 +3,9 @@
 hermes-worker-wrapper.py
 Safe wrapper for the pipeline worker.
 - Parses .env.local with python-dotenv (no special-char issues in bash)
-- Fixes DNS to IPv4-first
-- Restarts worker automatically
+- Fixes DNS with --dns-result-order=ipv4first + NODE_OPTIONS
+- Restarts worker automatically on crash
+- Uses direct node binary (npx was stripping env)
 - Logs to .tmp/hermes-worker.log
 """
 
@@ -32,7 +33,6 @@ def load_env():
             load_dotenv(env_path, override=True)
             log("Loaded .env.local via python-dotenv")
         except ImportError:
-            # Fallback: manual parse
             with open(env_path, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
@@ -40,26 +40,27 @@ def load_env():
                         continue
                     k, v = line.split("=", 1)
                     os.environ[k] = v
-            log("Loaded .env.local via manual parse")
+            log("Loaded .env.local via manual parse (python-dotenv not installed)")
     except Exception as e:
         log(f"ERROR loading .env.local: {e}")
         sys.exit(1)
 
 def main():
     os.environ["DNS_RESULT_ORDER"] = "ipv4first"
+    os.environ["NODE_OPTIONS"] = "--dns-result-order=ipv4first --no-warnings"
     load_env()
     os.chdir(PROJECT_DIR)
 
-    # Verify DB URL is set
     db_url = os.environ.get("NEON_DATABASE_URL")
     if not db_url:
         log("ERROR: NEON_DATABASE_URL not set after loading .env.local")
         sys.exit(1)
     log(f"DB URL present (starts with {db_url[:25]}...)")
 
+    node = subprocess.run(["which", "node"], capture_output=True, text=True).stdout.strip() or "node"
+
     while True:
         log("Starting hermes-worker...")
-        node = os.popen("which node").read().strip() or "node"
         cmd = [
             node,
             "--dns-result-order=ipv4first",
@@ -68,9 +69,11 @@ def main():
             "--max-jobs", "10000",
         ]
         env = dict(os.environ)
-        env["DNS_RESULT_ORDER"] = "ipv4first"
         log(f"CMD: {' '.join(cmd)}")
-        proc = subprocess.Popen(cmd, env=env, cwd=PROJECT_DIR)
+        proc = subprocess.Popen(cmd, env=env, cwd=PROJECT_DIR,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        for line in proc.stdout:
+            log(line.decode("utf-8", errors="replace").rstrip())
         ret = proc.wait()
         log(f"Worker exited with code {ret}, restarting in 5s...")
         time.sleep(5)

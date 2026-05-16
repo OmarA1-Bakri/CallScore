@@ -18,6 +18,8 @@ const REBUILT_PAGES: readonly string[] = [
   "src/app/page.tsx",
   "src/app/about/page.tsx",
   "src/app/pricing/page.tsx",
+  "src/app/alerts/page.tsx",
+  "src/app/webhooks/page.tsx",
   "src/app/methodology/page.tsx",
   "src/app/feedback/page.tsx",
   "src/app/creator/[handle]/page.tsx",
@@ -231,4 +233,34 @@ test("Whop dashboard view renders directly instead of redirecting", () => {
   assert.doesNotMatch(src, /redirect\(/);
   assert.match(src, /Whop dashboard view/);
   assert.match(src, /companyId/);
+});
+
+function getLinkBlockForLabel(src = "", label = "") {
+  const blocks = Array.from(src.matchAll(/<Link[\s\S]*?<\/Link>/g))
+    .map((match) => match[0])
+    .filter((block) => new RegExp(`>\\s*${label}\\s*<`).test(block));
+  assert.equal(blocks.length, 1, `expected one ${label} public nav link, found ${blocks.length}`);
+  return blocks[0];
+}
+
+test("desktop public nav sends Alerts and Webhooks to product pages", () => {
+  const src = read("src/components/Header.tsx");
+  const alerts = getLinkBlockForLabel(src, "ALERTS");
+  const webhooks = getLinkBlockForLabel(src, "WEBHOOKS");
+
+  assert.match(alerts, /href="\/alerts"/);
+  assert.doesNotMatch(alerts, /href="\/settings\/alerts"/);
+  assert.match(webhooks, /href="\/webhooks"/);
+  assert.doesNotMatch(webhooks, /href="\/settings\/webhooks"/);
+});
+
+test("mobile public nav sends Alerts and Webhooks to product pages", () => {
+  const src = read("src/components/MobileMenu.tsx");
+  const alerts = getLinkBlockForLabel(src, "ALERTS");
+  const webhooks = getLinkBlockForLabel(src, "WEBHOOKS");
+
+  assert.match(alerts, /href="\/alerts"/);
+  assert.doesNotMatch(alerts, /href="\/settings\/alerts"/);
+  assert.match(webhooks, /href="\/webhooks"/);
+  assert.doesNotMatch(webhooks, /href="\/settings\/webhooks"/);
 });

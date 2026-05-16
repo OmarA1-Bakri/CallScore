@@ -40,13 +40,13 @@ export default async function Header(): Promise<ReactElement> {
               BACKTEST
             </Link>
             <Link
-              href="/settings/alerts"
+              href="/alerts"
               className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
             >
               ALERTS
             </Link>
             <Link
-              href="/settings/webhooks"
+              href="/webhooks"
               className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
             >
               WEBHOOKS

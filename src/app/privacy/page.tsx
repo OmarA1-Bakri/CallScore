@@ -3,9 +3,10 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - CallScore",
+  title: "Privacy Policy — CallScore",
   description:
     "Privacy policy for CallScore. Learn how we handle your data, what we collect, and how we protect your privacy.",
+  alternates: { canonical: "/privacy" },
 };
 
 /* ------------------------------------------------------------------ */

@@ -1,0 +1,35 @@
+{
+  "workflow_id": "creator_page_seo_agent",
+  "side_effect_level": "draft_only",
+  "artifact": {
+    "artifact_id": "creator_page_creator_echo",
+    "type": "creator_page",
+    "status": "draft",
+    "creator_ids": [
+      "creator_echo"
+    ],
+    "evidence_receipt_ids": [
+      "launch_receipt_5"
+    ],
+    "claims": [
+      {
+        "claim": "Creator Echo has 7 eligible historical calls in this draft page.",
+        "source_ref": "launch_receipt_5",
+        "confidence": "medium",
+        "risk": "medium"
+      }
+    ],
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "payload_hash": "sha256:703a5a52f22461ab846376403a4a69adf566ead3fa0b0f69a5add99fe44d5125"
+  },
+  "body": "# Creator Echo\n\nSample-size caveat: this page has limited eligible calls and should be interpreted cautiously.\n\nIncludes methodology link, correction history, right-of-reply status, last updated timestamp, structured metadata, and canonical URL plan.",
+  "metadata": {
+    "canonical_url": "/creators/creator_echo",
+    "noindex": false
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "workflow_id": "creator_receipt_content_agent",
+  "side_effect_level": "draft_only",
+  "evidence_receipt": {
+    "evidence_receipt_id": "launch_receipt_3",
+    "creator_id": "creator_charlie",
+    "call_id": "launch_call_3",
+    "asset": "SOL",
+    "direction": "bearish",
+    "call_timestamp": "2026-05-13T00:00:00Z",
+    "transcript_ref": "launch-batch/evidence/transcripts/launch_call_3.txt",
+    "evidence_span": {
+      "start": 0,
+      "end": 123
+    },
+    "price_data_ref": "launch-batch/evidence/prices/sol_3.json",
+    "scoring_methodology_version": "calls-core-v1",
+    "limitations": [
+      "draft launch fixture; requires human evidence review before approval"
+    ],
+    "confidence": "high",
+    "claim_source_map": [
+      {
+        "claim_id": "claim_3",
+        "source_ref": "launch_receipt_3"
+      }
+    ]
+  },
+  "artifact": {
+    "artifact_id": "scorecard_launch_receipt_3",
+    "type": "scorecard",
+    "status": "draft",
+    "creator_ids": [
+      "creator_charlie"
+    ],
+    "evidence_receipt_ids": [
+      "launch_receipt_3"
+    ],
+    "claims": [
+      {
+        "claim": "creator_charlie has an eligible SOL historical call recorded by CallScore.",
+        "source_ref": "launch_receipt_3",
+        "confidence": "high",
+        "risk": "medium"
+      }
+    ],
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "payload_hash": "sha256:bbccf60118a64b2bded21eb6f1d0f38bb4fb1ab7e16583c35b18eb217caf37ee"
+  },
+  "scorecard_markdown": "# Evidence-backed scorecard\n\nMethodology: calls-core-v1\n\nNo investment advice. Historical evidence only.",
+  "chart_spec": {
+    "asset": "SOL",
+    "price_data_ref": "launch-batch/evidence/prices/sol_3.json"
+  },
+  "publish_payload_preview": {
+    "actor": "agent",
+    "artifact_id": "scorecard_launch_receipt_3",
+    "workflow_id": "creator_receipt_content_agent",
+    "runtime_id": "callscore-pipeline-runtime",
+    "action_class": "publish",
+    "action_type": "publish_creator_scorecard",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_charlie/scorecard"
+    },
+    "payload": {
+      "artifact_id": "scorecard_launch_receipt_3",
+      "content_ref": "sha256:bbccf60118a64b2bded21eb6f1d0f38bb4fb1ab7e16583c35b18eb217caf37ee"
+    },
+    "evidence_receipt_ids": [
+      "launch_receipt_3"
+    ],
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "methodology_version": "calls-core-v1"
+  }
+}

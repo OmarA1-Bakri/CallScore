@@ -80,8 +80,9 @@ export function classifyFalsePositive(call: ExtractionLike): FalsePositiveBucket
   const quote = (call.raw_quote ?? "").toLowerCase();
   if (/\b(sponsor|affiliate|link below|telegram|discord)\b/.test(quote)) return "sponsor_or_link";
   if (/\b(yesterday|last cycle|in 2021|back then|previous bull)\b/.test(quote)) return "historical_recap";
-  if (!VALID_DIRECTIONS.includes(call.direction.toLowerCase() as (typeof VALID_DIRECTIONS)[number])) return "missing_direction";
+  if (!VALID_DIRECTIONS.some((direction) => direction === call.direction.toLowerCase())) return "missing_direction";
   if (!/USDT$/i.test(call.symbol)) return "unsupported_asset";
+  // Short quotes are treated as an insufficient evidence proxy even when the transcript itself is unavailable here.
   if (quote.length < QUOTE_MIN_LENGTH) return "quote_not_in_transcript";
   return "generic_asset_mention";
 }

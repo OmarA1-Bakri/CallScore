@@ -1,0 +1,17 @@
+{
+  "workflow_id": "creator_page_seo_agent",
+  "side_effect_level": "draft_only",
+  "artifact": {
+    "artifact_id": "methodology_page",
+    "type": "methodology_page",
+    "status": "draft",
+    "body_ref": "docs/callscore-growth-os/trust-assets/METHODOLOGY.md",
+    "body_hash": "sha256:82306be860aa2c2b92480c8710ff36b65c97610e9a0ed2b1bb078f334a57be96",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "PUBLISH_GATE"
+    ]
+  },
+  "body": "# CallScore Methodology Draft\n\nCallScore evaluates historical creator calls using evidence receipts, transcript spans, price-data references, methodology versions, limitations, and confidence labels. It does not predict future returns and does not provide financial guidance.\n"
+}

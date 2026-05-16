@@ -13,7 +13,7 @@ SELECT DISTINCT ON (symbol, day)
 FROM (
   SELECT
     symbol,
-    date_trunc('day', to_timestamp(open_time / 1000.0))::date AS day,
+    date_trunc('day', to_timestamp(open_time / 1000.0) AT TIME ZONE 'UTC')::date AS day,
     close,
     open_time
   FROM candles

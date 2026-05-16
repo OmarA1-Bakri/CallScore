@@ -1,0 +1,86 @@
+{
+  "workflow_id": "creator_receipt_content_agent",
+  "side_effect_level": "draft_only",
+  "evidence_receipt": {
+    "evidence_receipt_id": "launch_receipt_4",
+    "creator_id": "creator_delta",
+    "call_id": "launch_call_4",
+    "asset": "BTC",
+    "direction": "long",
+    "call_timestamp": "2026-05-14T00:00:00Z",
+    "transcript_ref": "launch-batch/evidence/transcripts/launch_call_4.txt",
+    "evidence_span": {
+      "start": 0,
+      "end": 124
+    },
+    "price_data_ref": "launch-batch/evidence/prices/btc_4.json",
+    "scoring_methodology_version": "calls-core-v1",
+    "limitations": [
+      "draft launch fixture; requires human evidence review before approval"
+    ],
+    "confidence": "medium",
+    "claim_source_map": [
+      {
+        "claim_id": "claim_4",
+        "source_ref": "launch_receipt_4"
+      }
+    ]
+  },
+  "artifact": {
+    "artifact_id": "scorecard_launch_receipt_4",
+    "type": "scorecard",
+    "status": "draft",
+    "creator_ids": [
+      "creator_delta"
+    ],
+    "evidence_receipt_ids": [
+      "launch_receipt_4"
+    ],
+    "claims": [
+      {
+        "claim": "creator_delta has an eligible BTC historical call recorded by CallScore.",
+        "source_ref": "launch_receipt_4",
+        "confidence": "medium",
+        "risk": "medium"
+      }
+    ],
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "payload_hash": "sha256:fa2b50dbbdbbbb4a2d653c63e12edaea8b1ea6664a0153f3a75b8df46c9befa6"
+  },
+  "scorecard_markdown": "# Evidence-backed scorecard\n\nMethodology: calls-core-v1\n\nNo investment advice. Historical evidence only.",
+  "chart_spec": {
+    "asset": "BTC",
+    "price_data_ref": "launch-batch/evidence/prices/btc_4.json"
+  },
+  "publish_payload_preview": {
+    "actor": "agent",
+    "artifact_id": "scorecard_launch_receipt_4",
+    "workflow_id": "creator_receipt_content_agent",
+    "runtime_id": "callscore-pipeline-runtime",
+    "action_class": "publish",
+    "action_type": "publish_creator_scorecard",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_delta/scorecard"
+    },
+    "payload": {
+      "artifact_id": "scorecard_launch_receipt_4",
+      "content_ref": "sha256:fa2b50dbbdbbbb4a2d653c63e12edaea8b1ea6664a0153f3a75b8df46c9befa6"
+    },
+    "evidence_receipt_ids": [
+      "launch_receipt_4"
+    ],
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "methodology_version": "calls-core-v1"
+  }
+}

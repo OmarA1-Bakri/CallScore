@@ -1,0 +1,626 @@
+[
+  {
+    "item": "creator scorecard 1",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_alpha/scorecard"
+    },
+    "payload_hash": "sha256:054832afcd0744dd29056346053486fb8b6b9c8f756dcef982619ff1fa66c49f",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "scorecard_launch_receipt_1",
+      "workflow_id": "creator_receipt_content_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_scorecard",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_alpha/scorecard"
+      },
+      "payload": {
+        "artifact_id": "scorecard_launch_receipt_1",
+        "content_ref": "sha256:c689180f4c6dd8646b92c963e38578a528542f00ac73b47f6800c15a81fececb"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_1"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator SEO page 1",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_alpha"
+    },
+    "payload_hash": "sha256:24f901ec41085fd1930952429fd09bae9d1d281b1742a05d96fa645529564d65",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "creator_page_creator_alpha",
+      "workflow_id": "creator_page_seo_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_page",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_alpha"
+      },
+      "payload": {
+        "artifact_id": "creator_page_creator_alpha",
+        "content_ref": "sha256:6cf73a30a935d1366d1a008ef825b1d3d23a72fa68ce56580561b8cecd9e631c"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_1"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator scorecard 2",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_bravo/scorecard"
+    },
+    "payload_hash": "sha256:108162a54e1366ebe41629cece5a8feebb59a490d9cc43948e2c1f24a698b357",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "scorecard_launch_receipt_2",
+      "workflow_id": "creator_receipt_content_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_scorecard",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_bravo/scorecard"
+      },
+      "payload": {
+        "artifact_id": "scorecard_launch_receipt_2",
+        "content_ref": "sha256:c63f7777c2593096b9affb1fa97e818088c5a8edba241e6d89d893c41171729f"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_2"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator SEO page 2",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_bravo"
+    },
+    "payload_hash": "sha256:c8394b04959ff9dd7c79c2d2189fae7f0176ff412b4d85fda099e0c0a8dafe92",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "creator_page_creator_bravo",
+      "workflow_id": "creator_page_seo_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_page",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_bravo"
+      },
+      "payload": {
+        "artifact_id": "creator_page_creator_bravo",
+        "content_ref": "sha256:327b29a0d57a5b2c646cb648c8071275d55accabdaa80bcc8e6e9d386974ba21"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_2"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator scorecard 3",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_charlie/scorecard"
+    },
+    "payload_hash": "sha256:1f787ab3dffa560f2bb6ea08dd205a487b621f23b028716eb209d3a661d81a68",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "scorecard_launch_receipt_3",
+      "workflow_id": "creator_receipt_content_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_scorecard",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_charlie/scorecard"
+      },
+      "payload": {
+        "artifact_id": "scorecard_launch_receipt_3",
+        "content_ref": "sha256:bbccf60118a64b2bded21eb6f1d0f38bb4fb1ab7e16583c35b18eb217caf37ee"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_3"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator SEO page 3",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_charlie"
+    },
+    "payload_hash": "sha256:cb2c359bc31400e84e78b816901bfa63434d9291d4600cc2b80b8f5827e4f102",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "creator_page_creator_charlie",
+      "workflow_id": "creator_page_seo_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_page",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_charlie"
+      },
+      "payload": {
+        "artifact_id": "creator_page_creator_charlie",
+        "content_ref": "sha256:48782eb2d5b532b616006f1875b88080e38e209dc090f1ed5f6d8191fbfe5409"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_3"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator scorecard 4",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_delta/scorecard"
+    },
+    "payload_hash": "sha256:001f0e3e87247656aec15025d7ed40919a781344ae58379d20ad9c576cd3d644",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "scorecard_launch_receipt_4",
+      "workflow_id": "creator_receipt_content_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_scorecard",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_delta/scorecard"
+      },
+      "payload": {
+        "artifact_id": "scorecard_launch_receipt_4",
+        "content_ref": "sha256:fa2b50dbbdbbbb4a2d653c63e12edaea8b1ea6664a0153f3a75b8df46c9befa6"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_4"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator SEO page 4",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_delta"
+    },
+    "payload_hash": "sha256:aee4edd3982ae2dabc3de829c43e95bc77c30cb887ee41fbb3b087d0d061ae50",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "creator_page_creator_delta",
+      "workflow_id": "creator_page_seo_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_page",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_delta"
+      },
+      "payload": {
+        "artifact_id": "creator_page_creator_delta",
+        "content_ref": "sha256:0a21c665f207e7dabe989dcaac688de3f8973216ef65e5afce1280a2838591da"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_4"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator scorecard 5",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_echo/scorecard"
+    },
+    "payload_hash": "sha256:ce25c66fd4081f73e5b0c6606ee68385db2814c8ae581910fd4a45d1648c87a8",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "scorecard_launch_receipt_5",
+      "workflow_id": "creator_receipt_content_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_scorecard",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_echo/scorecard"
+      },
+      "payload": {
+        "artifact_id": "scorecard_launch_receipt_5",
+        "content_ref": "sha256:965844809443ed9f6602029d6d2a757c78c7af08ce4fd722d3d31ea9da563230"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_5"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "creator SEO page 5",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/creators/creator_echo"
+    },
+    "payload_hash": "sha256:d5e3038dda1a95b64083fd3b172d274962fc497cbd8e2b72319031cdb347d638",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "RIGHT_OF_REPLY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "creator_page_creator_echo",
+      "workflow_id": "creator_page_seo_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_creator_page",
+      "target": {
+        "destination": "public_site",
+        "path": "/creators/creator_echo"
+      },
+      "payload": {
+        "artifact_id": "creator_page_creator_echo",
+        "content_ref": "sha256:703a5a52f22461ab846376403a4a69adf566ead3fa0b0f69a5add99fe44d5125"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_5"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "RIGHT_OF_REPLY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "weekly digest",
+    "action_class": "send",
+    "target": {
+      "audience": "digest_subscribers"
+    },
+    "payload_hash": "sha256:afed94599f60f7784a0b61a6b40db0391db7a59e1ed45e083d7459182fabcecc",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "SEND_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "digest_controlled_launch_week_1",
+      "workflow_id": "digest_retention_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "send",
+      "action_type": "send_digest_email",
+      "target": {
+        "audience": "digest_subscribers"
+      },
+      "payload": {
+        "artifact_id": "digest_controlled_launch_week_1",
+        "content_ref": "sha256:183c99a5f847ba79f1cf35dc85a127b93aef746c05f3e276786a10a1e6b5e04f"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_1",
+        "launch_receipt_2",
+        "launch_receipt_3",
+        "launch_receipt_4",
+        "launch_receipt_5"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "SEND_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "methodology page",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/methodology"
+    },
+    "payload_hash": "sha256:16cc034d8a5212708fbc4e3ad24661479efa635c977a4ae292644c93473d5ddb",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "methodology_page",
+      "workflow_id": "creator_page_seo_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_methodology_page",
+      "target": {
+        "destination": "public_site",
+        "path": "/methodology"
+      },
+      "payload": {
+        "artifact_id": "methodology_page",
+        "content_ref": "sha256:82306be860aa2c2b92480c8710ff36b65c97610e9a0ed2b1bb078f334a57be96"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_1",
+        "launch_receipt_2",
+        "launch_receipt_3",
+        "launch_receipt_4",
+        "launch_receipt_5"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "correction log page",
+    "action_class": "publish",
+    "target": {
+      "destination": "public_site",
+      "path": "/corrections"
+    },
+    "payload_hash": "sha256:52f5209a8cef7a5cf0ab9f47e5dbf229c8538a70ae0b9dfc85e840d6bbba7cdb",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "correction_log_page",
+      "workflow_id": "correction_log_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_correction_log",
+      "target": {
+        "destination": "public_site",
+        "path": "/corrections"
+      },
+      "payload": {
+        "artifact_id": "correction_log_page",
+        "content_ref": "sha256:34d253eeea2484b63a48ff17b59f507de53aef2db72607605fc50f6ce69c614f"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_1",
+        "launch_receipt_2",
+        "launch_receipt_3",
+        "launch_receipt_4",
+        "launch_receipt_5"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  },
+  {
+    "item": "GitHub methodology repo draft",
+    "action_class": "publish",
+    "target": {
+      "destination": "github",
+      "repo": "binarybaron/callscore-methodology",
+      "branch": "draft-controlled-launch"
+    },
+    "payload_hash": "sha256:22f0bcb4bc7f41fff8cf307865a93bca30c21cf992cca9ea5ca15fbed5fa2ede",
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "PUBLISH_GATE"
+    ],
+    "hermes_approval_ids": [],
+    "operator_status": "PENDING",
+    "draft_only": true,
+    "action": {
+      "actor": "workplane",
+      "artifact_id": "github_methodology_repo",
+      "workflow_id": "creator_page_seo_agent",
+      "runtime_id": "callscore-pipeline-runtime",
+      "action_class": "publish",
+      "action_type": "publish_github_methodology_repo",
+      "target": {
+        "destination": "github",
+        "repo": "binarybaron/callscore-methodology",
+        "branch": "draft-controlled-launch"
+      },
+      "payload": {
+        "artifact_id": "github_methodology_repo",
+        "content_ref": "sha256:82306be860aa2c2b92480c8710ff36b65c97610e9a0ed2b1bb078f334a57be96"
+      },
+      "evidence_receipt_ids": [
+        "launch_receipt_1",
+        "launch_receipt_2",
+        "launch_receipt_3",
+        "launch_receipt_4",
+        "launch_receipt_5"
+      ],
+      "required_gates": [
+        "TRUST_GATE",
+        "DATA_POLICY_GATE",
+        "PUBLISH_GATE"
+      ],
+      "methodology_version": "calls-core-v1"
+    }
+  }
+]
