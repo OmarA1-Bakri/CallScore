@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS llm_gold_examples (
   source TEXT NOT NULL DEFAULT 'human_review',
   split TEXT NOT NULL DEFAULT 'eval' CHECK (split IN ('train', 'holdout', 'eval')),
   transcript_excerpt TEXT NOT NULL,
-  expected_calls JSONB NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(expected_calls) = 'array'),
+  expected_calls JSONB NOT NULL DEFAULT '[]'::jsonb,
   false_positive_bucket TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

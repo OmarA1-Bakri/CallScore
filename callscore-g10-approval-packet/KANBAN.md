@@ -1,6 +1,6 @@
 # CallScore Growth OS Macro Kanban
 
-**Last updated:** 2026-05-13T05:06:31Z  
+**Last updated:** 2026-05-16T13:19:00Z  
 **Board owner:** OMX/Codex lead agent  
 **Source of truth:** `ENTERPRISE_IMPLEMENTATION_PLAN.md`, `GATE_STATUS.md`, `workplane/` verification output  
 **Stop rule:** no publish/send/spend/production mutation/live third-party call/money movement without Workplane gate pass and exact Hermes/operator approval.

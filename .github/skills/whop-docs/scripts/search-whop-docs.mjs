@@ -52,22 +52,18 @@ function scoreEntry(entry) {
   return score;
 }
 
-const controller = new AbortController();
-const timeout = setTimeout(() => controller.abort(), 15_000);
 let markdown;
 try {
-  const response = await fetch(indexUrl, { signal: controller.signal });
+  const response = await fetch(indexUrl, { signal: AbortSignal.timeout(15_000) });
   if (!response.ok) {
     throw new Error(`Failed to fetch ${indexUrl}: ${response.status} ${response.statusText}`);
   }
   markdown = await response.text();
 } catch (error) {
-  if (error instanceof Error && error.name === "AbortError") {
+  if (error instanceof Error && error.name === "TimeoutError") {
     throw new Error(`Timed out fetching ${indexUrl}`);
   }
   throw error;
-} finally {
-  clearTimeout(timeout);
 }
 
 const results = extractEntries(markdown)

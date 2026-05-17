@@ -38,3 +38,5 @@ home-*-alpha-nav.png
 .env*.local
 .kilo/kilo.jsonc
 .kilo/kilo.json
+.env.prod.pull*
+.1env.prod.pulled*

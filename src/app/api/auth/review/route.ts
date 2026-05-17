@@ -9,13 +9,11 @@ function timingSafeTokenEqual(provided: string | null, expected: string): boolea
   if (provided === null) return false;
   const expectedBuffer = Buffer.from(expected);
   const providedBuffer = Buffer.from(provided);
-  const comparable = providedBuffer.length === expectedBuffer.length
-    ? providedBuffer
-    : Buffer.alloc(expectedBuffer.length);
-  if (providedBuffer.length === expectedBuffer.length) {
-    providedBuffer.copy(comparable);
+  if (providedBuffer.length !== expectedBuffer.length) {
+    crypto.timingSafeEqual(providedBuffer, Buffer.alloc(providedBuffer.length));
+    return false;
   }
-  return crypto.timingSafeEqual(comparable, expectedBuffer) && providedBuffer.length === expectedBuffer.length;
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 function trustedBaseUrl(): string {

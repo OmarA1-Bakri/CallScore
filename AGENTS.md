@@ -1,6 +1,8 @@
 AGENTS.md — crypto-tuber-ranked
 Operating rules for AI coding agents working in `OmarA1-Bakri/crypto-tuber-ranked`.
 This file is for any LLM-based development agent, including Claude Code, Codex, OpenCode, Cursor agents, Aider, Devin-style agents, or custom runners. Treat it as the repository-local contract. Inspect the repository before making changes; this file is a high-signal starting point, not a substitute for reading the code.
+
+**Scope and relationship to CLAUDE.md:** This file is the authoritative rules document. `CLAUDE.md` is retained for historical context and compatibility with Claude Code tooling, but AGENTS.md takes precedence on all rule conflicts. The repository-specific gotchas in section 3 are the canonical gotcha list; CLAUDE.md may contain a cached copy for tool-local consumption but should not diverge without updating this file.
 ---
 Project Context
 Project name: Crypto Tubers Tracked / `crypto-tuber-ranked`
@@ -253,3 +255,8 @@ Rules:
 `~/cloned_libraries/whop_pipeline_plugin/skills/` provides Whop pipeline automation skills (deploy, adopt, etc.). These are companion-repo tools; use them for reference but prefer the companion repo for live Whop/Vercel mutations.
 When a skill is missing or needs updating, modify it in the source library, not in the project config. Project-local skill overrides are a last resort.
 Agent definitions (`.kilo/agent/*.md`) and commands (`.kilo/command/*.md`) follow the same pattern: library-owned by default, project-level only for repo-specific overrides.
+
+### Prerequisites / Setup
+- **Composio MCP**: Configure `COMPOSIO_API_KEY` and connect to `https://connect.composio.dev/mcp` via the MCP server entry in `.kilo/kilo.jsonc`. The server exposes 7 meta-tools: `COMPOSIO_SEARCH_TOOLS`, `COMPOSIO_GET_TOOL_SCHEMAS`, `COMPOSIO_MULTI_EXECUTE_TOOL`, `COMPOSIO_MANAGE_CONNECTIONS`, `COMPOSIO_WAIT_FOR_CONNECTIONS`, `COMPOSIO_REMOTE_WORKBENCH`, `COMPOSIO_REMOTE_BASH_TOOL`.
+- **Cloned libraries**: Ensure `~/cloned_libraries/hermes-library/skills/` and `~/cloned_libraries/whop_pipeline_plugin/skills/` exist. Alternative paths can be configured in `.kilo/kilo.jsonc` under `skills.paths`.
+- **Kilo config**: `.kilo/kilo.jsonc` must point to those skill directories and include the Composio MCP entry. See `.kilo/kilo.jsonc` for the current working example.

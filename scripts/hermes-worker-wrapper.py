@@ -9,9 +9,9 @@ Safe wrapper for the pipeline worker.
 - Logs to .tmp/hermes-worker.log
 """
 
-import os, sys, subprocess, time
+import os, sys, subprocess, time, shutil
 
-PROJECT_DIR = "/mnt/c/Users/albak/xdev/crypto-tuber-ranked"
+PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 LOG_PATH = os.path.join(PROJECT_DIR, ".tmp", "hermes-worker.log")
 
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
@@ -47,7 +47,7 @@ def load_env():
 
 def main():
     os.environ["DNS_RESULT_ORDER"] = "ipv4first"
-    os.environ["NODE_OPTIONS"] = "--dns-result-order=ipv4first --no-warnings"
+    os.environ["NODE_OPTIONS"] = "--no-warnings"
     load_env()
     os.chdir(PROJECT_DIR)
 
@@ -55,9 +55,12 @@ def main():
     if not db_url:
         log("ERROR: NEON_DATABASE_URL not set after loading .env.local")
         sys.exit(1)
-    log(f"DB URL present (starts with {db_url[:25]}...)")
+    log("DB URL present")
 
-    node = subprocess.run(["which", "node"], capture_output=True, text=True).stdout.strip() or "node"
+    node = shutil.which("node")
+    if node is None:
+        log("ERROR: node not found in PATH. Install Node.js or ensure it is on PATH.")
+        sys.exit(1)
 
     while True:
         log("Starting hermes-worker...")

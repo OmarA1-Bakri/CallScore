@@ -185,7 +185,7 @@ Standard flows:
 Required environment (read from `.env.local` for dev; from Vercel env in prod):
 
 - `DATABASE_URL` — Neon Postgres connection string. Pipeline scripts will hit whichever DB this points at; double-check before running anything mutating.
-- `GEMINI_API_KEY` / `OLLAMA_API_KEY` (or `OLLAMA_TOKEN`) — used by `extract-calls*` scripts (Ollama Cloud is the default provider; OpenRouter has been removed).
+- `GEMINI_API_KEY` / `OLLAMA_API_KEY` (or `OLLAMA_TOKEN`) — used by `extract-calls*` scripts. Ollama Cloud is the default LLM provider. OpenRouter scripts (see `src/scripts/extract-calls-openrouter.ts` and `tests/extract-calls-openrouter.test.ts`) are retained for compatibility with legacy extraction/test flows but are deprecated and not the primary path.
 - `RESEND_API_KEY` — alerts and feedback emails.
 - Optional integrations: Whop (`WHOP_*`), Firecrawl, SerpAPI for global creator discovery.
 

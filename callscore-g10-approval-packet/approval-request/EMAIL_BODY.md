@@ -1,6 +1,8 @@
 Subject: Formal Approval Request: CallScore Growth OS G10 Controlled Launch Pack
 
-Hi Omar,
+Hi {{approverName}},
+
+> _Fallback: "Approver" when approverName is missing._
 
 The CallScore Growth OS G10 controlled launch pack is ready for your formal review. Automated/local preparation is complete and clean, but launch remains blocked until human approval is recorded.
 
@@ -9,6 +11,7 @@ Requested decisions:
 2. Trust asset approval.
 3. Approval or requested changes for the 14 exact draft payload hashes/targets.
 4. Final G10 release sign-off.
+5. Rollback/emergency-stop acknowledgement.
 
 Verification summary:
 - Workplane tests: 94 passed, 0 failed.

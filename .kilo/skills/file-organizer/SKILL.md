@@ -140,8 +140,12 @@ When a user requests file organization help:
    
    When requested, search for duplicates:
    ```bash
-   # Find exact duplicates by hash
-   find [directory] -type f -exec md5 {} \; | sort | uniq -d
+   # Find exact duplicates by hash (portable: uses md5sum on Linux, md5 on macOS)
+   if command -v md5sum >/dev/null 2>&1; then
+     find [directory] -type f -exec md5sum {} \; | sort | uniq -d
+   else
+     find [directory] -type f -exec md5 {} \; | sort | uniq -d
+   fi
    
    # Find files with same name
    find [directory] -type f -printf '%f\n' | sort | uniq -d

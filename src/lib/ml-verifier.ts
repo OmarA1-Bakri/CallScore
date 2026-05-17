@@ -203,7 +203,7 @@ export function parseVerifierOutput(text: string, rawResponse?: string): ParsedV
     decision: record.decision,
     reason_code: reasonCode,
     confidence: zeroToOne(record.confidence, "confidence"),
-    evidence_span: evidenceSpan.slice(0, 4000) || "",
+    evidence_span: evidenceSpan.slice(0, 4000),
     recommended_extraction_confidence: zeroToOne(
       record.recommended_extraction_confidence,
       "recommended_extraction_confidence",
@@ -603,9 +603,8 @@ async function insertVerificationRun(input: {
   readonly output: ParsedVerifierOutput;
   readonly queryFn: QueryFn;
 }): Promise<void> {
-  // Defensive: if the DB hasn't been migrated to accept "missing_evidence",
-  // fall back to "unclear" so the row still inserts. The true reason is preserved
-  // in the text `reason` field.
+  // REASON_CODES includes "missing_evidence" after migration 016.
+  // This guard is retained as a runtime safety net in case the migration hasn't run yet.
   const safeReasonCode: MlVerifierReasonCode = REASON_CODES.includes(
     input.output.reason_code,
   )

@@ -39,12 +39,13 @@ const nextConfig = {
       },
     ];
   },
-  async rewrites() {
+  async redirects() {
     return [
       {
         source: "/:path*",
         has: [{ type: "host", value: "call-score.com" }],
         destination: "https://www.call-score.com/:path*",
+        permanent: true,
       },
     ];
   },
