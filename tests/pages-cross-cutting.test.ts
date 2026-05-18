@@ -188,6 +188,23 @@ test("home page does not import recharts-backed chart components", () => {
   assert.doesNotMatch(src, /BacktestLabCharts|PerformanceChart|recharts/);
 });
 
+test("dashboard page keeps the Next 15 async params contract", () => {
+  const src = read("src/app/dashboard/[companyId]/page.tsx");
+  assert.match(src, /readonly params:\s*Promise<\{\s*readonly companyId: string;\s*\}>;/s);
+  assert.match(src, /const \{ companyId \} = await params;/);
+});
+
+test("settings pages keep the Next 15 async searchParams contract", () => {
+  for (const rel of [
+    "src/app/settings/alerts/page.tsx",
+    "src/app/settings/webhooks/page.tsx",
+  ]) {
+    const src = read(rel);
+    assert.match(src, /readonly searchParams\?:\s*Promise<\{/);
+    assert.match(src, /const searchParams = await searchParamsPromise;/);
+  }
+});
+
 test("public leaderboard/profile/call pages use live data instead of mock data", () => {
   for (const rel of [
     "src/app/page.tsx",

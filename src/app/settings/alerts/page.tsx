@@ -10,12 +10,12 @@ import { creatorHandlePath } from "@/lib/creator-handles";
 import { query } from "@/lib/db";
 
 interface PageProps {
-  readonly searchParams?: {
+  readonly searchParams?: Promise<{
     readonly added?: string;
     readonly removed?: string;
     readonly error?: string;
     readonly q?: string;
-  };
+  }>;
 }
 
 interface CreatorOption {
@@ -93,8 +93,9 @@ function StatusNotice({
 }
 
 export default async function AlertSettingsPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: PageProps) {
+  const searchParams = await searchParamsPromise;
   const session = await requireSessionAccess("pro");
   if (session instanceof Response) {
     const isGuest = session.status === 401;

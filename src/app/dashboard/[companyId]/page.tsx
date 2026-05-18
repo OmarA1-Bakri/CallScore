@@ -11,21 +11,22 @@ export const metadata: Metadata = {
 };
 
 interface DashboardEntryPageProps {
-  readonly params: {
+  readonly params: Promise<{
     readonly companyId: string;
-  };
+  }>;
 }
 
 export default async function DashboardEntryPage({
   params,
 }: DashboardEntryPageProps): Promise<ReactElement> {
+  const { companyId } = await params;
   const session = await getSession();
   const tier = session?.tier ?? "free";
 
   return (
     <div className="mx-auto max-w-page px-4 py-10 tab:px-6 desk:px-8">
-      <DashboardHero companyId={params.companyId} tier={tier} />
-      <DashboardCardGrid companyId={params.companyId} />
+      <DashboardHero companyId={companyId} tier={tier} />
+      <DashboardCardGrid companyId={companyId} />
       <DashboardSummary />
     </div>
   );

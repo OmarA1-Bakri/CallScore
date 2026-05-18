@@ -13,16 +13,17 @@ import {
 const WEBHOOKS_ROUTE = "/api/webhooks";
 
 interface PageProps {
-  readonly searchParams?: {
+  readonly searchParams?: Promise<{
     readonly disabled?: string;
     readonly error?: string;
     readonly tested?: string;
-  };
+  }>;
 }
 
 export default async function WebhookSettingsPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: PageProps) {
+  const searchParams = await searchParamsPromise;
   const session = await requireSessionAccess("alpha");
   if (session instanceof Response) {
     const isGuest = session.status === 401;
