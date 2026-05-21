@@ -125,7 +125,7 @@ export async function executeJobWithKeepalive(
   job: PipelineJob,
   logger: ReturnType<typeof createLogger>,
 ): Promise<Record<string, unknown>> {
-  await updatePipelineJobHeartbeat(job, { worker_id: job.locked_by, phase: "start" });
+  await updatePipelineJobHeartbeat(job, { worker_id: job.locked_by });
   await auditDispatchEvent(job, "started");
 
   const startMs = Date.now();
