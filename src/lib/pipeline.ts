@@ -1,6 +1,7 @@
 import { throwIfCronDeadlineExceeded } from "@/app/api/cron/deadline";
 import { TRACKED_SYMBOLS } from "./constants";
 import { query } from "./db";
+import { createHash } from "node:crypto";
 
 export type PipelineRunStatus =
   | "queued"
@@ -43,6 +44,7 @@ export interface PipelineJob {
   readonly run_after: string;
   readonly idempotency_key: string | null;
   readonly error: string | null;
+  readonly metrics: Record<string, unknown>;
   readonly created_at: string;
   readonly updated_at: string;
 }
@@ -120,7 +122,7 @@ function readPayload(value: unknown): Record<string, unknown> {
 }
 
 function normalizeJob(row: PipelineJob): PipelineJob {
-  return { ...row, payload: readPayload(row.payload) };
+  return { ...row, payload: readPayload(row.payload), metrics: readPayload(row.metrics) };
 }
 
 function normalizeRun(row: PipelineRun): PipelineRun {
@@ -438,6 +440,48 @@ export async function appendPipelineJobEvent(input: {
   );
   if (!event) throw new Error("Failed to write pipeline job event");
   return normalizeEvent(event);
+}
+
+function hashPayload(payload: Record<string, unknown>): string {
+  const normalized = JSON.stringify(payload, Object.keys(payload).sort());
+  return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
+}
+
+export type DispatchAuditEvent = "started" | "completed" | "failed";
+
+export interface DispatchAuditMeta {
+  readonly input_hash: string;
+  readonly duration_ms?: number;
+  readonly error?: string;
+}
+
+export async function auditDispatchEvent(
+  job: Pick<PipelineJob, "id" | "run_id" | "payload">,
+  event: DispatchAuditEvent,
+  meta: Record<string, unknown> = {},
+): Promise<void> {
+  const auditPayload: Record<string, unknown> = { event, ...meta };
+
+  if (event === "started") {
+    auditPayload.input_hash = hashPayload(job.payload);
+  }
+
+  await query(
+    `UPDATE pipeline_jobs
+     SET metrics = COALESCE(metrics, '{}'::jsonb) || $2::jsonb,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [job.id, asJsonbParam(auditPayload)],
+  );
+
+  await appendPipelineJobEvent({
+    runId: job.run_id,
+    jobId: job.id,
+    eventType: `dispatch_${event}`,
+    status: event === "failed" ? "failed" : event === "completed" ? "succeeded" : "running",
+    message: `Dispatch ${event}`,
+    payload: auditPayload,
+  });
 }
 
 export async function completePipelineJob(

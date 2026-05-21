@@ -2,6 +2,7 @@ import os from "node:os";
 import { retryWithBackoff } from "../lib/pipeline/retry";
 import {
   appendPipelineJobEvent,
+  auditDispatchEvent,
   claimNextPipelineJob,
   completePipelineJob,
   enqueuePipelineJob,
@@ -123,7 +124,9 @@ export async function executeJobWithKeepalive(
   logger: ReturnType<typeof createLogger>,
 ): Promise<Record<string, unknown>> {
   await updatePipelineJobHeartbeat(job, { worker_id: job.locked_by, phase: "start" });
+  await auditDispatchEvent(job, "started");
 
+  const startMs = Date.now();
   const heartbeat = setInterval(() => {
     void updatePipelineJobHeartbeat(job, { worker_id: job.locked_by }).catch((error) => {
       logger.warn("job_heartbeat_failed", {
@@ -136,7 +139,15 @@ export async function executeJobWithKeepalive(
   }, HEARTBEAT_INTERVAL_MS);
 
   try {
-    return await executeJob(job);
+    const result = await executeJob(job);
+    const durationMs = Date.now() - startMs;
+    await auditDispatchEvent(job, "completed", { duration_ms: durationMs });
+    return result;
+  } catch (error) {
+    const durationMs = Date.now() - startMs;
+    const message = error instanceof Error ? error.message : String(error);
+    await auditDispatchEvent(job, "failed", { duration_ms: durationMs, error: message });
+    throw error;
   } finally {
     clearInterval(heartbeat);
   }
