@@ -5,7 +5,7 @@ import { runAlertSend } from "@/lib/alert-jobs";
 
 export const runtime = "nodejs";
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function enqueue(request: NextRequest): Promise<NextResponse> {
   if (!verifyCronSecret(request)) return cronUnauthorized();
   const batch = Number(request.nextUrl.searchParams.get("batch") ?? process.env.ALERTS_CLAIM_BATCH ?? 500);
   const deadlineSignal = createCronDeadlineSignal();
@@ -21,4 +21,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const result = deadlineResult.value;
   return NextResponse.json({ ok: result.failed === 0, ...result }, { status: result.failed === 0 ? 200 : 500 });
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  return enqueue(request);
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  return enqueue(request);
 }

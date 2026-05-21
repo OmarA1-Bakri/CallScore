@@ -5,7 +5,7 @@ import { runAlertScan } from "@/lib/alert-jobs";
 
 export const runtime = "nodejs";
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function enqueue(request: NextRequest): Promise<NextResponse> {
   if (!verifyCronSecret(request)) return cronUnauthorized();
   const hours = Number(request.nextUrl.searchParams.get("hours") ?? 6);
   const deadlineSignal = createCronDeadlineSignal();
@@ -21,4 +21,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   const result = deadlineResult.value;
   return NextResponse.json({ ok: result.failures === 0, ...result }, { status: result.failures === 0 ? 200 : 500 });
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  return enqueue(request);
+}
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  return enqueue(request);
 }
