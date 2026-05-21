@@ -8,6 +8,7 @@ export const DEFAULT_ML_VERIFIER_PROVIDER = "ollama";
 export const DEFAULT_ML_VERIFIER_MODEL = "kimi-k2.6";
 export const DEFAULT_OLLAMA_HOST = "https://ollama.com";
 export const DEFAULT_ML_VERIFIER_TIMEOUT_MS = 180_000;
+export const DEFAULT_ML_VERIFIER_ATTEMPT_TIMEOUTS_MS = [90_000, 120_000, 180_000] as const;
 export const DEFAULT_ML_VERIFIER_BATCH_SIZE = 50;
 
 const AMBIGUOUS_TICKER_SYMBOLS = [
@@ -27,6 +28,9 @@ const REASON_CODES = [
   "quote_not_in_transcript",
   "unclear",
   "missing_evidence",
+  "model_timeout",
+  "malformed_model_output",
+  "model_provider_error",
 ] as const;
 
 export type MlVerifierDecision = (typeof DECISIONS)[number];
@@ -72,6 +76,7 @@ export interface MlVerifierConfig {
   readonly ollamaHost: string;
   readonly promptVersion: string;
   readonly requestTimeoutMs: number;
+  readonly attemptTimeoutMs: readonly number[];
 }
 
 export interface MlVerifierMetrics extends Record<string, unknown> {
@@ -176,6 +181,32 @@ export function extractJsonObjectText(text: string): { readonly json: string; re
   }
 
   throw new Error(`Response does not contain valid JSON object. Received: ${trimmed.slice(0, 300)}${trimmed.length > 300 ? " ..." : ""}`);
+}
+
+export function isMalformedVerifierOutputError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /valid JSON object|Verifier response|decision must|reason_code|confidence must|recommended_extraction_confidence|Unexpected token|JSON/.test(error.message);
+}
+
+export function isVerifierTimeoutError(error: unknown): boolean {
+  return error instanceof Error && (error.name === "AbortError" || /timed out|timeout/i.test(error.message));
+}
+
+export function verifierFailureOutput(input: {
+  readonly reasonCode: "model_timeout" | "malformed_model_output" | "model_provider_error";
+  readonly message: string;
+  readonly rawModelOutput?: string;
+}): ParsedVerifierOutput {
+  return {
+    decision: "review",
+    reason_code: input.reasonCode,
+    confidence: 0,
+    evidence_span: "",
+    recommended_extraction_confidence: 0,
+    reason: input.message.slice(0, 500),
+    parse_strategy: "failed",
+    raw_llm_response: input.rawModelOutput?.slice(0, 8000),
+  };
 }
 
 export function parseVerifierOutput(text: string, rawResponse?: string): ParsedVerifierOutput {
@@ -477,7 +508,7 @@ Pay special attention to ambiguous tickers:
 Return ONLY one JSON object:
 {
   "decision": "approve|reject|review",
-  "reason_code": "valid_call|generic_word|asset_not_supported|direction_not_supported|non_actionable|quote_not_in_transcript|unclear|missing_evidence",
+  "reason_code": "valid_call|generic_word|asset_not_supported|direction_not_supported|non_actionable|quote_not_in_transcript|unclear|missing_evidence|model_timeout|malformed_model_output|model_provider_error",
   "confidence": 0.0,
   "evidence_span": "short exact transcript span supporting your decision",
   "recommended_extraction_confidence": 0.0,
@@ -525,22 +556,37 @@ export function resolveMlVerifierConfig(env = process.env): MlVerifierConfig {
     1_000,
     Math.floor(Number(env.ML_VERIFIER_TIMEOUT_MS ?? DEFAULT_ML_VERIFIER_TIMEOUT_MS)),
   );
+  const attemptTimeoutMs = parseAttemptTimeouts(env.ML_VERIFIER_ATTEMPT_TIMEOUTS_MS, requestTimeoutMs);
   return {
     provider,
     model: env.ML_VERIFIER_MODEL ?? env.OLLAMA_MODEL ?? DEFAULT_ML_VERIFIER_MODEL,
     ollamaHost: (env.OLLAMA_HOST ?? DEFAULT_OLLAMA_HOST).replace(/\/+$/, ""),
     promptVersion: env.ML_VERIFIER_PROMPT_VERSION ?? ML_VERIFIER_PROMPT_VERSION,
     requestTimeoutMs,
+    attemptTimeoutMs,
   };
+}
+
+function parseAttemptTimeouts(value: string | undefined, fallback: number): readonly number[] {
+  if (!value) return DEFAULT_ML_VERIFIER_ATTEMPT_TIMEOUTS_MS;
+  const parsed = value
+    .split(",")
+    .map((part) => Math.floor(Number(part.trim())))
+    .filter((part) => Number.isFinite(part) && part >= 1_000);
+  return parsed.length > 0 ? parsed.slice(0, 5) : [fallback];
 }
 
 export function buildOllamaVerifierRequestBody(
   candidate: MlVerifierCandidate,
   config: MlVerifierConfig,
+  repairJson = false,
 ): Record<string, unknown> {
+  const content = repairJson
+    ? `Return only valid JSON. No markdown. No explanation.\n\n${buildVerifierPrompt(candidate)}`
+    : buildVerifierPrompt(candidate);
   return {
     model: config.model,
-    messages: [{ role: "user", content: buildVerifierPrompt(candidate) }],
+    messages: [{ role: "user", content }],
     stream: false,
     format: "json",
     think: false,
@@ -559,29 +605,75 @@ export async function verifyCandidateWithOllama(
     throw new Error("OLLAMA_API_KEY or OLLAMA_TOKEN not configured for Ollama Cloud");
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.requestTimeoutMs);
-  let response: Response;
-  try {
-    response = await fetch(`${config.ollamaHost}/api/chat`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: buildOllamaHeaders(config.ollamaHost),
-      body: JSON.stringify(buildOllamaVerifierRequestBody(candidate, config)),
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`Ollama verifier timed out after ${config.requestTimeoutMs}ms`);
+  const timeouts = config.attemptTimeoutMs.length > 0
+    ? config.attemptTimeoutMs
+    : [config.requestTimeoutMs];
+  let lastError: unknown;
+  let lastRawModelOutput: string | undefined;
+  let malformedRetries = 0;
+
+  for (let attemptIndex = 0; attemptIndex < timeouts.length; attemptIndex++) {
+    const timeoutMs = timeouts[attemptIndex];
+    const repairJson = malformedRetries > 0;
+    try {
+      const response = await fetch(`${config.ollamaHost}/api/chat`, {
+        method: "POST",
+        signal: AbortSignal.timeout(timeoutMs),
+        headers: buildOllamaHeaders(config.ollamaHost),
+        body: JSON.stringify(buildOllamaVerifierRequestBody(candidate, config, repairJson)),
+      });
+
+      const body = await response.text();
+      if (!response.ok) {
+        throw new Error(`Ollama verifier HTTP ${response.status}: ${body.slice(0, 500)}`);
+      }
+
+      const parsed: unknown = JSON.parse(body);
+      const content = (parsed as { message?: { content?: unknown } }).message?.content;
+      if (typeof content !== "string") {
+        throw new Error(`Ollama verifier response missing message content: ${body.slice(0, 500)}`);
+      }
+      lastRawModelOutput = body;
+      try {
+        return parseVerifierOutput(content, body);
+      } catch (error) {
+        lastError = error;
+        lastRawModelOutput = content || body;
+        if (isMalformedVerifierOutputError(error) && malformedRetries < 1 && attemptIndex + 1 < timeouts.length) {
+          malformedRetries += 1;
+          continue;
+        }
+        return verifierFailureOutput({
+          reasonCode: "malformed_model_output",
+          message: `Malformed model output: ${error instanceof Error ? error.message : String(error)}`,
+          rawModelOutput: lastRawModelOutput,
+        });
+      }
+    } catch (error) {
+      lastError = error;
+      if (isVerifierTimeoutError(error) && attemptIndex + 1 < timeouts.length) continue;
+      if (isVerifierTimeoutError(error)) {
+        return verifierFailureOutput({
+          reasonCode: "model_timeout",
+          message: `Ollama verifier timed out after ${timeoutMs}ms`,
+          rawModelOutput: lastRawModelOutput,
+        });
+      }
+      if (isMalformedVerifierOutputError(error)) {
+        return verifierFailureOutput({
+          reasonCode: "malformed_model_output",
+          message: `Malformed model output: ${error instanceof Error ? error.message : String(error)}`,
+          rawModelOutput: lastRawModelOutput,
+        });
+      }
+      if (attemptIndex + 1 < timeouts.length) continue;
     }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
   }
 
   const body = await Promise.race([
     response.text(),
     new Promise<string>((_, reject) =>
-      setTimeout(() => reject(new Error(`Body read timed out after ${config.requestTimeoutMs}ms`)), config.requestTimeoutMs)
+      setTimeout(() => reject(new Error(`Body read timed out after ${timeoutMs}ms`)), timeoutMs)
     ),
   ]);
   if (!response.ok) {
@@ -608,7 +700,7 @@ async function insertVerificationRun(input: {
   readonly output: ParsedVerifierOutput;
   readonly queryFn: QueryFn;
 }): Promise<void> {
-  // REASON_CODES includes "missing_evidence" after migration 016.
+  // REASON_CODES includes operational failure codes after migration 017.
   // This guard is retained as a runtime safety net in case the migration hasn't run yet.
   const safeReasonCode: MlVerifierReasonCode = REASON_CODES.includes(
     input.output.reason_code,
@@ -800,15 +892,14 @@ export async function runMlVerifierBatch(
       });
       // Degrade gracefully: mark candidate as "review" and continue.
       // Do NOT throw — one bad LLM response must not abort 249 other candidates.
-      output = {
-        decision: "review",
-        reason_code: "unclear",
-        confidence: 0,
-        evidence_span: "",
-        recommended_extraction_confidence: 0,
-        reason: `LLM parse error: ${message.slice(0, 200)}`,
-        parse_strategy: "failed",
-      };
+      output = verifierFailureOutput({
+        reasonCode: isVerifierTimeoutError(error)
+          ? "model_timeout"
+          : isMalformedVerifierOutputError(error)
+            ? "malformed_model_output"
+            : "model_provider_error",
+        message: `LLM verifier error: ${message.slice(0, 200)}`,
+      });
       review += 1;
       processed += 1;
       await insertVerificationRun({ job, candidate, config, output, queryFn });

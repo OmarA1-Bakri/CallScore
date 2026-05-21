@@ -53,6 +53,7 @@ export interface PipelineJob {
   readonly locked_by: string | null;
   readonly locked_at: string | null;
   readonly heartbeat_at: string | null;
+  readonly lease_expires_at: string | null;
   readonly run_after: string;
   readonly idempotency_key: string | null;
   readonly error: string | null;
@@ -115,6 +116,7 @@ const DEFAULT_ML_BATCH_SIZE = 250;
 const DEFAULT_MATCH_PRICES_LIMIT = 1000;
 const DEFAULT_MATCH_PRICES_BATCH_SIZE = 200;
 const DEFAULT_STUCK_JOB_SECONDS = 30 * 60;
+export const DEFAULT_PIPELINE_JOB_LEASE_SECONDS = 10 * 60;
 const FRESH_CANDLE_SECONDS = 2 * 60 * 60;
 const CANDLE_FRESHNESS_SYMBOLS = Array.from(new Set([...TRACKED_SYMBOLS, "XLMUSDT"]));
 
@@ -320,6 +322,7 @@ SET
   locked_by = $1,
   locked_at = NOW(),
   heartbeat_at = NOW(),
+  lease_expires_at = NOW() + ($3::int * INTERVAL '1 second'),
   attempts = attempts + 1,
   updated_at = NOW()
 WHERE id = (
@@ -342,9 +345,10 @@ export async function updatePipelineJobHeartbeat(
   await query(
     `UPDATE pipeline_jobs
      SET heartbeat_at = NOW(),
+         lease_expires_at = NOW() + ($2::int * INTERVAL '1 second'),
          updated_at = NOW()
      WHERE id = $1`,
-    [job.id],
+    [job.id, DEFAULT_PIPELINE_JOB_LEASE_SECONDS],
   );
 
   await appendPipelineJobEvent({
@@ -368,6 +372,7 @@ export async function resetStalePipelineJobs(input: {
          locked_by = NULL,
          locked_at = NULL,
          heartbeat_at = NULL,
+         lease_expires_at = NULL,
          run_after = NOW(),
          updated_at = NOW()
      WHERE id IN (
@@ -375,8 +380,9 @@ export async function resetStalePipelineJobs(input: {
        FROM pipeline_jobs
        WHERE status = 'running'
          AND (
-           (heartbeat_at IS NOT NULL AND heartbeat_at < NOW() - ($1::int * INTERVAL '1 second'))
-           OR (heartbeat_at IS NULL AND locked_at IS NOT NULL AND locked_at < NOW() - ($1::int * INTERVAL '1 second'))
+           (lease_expires_at IS NOT NULL AND lease_expires_at < NOW())
+           OR (lease_expires_at IS NULL AND heartbeat_at IS NOT NULL AND heartbeat_at < NOW() - ($1::int * INTERVAL '1 second'))
+           OR (lease_expires_at IS NULL AND heartbeat_at IS NULL AND locked_at IS NOT NULL AND locked_at < NOW() - ($1::int * INTERVAL '1 second'))
          )
        FOR UPDATE SKIP LOCKED
      )
@@ -405,7 +411,7 @@ export async function claimNextPipelineJob(input: ClaimNextJobInput): Promise<Pi
   if (input.types.length === 0) return null;
   const [job] = await query<PipelineJob>(
     CLAIM_NEXT_PIPELINE_JOB_SQL,
-    [input.workerId, input.types],
+    [input.workerId, input.types, DEFAULT_PIPELINE_JOB_LEASE_SECONDS],
   );
   if (!job) return null;
 
@@ -508,6 +514,8 @@ export async function completePipelineJob(
      SET status = 'succeeded',
          locked_by = NULL,
          locked_at = NULL,
+         heartbeat_at = NULL,
+         lease_expires_at = NULL,
          error = NULL,
          updated_at = NOW()
      WHERE id = $1`,
@@ -547,6 +555,8 @@ export async function retryOrFailPipelineJob(
      SET status = $2,
          locked_by = NULL,
          locked_at = NULL,
+         heartbeat_at = NULL,
+         lease_expires_at = NULL,
          error = $3,
          run_after = CASE
            WHEN $2 = 'pending' THEN NOW() + ($4::int * INTERVAL '1 second')
@@ -645,8 +655,10 @@ export async function getPipelineStatusSnapshot(limit = 20): Promise<PipelineSta
               EXTRACT(EPOCH FROM (NOW() - locked_at))::int AS stuck_seconds
        FROM pipeline_jobs
        WHERE status = 'running'
-         AND locked_at IS NOT NULL
-         AND locked_at <= NOW() - ($1::int * INTERVAL '1 second')
+         AND (
+           (lease_expires_at IS NOT NULL AND lease_expires_at < NOW())
+           OR (lease_expires_at IS NULL AND locked_at IS NOT NULL AND locked_at <= NOW() - ($1::int * INTERVAL '1 second'))
+         )
        ORDER BY locked_at ASC
        LIMIT $2`,
       [DEFAULT_STUCK_JOB_SECONDS, safeLimit],

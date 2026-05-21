@@ -13,6 +13,8 @@ import {
   transcriptContext,
   ML_VERIFIER_PROMPT_VERSION,
   DEFAULT_ML_VERIFIER_BATCH_SIZE,
+  DEFAULT_ML_VERIFIER_ATTEMPT_TIMEOUTS_MS,
+  verifyCandidateWithOllama,
 } from "../src/lib/ml-verifier";
 import type { MlVerifierCandidate, ParsedVerifierOutput, MlVerifierConfig } from "../src/lib/ml-verifier";
 
@@ -71,6 +73,7 @@ function makeJob(payload: Record<string, unknown> = {}): PipelineJob {
     locked_by: null,
     locked_at: null,
     heartbeat_at: null,
+    lease_expires_at: null,
     run_after: now,
     idempotency_key: null,
     error: null,
@@ -328,6 +331,7 @@ test("resolveMlVerifierConfig: defaults", () => {
   assert.equal(config.ollamaHost, "https://ollama.com");
   assert.equal(config.promptVersion, "ml-verifier-v1");
   assert.equal(config.requestTimeoutMs, 180_000);
+  assert.deepEqual(config.attemptTimeoutMs, [...DEFAULT_ML_VERIFIER_ATTEMPT_TIMEOUTS_MS]);
 });
 
 test("resolveMlVerifierConfig: env overrides", () => {
@@ -335,10 +339,68 @@ test("resolveMlVerifierConfig: env overrides", () => {
     ML_VERIFIER_MODEL: "custom-model",
     OLLAMA_HOST: "http://localhost:11434/",
     ML_VERIFIER_TIMEOUT_MS: "5000",
+    ML_VERIFIER_ATTEMPT_TIMEOUTS_MS: "1000,2000",
   } as any);
   assert.equal(config.model, "custom-model");
   assert.equal(config.ollamaHost, "http://localhost:11434");
   assert.equal(config.requestTimeoutMs, 5000);
+  assert.deepEqual(config.attemptTimeoutMs, [1000, 2000]);
+});
+
+
+test("verifyCandidateWithOllama: timeout attempts become review/model_timeout", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    const error = new Error("operation timed out");
+    error.name = "AbortError";
+    throw error;
+  }) as typeof fetch;
+
+  try {
+    const out = await verifyCandidateWithOllama(makeCandidate(), {
+      provider: "ollama",
+      model: "test-model",
+      ollamaHost: "http://localhost:11434",
+      promptVersion: "test-v1",
+      requestTimeoutMs: 1_000,
+      attemptTimeoutMs: [1_000, 1_000],
+    });
+    assert.equal(calls, 2);
+    assert.equal(out.decision, "review");
+    assert.equal(out.reason_code, "model_timeout");
+    assert.equal(out.parse_strategy, "failed");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("verifyCandidateWithOllama: malformed JSON retries once then stores malformed_model_output", async () => {
+  const originalFetch = globalThis.fetch;
+  const prompts: string[] = [];
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    prompts.push(String(JSON.parse(String(init?.body)).messages[0].content));
+    return new Response(JSON.stringify({ message: { content: "not json" } }), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const out = await verifyCandidateWithOllama(makeCandidate(), {
+      provider: "ollama",
+      model: "test-model",
+      ollamaHost: "http://localhost:11434",
+      promptVersion: "test-v1",
+      requestTimeoutMs: 1_000,
+      attemptTimeoutMs: [1_000, 1_000],
+    });
+    assert.equal(prompts.length, 2);
+    assert.match(prompts[1], /Return only valid JSON/);
+    assert.equal(out.decision, "review");
+    assert.equal(out.reason_code, "malformed_model_output");
+    assert.equal(out.raw_llm_response, "not json");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("resolveMlVerifierConfig: throws on unsupported provider", () => {
@@ -416,7 +478,7 @@ test("runMlVerifierBatch: graceful degradation on LLM error", async () => {
   assert.equal(metrics.processed, 1);
   assert.equal(metrics.review, 1); // degraded to review
   assert.equal(runs.length, 1);
-  assert.equal(runs[0].reasonCode, "unclear");
+  assert.equal(runs[0].reasonCode, "model_provider_error");
 });
 
 test("runMlVerifierBatch: success path with LLM approval", async () => {

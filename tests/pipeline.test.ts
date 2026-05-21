@@ -84,6 +84,7 @@ function job(payload: Record<string, unknown> = { batch_size: 1 }): PipelineJob 
     locked_by: "test-worker",
     locked_at: "2026-01-01T00:00:00.000Z",
     heartbeat_at: "2026-01-01T00:00:00.000Z",
+    lease_expires_at: "2026-01-01T00:10:00.000Z",
     run_after: "2026-01-01T00:00:00.000Z",
     idempotency_key: "test-key",
     error: null,
@@ -97,12 +98,16 @@ test("pipeline job claim SQL uses row locks with SKIP LOCKED", () => {
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /status = 'pending'/i);
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /attempts < max_attempts/i);
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /heartbeat_at = NOW\(\)/i);
+  assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /lease_expires_at = NOW\(\) \+ \(\$3::int \* INTERVAL '1 second'\)/i);
 });
 
 test("Phase 2 pipeline recovery adds heartbeats, keepalive, and stale reset semantics", () => {
   const migration = read("migrations/010-pipeline-heartbeats.sql");
   assert.match(migration, /ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ/i);
   assert.match(migration, /idx_pipeline_jobs_stale_running/i);
+  const leaseMigration = read("migrations/018-pipeline-job-lease-expiry.sql");
+  assert.match(leaseMigration, /ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ/i);
+  assert.match(leaseMigration, /idx_pipeline_jobs_running_lease_expiry/i);
   assert.equal(typeof updatePipelineJobHeartbeat, "function");
   assert.equal(typeof resetStalePipelineJobs, "function");
   assert.equal(typeof executeJobWithKeepalive, "function");
@@ -154,6 +159,16 @@ test("Phase 1 job payload parsers keep bounded production-safe defaults", () => 
     batchSize: 10,
     startAfterId: 123,
   });
+});
+
+test("ML verifier reason-code migration uses lookup table and provider failure codes", () => {
+  const migration = read("migrations/017-ml-verifier-reason-code-lookup.sql");
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS ml_verification_reason_codes/i);
+  assert.match(migration, /model_timeout/);
+  assert.match(migration, /malformed_model_output/);
+  assert.match(migration, /model_provider_error/);
+  assert.match(migration, /FOREIGN KEY \(reason_code\)/i);
+  assert.match(migration, /DROP CONSTRAINT/i);
 });
 
 test("verifier parser accepts valid schema and rejects malformed output", () => {
