@@ -3,6 +3,18 @@ import { TRACKED_SYMBOLS } from "./constants";
 import { query } from "./db";
 import { createHash } from "node:crypto";
 
+export const RALPLAN_PHASES = [
+  "phase1-stabilize",
+  "phase2-pipeline",
+  "phase3-whop-scaffold",
+  "phase4-commerce",
+  "phase5-marketing",
+] as const;
+
+export type RalplanPhase = (typeof RALPLAN_PHASES)[number];
+
+export const DEFAULT_PHASE: RalplanPhase = "phase2-pipeline";
+
 export type PipelineRunStatus =
   | "queued"
   | "running"
@@ -45,6 +57,7 @@ export interface PipelineJob {
   readonly idempotency_key: string | null;
   readonly error: string | null;
   readonly metrics: Record<string, unknown>;
+  readonly phase: string | null;
   readonly created_at: string;
   readonly updated_at: string;
 }
@@ -81,6 +94,7 @@ interface EnqueueJobInput {
   readonly priority?: number;
   readonly idempotencyKey: string;
   readonly maxAttempts?: number;
+  readonly phase?: string;
   readonly signal?: AbortSignal;
 }
 
@@ -176,9 +190,9 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
   throwIfCronDeadlineExceeded(input.signal);
   const [job] = await query<PipelineJob>(
     `INSERT INTO pipeline_jobs (
-       run_id, type, status, priority, payload, max_attempts, idempotency_key, updated_at
+       run_id, type, status, priority, payload, max_attempts, idempotency_key, phase, updated_at
      )
-     VALUES ($1, $2, 'pending', $3, $4::jsonb, $5, $6, NOW())
+     VALUES ($1, $2, 'pending', $3, $4::jsonb, $5, $6, $7, NOW())
      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO UPDATE
        SET updated_at = NOW()
      RETURNING *`,
@@ -189,6 +203,7 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
       asJsonbParam(input.payload),
       input.maxAttempts ?? 3,
       input.idempotencyKey,
+      input.phase ?? DEFAULT_PHASE,
     ],
   );
 

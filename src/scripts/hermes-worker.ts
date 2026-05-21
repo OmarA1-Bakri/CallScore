@@ -5,6 +5,7 @@ import {
   auditDispatchEvent,
   claimNextPipelineJob,
   completePipelineJob,
+  DEFAULT_PHASE,
   enqueuePipelineJob,
   resetStalePipelineJobs,
   retryOrFailPipelineJob,
@@ -82,6 +83,7 @@ async function enqueueSmokeJob(workerId: string): Promise<void> {
     priority: 1000,
     idempotencyKey: key,
     maxAttempts: 1,
+    phase: DEFAULT_PHASE,
     payload: {
       smoke: true,
       worker_id: workerId,
@@ -202,6 +204,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       job_id: job.id,
       job_type: job.type,
       run_id: job.run_id,
+      phase: job.phase ?? DEFAULT_PHASE,
       attempt: job.attempts,
       max_attempts: job.max_attempts,
     });
@@ -212,6 +215,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         job_id: job.id,
         job_type: job.type,
         run_id: job.run_id,
+        phase: job.phase ?? DEFAULT_PHASE,
       });
     } catch (error) {
       const result = await retryOrFailPipelineJob(job, error);
@@ -234,6 +238,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         job_id: job.id,
         job_type: job.type,
         run_id: job.run_id,
+        phase: job.phase ?? DEFAULT_PHASE,
         retrying: result.retrying,
         error: message,
       });
