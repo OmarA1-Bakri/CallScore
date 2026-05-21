@@ -1,4 +1,5 @@
 import os from "node:os";
+import { retryWithBackoff } from "../lib/pipeline/retry";
 import {
   appendPipelineJobEvent,
   claimNextPipelineJob,
@@ -101,13 +102,20 @@ async function runSmokeJob(job: PipelineJob): Promise<Record<string, unknown>> {
 }
 
 async function executeJob(job: PipelineJob): Promise<Record<string, unknown>> {
-  if (job.type === "hermes_smoke_test") return runSmokeJob(job);
-  if (job.type === "ml_verifier_batch") return runMlVerifierBatch(job) as Promise<Record<string, unknown>>;
-  if (job.type === "candle_refresh") return runCandleRefreshJob(job);
-  if (job.type === "match_prices_batch") return runMatchPricesJob(job);
-  if (job.type === "compute_scores") return runComputeScoresJob();
-  if (job.type === PROMOTE_ML_VERIFIED_JOB_TYPE) return runMlPromotionJob(job);
-  throw new Error(`Unsupported pipeline job type: ${job.type}`);
+  return retryWithBackoff(
+    async () => {
+      if (job.type === "hermes_smoke_test") return runSmokeJob(job);
+      if (job.type === "ml_verifier_batch") return runMlVerifierBatch(job) as Promise<Record<string, unknown>>;
+      if (job.type === "candle_refresh") return runCandleRefreshJob(job);
+      if (job.type === "match_prices_batch") return runMatchPricesJob(job);
+      if (job.type === "compute_scores") return runComputeScoresJob();
+      if (job.type === PROMOTE_ML_VERIFIED_JOB_TYPE) return runMlPromotionJob(job);
+      throw new Error(`Unsupported pipeline job type: ${job.type}`);
+    },
+    {
+      shouldRetry: (err: Error) => !err.message.startsWith("Unsupported pipeline job type:"),
+    },
+  );
 }
 
 export async function executeJobWithKeepalive(

@@ -578,7 +578,12 @@ export async function verifyCandidateWithOllama(
     clearTimeout(timeout);
   }
 
-  const body = await response.text();
+  const body = await Promise.race([
+    response.text(),
+    new Promise<string>((_, reject) =>
+      setTimeout(() => reject(new Error(`Body read timed out after ${config.requestTimeoutMs}ms`)), config.requestTimeoutMs)
+    ),
+  ]);
   if (!response.ok) {
     throw new Error(`Ollama verifier HTTP ${response.status}: ${body.slice(0, 500)}`);
   }
