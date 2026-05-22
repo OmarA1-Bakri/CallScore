@@ -27,8 +27,10 @@ test("migration plan applies schema then numbered migrations in order", () => {
     normalize("migrations/014-ml-promotion-audit.sql"),
     normalize("migrations/015-candles-symbol-open-time.sql"),
     normalize("migrations/016-ml-verifier-missing-evidence.sql"),
-    normalize("migrations/017-ml-verifier-reason-code-lookup.sql"),
-    normalize("migrations/018-pipeline-job-lease-expiry.sql"),
+    normalize("migrations/017-pipeline-job-metrics.sql"),
+    normalize("migrations/018-add-pipeline-phase.sql"),
+    normalize("migrations/019-ml-verifier-reason-code-lookup.sql"),
+    normalize("migrations/020-pipeline-job-lease-expiry.sql"),
   ]);
 });
 

@@ -105,7 +105,7 @@ test("Phase 2 pipeline recovery adds heartbeats, keepalive, and stale reset sema
   const migration = read("migrations/010-pipeline-heartbeats.sql");
   assert.match(migration, /ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ/i);
   assert.match(migration, /idx_pipeline_jobs_stale_running/i);
-  const leaseMigration = read("migrations/018-pipeline-job-lease-expiry.sql");
+  const leaseMigration = read("migrations/020-pipeline-job-lease-expiry.sql");
   assert.match(leaseMigration, /ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ/i);
   assert.match(leaseMigration, /idx_pipeline_jobs_running_lease_expiry/i);
   assert.equal(typeof updatePipelineJobHeartbeat, "function");
@@ -162,7 +162,7 @@ test("Phase 1 job payload parsers keep bounded production-safe defaults", () => 
 });
 
 test("ML verifier reason-code migration uses lookup table and provider failure codes", () => {
-  const migration = read("migrations/017-ml-verifier-reason-code-lookup.sql");
+  const migration = read("migrations/019-ml-verifier-reason-code-lookup.sql");
   assert.match(migration, /CREATE TABLE IF NOT EXISTS ml_verification_reason_codes/i);
   assert.match(migration, /model_timeout/);
   assert.match(migration, /malformed_model_output/);

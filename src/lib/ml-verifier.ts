@@ -597,6 +597,24 @@ export function buildOllamaVerifierRequestBody(
   };
 }
 
+
+async function readResponseTextWithTimeout(response: Response, timeoutMs: number): Promise<string> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      response.text(),
+      new Promise<string>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`Body read timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export async function verifyCandidateWithOllama(
   candidate: MlVerifierCandidate,
   config: MlVerifierConfig,
@@ -623,7 +641,7 @@ export async function verifyCandidateWithOllama(
         body: JSON.stringify(buildOllamaVerifierRequestBody(candidate, config, repairJson)),
       });
 
-      const body = await response.text();
+      const body = await readResponseTextWithTimeout(response, timeoutMs);
       if (!response.ok) {
         throw new Error(`Ollama verifier HTTP ${response.status}: ${body.slice(0, 500)}`);
       }
@@ -670,22 +688,12 @@ export async function verifyCandidateWithOllama(
     }
   }
 
-  const body = await Promise.race([
-    response.text(),
-    new Promise<string>((_, reject) =>
-      setTimeout(() => reject(new Error(`Body read timed out after ${timeoutMs}ms`)), timeoutMs)
-    ),
-  ]);
-  if (!response.ok) {
-    throw new Error(`Ollama verifier HTTP ${response.status}: ${body.slice(0, 500)}`);
-  }
-
-  const parsed: unknown = JSON.parse(body);
-  const content = (parsed as { message?: { content?: unknown } }).message?.content;
-  if (typeof content !== "string") {
-    throw new Error(`Ollama verifier response missing message content: ${body.slice(0, 500)}`);
-  }
-  return parseVerifierOutput(content, body);
+  const message = lastError instanceof Error ? lastError.message : String(lastError ?? "unknown provider error");
+  return verifierFailureOutput({
+    reasonCode: isVerifierTimeoutError(lastError) ? "model_timeout" : "model_provider_error",
+    message,
+    rawModelOutput: lastRawModelOutput,
+  });
 }
 
 function payloadNumber(payload: Record<string, unknown>, key: string, fallback: number): number {
