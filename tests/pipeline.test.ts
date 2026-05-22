@@ -88,6 +88,8 @@ function job(payload: Record<string, unknown> = { batch_size: 1 }): PipelineJob 
     run_after: "2026-01-01T00:00:00.000Z",
     idempotency_key: "test-key",
     error: null,
+    metrics: {},
+    phase: "phase2-pipeline",
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
   };

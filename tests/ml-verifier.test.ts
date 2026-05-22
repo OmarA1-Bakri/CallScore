@@ -77,6 +77,8 @@ function makeJob(payload: Record<string, unknown> = {}): PipelineJob {
     run_after: now,
     idempotency_key: null,
     error: null,
+    metrics: {},
+    phase: null,
     created_at: now,
     updated_at: now,
   };
