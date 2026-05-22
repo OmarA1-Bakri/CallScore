@@ -8,6 +8,7 @@
   "gitRemote": "git@github.com:OmarA1-Bakri/crypto-tuber-ranked.git",
   "envVarPolicy": "merge",
   "syncedAt": {
-    "binding": "2026-05-06T16:11:25.187Z"
+    "binding": "2026-05-06T16:11:25.187Z",
+    "adopt": "2026-05-22T15:12:13.927Z"
   }
 }
