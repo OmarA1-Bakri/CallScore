@@ -33,6 +33,9 @@ export function resolveDatabaseUrl(
 export function getDb(): NeonQueryFunction<false, false> {
   if (sql) return sql;
 
+  // Use built-in WebSocket for Netlify/AWS Lambda 
+  neonConfig.webSocketConstructor = globalThis.WebSocket as typeof WebSocket;
+
   const url = resolveDatabaseUrl();
 
   sql = neon(url);
