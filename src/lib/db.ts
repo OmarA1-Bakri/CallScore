@@ -1,7 +1,7 @@
 import { neon, NeonQueryFunction, neonConfig } from "@neondatabase/serverless";
-import ws from "ws";
 
-neonConfig.webSocketConstructor = ws;
+// Use built-in WebSocket on Node 20+ (Netlify/AWS Lambda)  
+neonConfig.webSocketConstructor = globalThis.WebSocket as typeof WebSocket;
 
 let sql: NeonQueryFunction<false, false> | null = null;
 
