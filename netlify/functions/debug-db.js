@@ -1,6 +1,6 @@
 import { neon, neonConfig } from "@neondatabase/serverless";
 
-neonConfig.webSocketConstructor = globalThis.WebSocket as typeof WebSocket;
+neonConfig.webSocketConstructor = globalThis.WebSocket;
 
 export default async function handler() {
   try {
@@ -17,8 +17,7 @@ export default async function handler() {
   } catch (err) {
     return new Response(JSON.stringify({ 
       error: "Neon connection failed", 
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack?.split("\n").slice(0,5) : undefined
+      message: err instanceof Error ? err.message : String(err)
     }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 }
