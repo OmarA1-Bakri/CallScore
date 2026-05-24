@@ -8,7 +8,7 @@ export default async function handler() {
   console.log(`[cron-weekly] → ${url}`);
   
   const res = await fetch(url, {
-    headers: secret ? { "x-cron-secret": secret } : {},
+    headers: secret ? { "Authorization": `Bearer ${secret}` } : {},
   });
   
   console.log(`[cron-weekly] ← ${res.status} ${res.statusText}`);
