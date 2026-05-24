@@ -1,0 +1,68 @@
+{
+  "workflow_id": "digest_retention_agent",
+  "side_effect_level": "draft_only",
+  "artifact": {
+    "artifact_id": "digest_controlled_launch_week_1",
+    "type": "digest",
+    "status": "draft",
+    "creator_ids": [],
+    "evidence_receipt_ids": [
+      "launch_receipt_1",
+      "launch_receipt_2",
+      "launch_receipt_3",
+      "launch_receipt_4",
+      "launch_receipt_5"
+    ],
+    "claims": [
+      {
+        "claim": "This digest summarizes historical CallScore leaderboard changes from evidence-backed artifacts.",
+        "source_ref": "launch_receipt_1",
+        "confidence": "medium",
+        "risk": "medium"
+      }
+    ],
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "SEND_GATE"
+    ],
+    "payload_hash": "sha256:183c99a5f847ba79f1cf35dc85a127b93aef746c05f3e276786a10a1e6b5e04f"
+  },
+  "body": "Weekly historical leaderboard digest draft. Historical evidence only; not financial guidance. No future-return claims. Methodology and caveats included.",
+  "email_subjects": [
+    "This week in verified creator calls"
+  ],
+  "utm_plan": {
+    "utm_source": "newsletter",
+    "utm_medium": "email",
+    "utm_campaign": "controlled_launch_week_1"
+  },
+  "send_payload_preview": {
+    "actor": "agent",
+    "artifact_id": "digest_controlled_launch_week_1",
+    "workflow_id": "digest_retention_agent",
+    "runtime_id": "callscore-pipeline-runtime",
+    "action_class": "send",
+    "action_type": "send_digest_email",
+    "target": {
+      "audience": "digest_subscribers"
+    },
+    "payload": {
+      "artifact_id": "digest_controlled_launch_week_1",
+      "content_ref": "sha256:183c99a5f847ba79f1cf35dc85a127b93aef746c05f3e276786a10a1e6b5e04f"
+    },
+    "evidence_receipt_ids": [
+      "launch_receipt_1",
+      "launch_receipt_2",
+      "launch_receipt_3",
+      "launch_receipt_4",
+      "launch_receipt_5"
+    ],
+    "required_gates": [
+      "TRUST_GATE",
+      "DATA_POLICY_GATE",
+      "SEND_GATE"
+    ],
+    "methodology_version": "calls-core-v1"
+  }
+}

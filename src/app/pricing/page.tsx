@@ -28,14 +28,14 @@ const FEATURES: readonly FeatureRow[] = [
   { label: "Profiles + call history",                   free: "yes", pro: "yes", alpha: "yes", href: "/" },
   { label: "Alpha breakdowns",                          free: "yes", pro: "yes", alpha: "yes", href: "/methodology" },
   { label: "Methodology",                               free: "yes", pro: "yes", alpha: "yes", href: "/methodology" },
-  { label: "Per-creator email alerts + queue",          free: "no",  pro: "yes", alpha: "yes", href: "/settings/alerts" },
-  { label: "Watchlists with creator management",        free: "no",  pro: "yes", alpha: "yes", href: "/settings/alerts" },
+  { label: "Per-creator email alerts + queue",          free: "no",  pro: "yes", alpha: "yes", href: "/alerts" },
+  { label: "Watchlists with creator management",        free: "no",  pro: "yes", alpha: "yes", href: "/alerts" },
   { label: "Recent-performance filter (30/90d planned)", free: "no", pro: "soon", alpha: "soon" },
   { label: "CSV export of creator call history",        free: "no",  pro: "yes", alpha: "yes", href: "/api/export/calls" },
   { label: "Historical backtest simulator",             free: "no",  pro: "no",  alpha: "yes", href: "/backtest" },
-  { label: "Anti-consensus alerts (Alpha preview)",     free: "no",  pro: "no",  alpha: "soon", href: "/settings/alerts" },
+  { label: "Anti-consensus alerts (Alpha preview)",     free: "no",  pro: "no",  alpha: "soon", href: "/alerts" },
   { label: "API access with key manager",               free: "no",  pro: "no",  alpha: "yes", href: "/settings/api" },
-  { label: "Webhook notifications + delivery log",      free: "no",  pro: "no",  alpha: "yes", href: "/settings/webhooks" },
+  { label: "Webhook notifications + delivery log",      free: "no",  pro: "no",  alpha: "yes", href: "/webhooks" },
 ] as const;
 
 function glyphChar(g: Glyph): string {

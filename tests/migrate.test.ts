@@ -25,6 +25,12 @@ test("migration plan applies schema then numbered migrations in order", () => {
     normalize("migrations/012-video-transcript-status.sql"),
     normalize("migrations/013-llm-gold-examples.sql"),
     normalize("migrations/014-ml-promotion-audit.sql"),
+    normalize("migrations/015-candles-symbol-open-time.sql"),
+    normalize("migrations/016-ml-verifier-missing-evidence.sql"),
+    normalize("migrations/017-pipeline-job-metrics.sql"),
+    normalize("migrations/018-add-pipeline-phase.sql"),
+    normalize("migrations/019-ml-verifier-reason-code-lookup.sql"),
+    normalize("migrations/020-pipeline-job-lease-expiry.sql"),
   ]);
 });
 
@@ -40,5 +46,36 @@ test("SQL splitter ignores standalone comments and keeps statements", () => {
   assert.deepEqual(statements, [
     "CREATE TABLE IF NOT EXISTS example (id SERIAL PRIMARY KEY)",
     "CREATE INDEX IF NOT EXISTS idx_example_id ON example(id)",
+  ]);
+});
+
+test("SQL splitter keeps dollar-quoted blocks intact", () => {
+  const statements = splitSqlStatements(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'example_check') THEN
+        ALTER TABLE example ADD CONSTRAINT example_check CHECK (status IN ('ready', 'failed'));
+      END IF;
+    END $$;
+
+    CREATE INDEX IF NOT EXISTS idx_example_status ON example(status);
+  `);
+
+  assert.equal(statements.length, 2);
+  assert.match(statements[0], /^DO \$\$/);
+  assert.match(statements[0], /ALTER TABLE example ADD CONSTRAINT example_check/);
+  assert.match(statements[0], /END \$\$$/);
+  assert.equal(statements[1], "CREATE INDEX IF NOT EXISTS idx_example_status ON example(status)");
+});
+
+test("SQL splitter does not split semicolons inside quoted strings", () => {
+  const statements = splitSqlStatements(`
+    INSERT INTO example(message) VALUES ('first;second');
+    SELECT "semi;colon" FROM example;
+  `);
+
+  assert.deepEqual(statements, [
+    "INSERT INTO example(message) VALUES ('first;second')",
+    'SELECT "semi;colon" FROM example',
   ]);
 });

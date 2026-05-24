@@ -8,7 +8,6 @@ import {
 interface RankTierBadgeProps {
   readonly rank: number;
   readonly totalCalls: number;
-  readonly wilsonLb: number;
 }
 
 function getTier(rank: number): { label: string; color: string } {
@@ -21,7 +20,7 @@ if (MIN_PUBLIC_LEADERBOARD_CALLS > LOW_N_WARNING_CALLS) {
   throw new Error("MIN_PUBLIC_LEADERBOARD_CALLS must be <= LOW_N_WARNING_CALLS");
 }
 
-export default function RankTierBadge({ rank, totalCalls, wilsonLb }: RankTierBadgeProps) {
+export default function RankTierBadge({ rank, totalCalls }: RankTierBadgeProps) {
   const tier = getTier(rank);
   // Ordering invariant: obsoleteData is the stricter floor, lowData covers the visible low-N band above it.
   const obsoleteData = totalCalls < MIN_PUBLIC_LEADERBOARD_CALLS;
@@ -30,13 +29,13 @@ export default function RankTierBadge({ rank, totalCalls, wilsonLb }: RankTierBa
   return (
     <div className="flex items-center gap-1.5">
       <span
-        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold uppercase border ${tier.color}`}
+        className={`inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-bold uppercase border ${tier.color}`}
       >
         {tier.label}
       </span>
       {obsoleteData && (
         <span
-          className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-ink-100 text-ink-600 border border-ink-300/70"
+          className="inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-medium bg-ink-100 text-ink-600 border border-ink-300/70"
           title={`Only ${totalCalls} scored calls — below the ${MIN_PUBLIC_LEADERBOARD_CALLS}-call leaderboard floor`}
         >
           Obsolete
@@ -44,7 +43,7 @@ export default function RankTierBadge({ rank, totalCalls, wilsonLb }: RankTierBa
       )}
       {lowData && (
         <span
-          className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-accent/10 text-accent border border-accent/20"
+          className="inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-medium bg-accent/10 text-accent border border-accent/20"
           title={`Only ${totalCalls} scored calls — visible but still a low-N sample`}
         >
           Low N

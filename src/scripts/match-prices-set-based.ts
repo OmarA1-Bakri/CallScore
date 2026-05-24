@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import process from "node:process";
 import { query } from "../lib/db";
 import { createLogger } from "../lib/logger";
 import { MATCH_PRICES_ADVISORY_LOCK_ID, withMatchPricesAdvisoryLock } from "./match-prices";
@@ -19,21 +20,14 @@ function loadEnv(): void {
     ? path.join(root, ".env.local")
     : path.join(root, ".env");
   if (!fs.existsSync(envPath)) return;
-  for (const raw of fs.readFileSync(envPath, "utf-8").split("\n")) {
-    const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eqIdx = line.indexOf("=");
-    if (eqIdx < 0) continue;
-    const key = line.slice(0, eqIdx).trim();
-    const value = line.slice(eqIdx + 1).trim();
-    if (!process.env[key]) process.env[key] = value;
-  }
+  process.loadEnvFile?.(envPath);
 }
 
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
-  if (index < 0 || !argv[index + 1]) return null;
-  return argv[index + 1];
+  const next = argv[index + 1];
+  if (index < 0 || next === undefined || next.startsWith("--")) return null;
+  return next;
 }
 
 function positiveInt(value: string | null, fallback: number): number {
@@ -88,7 +82,9 @@ export function buildSetBasedMatchSql(rematchAll: boolean): string {
       btc_30d.close AS btc_price_30d,
       btc_90d.close AS btc_price_90d,
       high_low.max_high,
-      high_low.min_low
+      high_low.min_low,
+      high_low.target_hit_time,
+      high_low.stop_loss_hit_time
     FROM candidates c
     LEFT JOIN LATERAL (
       SELECT close, regime FROM candles
@@ -147,7 +143,17 @@ export function buildSetBasedMatchSql(rematchAll: boolean): string {
       ORDER BY open_time DESC LIMIT 1
     ) btc_90d ON true
     LEFT JOIN LATERAL (
-      SELECT MAX(high) AS max_high, MIN(low) AS min_low
+      SELECT
+        MAX(high) AS max_high,
+        MIN(low) AS min_low,
+        MIN(CASE
+          WHEN c.direction = 'bullish' AND c.target_price IS NOT NULL AND high >= c.target_price THEN open_time
+          WHEN c.direction = 'bearish' AND c.target_price IS NOT NULL AND low <= c.target_price THEN open_time
+        END) AS target_hit_time,
+        MIN(CASE
+          WHEN c.direction = 'bullish' AND c.stop_loss IS NOT NULL AND low <= c.stop_loss THEN open_time
+          WHEN c.direction = 'bearish' AND c.stop_loss IS NOT NULL AND high >= c.stop_loss THEN open_time
+        END) AS stop_loss_hit_time
       FROM candles
       WHERE symbol = c.symbol
         AND c.call_date <= NOW() - INTERVAL '90 days'
@@ -189,8 +195,7 @@ export function buildSetBasedMatchSql(rematchAll: boolean): string {
     END,
     hit_target = CASE
       WHEN computed.target_price IS NULL THEN false
-      WHEN computed.direction = 'bullish' AND computed.max_high IS NOT NULL THEN computed.max_high >= computed.target_price AND NOT (computed.stop_loss IS NOT NULL AND computed.min_low <= computed.stop_loss)
-      WHEN computed.direction = 'bearish' AND computed.min_low IS NOT NULL THEN computed.min_low <= computed.target_price AND NOT (computed.stop_loss IS NOT NULL AND computed.max_high >= computed.stop_loss)
+      WHEN computed.target_hit_time IS NOT NULL THEN computed.stop_loss_hit_time IS NULL OR computed.target_hit_time < computed.stop_loss_hit_time
       ELSE false
     END,
     regime_at_call = computed.regime_at_call,

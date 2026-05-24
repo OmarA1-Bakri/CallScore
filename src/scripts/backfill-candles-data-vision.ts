@@ -101,7 +101,14 @@ export function parseDataVisionCsv(csv: string): readonly CandleCsvRow[] {
       close: Number(columns[4]),
       volume: Number(columns[5]),
     }))
-    .filter((row) => isValidCandleOpenTimeMs(row.open_time) && Number.isFinite(row.close));
+    .filter((row) => (
+      isValidCandleOpenTimeMs(row.open_time)
+      && Number.isFinite(row.open)
+      && Number.isFinite(row.high)
+      && Number.isFinite(row.low)
+      && Number.isFinite(row.close)
+      && Number.isFinite(row.volume)
+    ));
 }
 
 async function downloadZip(url: string, destination: string): Promise<void> {
@@ -112,9 +119,23 @@ async function downloadZip(url: string, destination: string): Promise<void> {
   await writeFile(destination, buffer);
 }
 
+// Requires the system `unzip` command to be installed and available in PATH.
+async function validateDependencies(): Promise<void> {
+  try {
+    await execFileAsync("unzip", ["-h"]);
+  } catch {
+    throw new Error("Required system dependency 'unzip' is not installed or not in PATH");
+  }
+}
+
 async function unzipCsv(zipPath: string): Promise<string> {
-  const { stdout } = await execFileAsync("unzip", ["-p", zipPath], { maxBuffer: 250 * 1024 * 1024 });
-  return String(stdout);
+  try {
+    const { stdout } = await execFileAsync("unzip", ["-p", zipPath], { maxBuffer: 250 * 1024 * 1024 });
+    return String(stdout);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read ${zipPath} with unzip. Ensure 'unzip' is installed and in PATH. ${message}`);
+  }
 }
 
 async function insertCandles(symbol: string, candles: readonly CandleCsvRow[]): Promise<number> {
@@ -145,23 +166,24 @@ export async function runBulkBackfill(args: BulkBackfillArgs): Promise<Record<st
   let files = 0;
   let fetchedCandles = 0;
   let insertedCandles = 0;
+  const jobs = args.symbols.flatMap((symbol) =>
+    enumerateMonths(args.startMonth, args.endMonth, args.maxFilesPerSymbol).map((month) => ({ symbol, month })),
+  );
   try {
-    for (const symbol of args.symbols) {
-      for (const month of enumerateMonths(args.startMonth, args.endMonth, args.maxFilesPerSymbol)) {
-        const url = buildDataVisionMonthlyUrl(symbol, month);
-        files += 1;
-        if (!args.write) {
-          logger.info("bulk_backfill_dry_run_file", { symbol, month, url });
-          continue;
-        }
-        const zipPath = join(tmp, `${symbol}-${month}.zip`);
-        await downloadZip(url, zipPath);
-        const candles = parseDataVisionCsv(await unzipCsv(zipPath));
-        fetchedCandles += candles.length;
-        insertedCandles += await insertCandles(symbol, candles);
-        logger.info("bulk_backfill_file_complete", { symbol, month, candles: candles.length });
-        if (args.gapMs > 0) await sleep(args.gapMs);
+    for (const [index, job] of jobs.entries()) {
+      const url = buildDataVisionMonthlyUrl(job.symbol, job.month);
+      files += 1;
+      if (!args.write) {
+        logger.info("bulk_backfill_dry_run_file", { symbol: job.symbol, month: job.month, url });
+        continue;
       }
+      const zipPath = join(tmp, `${job.symbol}-${job.month}.zip`);
+      await downloadZip(url, zipPath);
+      const candles = parseDataVisionCsv(await unzipCsv(zipPath));
+      fetchedCandles += candles.length;
+      insertedCandles += await insertCandles(job.symbol, candles);
+      logger.info("bulk_backfill_file_complete", { symbol: job.symbol, month: job.month, candles: candles.length });
+      if (args.gapMs > 0 && index < jobs.length - 1) await sleep(args.gapMs);
     }
   } finally {
     await rm(tmp, { recursive: true, force: true });
@@ -171,6 +193,7 @@ export async function runBulkBackfill(args: BulkBackfillArgs): Promise<Record<st
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
+  await validateDependencies();
   const args = parseBulkBackfillArgs(argv);
   const metrics = await runBulkBackfill(args);
   logger.info("bulk_backfill_complete", { ...metrics, write: args.write });

@@ -1,8 +1,11 @@
 import os from "node:os";
+import { retryWithBackoff } from "../lib/pipeline/retry";
 import {
   appendPipelineJobEvent,
+  auditDispatchEvent,
   claimNextPipelineJob,
   completePipelineJob,
+  DEFAULT_PHASE,
   enqueuePipelineJob,
   resetStalePipelineJobs,
   retryOrFailPipelineJob,
@@ -80,6 +83,7 @@ async function enqueueSmokeJob(workerId: string): Promise<void> {
     priority: 1000,
     idempotencyKey: key,
     maxAttempts: 1,
+    phase: DEFAULT_PHASE,
     payload: {
       smoke: true,
       worker_id: workerId,
@@ -101,21 +105,30 @@ async function runSmokeJob(job: PipelineJob): Promise<Record<string, unknown>> {
 }
 
 async function executeJob(job: PipelineJob): Promise<Record<string, unknown>> {
-  if (job.type === "hermes_smoke_test") return runSmokeJob(job);
-  if (job.type === "ml_verifier_batch") return runMlVerifierBatch(job) as Promise<Record<string, unknown>>;
-  if (job.type === "candle_refresh") return runCandleRefreshJob(job);
-  if (job.type === "match_prices_batch") return runMatchPricesJob(job);
-  if (job.type === "compute_scores") return runComputeScoresJob();
-  if (job.type === PROMOTE_ML_VERIFIED_JOB_TYPE) return runMlPromotionJob(job);
-  throw new Error(`Unsupported pipeline job type: ${job.type}`);
+  return retryWithBackoff(
+    async () => {
+      if (job.type === "hermes_smoke_test") return runSmokeJob(job);
+      if (job.type === "ml_verifier_batch") return runMlVerifierBatch(job) as Promise<Record<string, unknown>>;
+      if (job.type === "candle_refresh") return runCandleRefreshJob(job);
+      if (job.type === "match_prices_batch") return runMatchPricesJob(job);
+      if (job.type === "compute_scores") return runComputeScoresJob();
+      if (job.type === PROMOTE_ML_VERIFIED_JOB_TYPE) return runMlPromotionJob(job);
+      throw new Error(`Unsupported pipeline job type: ${job.type}`);
+    },
+    {
+      shouldRetry: (err: Error) => !err.message.startsWith("Unsupported pipeline job type:"),
+    },
+  );
 }
 
 export async function executeJobWithKeepalive(
   job: PipelineJob,
   logger: ReturnType<typeof createLogger>,
 ): Promise<Record<string, unknown>> {
-  await updatePipelineJobHeartbeat(job, { worker_id: job.locked_by, phase: "start" });
+  await updatePipelineJobHeartbeat(job, { worker_id: job.locked_by });
+  await auditDispatchEvent(job, "started");
 
+  const startMs = Date.now();
   const heartbeat = setInterval(() => {
     void updatePipelineJobHeartbeat(job, { worker_id: job.locked_by }).catch((error) => {
       logger.warn("job_heartbeat_failed", {
@@ -128,7 +141,15 @@ export async function executeJobWithKeepalive(
   }, HEARTBEAT_INTERVAL_MS);
 
   try {
-    return await executeJob(job);
+    const result = await executeJob(job);
+    const durationMs = Date.now() - startMs;
+    await auditDispatchEvent(job, "completed", { duration_ms: durationMs });
+    return result;
+  } catch (error) {
+    const durationMs = Date.now() - startMs;
+    const message = error instanceof Error ? error.message : String(error);
+    await auditDispatchEvent(job, "failed", { duration_ms: durationMs, error: message });
+    throw error;
   } finally {
     clearInterval(heartbeat);
   }
@@ -183,6 +204,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       job_id: job.id,
       job_type: job.type,
       run_id: job.run_id,
+      phase: job.phase ?? DEFAULT_PHASE,
       attempt: job.attempts,
       max_attempts: job.max_attempts,
     });
@@ -193,6 +215,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         job_id: job.id,
         job_type: job.type,
         run_id: job.run_id,
+        phase: job.phase ?? DEFAULT_PHASE,
       });
     } catch (error) {
       const result = await retryOrFailPipelineJob(job, error);
@@ -215,6 +238,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         job_id: job.id,
         job_type: job.type,
         run_id: job.run_id,
+        phase: job.phase ?? DEFAULT_PHASE,
         retrying: result.retrying,
         error: message,
       });

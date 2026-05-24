@@ -199,6 +199,7 @@ export default function SettingsShell({
                   return (
                     <div
                       key={item.id}
+                      aria-disabled="true"
                       className={className}
                     >
                       {content}

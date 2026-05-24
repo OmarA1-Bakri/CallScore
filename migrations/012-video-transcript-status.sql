@@ -28,18 +28,36 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conname = 'videos_transcript_failed_requires_error_or_attempt'
+    WHERE conname = 'videos_transcript_failed_requires_error_and_attempt'
   ) THEN
     ALTER TABLE videos
-      ADD CONSTRAINT videos_transcript_failed_requires_error_or_attempt
+      ADD CONSTRAINT videos_transcript_failed_requires_error_and_attempt
       CHECK (
         transcript_status <> 'failed'
         OR (
           transcript_attempts > 0
           AND transcript_last_attempt_at IS NOT NULL
-          AND COALESCE(NULLIF(transcript_error, ''), '') <> ''
+          AND transcript_error IS NOT NULL
+          AND transcript_error <> ''
         )
       );
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'videos_transcript_failed_requires_error_or_attempt'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'videos_transcript_failed_requires_error_and_attempt'
+  ) THEN
+    ALTER TABLE videos
+      RENAME CONSTRAINT videos_transcript_failed_requires_error_or_attempt
+      TO videos_transcript_failed_requires_error_and_attempt;
   END IF;
 END $$;
 

@@ -28,7 +28,7 @@ export interface DiscoveredVideo {
 
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
-  if (index < 0 || !argv[index + 1]) return null;
+  if (index < 0 || argv[index + 1] === undefined) return null;
   return argv[index + 1];
 }
 
@@ -56,13 +56,14 @@ export function parseRssApiDiscoveryArgs(argv = process.argv.slice(2)): Args {
 
 function unescapeXml(value: string): string {
   return value
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, "\"")
+    .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
     .replace(/&#(\d+);/g, (_match, decimal) => String.fromCodePoint(Number(decimal)))
-    .replace(/&#x([0-9A-Fa-f]+);/g, (_match, hex) => String.fromCodePoint(parseInt(hex, 16)));
+    .replace(/&#x([0-9A-Fa-f]+);/g, (_match, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&amp;/g, "&");
 }
 
 function tagText(xml: string, tag: string): string | null {

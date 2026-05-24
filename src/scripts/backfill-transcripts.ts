@@ -230,9 +230,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       if (args.write) {
         await query(
           `UPDATE videos
-           SET transcript = $1, transcript_quality = $2, calls_extracted = false
+           SET transcript = $1, transcript_quality = $2, calls_extracted = false,
+               transcript_status = 'available', transcript_provider = $4, transcript_attempts = transcript_attempts + 1,
+               transcript_last_attempt_at = NOW()
            WHERE id = $3 AND (transcript IS NULL OR length(transcript) = 0)`,
-          [transcript.text, transcript.quality, video.id],
+          [transcript.text, transcript.quality, video.id, transcript.source],
         );
       }
       written++;

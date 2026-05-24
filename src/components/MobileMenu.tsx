@@ -59,14 +59,14 @@ export default function MobileMenu({
             BACKTEST
           </Link>
           <Link
-            href="/settings/alerts"
+            href="/alerts"
             onClick={() => setOpen(false)}
             className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
           >
             ALERTS
           </Link>
           <Link
-            href="/settings/webhooks"
+            href="/webhooks"
             onClick={() => setOpen(false)}
             className="block border-b border-ink-150 py-3 font-mono text-mono-sm uppercase tracking-caps text-ink-600 transition-colors hover:text-ink-900"
           >

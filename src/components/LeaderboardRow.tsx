@@ -80,7 +80,6 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
         <RankTierBadge
           rank={row.rank}
           totalCalls={row.stats.total_calls}
-          wilsonLb={row.stats.wilson_lb}
         />
       </td>
       {/* Last call — most recent scored symbol */}

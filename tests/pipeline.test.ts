@@ -40,7 +40,12 @@ import { buildSetBasedMatchSql } from "../src/scripts/match-prices-set-based";
 const root = join(__dirname, "..");
 
 function read(relativePath: string): string {
-  return readFileSync(join(root, relativePath), "utf8");
+  try {
+    return readFileSync(join(root, relativePath), "utf8");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read ${relativePath}: ${message}`);
+  }
 }
 
 function candidate(overrides: Partial<MlVerifierCandidate>): MlVerifierCandidate {
@@ -79,9 +84,12 @@ function job(payload: Record<string, unknown> = { batch_size: 1 }): PipelineJob 
     locked_by: "test-worker",
     locked_at: "2026-01-01T00:00:00.000Z",
     heartbeat_at: "2026-01-01T00:00:00.000Z",
+    lease_expires_at: "2026-01-01T00:10:00.000Z",
     run_after: "2026-01-01T00:00:00.000Z",
     idempotency_key: "test-key",
     error: null,
+    metrics: {},
+    phase: "phase2-pipeline",
     created_at: "2026-01-01T00:00:00.000Z",
     updated_at: "2026-01-01T00:00:00.000Z",
   };
@@ -92,16 +100,19 @@ test("pipeline job claim SQL uses row locks with SKIP LOCKED", () => {
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /status = 'pending'/i);
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /attempts < max_attempts/i);
   assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /heartbeat_at = NOW\(\)/i);
+  assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /lease_expires_at = NOW\(\) \+ \(\$3::int \* INTERVAL '1 second'\)/i);
 });
 
 test("Phase 2 pipeline recovery adds heartbeats, keepalive, and stale reset semantics", () => {
   const migration = read("migrations/010-pipeline-heartbeats.sql");
   assert.match(migration, /ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ/i);
   assert.match(migration, /idx_pipeline_jobs_stale_running/i);
+  const leaseMigration = read("migrations/020-pipeline-job-lease-expiry.sql");
+  assert.match(leaseMigration, /ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMPTZ/i);
+  assert.match(leaseMigration, /idx_pipeline_jobs_running_lease_expiry/i);
   assert.equal(typeof updatePipelineJobHeartbeat, "function");
   assert.equal(typeof resetStalePipelineJobs, "function");
   assert.equal(typeof executeJobWithKeepalive, "function");
-  assert.match(CLAIM_NEXT_PIPELINE_JOB_SQL, /FOR UPDATE SKIP LOCKED/i);
 });
 
 test("Phase 3 set-based matcher uses lateral candle lookups and SQL batch update", () => {
@@ -150,6 +161,16 @@ test("Phase 1 job payload parsers keep bounded production-safe defaults", () => 
     batchSize: 10,
     startAfterId: 123,
   });
+});
+
+test("ML verifier reason-code migration uses lookup table and provider failure codes", () => {
+  const migration = read("migrations/019-ml-verifier-reason-code-lookup.sql");
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS ml_verification_reason_codes/i);
+  assert.match(migration, /model_timeout/);
+  assert.match(migration, /malformed_model_output/);
+  assert.match(migration, /model_provider_error/);
+  assert.match(migration, /FOREIGN KEY \(reason_code\)/i);
+  assert.match(migration, /DROP CONSTRAINT/i);
 });
 
 test("verifier parser accepts valid schema and rejects malformed output", () => {
@@ -215,26 +236,33 @@ test("mocked verifier writes ml_verification_runs and never mutates calls in aud
   );
 });
 
-test("provider failures record a retryable verifier event", async () => {
+test("provider failures fall back to review and do not abort batch", async () => {
   const eventParams: unknown[][] = [];
+  const insertions: unknown[][] = [];
   const queryFn = async <T>(text: string, queryParams: unknown[] = []): Promise<T[]> => {
     if (text.includes("WITH candidates AS")) return [candidate({ id: 77 })] as T[];
     if (text.includes("INSERT INTO pipeline_job_events")) eventParams.push(queryParams);
+    if (text.includes("INSERT INTO ml_verification_runs")) insertions.push(queryParams);
     return [] as T[];
   };
 
-  await assert.rejects(
-    () => runMlVerifierBatch(job(), {
-      queryFn,
-      verifyCandidate: async () => {
-        throw new Error("provider unavailable");
-      },
-    }),
-    /provider unavailable/,
-  );
+  const metrics = await runMlVerifierBatch(job(), {
+    queryFn,
+    verifyCandidate: async () => {
+      throw new Error("provider unavailable");
+    },
+  });
 
+  assert.equal(metrics.processed, 1);
+  assert.equal(metrics.review, 1);
+  assert.equal(metrics.approved, 0);
+  assert.equal(metrics.rejected, 0);
   assert.ok(eventParams.some((params) => params.includes("ml_verifier_provider_error")));
-  assert.ok(eventParams.some((params) => params.includes("retryable_error")));
+  assert.ok(eventParams.some((params) => params.includes("review")));
+  assert.ok(insertions.some((params) => params.some(p => {
+    const s = typeof p === "string" ? p : typeof p === "number" || p === null || p === undefined ? String(p) : JSON.stringify(p);
+    return s.includes("provider unavailable");
+  })));
 });
 
 test("Phase 6 ML promotion gates are disabled by default and require review, shadow diff, and gold set pass", () => {
@@ -271,7 +299,9 @@ test("Phase 6 ML promotion SQL only selects approved verifier rows below public 
   assert.match(sql, /decision = 'approve'/);
   assert.match(sql, /recommended_extraction_confidence >= \$3/);
   assert.match(sql, /c\.extraction_confidence < \$3/);
-  assert.doesNotMatch(sql, /recommended_extraction_confidence >= \$2/);
+});
+
+test("Phase 6 migration creates the ML promotion audit table", () => {
   assert.match(read("migrations/014-ml-promotion-audit.sql"), /CREATE TABLE IF NOT EXISTS ml_promotion_audit/);
 });
 

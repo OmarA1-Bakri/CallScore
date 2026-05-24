@@ -14,6 +14,19 @@ CREATE TABLE IF NOT EXISTS llm_gold_examples (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'llm_gold_examples_expected_calls_is_array'
+  ) THEN
+    ALTER TABLE llm_gold_examples
+      ADD CONSTRAINT llm_gold_examples_expected_calls_is_array
+      CHECK (jsonb_typeof(expected_calls) = 'array');
+  END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION update_llm_gold_examples_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -31,3 +44,6 @@ EXECUTE FUNCTION update_llm_gold_examples_updated_at();
 
 CREATE INDEX IF NOT EXISTS idx_llm_gold_examples_split
   ON llm_gold_examples(split, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_llm_gold_examples_video_id
+  ON llm_gold_examples(video_id);

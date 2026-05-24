@@ -35,3 +35,9 @@ home-*-alpha-nav.png
 
 # Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+.env*.local
+.kilo/kilo.jsonc
+.kilo/kilo.json
+.env.prod.pull*
+.1env.prod.pulled*
+.env.production

@@ -394,21 +394,40 @@ export async function runMlPromotionJob(
     throw new Error(message);
   }
 
-  const promotedCallIds = await promoteCandidates({ args, candidates, queryFn });
-  await updateAudit({ auditId, status: "succeeded", promotedCallIds, queryFn });
-  await writePromotionEvent(
-    job,
-    "ml_promotion_completed",
-    "succeeded",
-    "ML promotion completed",
-    {
-      ...baseMetrics,
-      promoted: promotedCallIds.length,
-      audit_id: auditId,
-      promoted_call_ids: promotedCallIds,
-    },
-    queryFn,
-  );
+  try {
+    const promotedCallIds = await promoteCandidates({ args, candidates, queryFn });
+    await updateAudit({ auditId, status: "succeeded", promotedCallIds, queryFn });
+    await writePromotionEvent(
+      job,
+      "ml_promotion_completed",
+      "succeeded",
+      "ML promotion completed",
+      {
+        ...baseMetrics,
+        promoted: promotedCallIds.length,
+        audit_id: auditId,
+        promoted_call_ids: promotedCallIds,
+      },
+      queryFn,
+    );
 
-  return { ...baseMetrics, promoted: promotedCallIds.length };
+    return { ...baseMetrics, promoted: promotedCallIds.length };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await updateAudit({ auditId, status: "failed", error: message, queryFn });
+    await writePromotionEvent(
+      job,
+      "ml_promotion_completed",
+      "failed",
+      "ML promotion failed",
+      {
+        ...baseMetrics,
+        promoted: 0,
+        audit_id: auditId,
+        error: message,
+      },
+      queryFn,
+    );
+    throw error;
+  }
 }

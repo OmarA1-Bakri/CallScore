@@ -102,6 +102,25 @@ export const callRowSchema = z.object({
   created_at: dbTimestampSchema,
 }).passthrough() satisfies z.ZodType<Call>;
 
+export const consensusSignalRowSchema = z.object({
+  id: numberFromDb,
+  symbol: z.string(),
+  direction: z.enum(["bullish", "bearish"]).nullable(),
+  creator_count: numberFromDb,
+  creator_ids: z.array(numberFromDb),
+  call_ids: z.array(numberFromDb),
+  signal_date: dbTimestampSchema,
+  avg_target_price: nullableNumber,
+  price_at_signal: nullableNumber,
+  price_7d: nullableNumber,
+  price_30d: nullableNumber,
+  return_7d: nullableNumber,
+  return_30d: nullableNumber,
+  correct: z.boolean().nullable(),
+  quality_score: nullableNumber,
+  created_at: optionalNullableTimestamp,
+}).passthrough();
+
 export const leaderboardQueryRowSchema = creatorStatsRowSchema.extend({
   name: z.string(),
   youtube_handle: z.string(),

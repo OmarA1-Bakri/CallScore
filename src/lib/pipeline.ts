@@ -1,6 +1,19 @@
 import { throwIfCronDeadlineExceeded } from "@/app/api/cron/deadline";
 import { TRACKED_SYMBOLS } from "./constants";
 import { query } from "./db";
+import { createHash } from "node:crypto";
+
+export const RALPLAN_PHASES = [
+  "phase1-stabilize",
+  "phase2-pipeline",
+  "phase3-whop-scaffold",
+  "phase4-commerce",
+  "phase5-marketing",
+] as const;
+
+export type RalplanPhase = (typeof RALPLAN_PHASES)[number];
+
+export const DEFAULT_PHASE: RalplanPhase = "phase2-pipeline";
 
 export type PipelineRunStatus =
   | "queued"
@@ -40,9 +53,12 @@ export interface PipelineJob {
   readonly locked_by: string | null;
   readonly locked_at: string | null;
   readonly heartbeat_at: string | null;
+  readonly lease_expires_at: string | null;
   readonly run_after: string;
   readonly idempotency_key: string | null;
   readonly error: string | null;
+  readonly metrics: Record<string, unknown>;
+  readonly phase: string | null;
   readonly created_at: string;
   readonly updated_at: string;
 }
@@ -79,6 +95,7 @@ interface EnqueueJobInput {
   readonly priority?: number;
   readonly idempotencyKey: string;
   readonly maxAttempts?: number;
+  readonly phase?: string;
   readonly signal?: AbortSignal;
 }
 
@@ -99,6 +116,7 @@ const DEFAULT_ML_BATCH_SIZE = 250;
 const DEFAULT_MATCH_PRICES_LIMIT = 1000;
 const DEFAULT_MATCH_PRICES_BATCH_SIZE = 200;
 const DEFAULT_STUCK_JOB_SECONDS = 30 * 60;
+export const DEFAULT_PIPELINE_JOB_LEASE_SECONDS = 10 * 60;
 const FRESH_CANDLE_SECONDS = 2 * 60 * 60;
 const CANDLE_FRESHNESS_SYMBOLS = Array.from(new Set([...TRACKED_SYMBOLS, "XLMUSDT"]));
 
@@ -120,7 +138,7 @@ function readPayload(value: unknown): Record<string, unknown> {
 }
 
 function normalizeJob(row: PipelineJob): PipelineJob {
-  return { ...row, payload: readPayload(row.payload) };
+  return { ...row, payload: readPayload(row.payload), metrics: readPayload(row.metrics) };
 }
 
 function normalizeRun(row: PipelineRun): PipelineRun {
@@ -174,9 +192,9 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
   throwIfCronDeadlineExceeded(input.signal);
   const [job] = await query<PipelineJob>(
     `INSERT INTO pipeline_jobs (
-       run_id, type, status, priority, payload, max_attempts, idempotency_key, updated_at
+       run_id, type, status, priority, payload, max_attempts, idempotency_key, phase, updated_at
      )
-     VALUES ($1, $2, 'pending', $3, $4::jsonb, $5, $6, NOW())
+     VALUES ($1, $2, 'pending', $3, $4::jsonb, $5, $6, $7, NOW())
      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO UPDATE
        SET updated_at = NOW()
      RETURNING *`,
@@ -187,6 +205,7 @@ export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
       asJsonbParam(input.payload),
       input.maxAttempts ?? 3,
       input.idempotencyKey,
+      input.phase ?? DEFAULT_PHASE,
     ],
   );
 
@@ -303,6 +322,7 @@ SET
   locked_by = $1,
   locked_at = NOW(),
   heartbeat_at = NOW(),
+  lease_expires_at = NOW() + ($3::int * INTERVAL '1 second'),
   attempts = attempts + 1,
   updated_at = NOW()
 WHERE id = (
@@ -325,9 +345,10 @@ export async function updatePipelineJobHeartbeat(
   await query(
     `UPDATE pipeline_jobs
      SET heartbeat_at = NOW(),
+         lease_expires_at = NOW() + ($2::int * INTERVAL '1 second'),
          updated_at = NOW()
      WHERE id = $1`,
-    [job.id],
+    [job.id, DEFAULT_PIPELINE_JOB_LEASE_SECONDS],
   );
 
   await appendPipelineJobEvent({
@@ -351,6 +372,7 @@ export async function resetStalePipelineJobs(input: {
          locked_by = NULL,
          locked_at = NULL,
          heartbeat_at = NULL,
+         lease_expires_at = NULL,
          run_after = NOW(),
          updated_at = NOW()
      WHERE id IN (
@@ -358,8 +380,9 @@ export async function resetStalePipelineJobs(input: {
        FROM pipeline_jobs
        WHERE status = 'running'
          AND (
-           (heartbeat_at IS NOT NULL AND heartbeat_at < NOW() - ($1::int * INTERVAL '1 second'))
-           OR (heartbeat_at IS NULL AND locked_at IS NOT NULL AND locked_at < NOW() - ($1::int * INTERVAL '1 second'))
+           (lease_expires_at IS NOT NULL AND lease_expires_at < NOW())
+           OR (lease_expires_at IS NULL AND heartbeat_at IS NOT NULL AND heartbeat_at < NOW() - ($1::int * INTERVAL '1 second'))
+           OR (lease_expires_at IS NULL AND heartbeat_at IS NULL AND locked_at IS NOT NULL AND locked_at < NOW() - ($1::int * INTERVAL '1 second'))
          )
        FOR UPDATE SKIP LOCKED
      )
@@ -388,7 +411,7 @@ export async function claimNextPipelineJob(input: ClaimNextJobInput): Promise<Pi
   if (input.types.length === 0) return null;
   const [job] = await query<PipelineJob>(
     CLAIM_NEXT_PIPELINE_JOB_SQL,
-    [input.workerId, input.types],
+    [input.workerId, input.types, DEFAULT_PIPELINE_JOB_LEASE_SECONDS],
   );
   if (!job) return null;
 
@@ -440,6 +463,48 @@ export async function appendPipelineJobEvent(input: {
   return normalizeEvent(event);
 }
 
+function hashPayload(payload: Record<string, unknown>): string {
+  const normalized = JSON.stringify(payload, Object.keys(payload).sort());
+  return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
+}
+
+export type DispatchAuditEvent = "started" | "completed" | "failed";
+
+export interface DispatchAuditMeta {
+  readonly input_hash: string;
+  readonly duration_ms?: number;
+  readonly error?: string;
+}
+
+export async function auditDispatchEvent(
+  job: Pick<PipelineJob, "id" | "run_id" | "payload">,
+  event: DispatchAuditEvent,
+  meta: Record<string, unknown> = {},
+): Promise<void> {
+  const auditPayload: Record<string, unknown> = { event, ...meta };
+
+  if (event === "started") {
+    auditPayload.input_hash = hashPayload(job.payload);
+  }
+
+  await query(
+    `UPDATE pipeline_jobs
+     SET metrics = COALESCE(metrics, '{}'::jsonb) || $2::jsonb,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [job.id, asJsonbParam(auditPayload)],
+  );
+
+  await appendPipelineJobEvent({
+    runId: job.run_id,
+    jobId: job.id,
+    eventType: `dispatch_${event}`,
+    status: event === "failed" ? "failed" : event === "completed" ? "succeeded" : "running",
+    message: `Dispatch ${event}`,
+    payload: auditPayload,
+  });
+}
+
 export async function completePipelineJob(
   job: Pick<PipelineJob, "id" | "run_id">,
   metrics: Record<string, unknown> = {},
@@ -449,6 +514,8 @@ export async function completePipelineJob(
      SET status = 'succeeded',
          locked_by = NULL,
          locked_at = NULL,
+         heartbeat_at = NULL,
+         lease_expires_at = NULL,
          error = NULL,
          updated_at = NOW()
      WHERE id = $1`,
@@ -488,6 +555,8 @@ export async function retryOrFailPipelineJob(
      SET status = $2,
          locked_by = NULL,
          locked_at = NULL,
+         heartbeat_at = NULL,
+         lease_expires_at = NULL,
          error = $3,
          run_after = CASE
            WHEN $2 = 'pending' THEN NOW() + ($4::int * INTERVAL '1 second')
@@ -586,8 +655,10 @@ export async function getPipelineStatusSnapshot(limit = 20): Promise<PipelineSta
               EXTRACT(EPOCH FROM (NOW() - locked_at))::int AS stuck_seconds
        FROM pipeline_jobs
        WHERE status = 'running'
-         AND locked_at IS NOT NULL
-         AND locked_at <= NOW() - ($1::int * INTERVAL '1 second')
+         AND (
+           (lease_expires_at IS NOT NULL AND lease_expires_at < NOW())
+           OR (lease_expires_at IS NULL AND locked_at IS NOT NULL AND locked_at <= NOW() - ($1::int * INTERVAL '1 second'))
+         )
        ORDER BY locked_at ASC
        LIMIT $2`,
       [DEFAULT_STUCK_JOB_SECONDS, safeLimit],
