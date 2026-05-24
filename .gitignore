@@ -40,3 +40,4 @@ home-*-alpha-nav.png
 .kilo/kilo.json
 .env.prod.pull*
 .1env.prod.pulled*
+.env.production
