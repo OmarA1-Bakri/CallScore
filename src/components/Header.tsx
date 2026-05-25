@@ -19,7 +19,7 @@ export default async function Header(): Promise<ReactElement> {
             className="flex items-center gap-2.5 group"
             aria-label="CallScore home"
           >
-            <CallScoreBrand />
+            <CallScoreBrand className="h-[56px] w-[138px]" />
           </Link>
 
           {/* Desktop nav */}

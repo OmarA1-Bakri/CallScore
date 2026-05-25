@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import Link from "next/link";
 import Leaderboard from "@/components/Leaderboard";
-import CallScoreBrand from "@/components/CallScoreBrand";
 import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
@@ -326,9 +325,6 @@ export default async function HomePage({
         />
         <div className="relative grid grid-cols-1 desk:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-10 desk:gap-14 items-center pt-10 tab:pt-14 desk:pt-8">
           <div className="desk:pt-6">
-            <div className="mb-6">
-              <CallScoreBrand showTagline className="h-[120px] w-[296px] tab:h-[140px] tab:w-[346px]" />
-            </div>
             <p
               className="inline-flex items-center gap-2 border border-accent/30 bg-accent/5 px-3 py-2 font-mono text-[12px] text-accent tracking-caps uppercase mb-6"
               style={{ borderRadius: 2 }}
