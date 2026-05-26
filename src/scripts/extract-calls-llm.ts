@@ -147,11 +147,14 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
     chunkOverlap: positiveInt(argValue(argv, "--chunk-overlap"), DEFAULT_CHUNK_OVERLAP),
     maxChunks: positiveInt(argValue(argv, "--max-chunks"), DEFAULT_MAX_CHUNKS),
   });
+  const providerWasExplicit = argValue(argv, "--provider") != null;
   const ollamaHost = argValue(argv, "--ollama-host") ?? process.env.OLLAMA_HOST ?? DEFAULT_OLLAMA_HOST;
   const normalizedOllamaHost = ollamaHost.replace(/\/+$/, "");
-  const defaultOllamaModel = normalizedOllamaHost === DEFAULT_OLLAMA_HOST
-    ? DEFAULT_OLLAMA_CLOUD_MODEL
-    : DEFAULT_OLLAMA_LOCAL_CLOUD_MODEL;
+  const defaultOllamaModel = !providerWasExplicit
+    ? DEFAULT_MODEL
+    : normalizedOllamaHost === DEFAULT_OLLAMA_HOST
+      ? DEFAULT_OLLAMA_CLOUD_MODEL
+      : DEFAULT_OLLAMA_LOCAL_CLOUD_MODEL;
   const defaultRequestTimeoutMs = DEFAULT_OLLAMA_TIMEOUT_MS;
   return {
     creatorHandle: argValue(argv, "--creator"),
