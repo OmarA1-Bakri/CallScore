@@ -77,7 +77,7 @@ Before production repair/restart, the run captured:
 ## Go-forward rules
 
 - Treat `/opt/crypto-tuber-ranked` on HH as the runtime truth until a newer reviewed source commit is promoted.
-- Keep WSL backups secret-safe: exclude `.env*`, `node_modules/`, `.next/`, `.tmp/`, and `.vercel/`.
+- Keep WSL backups secret-safe: exclude private env files (`.env`, `.env.local`, `.env.hermes`, `.env.production*`) plus `node_modules/`, `.next/`, `.tmp/`, and `.vercel/`; keep tracked templates such as `.env.hermes.example`.
 - Do not run schema repair without a fresh schema dump and command-log entry.
 - Do not restart the worker without a Docker rollback tag or explicit rollback note.
 - Do not mark a phase complete unless WSL tests/type/lint/build and HH smoke evidence are fresh for that phase.
