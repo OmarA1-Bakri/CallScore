@@ -5,8 +5,9 @@ import type { PipelineJob } from "./pipeline";
 
 export const ML_VERIFIER_PROMPT_VERSION = "ml-verifier-v1";
 export const DEFAULT_ML_VERIFIER_PROVIDER = "ollama";
-export const DEFAULT_ML_VERIFIER_MODEL = "kimi-k2.6";
-export const DEFAULT_OLLAMA_HOST = "https://ollama.com";
+export const DEFAULT_ML_VERIFIER_MODEL = "qwen2.5:3b";
+export const DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434";
+export const OLLAMA_CLOUD_HOST = "https://ollama.com";
 export const DEFAULT_ML_VERIFIER_TIMEOUT_MS = 180_000;
 export const DEFAULT_ML_VERIFIER_ATTEMPT_TIMEOUTS_MS = [90_000, 120_000, 180_000] as const;
 export const DEFAULT_ML_VERIFIER_BATCH_SIZE = 50;
@@ -541,7 +542,7 @@ function getOllamaApiKey(env = process.env): string | undefined {
 
 function buildOllamaHeaders(host: string, apiKey = getOllamaApiKey()): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (host.replace(/\/+$/, "") === DEFAULT_OLLAMA_HOST && apiKey) {
+  if (host.replace(/\/+$/, "") === OLLAMA_CLOUD_HOST && apiKey) {
     headers.Authorization = `Bearer ${apiKey}`;
   }
   return headers;
@@ -619,7 +620,7 @@ export async function verifyCandidateWithOllama(
   candidate: MlVerifierCandidate,
   config: MlVerifierConfig,
 ): Promise<ParsedVerifierOutput> {
-  if (config.ollamaHost === DEFAULT_OLLAMA_HOST && !getOllamaApiKey()) {
+  if (config.ollamaHost === OLLAMA_CLOUD_HOST && !getOllamaApiKey()) {
     throw new Error("OLLAMA_API_KEY or OLLAMA_TOKEN not configured for Ollama Cloud");
   }
 
