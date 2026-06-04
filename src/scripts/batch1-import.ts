@@ -1,3 +1,5 @@
+export {};
+
 const { getDb } = require('../lib/db');
 const sql = getDb();
 
@@ -43,13 +45,14 @@ const newChannels = [
       `;
       inserted++;
       console.log('✓', ch.name, '|', ch.subscribers.toLocaleString());
-    } catch(e) {
-      if (e.message.includes('conflict') || e.message.includes('duplicate')) {
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('conflict') || message.includes('duplicate')) {
         skipped++;
         console.log('⚠', ch.name, '| ALREADY EXISTS');
       } else {
         failed++;
-        console.log('✗', ch.name, '|', e.message);
+        console.log('✗', ch.name, '|', message);
       }
     }
   }

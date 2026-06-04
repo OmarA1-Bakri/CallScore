@@ -57,6 +57,7 @@
     "@sentry/node": "^10.51.0",
     "@whop/sdk": "^0.0.38",
     "date-fns": "^4.1.0",
+    "dotenv": "^17.3.1",
     "googleapis": "^171.4.0",
     "lucide-react": "^1.14.0",
     "next": "^15.5.15",

@@ -1,3 +1,5 @@
+export {};
+
 const { getDb } = require('../lib/db');
 
 const NEW = [
@@ -46,8 +48,9 @@ async function run() {
         ON CONFLICT (youtube_channel_id) DO NOTHING`;
       inserted++;
       console.log(`+ ${c.name} (${c.subs.toLocaleString()})`);
-    } catch (err) {
-      console.log(`✗ ${c.name}: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.log(`✗ ${c.name}: ${message}`);
       skipped++;
     }
   }
