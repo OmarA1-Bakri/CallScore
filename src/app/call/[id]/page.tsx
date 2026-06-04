@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import CallDetailUpgradeCta from "@/components/commercial/CallDetailUpgradeCta";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { query } from "@/lib/db";
@@ -312,6 +313,15 @@ export default async function CallDetailPage({ params }: PageProps) {
           </div>
         )}
       </EditorialSection>
+
+      <CallDetailUpgradeCta
+        offerTier="Pro Monthly"
+        headline="Turn crypto calls into a repeatable edge."
+        subheadline="Upgrade when you want faster signal review, cleaner creator comparisons, and a stronger daily decision loop."
+        buttonCopy="Review Pro upgrade"
+        href="/pricing"
+        killSwitchActive
+      />
 
       {/* 03 — source clip
           Always render the section to preserve index numbering across calls
