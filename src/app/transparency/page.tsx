@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/transparency" },
 };
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 interface BlockedCreator {
   name: string;
