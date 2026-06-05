@@ -80,7 +80,7 @@ export class BacktestValidationError extends Error {
 
 // Injectable dependencies for the backtest engine. Tests substitute
 // fakes for all three loaders; production wiring goes through
-// `liveBacktestDeps` which queries Neon directly.
+// `liveBacktestDeps` which queries the primary Postgres connection directly.
 export interface BacktestDeps {
   readonly loadCreator: (creatorId: number) => Promise<Creator | null>;
   readonly loadCalls: (

@@ -6,11 +6,11 @@ neonConfig.webSocketConstructor = globalThis.WebSocket as typeof WebSocket;
 let sql: NeonQueryFunction<false, false> | null = null;
 
 export const DATABASE_URL_ENV_KEYS = [
-  "NEON_DATABASE_URL",
   "DATABASE_URL",
   "POSTGRES_URL",
   "POSTGRES_URL_NON_POOLING",
   "POSTGRES_PRISMA_URL",
+  "NEON_DATABASE_URL",
 ] as const;
 
 type DatabaseEnv = Record<string, string | undefined>;

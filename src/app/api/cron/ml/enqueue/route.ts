@@ -76,7 +76,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   return enqueue(request);
 }
 
-// Vercel Cron invokes route handlers with GET, while manual/debug callers may
+// Netlify scheduled functions invoke route handlers with GET, while manual/debug callers may
 // use the POST contract documented in the pipeline plan. Keep both paths wired
 // to the same protected enqueue operation.
 export async function GET(request: NextRequest): Promise<NextResponse> {

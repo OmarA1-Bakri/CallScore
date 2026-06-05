@@ -160,6 +160,8 @@ test("Phase 1 job payload parsers keep bounded production-safe defaults", () => 
     limit: 50,
     batchSize: 10,
     startAfterId: 123,
+    fetchBinance: false,
+    binanceToleranceMinutes: 30,
   });
 });
 
@@ -383,7 +385,7 @@ test("Phase 6 write promotion preserves the public confidence threshold floor", 
   assert.ok(statements.some((statement) => /recommended_extraction_confidence >= \$4/i.test(statement)));
 });
 
-test("Vercel ML enqueue endpoint rejects missing or invalid CRON_SECRET before DB work", async () => {
+test("Netlify ML enqueue endpoint rejects missing or invalid CRON_SECRET before DB work", async () => {
   const previous = process.env.CRON_SECRET;
   process.env.CRON_SECRET = "cron-secret";
 

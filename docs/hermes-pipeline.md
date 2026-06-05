@@ -1,10 +1,10 @@
-# Vercel → Neon → Hermes ML pipeline
+# Netlify → HH pgsql → Hermes ML pipeline
 
-Vercel only schedules and observes. Neon stores durable runs/jobs/events and ML audit state. Hermes/Hetzner runs the long-lived Docker worker that claims Neon jobs with `FOR UPDATE SKIP LOCKED`.
+Netlify is the canonical app host and scheduler. HH VM PostgreSQL/pgsql is the canonical primary database for durable runs/jobs/events and ML audit state. Neon remains backup/legacy compatibility only. Hermes/Hetzner runs the long-lived Docker worker that claims pgsql jobs with `FOR UPDATE SKIP LOCKED`.
 
 ## Deploy on Hermes
 
-1. Copy `.env.hermes.example` to `.env.hermes` on the server and fill in Neon/Ollama secrets.
+1. Copy `.env.hermes.example` to `.env.hermes` on the server and fill in pgsql/Ollama secrets.
 2. Run migrations from a trusted environment:
    ```bash
    npm run db:migrate
@@ -30,7 +30,7 @@ Dry-run enqueues a `hermes_smoke_test` job, claims it, writes job events, and ex
 Worker stdout/stderr is JSONL structured logging with `event`, `worker_id`,
 `job_id`, and `run_id` fields so production logs can be filtered by run.
 
-## Vercel endpoints
+## Netlify/Next endpoints
 
 - `GET|POST /api/cron/ml/enqueue` requires `Authorization: Bearer $CRON_SECRET` and queues one idempotent nightly `ml_verifier_batch` job.
 - `GET /api/pipeline/status` requires `Authorization: Bearer $PIPELINE_STATUS_SECRET` (or `$CRON_SECRET`) and returns recent runs/jobs/events.
