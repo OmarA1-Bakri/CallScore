@@ -75,6 +75,8 @@ export function matchPricesArgsFromPayload(payload: Record<string, unknown>): Ma
     limit: positiveInt(payload.limit, 1000),
     batchSize: positiveInt(payload.batch_size, 200),
     startAfterId: nonNegativeInt(payload.start_after_id, 0),
+    fetchBinance: booleanValue(payload.fetch_binance, false),
+    binanceToleranceMinutes: positiveInt(payload.binance_tolerance_minutes, 30),
   };
 }
 

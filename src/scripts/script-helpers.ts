@@ -83,6 +83,58 @@ export function timestamp(): string {
   return new Date().toISOString();
 }
 
+export async function runWithConcurrency<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+  shouldStop: (result: R) => boolean = () => false,
+): Promise<readonly R[]> {
+  const limit = Math.max(1, Math.floor(concurrency) || 1);
+  const results: R[] = [];
+  let active = 0;
+  let nextIndex = 0;
+  let stopped = false;
+
+  return await new Promise<readonly R[]>((resolve, reject) => {
+    const launch = () => {
+      if ((stopped || nextIndex >= items.length) && active === 0) {
+        resolve(results.filter((_, index) => index in results));
+        return;
+      }
+
+      while (!stopped && active < limit && nextIndex < items.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        active += 1;
+
+        const item = items[index];
+        if (item === undefined) {
+          active -= 1;
+          launch();
+          continue;
+        }
+
+        worker(item, index)
+          .then((result) => {
+            results[index] = result;
+            if (shouldStop(result)) stopped = true;
+          })
+          .then(
+            () => {
+              active -= 1;
+              launch();
+            },
+            (error: unknown) => {
+              reject(error);
+            },
+          );
+      }
+    };
+
+    launch();
+  });
+}
+
 export function buildReplaceStoredCallsStatements({
   creatorId,
   videoId,

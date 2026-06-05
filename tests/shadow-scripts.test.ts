@@ -121,6 +121,7 @@ test("shadow promotion requires explicit run and status guardrails", () => {
   assert.equal(args.allowStatuses.has("new_calls"), true);
   assert.equal(args.allowStatuses.has("changed_calls"), true);
   assert.equal(args.allowStatuses.has("manual_review"), false);
+  assert.equal(args.videoIds.size, 0);
   assert.throws(
     () =>
       parsePromoteShadowArgs([
@@ -135,6 +136,37 @@ test("shadow promotion requires explicit run and status guardrails", () => {
       ]),
     /Unsupported or unsafe promotion status: manual_review/,
   );
+});
+
+test("shadow promotion write mode requires reviewed video IDs", async () => {
+  await assert.rejects(
+    () =>
+      promoteShadowMain([
+        "--shadow-in",
+        "s.jsonl",
+        "--diff-in",
+        "d.jsonl",
+        "--confirm-run-id",
+        "shadow-test",
+        "--allow-statuses",
+        "changed_calls",
+        "--write",
+      ]),
+    /--write requires explicit --video-ids for reviewed promotion/,
+  );
+
+  const args = parsePromoteShadowArgs([
+    "--shadow-in",
+    "s.jsonl",
+    "--diff-in",
+    "d.jsonl",
+    "--confirm-run-id",
+    "shadow-test",
+    "--reviewed-video-ids",
+    "101,102,not-a-number,101",
+  ]);
+
+  assert.deepEqual(Array.from(args.videoIds), [101, 102]);
 });
 
 test("shadow promotion derives a structured audit output path by default", () => {
@@ -227,6 +259,115 @@ test("shadow promotion emits structured dry-run audit rows before any write", as
   assert.equal(rows[0].phase, "dry_run");
   assert.equal(rows[0].action, "promote");
   assert.equal(rows[0].video.id, 101);
+});
+
+test("shadow promotion only promotes reviewed video IDs when an allowlist is present", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "shadow-promote-reviewed-"));
+  const shadowIn = join(dir, "shadow.jsonl");
+  const diffIn = join(dir, "diff.jsonl");
+  const auditOut = join(dir, "promote.jsonl");
+  const video101 = {
+    id: 101,
+    creator_id: 7,
+    creator_name: "Creator",
+    youtube_handle: "@Creator",
+    youtube_video_id: "yt101",
+    title: "BTC update",
+    published_at: "2026-01-01T00:00:00.000Z",
+    created_at: "2026-01-01T00:00:00.000Z",
+  };
+  const video102 = { ...video101, id: 102, youtube_video_id: "yt102" };
+
+  const shadowBase = {
+    record_type: "shadow_extraction",
+    ts: "2026-01-01T00:00:00.000Z",
+    run_id: "shadow-test",
+    provider: "ollama",
+    model: "kimi-k2.6",
+    fallback_model: null,
+    transcript_sha256: "abc",
+    transcript_length: 100,
+    candidate_count: 1,
+    accepted_count: 1,
+    accepted_calls: [
+      {
+        symbol: "BTCUSDT",
+        direction: "bullish",
+        call_type: "watch",
+        entry_price: null,
+        target_price: null,
+        stop_loss: null,
+        timeframe: null,
+        confidence: "high",
+        strategy_type: "narrative",
+        raw_quote: "Bitcoin looks constructive",
+        extraction_confidence: 1,
+        specificity_score: 1,
+      },
+    ],
+    chunk_summary: {
+      chunk_count: 1,
+      covered_until_offset: 100,
+      reached_transcript_end: true,
+    },
+    error: null,
+  };
+
+  writeFileSync(
+    shadowIn,
+    [video101, video102]
+      .map((video) => JSON.stringify({ ...shadowBase, video }))
+      .join("\n") + "\n",
+  );
+  writeFileSync(
+    diffIn,
+    [video101, video102]
+      .map((video) =>
+        JSON.stringify({
+          record_type: "shadow_diff",
+          ts: "2026-01-01T00:00:00.000Z",
+          run_id: "shadow-test",
+          video,
+          status: "changed_calls",
+          existing_count: 1,
+          accepted_count: 1,
+          unchanged_count: 0,
+          added: ["BTCUSDT bullish watch"],
+          removed: ["BTCUSDT bullish buy"],
+          reasons: [],
+        }),
+      )
+      .join("\n") + "\n",
+  );
+
+  await promoteShadowMain([
+    "--shadow-in",
+    shadowIn,
+    "--diff-in",
+    diffIn,
+    "--confirm-run-id",
+    "shadow-test",
+    "--allow-statuses",
+    "changed_calls",
+    "--video-ids",
+    "102",
+    "--audit-out",
+    auditOut,
+  ]);
+
+  const rows = readFileSync(auditOut, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => JSON.parse(line));
+
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].action, "skip");
+  assert.equal(rows[0].reason, "video_not_reviewed");
+  assert.equal(rows[0].video.id, 101);
+  assert.equal(rows[1].action, "promote");
+  assert.equal(rows[1].reason, null);
+  assert.equal(rows[1].video.id, 102);
+  assert.deepEqual(rows[1].reviewed_video_ids, [102]);
 });
 
 test("shadow validation catches failed and duplicate records before promotion", () => {
