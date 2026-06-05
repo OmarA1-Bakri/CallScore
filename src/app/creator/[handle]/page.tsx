@@ -217,7 +217,11 @@ export default async function CreatorPage({ params }: PageProps) {
       </EditorialSection>
 
       {/* 03 — calls */}
-      <EditorialSection index="03" title={<>Recent <em className="italic text-accent">calls</em>.</>}>
+      <EditorialSection
+        index="03"
+        title={<>Recent call <em className="italic text-accent">history</em>.</>}
+        meta={<>latest 50 tracked calls<br />Last 12 months · newest first</>}
+      >
         <div className="mb-4 flex flex-wrap gap-2">
           <Link
             href={
@@ -241,14 +245,21 @@ export default async function CreatorPage({ params }: PageProps) {
           </Link>
         </div>
         {displayCalls.length > 0 ? (
-          <CallHistory
-            calls={displayCalls}
-            totalCount={trackedCallCount}
-            scoredCount={scoredCallCount}
-          />
+          <>
+            {scoredCallCount === 0 ? (
+              <p className="mb-4 font-mono text-[12px] text-ink-500 tracking-wide">
+                No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or 30d/90d outcomes.
+              </p>
+            ) : null}
+            <CallHistory
+              calls={displayCalls}
+              totalCount={trackedCallCount}
+              scoredCount={scoredCallCount}
+            />
+          </>
         ) : (
           <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-            No calls tracked yet for this creator.
+            No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or 30d/90d outcomes.
           </p>
         )}
       </EditorialSection>

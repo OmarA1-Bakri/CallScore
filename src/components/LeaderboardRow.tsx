@@ -21,7 +21,7 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
   const alpha = row.stats.alpha_score;
   const delta30 = row.stats.avg_alpha_30d;
   const winPct = (row.stats.win_rate * 100).toFixed(1);
-  const lastCall = row.best_call?.symbol?.replace("USDT", "") ?? "—";
+  const bestCoin = row.best_call?.symbol?.replace("USDT", "") ?? "—";
   const alphaTone = alpha >= 50 ? "text-pos" : alpha < 30 ? "text-neg" : "text-ink-700";
 
   return (
@@ -82,8 +82,8 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
           totalCalls={row.stats.total_calls}
         />
       </td>
-      {/* Last call — most recent scored symbol */}
-      <td className="py-3 text-right font-mono text-[12px] text-ink-600">{lastCall}</td>
+      {/* Best coin — symbol from the best public-scored call */}
+      <td className="py-3 text-right font-mono text-[12px] text-ink-600">{bestCoin}</td>
     </tr>
   );
 }

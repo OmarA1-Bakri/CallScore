@@ -9,7 +9,7 @@ import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { getPublicCounts } from "@/lib/public-counts";
 import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
-import { CREATOR_JUDGMENT_WINDOW_SHORT_LABEL } from "@/lib/judgment-window";
+import { CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL, CREATOR_JUDGMENT_WINDOW_LABEL, RECENT_PUBLIC_SCORING_MATURITY_NOTE } from "@/lib/judgment-window";
 import { getCreatorTier } from "@/lib/creator-tier";
 import { hasAccess } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
@@ -446,14 +446,19 @@ export default async function HomePage({
           <>
             {publicCounts.rankedCreators} ranked creators · {totalCalls} public-scored calls
             <br />
-            tier S/A/B/C · low-N flagged
+            {CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL}
           </>
         }
       >
         <div className="flex flex-col tab:flex-row tab:items-end tab:justify-between gap-3 mb-4">
-          <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-            Sorted by alpha; ties broken by Wilson lower bound.
-          </p>
+          <div className="space-y-1">
+            <p className="font-mono text-[12px] text-ink-500 tracking-wide">
+              Sorted by alpha; ties broken by Wilson lower bound.
+            </p>
+            <p className="font-mono text-[11px] text-ink-500 tracking-wide max-w-[720px]">
+              {RECENT_PUBLIC_SCORING_MATURITY_NOTE}
+            </p>
+          </div>
           <PeriodFilter value={period} canUseRecent={canUseRecent} />
         </div>
         {leaderboard.length > 0 ? (
@@ -461,8 +466,7 @@ export default async function HomePage({
         ) : (
           <div className="border-t border-ink-250 py-12 text-center">
             <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-              Leaderboard data is being computed. Run the data pipeline to populate
-              scores.
+              No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or 30d/90d outcomes.
             </p>
           </div>
         )}
@@ -685,9 +689,9 @@ function MarketCallPreview({
             Top Creators
           </p>
           <div className="hidden tab:flex items-center gap-6 font-mono text-[11px] text-ink-500 tracking-caps uppercase">
-            <span className="text-ink-900 border-b border-accent pb-1">{CREATOR_JUDGMENT_WINDOW_SHORT_LABEL}</span>
-            <span>90 Days</span>
-            <span>30 Days</span>
+            <span className="text-ink-900 border-b border-accent pb-1">{CREATOR_JUDGMENT_WINDOW_LABEL}</span>
+            <span>90 Days · Pro</span>
+            <span>30 Days · Pro</span>
           </div>
         </div>
         <div className="overflow-hidden">
@@ -698,7 +702,7 @@ function MarketCallPreview({
               <span>alpha</span>
               <span>30d Δ</span>
               <span>win %</span>
-              <span>call</span>
+              <span>best coin</span>
             </div>
             {previewRows.length > 0 ? (
               previewRows.map((row) => {
@@ -709,7 +713,7 @@ function MarketCallPreview({
                       ? "text-neg"
                       : "text-ink-800";
                 const deltaTone = row.stats.avg_alpha_30d >= 0 ? "text-pos" : "text-neg";
-                const lastCall = row.best_call ?? row.worst_call;
+                const bestCoin = row.best_call;
                 return (
                   <div
                     key={row.creator.id}
@@ -742,14 +746,14 @@ function MarketCallPreview({
                       {formatPercent(row.stats.win_rate)}
                     </span>
                     <span className="min-w-0 truncate text-ink-800">
-                      {lastCall?.symbol?.replace("USDT", "") ?? "—"}
+                      {bestCoin?.symbol?.replace("USDT", "") ?? "—"}
                     </span>
                   </div>
                 );
               })
             ) : (
               <div className="border-t border-ink-200 py-8 text-center font-mono text-[12px] text-ink-500 tracking-wide">
-                Real leaderboard rows appear here after the data pipeline computes scores.
+                No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or 30d/90d outcomes.
               </div>
             )}
           </div>

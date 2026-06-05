@@ -32,7 +32,7 @@ const HEADERS: ReadonlyArray<{ key: string; label: ReactElement; align: "left" |
   { key: "win", label: <>Win %</>, align: "right" },
   { key: "n", label: <>N</>, align: "right" },
   { key: "tier", label: <>Tier</>, align: "center" },
-  { key: "last", label: <>Last call</>, align: "right" },
+  { key: "best", label: <>Best coin<span className="sr-only"> Best public-scored call symbol</span></>, align: "right" },
 ];
 
 function renderTable(rows: readonly Row[]): ReactElement {
