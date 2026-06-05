@@ -119,6 +119,7 @@ export default async function CallDetailPage({ params }: PageProps) {
   const creatorName = creator?.name ?? "Unknown Creator";
   const creatorHandle = creator?.youtube_handle ?? "unknown";
   const ticker = SYMBOL_TICKERS[serializedCall.symbol] ?? serializedCall.symbol.replace("USDT", "");
+  const displayTargetPrice = serializedCall.validated_target_price;
 
   const directionLabel = DIRECTION_LABEL[serializedCall.direction];
 
@@ -138,7 +139,7 @@ export default async function CallDetailPage({ params }: PageProps) {
             : "flat";
 
   const targetHitLabel: string =
-    serializedCall.target_price === null
+    displayTargetPrice === null
       ? "—"
       : serializedCall.target_status !== "available"
         ? "pending"
@@ -201,10 +202,10 @@ export default async function CallDetailPage({ params }: PageProps) {
           {serializedCall.is_live_open
             ? "Live/open call tracked against the latest Binance candle until the 30-day window closes."
             : "Scored against Binance candles for the 30-day window following the call date."}
-          {serializedCall.target_price !== null && (
+          {displayTargetPrice !== null && (
             <>
               {" "}Target was{" "}
-              <em className="italic text-accent">${serializedCall.target_price.toFixed(2)}</em>.
+              <em className="italic text-accent">${displayTargetPrice.toFixed(2)}</em>.
             </>
           )}
         </p>
@@ -390,6 +391,17 @@ export default async function CallDetailPage({ params }: PageProps) {
                 <td className="py-2.5 text-accent">extract</td>
                 <td className="py-2.5 pl-4 text-ink-700">
                   Confidence {(serializedCall.extraction_confidence * 100).toFixed(0)}%
+                </td>
+              </tr>
+              <tr className="border-b border-ink-150">
+                <td className="py-2.5 text-ink-600 tabular-nums">
+                  {new Date(serializedCall.call_date).toISOString().slice(0, 19).replace("T", " ")}
+                </td>
+                <td className="py-2.5 text-accent">validate</td>
+                <td className="py-2.5 pl-4 text-ink-700">
+                  {serializedCall.extraction_valid
+                    ? "No deterministic validation flags"
+                    : `Flagged: ${serializedCall.extraction_notes.join("; ")}`}
                 </td>
               </tr>
             </tbody>

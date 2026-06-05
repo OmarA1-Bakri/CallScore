@@ -24,3 +24,9 @@ test("creator page does not use rounded-{lg,xl}", () => {
 test("creator page imports AlphaScoreBadge (not AlphaScoreBar — that's leaderboard)", () => {
   assert.match(src, /import AlphaScoreBadge/);
 });
+
+test("creator page distinguishes directional wins from target hit rate", () => {
+  assert.match(src, /30d dir\. win/);
+  assert.match(src, /directional win rate at 30 days/);
+  assert.match(src, /Target Hit Rate/);
+});

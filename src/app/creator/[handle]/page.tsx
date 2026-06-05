@@ -171,7 +171,7 @@ export default async function CreatorPage({ params }: PageProps) {
           cells={[
             { k: "rank", v: stats?.accuracy_rank ?? "—" },
             { k: "alpha", v: alphaScore.toFixed(1) },
-            { k: "win rate", v: `${(winRate * 100).toFixed(0)}%` },
+            { k: "30d dir. win", v: `${(winRate * 100).toFixed(0)}%` },
             { k: "scored calls", v: scoredCallCount },
           ]}
         />
@@ -184,7 +184,7 @@ export default async function CreatorPage({ params }: PageProps) {
           <em className="italic text-accent">#{stats?.accuracy_rank ?? "—"}</em> on average alpha
           across {scoredCallCount} scored calls
           {scoredCallCount > 0
-            ? `, with a ${(winRate * 100).toFixed(0)}% directional hit rate at 30 days`
+            ? `, with a ${(winRate * 100).toFixed(0)}% directional win rate at 30 days`
             : ""}
           .
         </p>
@@ -199,9 +199,9 @@ export default async function CreatorPage({ params }: PageProps) {
         <div className="grid grid-cols-2 tab:grid-cols-4 gap-4">
           <AlphaScoreBadge score={alphaScore} size="lg" />
           <MetricTile
-            label="Hit Rate"
+            label="Target Hit Rate"
             value={`${(hitRate * 100).toFixed(0)}%`}
-            unit="hit"
+            unit="target"
           />
           <MetricTile
             label="Avg α 30d"
