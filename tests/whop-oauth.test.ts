@@ -85,3 +85,24 @@ test("Whop OAuth route accepts canonical host even when request origin protocol 
     "https://call-score.netlify.app/api/auth/whop/callback",
   );
 });
+
+
+test("Whop OAuth route trusts canonical Host header behind Netlify", async () => {
+  process.env.WHOP_OAUTH_BASE_URL = "https://call-score.netlify.app";
+  process.env.WHOP_CLIENT_ID = "app_test";
+
+  const response = await GET(
+    new NextRequest("http://internal.netlify/api/auth/whop", {
+      headers: { host: "call-score.netlify.app" },
+    }),
+  );
+  const location = response.headers.get("location");
+  assert.ok(location);
+  assert.match(location, /^https:\/\/whop\.com\/oauth\?/);
+
+  const params = new URL(location).searchParams;
+  assert.equal(
+    params.get("redirect_uri"),
+    "https://call-score.netlify.app/api/auth/whop/callback",
+  );
+});
