@@ -49,7 +49,11 @@
     "eval:llm-gold": "node --import tsx src/scripts/evaluate-llm-gold-set.ts",
     "shadow:validate": "node --import tsx src/scripts/validate-shadow-extractions.ts",
     "extract:batch": "node --import tsx src/scripts/extract-calls-batch.ts",
-    "extract:llm": "node --import tsx src/scripts/extract-calls-llm.ts"
+    "extract:llm": "node --import tsx src/scripts/extract-calls-llm.ts",
+    "pipeline:data:continuous": "node --import tsx src/scripts/run-continuous-data-pipeline.ts",
+    "repair:price-at-call": "node --import tsx src/scripts/repair-price-at-call.ts",
+    "audit:symbol-funnel": "node --import tsx src/scripts/audit-symbol-funnel.ts",
+    "audit:blockers": "node --import tsx src/scripts/audit-call-blockers.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

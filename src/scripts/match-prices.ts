@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { query } from "../lib/db";
+import { fetchNearestBinanceCandle, insertFetchedCandle } from "./binance-candle-fallback";
 import { MS_7D, MS_30D, MS_90D } from "../lib/constants";
 import { createLogger } from "../lib/logger";
 import {
@@ -46,6 +47,8 @@ export interface MatchPricesArgs {
   readonly limit: number;
   readonly batchSize: number;
   readonly startAfterId: number;
+  readonly fetchBinance: boolean;
+  readonly binanceToleranceMinutes: number;
 }
 
 function argValue(argv: readonly string[], flag: string): string | null {
@@ -70,6 +73,8 @@ export function parseMatchPricesArgs(argv = process.argv.slice(2)): MatchPricesA
     limit: positiveInt(argValue(argv, "--limit"), Number.MAX_SAFE_INTEGER),
     batchSize: positiveInt(argValue(argv, "--batch-size"), 200),
     startAfterId: nonNegativeInt(argValue(argv, "--start-after-id"), 0),
+    fetchBinance: argv.includes("--fetch-binance"),
+    binanceToleranceMinutes: positiveInt(argValue(argv, "--binance-tolerance-minutes"), 30),
   };
 }
 
@@ -154,7 +159,11 @@ interface CandleResult {
 // Without this, a data gap could silently use a days-old price.
 const MAX_STALENESS_MS = 24 * 60 * 60 * 1000;
 
-async function getCandleAt(symbol: string, dateMs: number): Promise<CandleResult | null> {
+async function getCandleAt(
+  symbol: string,
+  dateMs: number,
+  args: Pick<MatchPricesArgs, "fetchBinance" | "binanceToleranceMinutes">,
+): Promise<CandleResult | null> {
   const key = cacheKey(symbol, dateMs);
   const cached = getLruCacheEntry(priceCache, key);
   if (cached !== undefined) {
@@ -166,25 +175,36 @@ async function getCandleAt(symbol: string, dateMs: number): Promise<CandleResult
     [symbol, dateMs],
   );
 
-  if (rows.length === 0) {
-    setLruCacheEntry(priceCache, key, null, MATCH_PRICE_CACHE_MAX_ENTRIES);
-    return null;
+  if (rows.length > 0) {
+    const candleTime = typeof rows[0].open_time === "string"
+      ? parseInt(rows[0].open_time, 10)
+      : Number(rows[0].open_time);
+    const staleness = dateMs - candleTime;
+
+    if (staleness <= MAX_STALENESS_MS) {
+      const result: CandleResult = { close: rows[0].close, regime: rows[0].regime };
+      setLruCacheEntry(priceCache, key, result, MATCH_PRICE_CACHE_MAX_ENTRIES);
+      return result;
+    }
   }
 
-  const candleTime = typeof rows[0].open_time === "string"
-    ? parseInt(rows[0].open_time, 10)
-    : Number(rows[0].open_time);
-  const staleness = dateMs - candleTime;
-
-  if (staleness > MAX_STALENESS_MS) {
-    // Candle is too old — data gap, don't trust this price
-    setLruCacheEntry(priceCache, key, null, MATCH_PRICE_CACHE_MAX_ENTRIES);
-    return null;
+  if (args.fetchBinance) {
+    const fetched = await fetchNearestBinanceCandle({
+      symbol,
+      targetMs: dateMs,
+      toleranceMs: args.binanceToleranceMinutes * 60_000,
+    });
+    if (fetched) {
+      await insertFetchedCandle(symbol, fetched);
+      const result: CandleResult = { close: fetched.close, regime: null };
+      setLruCacheEntry(priceCache, key, result, MATCH_PRICE_CACHE_MAX_ENTRIES);
+      return result;
+    }
   }
 
-  const result: CandleResult = { close: rows[0].close, regime: rows[0].regime };
-  setLruCacheEntry(priceCache, key, result, MATCH_PRICE_CACHE_MAX_ENTRIES);
-  return result;
+  // Candle is missing or too stale — data gap, don't trust this price.
+  setLruCacheEntry(priceCache, key, null, MATCH_PRICE_CACHE_MAX_ENTRIES);
+  return null;
 }
 
 // ── High/Low cache ────────────────────────────────────────────────
@@ -224,7 +244,7 @@ interface UnmatchedCall {
   readonly call_date: string;
 }
 
-async function processCall(call: UnmatchedCall): Promise<boolean> {
+async function processCall(call: UnmatchedCall, args: MatchPricesArgs): Promise<boolean> {
   const callDateMs = new Date(call.call_date).getTime();
   if (isNaN(callDateMs)) return false;
   const now = new Date();
@@ -235,14 +255,14 @@ async function processCall(call: UnmatchedCall): Promise<boolean> {
 
   // Fetch all needed prices (coin + BTC at 4 timestamps each) using cache
   const [coinNow, coin7d, coin30d, coin90d, btcNow, btc7d, btc30d, btc90d] = await Promise.all([
-    getCandleAt(call.symbol, callDateMs),
-    has7d ? getCandleAt(call.symbol, callDateMs + MS_7D) : Promise.resolve(null),
-    has30d ? getCandleAt(call.symbol, callDateMs + MS_30D) : Promise.resolve(null),
-    has90d ? getCandleAt(call.symbol, callDateMs + MS_90D) : Promise.resolve(null),
-    getCandleAt("BTCUSDT", callDateMs),
-    has7d ? getCandleAt("BTCUSDT", callDateMs + MS_7D) : Promise.resolve(null),
-    has30d ? getCandleAt("BTCUSDT", callDateMs + MS_30D) : Promise.resolve(null),
-    has90d ? getCandleAt("BTCUSDT", callDateMs + MS_90D) : Promise.resolve(null),
+    getCandleAt(call.symbol, callDateMs, args),
+    has7d ? getCandleAt(call.symbol, callDateMs + MS_7D, args) : Promise.resolve(null),
+    has30d ? getCandleAt(call.symbol, callDateMs + MS_30D, args) : Promise.resolve(null),
+    has90d ? getCandleAt(call.symbol, callDateMs + MS_90D, args) : Promise.resolve(null),
+    getCandleAt("BTCUSDT", callDateMs, args),
+    has7d ? getCandleAt("BTCUSDT", callDateMs + MS_7D, args) : Promise.resolve(null),
+    has30d ? getCandleAt("BTCUSDT", callDateMs + MS_30D, args) : Promise.resolve(null),
+    has90d ? getCandleAt("BTCUSDT", callDateMs + MS_90D, args) : Promise.resolve(null),
   ]);
 
   if (!coinNow) return false; // No candle data for this symbol
@@ -403,6 +423,7 @@ export async function runMatchPrices(args: MatchPricesArgs): Promise<MatchPrices
     limit: args.limit,
     batch_size: args.batchSize,
     start_after_id: args.startAfterId,
+    binance_fallback: args.fetchBinance,
   });
   const lockResult = await withMatchPricesAdvisoryLock(async (): Promise<MatchPricesMetrics> => {
     if (args.rematchAll) clearMatchPricesCaches();
@@ -443,7 +464,7 @@ export async function runMatchPrices(args: MatchPricesArgs): Promise<MatchPrices
           const call = batch[index];
           if (!call) return;
           try {
-            const matched = await processCall(call);
+            const matched = await processCall(call, args);
             if (matched) {
               batchMatched++;
             } else {

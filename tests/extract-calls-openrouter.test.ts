@@ -6,6 +6,7 @@ import {
   EXTRACTION_SYSTEM_PROMPT,
   extractJsonArrayText,
   formatUntrustedTranscriptBlock,
+  modelAttemptSequence,
   openRouterPrompt,
   parseOpenRouterCandidates,
   parseOpenRouterExtractionArgs,
@@ -38,6 +39,7 @@ test("CLI extraction defaults to Ollama Cloud with cloud model", () => {
   assert.equal(args.chunkOverlap, 500);
   assert.equal(args.maxChunks, 100);
   assert.equal(args.chunkAgents, 1);
+  assert.equal(args.modelAttempts, 2);
   assert.equal(args.requestTimeoutMs, 180_000);
 });
 
@@ -67,6 +69,9 @@ test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
   const tooManyChunkAgents = parseOpenRouterExtractionArgs(["--chunk-agents", "99"]);
 
   assert.equal(tooManyChunkAgents.chunkAgents, 3);
+
+  const tooManyModelAttempts = parseOpenRouterExtractionArgs(["--model-attempts", "99"]);
+  assert.equal(tooManyModelAttempts.modelAttempts, 3);
 
   const explicitTimeout = parseOpenRouterExtractionArgs(["--request-timeout-ms", "120000"]);
   assert.equal(explicitTimeout.requestTimeoutMs, 120_000);
@@ -111,6 +116,25 @@ test("Ollama provider accepts explicit model, fallback, and host", () => {
   assert.equal(args.model, "deepseek-v4-pro");
   assert.equal(args.fallbackModel, "gemma4:31b");
   assert.equal(args.ollamaHost, "http://127.0.0.1:11434");
+});
+
+test("model attempt sequence retries each model before failing a chunk", () => {
+  assert.deepEqual(
+    modelAttemptSequence({
+      model: "kimi-k2.6",
+      fallbackModel: "glm-5.1",
+      modelAttempts: 2,
+    }),
+    ["kimi-k2.6", "kimi-k2.6", "glm-5.1", "glm-5.1"],
+  );
+  assert.deepEqual(
+    modelAttemptSequence({
+      model: "kimi-k2.6",
+      fallbackModel: "kimi-k2.6",
+      modelAttempts: 2,
+    }),
+    ["kimi-k2.6", "kimi-k2.6"],
+  );
 });
 
 test("Ollama headers only attach the API key to Ollama Cloud", () => {

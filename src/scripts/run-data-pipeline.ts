@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { DEFAULT_CANDLE_REFRESH_SYMBOLS } from "./refresh-candles";
-import { loadEnv, timestamp } from "./script-helpers";
+import { loadEnv, runWithConcurrency, timestamp } from "./script-helpers";
 
 const DEFAULT_CREATORS = [
   "@AltcoinDaily",
@@ -22,18 +22,26 @@ const DEFAULT_SHADOW_VIDEO_AGENTS = 1;
 const MAX_SHADOW_VIDEO_AGENTS = 3;
 const DEFAULT_SHADOW_CHUNK_AGENTS = 1;
 const MAX_SHADOW_CHUNK_AGENTS = 3;
+const DEFAULT_SHADOW_MODEL_ATTEMPTS = 2;
+const MAX_SHADOW_MODEL_ATTEMPTS = 3;
+const DEFAULT_SHADOW_GAP_MS = 0;
 
 const STAGES = [
   "secret-hygiene",
+  "low-confidence-validate",
+  "candles",
+  "price-repair",
+  "evaluation-backfill",
+  "ready-extract",
   "discover",
   "transcripts",
   "shadow-extract",
   "shadow-validate",
   "shadow-diff",
   "shadow-promote",
-  "candles",
-  "match-prices",
   "compute-scores",
+  "blocker-audit",
+  "symbol-funnel-audit",
   "audit",
   "pipeline-readiness",
   "verify-public-surface",
@@ -47,6 +55,12 @@ interface DataPipelineArgs {
   readonly limitCreators: number;
   readonly limitVideos: number;
   readonly limitLlmVideos: number;
+  readonly limitReadyExtractVideos: number;
+  readonly limitLowConfidenceValidations: number;
+  readonly limitPriceRepairs: number;
+  readonly priceRepairBatchSize: number;
+  readonly priceRepairMaxToleranceMinutes: number;
+  readonly fetchBinanceFallback: boolean;
   readonly limitPromotions: number;
   readonly sinceDays: number;
   readonly maxCandleRequestsPerSymbol: number;
@@ -55,10 +69,14 @@ interface DataPipelineArgs {
   readonly shadowRunId: string;
   readonly shadowProvider: string | null;
   readonly shadowModel: string | null;
+  readonly shadowFallbackModel: string | null;
   readonly shadowRequestTimeoutMs: number;
   readonly shadowAgents: number;
   readonly shadowVideoAgents: number;
   readonly shadowChunkAgents: number;
+  readonly shadowModelAttempts: number;
+  readonly shadowGapMs: number;
+  readonly shadowPromoteVideoIds: readonly number[];
   readonly shadowAllowStatuses: string | null;
   readonly rematchAllPrices: boolean;
   readonly limitPriceMatches: number;
@@ -101,6 +119,18 @@ function boundedPositiveInt(
   return Math.min(positiveInt(value, fallback), max);
 }
 
+function positiveIntList(value: string | null): readonly number[] {
+  if (!value) return [];
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((part) => Number(part.trim()))
+        .filter((parsed) => Number.isInteger(parsed) && parsed > 0),
+    ),
+  );
+}
+
 function nonNegativeInt(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
@@ -123,6 +153,7 @@ function parseSkipStages(argv: readonly string[]): ReadonlySet<StageName> {
   for (const stage of STAGES) {
     if (argv.includes(`--skip-${stage}`)) skipped.add(stage);
   }
+  if (argv.includes("--skip-match-prices")) skipped.add("evaluation-backfill");
   return skipped;
 }
 
@@ -145,6 +176,24 @@ export function parseDataPipelineArgs(
     limitCreators,
     limitVideos: positiveInt(argValue(argv, "--limit-videos"), 250),
     limitLlmVideos: positiveInt(argValue(argv, "--limit-llm-videos"), 100),
+    limitReadyExtractVideos: positiveInt(
+      argValue(argv, "--limit-ready-extract-videos"),
+      239,
+    ),
+    limitLowConfidenceValidations: positiveInt(
+      argValue(argv, "--limit-low-confidence-validations"),
+      500,
+    ),
+    limitPriceRepairs: positiveInt(argValue(argv, "--limit-price-repairs"), 1000),
+    priceRepairBatchSize: positiveInt(
+      argValue(argv, "--price-repair-batch-size"),
+      250,
+    ),
+    priceRepairMaxToleranceMinutes: positiveInt(
+      argValue(argv, "--price-repair-max-tolerance-minutes"),
+      30,
+    ),
+    fetchBinanceFallback: !argv.includes("--no-binance-fallback"),
     limitPromotions: positiveInt(argValue(argv, "--limit-promotions"), 25),
     sinceDays: positiveInt(argValue(argv, "--since-days"), 365),
     maxCandleRequestsPerSymbol: positiveInt(
@@ -159,6 +208,7 @@ export function parseDataPipelineArgs(
     shadowProvider:
       argValue(argv, "--shadow-provider") ?? DEFAULT_SHADOW_PROVIDER,
     shadowModel: argValue(argv, "--shadow-model") ?? DEFAULT_SHADOW_MODEL,
+    shadowFallbackModel: argValue(argv, "--shadow-fallback-model"),
     shadowRequestTimeoutMs: positiveInt(
       argValue(argv, "--shadow-request-timeout-ms"),
       DEFAULT_SHADOW_REQUEST_TIMEOUT_MS,
@@ -178,11 +228,23 @@ export function parseDataPipelineArgs(
       DEFAULT_SHADOW_CHUNK_AGENTS,
       MAX_SHADOW_CHUNK_AGENTS,
     ),
+    shadowModelAttempts: boundedPositiveInt(
+      argValue(argv, "--shadow-model-attempts"),
+      DEFAULT_SHADOW_MODEL_ATTEMPTS,
+      MAX_SHADOW_MODEL_ATTEMPTS,
+    ),
+    shadowGapMs: nonNegativeInt(
+      argValue(argv, "--shadow-gap-ms"),
+      DEFAULT_SHADOW_GAP_MS,
+    ),
+    shadowPromoteVideoIds: positiveIntList(
+      argValue(argv, "--shadow-promote-video-ids"),
+    ),
     shadowAllowStatuses: argValue(argv, "--shadow-allow-statuses"),
     rematchAllPrices: argv.includes("--rematch-all-prices"),
     limitPriceMatches: positiveInt(
       argValue(argv, "--limit-price-matches"),
-      Number.MAX_SAFE_INTEGER,
+      1000,
     ),
     priceMatchBatchSize: positiveInt(
       argValue(argv, "--price-match-batch-size"),
@@ -363,30 +425,25 @@ function runCommandAsync(
   });
 }
 
-async function runCommandsInBatches(
+async function runCommandsWithPool(
   stage: StageName,
   commands: readonly (readonly string[])[],
   args: DataPipelineArgs,
   concurrency: number,
 ): Promise<readonly StageResult[]> {
-  const results: StageResult[] = [];
-  const limit = Math.max(1, concurrency);
-  for (let index = 0; index < commands.length; index += limit) {
-    const batch = commands.slice(index, index + limit);
-    const batchResults = await Promise.all(
-      batch.map((command) =>
-        runCommandAsync(
-          stage,
-          command,
-          args,
-          auditFile(args, stage, "log.jsonl"),
-        ),
+  const auditPath = auditFile(args, stage, "log.jsonl");
+  return await runWithConcurrency(
+    commands,
+    concurrency,
+    (command) =>
+      runCommandAsync(
+        stage,
+        command,
+        args,
+        auditPath,
       ),
-    );
-    results.push(...batchResults);
-    if (batchResults.some((result) => result.status === "failed")) break;
-  }
-  return results;
+    (result) => result.status === "failed",
+  );
 }
 
 function parallelLimitForStage(
@@ -424,6 +481,9 @@ export function buildDataPipelineStageCommands(
     ? ["--provider", args.shadowProvider]
     : [];
   const shadowModelArgs = args.shadowModel ? ["--model", args.shadowModel] : [];
+  const shadowFallbackModelArgs = args.shadowFallbackModel
+    ? ["--fallback-model", args.shadowFallbackModel]
+    : [];
   const shadowRequestTimeoutArgs = [
     "--request-timeout-ms",
     String(args.shadowRequestTimeoutMs),
@@ -436,9 +496,18 @@ export function buildDataPipelineStageCommands(
     "--chunk-agents",
     String(args.shadowChunkAgents),
   ];
+  const shadowModelAttemptsArgs = [
+    "--model-attempts",
+    String(args.shadowModelAttempts),
+  ];
+  const shadowGapArgs = ["--gap-ms", String(args.shadowGapMs)];
   const shadowAllowArgs = args.shadowAllowStatuses
     ? ["--allow-statuses", args.shadowAllowStatuses]
     : [];
+  const shadowPromoteVideoIdArgs =
+    args.shadowPromoteVideoIds.length > 0
+      ? ["--video-ids", args.shadowPromoteVideoIds.join(",")]
+      : [];
   const shadowOut = path.resolve(
     repoRoot(),
     args.auditDir,
@@ -476,6 +545,76 @@ export function buildDataPipelineStageCommands(
     "secret-hygiene": [
       scriptCommand("src/scripts/check-secret-hygiene.ts", []),
     ],
+    "low-confidence-validate": [
+      scriptCommand("src/scripts/audit-recompute.ts", [
+        "--score-ready-low-confidence",
+        "--valid-only",
+        "--summary",
+        "--limit",
+        String(args.limitLowConfidenceValidations),
+        "--audit-out",
+        auditFile(args, "low-confidence-validate"),
+        ...writeFlag,
+      ]),
+    ],
+    candles: [
+      scriptCommand("src/scripts/refresh-candles.ts", [
+        "--symbols",
+        args.symbols.join(","),
+        "--max-requests-per-symbol",
+        String(args.maxCandleRequestsPerSymbol),
+        "--gap-ms",
+        String(args.gapMs),
+        "--audit-out",
+        auditFile(args, "candles"),
+        ...writeFlag,
+      ]),
+    ],
+    "price-repair": [
+      scriptCommand("src/scripts/repair-price-at-call.ts", [
+        "--limit",
+        String(args.limitPriceRepairs),
+        "--batch-size",
+        String(args.priceRepairBatchSize),
+        "--max-tolerance-minutes",
+        String(args.priceRepairMaxToleranceMinutes),
+        "--audit-out",
+        auditFile(args, "price-repair"),
+        ...(args.fetchBinanceFallback ? ["--fetch-binance"] : []),
+        ...writeFlag,
+      ]),
+    ],
+    "evaluation-backfill": args.write
+      ? [
+          scriptCommand("src/scripts/match-prices.ts", [
+            ...(args.rematchAllPrices ? ["--all"] : []),
+            "--limit",
+            String(args.limitPriceMatches),
+            "--batch-size",
+            String(args.priceMatchBatchSize),
+            ...(args.fetchBinanceFallback ? ["--fetch-binance"] : []),
+            ...(args.priceMatchStartAfterId > 0
+              ? ["--start-after-id", String(args.priceMatchStartAfterId)]
+              : []),
+          ]),
+        ]
+      : [],
+    "ready-extract": [
+      scriptCommand("src/scripts/extract-calls-openrouter.ts", [
+        "--limit",
+        String(args.limitReadyExtractVideos),
+        "--audit-out",
+        auditFile(args, "ready-extract"),
+        ...shadowProviderArgs,
+        ...shadowModelArgs,
+        ...shadowFallbackModelArgs,
+        ...shadowRequestTimeoutArgs,
+        ...shadowChunkAgentsArgs,
+        ...shadowModelAttemptsArgs,
+        ...shadowGapArgs,
+        ...writeFlag,
+      ]),
+    ],
     discover: creatorCommands("src/scripts/discover-videos-365.ts", [
       "--limit-videos",
       String(args.limitVideos),
@@ -510,9 +649,12 @@ export function buildDataPipelineStageCommands(
         ),
         ...shadowProviderArgs,
         ...shadowModelArgs,
+        ...shadowFallbackModelArgs,
         ...shadowRequestTimeoutArgs,
         ...shadowVideoAgentsArgs,
         ...shadowChunkAgentsArgs,
+        ...shadowModelAttemptsArgs,
+        ...shadowGapArgs,
         ...shadowExecuteFlag,
       ]),
     ),
@@ -553,40 +695,29 @@ export function buildDataPipelineStageCommands(
         "--limit",
         String(args.limitPromotions),
         ...shadowAllowArgs,
+        ...shadowPromoteVideoIdArgs,
         ...writeFlag,
       ]),
     ],
-    candles: [
-      scriptCommand("src/scripts/refresh-candles.ts", [
-        "--symbols",
-        args.symbols.join(","),
-        "--max-requests-per-symbol",
-        String(args.maxCandleRequestsPerSymbol),
-        "--gap-ms",
-        String(args.gapMs),
-        "--audit-out",
-        auditFile(args, "candles"),
-        ...writeFlag,
-      ]),
-    ],
-    "match-prices": args.write
-      ? [
-          scriptCommand("src/scripts/match-prices.ts", [
-            ...(args.rematchAllPrices ? ["--all"] : []),
-            ...(args.limitPriceMatches !== Number.MAX_SAFE_INTEGER
-              ? ["--limit", String(args.limitPriceMatches)]
-              : []),
-            "--batch-size",
-            String(args.priceMatchBatchSize),
-            ...(args.priceMatchStartAfterId > 0
-              ? ["--start-after-id", String(args.priceMatchStartAfterId)]
-              : []),
-          ]),
-        ]
-      : [],
     "compute-scores": args.write
       ? [scriptCommand("src/scripts/compute-scores.ts", [])]
       : [],
+    "blocker-audit": [
+      scriptCommand("src/scripts/audit-call-blockers.ts", [
+        "--json",
+        "--audit-out",
+        path.resolve(repoRoot(), args.auditDir, "call-blockers.json"),
+      ]),
+    ],
+    "symbol-funnel-audit": [
+      scriptCommand("src/scripts/audit-symbol-funnel.ts", [
+        "--symbols",
+        "LINKUSDT,NEARUSDT,XRPUSDT",
+        "--json",
+        "--audit-out",
+        path.resolve(repoRoot(), args.auditDir, "symbol-funnel.jsonl"),
+      ]),
+    ],
     audit: [scriptCommand("src/scripts/audit-coverage-report.ts", ["--json"])],
     "pipeline-readiness": [
       scriptCommand("src/scripts/audit-pipeline-readiness.ts", [
@@ -626,7 +757,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   mkdirSync(path.resolve(repoRoot(), args.auditDir), { recursive: true });
 
   console.log(
-    `[${timestamp()}] data-pipeline ${args.write ? "WRITE" : "DRY-RUN"}: creators=${args.creators.join(",")} symbols=${args.symbols.length} shadowAgents=${args.shadowAgents} shadowVideoAgents=${args.shadowVideoAgents} shadowChunkAgents=${args.shadowChunkAgents} auditDir=${args.auditDir}`,
+    `[${timestamp()}] data-pipeline ${args.write ? "WRITE" : "DRY-RUN"}: creators=${args.creators.join(",")} symbols=${args.symbols.length} lowConfidenceLimit=${args.limitLowConfidenceValidations} priceRepairLimit=${args.limitPriceRepairs} evaluationLimit=${args.limitPriceMatches} readyExtractLimit=${args.limitReadyExtractVideos} binanceFallback=${args.fetchBinanceFallback} shadowAgents=${args.shadowAgents} shadowVideoAgents=${args.shadowVideoAgents} shadowChunkAgents=${args.shadowChunkAgents} shadowModelAttempts=${args.shadowModelAttempts} shadowGapMs=${args.shadowGapMs} auditDir=${args.auditDir}`,
   );
   const commandsByStage = buildDataPipelineStageCommands(args);
   let failed = false;
@@ -656,7 +787,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       console.log(
         `[${timestamp()}] ${stage}: running ${commands.length} commands with concurrency=${parallelLimit}`,
       );
-      const results = await runCommandsInBatches(
+      const results = await runCommandsWithPool(
         stage,
         commands,
         args,

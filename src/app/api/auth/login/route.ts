@@ -5,13 +5,13 @@ import type { Tier } from "@/lib/types";
 const FREE_PASSWORD = process.env.NON_WHOP_ACCESS_PASSWORD;
 const ALPHA_PASSWORD = process.env.ALPHA_ACCESS_PASSWORD;
 
-function resolveTier(password) {
+function resolveTier(password: string): Tier | null {
   if (ALPHA_PASSWORD && ALPHA_PASSWORD.length >= 8 && password === ALPHA_PASSWORD) return "alpha";
   if (FREE_PASSWORD && FREE_PASSWORD.length >= 8 && password === FREE_PASSWORD) return "free";
   return null;
 }
 
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   if (!FREE_PASSWORD || FREE_PASSWORD.length < 8) {
     return NextResponse.json({ error: "Not configured" }, { status: 500 });
   }
@@ -36,7 +36,7 @@ export async function POST(request) {
   return NextResponse.json({ ok: true, tier, userId });
 }
 
-export async function GET(request) {
+export async function GET(_request: NextRequest) {
   return NextResponse.json(
     { error: "Method not allowed" },
     { status: 405, headers: { Allow: "POST" } }

@@ -5,7 +5,7 @@ import { auditExtractedCallCandidates, normalizeExtractedCalls } from "../lib/ai
 import { TRACKED_SYMBOLS } from "../lib/constants";
 import { createLogger } from "../lib/logger";
 import type { CallType, Direction, StrategyType, Video } from "../lib/types";
-import { loadEnv, replaceStoredCallsForVideo, sleep, timestamp } from "./script-helpers";
+import { loadEnv, replaceStoredCallsForVideo, runWithConcurrency, sleep, timestamp } from "./script-helpers";
 
 const DEFAULT_PROVIDER = "ollama";
 const DEFAULT_MODEL = "kimi-k2.6:cloud";
@@ -23,6 +23,8 @@ const DEFAULT_MAX_CHUNKS = 100;
 const MAX_ALLOWED_CHUNKS = 100;
 const DEFAULT_CHUNK_AGENTS = 1;
 const MAX_CHUNK_AGENTS = 3;
+const DEFAULT_MODEL_ATTEMPTS = 2;
+const MAX_MODEL_ATTEMPTS = 3;
 const MAX_CANDIDATE_TEXT_CHARS = 1_000;
 const PROMPT_INJECTION_ECHO =
   /\b(ignore (?:all )?(?:previous|above) instructions|system prompt|developer message|return only|untrusted_transcript_(?:begin|end))\b/i;
@@ -51,6 +53,7 @@ export interface OpenRouterArgs {
   readonly chunkOverlap: number;
   readonly maxChunks: number;
   readonly chunkAgents: number;
+  readonly modelAttempts: number;
   readonly requestTimeoutMs: number;
 }
 
@@ -175,6 +178,11 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
       argValue(argv, "--chunk-agents"),
       DEFAULT_CHUNK_AGENTS,
       MAX_CHUNK_AGENTS,
+    ),
+    modelAttempts: boundedPositiveInt(
+      argValue(argv, "--model-attempts"),
+      DEFAULT_MODEL_ATTEMPTS,
+      MAX_MODEL_ATTEMPTS,
     ),
     ...chunkSettings,
   };
@@ -427,6 +435,18 @@ async function callExtractionProvider(args: OpenRouterArgs, model: string, trans
   throw new Error(`Provider ${args.provider} is not supported. Use Ollama Cloud (--provider ollama).`);
 }
 
+export function modelAttemptSequence(
+  args: Pick<OpenRouterArgs, "model" | "fallbackModel" | "modelAttempts">,
+): readonly string[] {
+  const models = [
+    args.model,
+    ...(args.fallbackModel && args.fallbackModel !== args.model
+      ? [args.fallbackModel]
+      : []),
+  ];
+  return models.flatMap((model) => Array(args.modelAttempts).fill(model));
+}
+
 export interface ChunkExtractionAudit {
   readonly chunk: TranscriptChunk;
   readonly model: string;
@@ -451,11 +471,13 @@ async function extractChunkWithModelFallback(
   fullTranscript: string,
   title?: string | null,
 ): Promise<ChunkExtractionAudit> {
-  const models = [args.model, ...(args.fallbackModel && args.fallbackModel !== args.model ? [args.fallbackModel] : [])];
+  const modelAttempts = modelAttemptSequence(args);
   let lastError: unknown = null;
   const validationTranscript = title ? `${title}\n${fullTranscript}` : fullTranscript;
 
-  for (const model of models) {
+  for (let attemptIndex = 0; attemptIndex < modelAttempts.length; attemptIndex += 1) {
+    const model = modelAttempts[attemptIndex];
+    if (!model) continue;
     try {
       const text = await callExtractionProvider(args, model, chunk.text, title, chunk, fullTranscript);
       const candidates = parseOpenRouterCandidates(text);
@@ -477,6 +499,8 @@ async function extractChunkWithModelFallback(
         model,
         chunk_index: chunk.index + 1,
         chunk_total: chunk.total,
+        attempt: attemptIndex + 1,
+        attempts: modelAttempts.length,
         error: message,
       });
     }
@@ -487,19 +511,11 @@ async function extractChunkWithModelFallback(
 
 export async function extractWithModelFallback(args: OpenRouterArgs, transcript: string, title?: string | null): Promise<ExtractionResult> {
   const chunks = splitTranscriptIntoChunks(transcript, args);
-  const chunkResults: ChunkExtractionAudit[] = [];
-  const chunkBatchSize = Math.max(1, args.chunkAgents);
-
-  for (let index = 0; index < chunks.length; index += chunkBatchSize) {
-    const batch = chunks.slice(index, index + chunkBatchSize);
-    chunkResults.push(
-      ...(await Promise.all(
-        batch.map((chunk) =>
-          extractChunkWithModelFallback(args, chunk, transcript, title),
-        ),
-      )),
-    );
-  }
+  const chunkResults = await runWithConcurrency(
+    chunks,
+    args.chunkAgents,
+    (chunk) => extractChunkWithModelFallback(args, chunk, transcript, title),
+  );
 
   const candidates = chunkResults.flatMap((result) => [...result.candidates]);
   const validationTranscript = title ? `${title}\n${transcript}` : transcript;

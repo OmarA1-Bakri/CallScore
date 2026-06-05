@@ -6,6 +6,11 @@ import {
 } from "../src/scripts/run-data-pipeline";
 import { getNextConsensusWindowStart } from "../src/scripts/detect-consensus";
 import {
+  buildCycleCommand,
+  lockIsStale,
+  parseContinuousDataPipelineArgs,
+} from "../src/scripts/run-continuous-data-pipeline";
+import {
   HIGH_LOW_CACHE_MAX_ENTRIES,
   MATCH_PRICE_CACHE_MAX_ENTRIES,
   MATCH_PRICES_ADVISORY_LOCK_ID,
@@ -17,6 +22,7 @@ import {
 import {
   buildReplaceStoredCallsStatements,
   executeStatementsInTransaction,
+  runWithConcurrency,
 } from "../src/scripts/script-helpers";
 import {
   computeAlpha,
@@ -24,7 +30,18 @@ import {
   didHitTarget,
   isDirectionCorrect,
 } from "../src/lib/scoring";
-import { parseVerifyPublicSurfaceArgs } from "../src/scripts/verify-public-surface";
+import {
+  buildLiveScoreEligibleStatsSql,
+  parseVerifyPublicSurfaceArgs,
+} from "../src/scripts/verify-public-surface";
+import { parseRepairPriceAtCallArgs, toleranceBand } from "../src/scripts/repair-price-at-call";
+import { buildSymbolFunnelSql, parseSymbolFunnelAuditArgs } from "../src/scripts/audit-symbol-funnel";
+import {
+  callBlockerCaseSql,
+  callsBlockedByReasonSql,
+  normalizePipelineBlockerLimit,
+  pipelineStageCaseSql,
+} from "../src/lib/pipeline-blockers";
 import { parseBackfillPublicationDatesArgs } from "../src/scripts/backfill-publication-dates";
 import {
   extractRequestedSubtitleUrl,
@@ -48,8 +65,8 @@ import {
   parseYouTubeRss,
   upsertVideo,
 } from "../src/scripts/discover-videos-rss-api";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { splitSqlStatements } from "../src/scripts/migrate";
 
 function toPosixPath(value: string): string {
@@ -60,6 +77,16 @@ const root = join(__dirname, "..");
 
 function read(relativePath: string): string {
   return readFileSync(join(root, relativePath), "utf8");
+}
+
+async function waitFor(predicate: () => boolean, timeoutMs = 500) {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("timed out waiting for condition");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
 }
 
 test("data pipeline defaults to safe local dry-run for top creators", () => {
@@ -87,7 +114,7 @@ test("data pipeline defaults to safe local dry-run for top creators", () => {
   assert.equal(args.shadowChunkAgents, 1);
   assert.equal(args.shadowAllowStatuses, null);
   assert.equal(args.rematchAllPrices, false);
-  assert.equal(args.limitPriceMatches, Number.MAX_SAFE_INTEGER);
+  assert.equal(args.limitPriceMatches, 1000);
   assert.equal(args.priceMatchBatchSize, 200);
   assert.equal(args.priceMatchStartAfterId, 0);
   assert.equal(args.verifyBaseUrl, null);
@@ -169,12 +196,93 @@ test("data pipeline parses explicit bounds and skip flags", () => {
   assert.equal(args.skipStages.has("discover"), true);
 });
 
+test("continuous data pipeline defaults to a non-overlapping dry-run loop", () => {
+  const args = parseContinuousDataPipelineArgs([]);
+
+  assert.equal(args.write, false);
+  assert.equal(args.once, false);
+  assert.equal(args.maxCycles, 0);
+  assert.equal(args.intervalMs, 30 * 60_000);
+  assert.equal(args.failureIntervalMs, 10 * 60_000);
+  assert.equal(args.auditRoot, ".tmp/callscore-pipeline/continuous");
+  assert.equal(args.lockFile, ".tmp/callscore-pipeline/continuous.lock");
+  assert.deepEqual(args.pipelineArgs, []);
+});
+
+test("continuous data pipeline treats dead-pid locks as stale", () => {
+  const lockFile = ".tmp/test-continuous-dead-pid.lock";
+  const lockPath = join(__dirname, "..", lockFile);
+  mkdirSync(dirname(lockPath), { recursive: true });
+  writeFileSync(
+    lockPath,
+    JSON.stringify({
+      pid: 999999999,
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      cycle: 1,
+    }),
+  );
+  try {
+    const args = parseContinuousDataPipelineArgs(["--lock-file", lockFile]);
+    assert.equal(lockIsStale(args), true);
+  } finally {
+    if (existsSync(lockPath)) rmSync(lockPath, { force: true });
+  }
+});
+
+test("continuous data pipeline write mode uses safe launch defaults", () => {
+  const args = parseContinuousDataPipelineArgs([
+    "--write",
+    "--once",
+    "--interval-minutes",
+    "5",
+    "--",
+    "--creators",
+    "@A",
+  ]);
+  const command = buildCycleCommand(args, 2, new Date("2026-05-06T00:00:00.000Z"));
+
+  assert.equal(args.write, true);
+  assert.equal(args.once, true);
+  assert.equal(args.maxCycles, 1);
+  assert.equal(args.intervalMs, 5 * 60_000);
+  assert.ok(command.includes("src/scripts/run-data-pipeline.ts"));
+  assert.ok(command.includes("--write"));
+  assert.ok(command.includes("--skip-shadow-promote"));
+  assert.ok(command.includes("--shadow-fallback-model"));
+  assert.ok(command.includes("glm-5.1"));
+  assert.ok(command.includes("--shadow-agents"));
+  assert.ok(command.includes("2"));
+  assert.ok(command.includes("--audit-dir"));
+  assert.ok(command.some((part) => part.endsWith("continuous/2026-05-06T00-00-00-000Z-cycle-2")));
+  assert.ok(command.includes("--shadow-run-id"));
+  assert.ok(command.includes("continuous-2026-05-06T00-00-00-000Z-cycle-2"));
+});
+
+test("continuous data pipeline preserves reviewed promotion args", () => {
+  const args = parseContinuousDataPipelineArgs([
+    "--write",
+    "--",
+    "--shadow-promote-video-ids",
+    "101,102",
+    "--shadow-allow-statuses",
+    "new_calls",
+  ]);
+  const command = buildCycleCommand(args, 1, new Date("2026-05-06T00:00:00.000Z"));
+
+  assert.ok(command.includes("--shadow-promote-video-ids"));
+  assert.ok(command.includes("101,102"));
+  assert.equal(command.includes("--skip-shadow-promote"), false);
+});
+
 test("match-prices defaults to incomplete market data and parses full recompute bounds", () => {
   const defaults = parseMatchPricesArgs([]);
   assert.equal(defaults.rematchAll, false);
   assert.equal(defaults.batchSize, 200);
   assert.equal(defaults.limit, Number.MAX_SAFE_INTEGER);
   assert.equal(defaults.startAfterId, 0);
+  assert.equal(defaults.fetchBinance, false);
+  assert.equal(defaults.binanceToleranceMinutes, 30);
   assert.match(getCallSelectionPredicate(defaults), /price_at_call IS NULL/);
   assert.match(getCallSelectionPredicate(defaults), /price_30d IS NULL/);
   assert.match(getCallSelectionPredicate(defaults), /hit_target IS NULL/);
@@ -187,11 +295,16 @@ test("match-prices defaults to incomplete market data and parses full recompute 
     "50",
     "--start-after-id",
     "123",
+    "--fetch-binance",
+    "--binance-tolerance-minutes",
+    "15",
   ]);
   assert.equal(full.rematchAll, true);
   assert.equal(full.limit, 250);
   assert.equal(full.batchSize, 50);
   assert.equal(full.startAfterId, 123);
+  assert.equal(full.fetchBinance, true);
+  assert.equal(full.binanceToleranceMinutes, 15);
   assert.equal(getCallSelectionPredicate(full), "id > $1");
 });
 
@@ -306,6 +419,16 @@ test("public surface verification only fetches external URLs when explicitly req
       .baseUrl,
     "https://www.call-score.com",
   );
+});
+
+test("public surface verification compares live score eligibility against cached creator stats", () => {
+  const sql = buildLiveScoreEligibleStatsSql();
+
+  assert.match(sql, /FROM calls c/);
+  assert.match(sql, /COUNT\(DISTINCT c\.creator_id\)/);
+  assert.match(sql, /extraction_confidence >= 0\.7/);
+  assert.match(sql, /price_at_call IS NOT NULL/);
+  assert.match(sql, /return_30d IS NOT NULL/);
 });
 
 test("publication-date backfill is dry-run and bounded by default", () => {
@@ -444,7 +567,34 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
       "src/scripts/verify-public-surface.ts",
     ),
   );
-  assert.deepEqual(commands["match-prices"], []);
+  assert.deepEqual(commands["evaluation-backfill"], []);
+});
+
+test("data pipeline command pool starts the next item when a lane frees", async () => {
+  const started: number[] = [];
+  let releaseFirst = () => {};
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+
+  const resultsPromise = runWithConcurrency(
+    [0, 1, 2],
+    2,
+    async (item) => {
+      started.push(item);
+      if (item === 0) await firstGate;
+      return item;
+    },
+  );
+
+  try {
+    await waitFor(() => started.length === 3);
+    assert.deepEqual(started, [0, 1, 2]);
+  } finally {
+    releaseFirst();
+  }
+
+  assert.deepEqual(await resultsPromise, [0, 1, 2]);
 });
 
 test("data pipeline write mode executes shadow extraction, guarded promotion, and full rematch when requested", () => {
@@ -474,8 +624,8 @@ test("data pipeline write mode executes shadow extraction, guarded promotion, an
   );
   assert.equal(commands["shadow-promote"][0].includes("new_calls"), true);
   assert.equal(commands["shadow-promote"][0].includes("2"), true);
-  assert.equal(commands["match-prices"][0].includes("--all"), true);
-  assert.equal(commands["match-prices"][0].includes("--batch-size"), true);
+  assert.equal(commands["evaluation-backfill"][0].includes("--all"), true);
+  assert.equal(commands["evaluation-backfill"][0].includes("--batch-size"), true);
   assert.equal(
     commands["verify-public-surface"][0].includes("https://www.call-score.com"),
     true,
@@ -552,6 +702,7 @@ test("audit recompute valid-only writes exclude rejected audit rows", () => {
       id: 1,
       reasons: [],
       after: { score_status: "scored", extraction_confidence: 1 },
+      decision: "PROMOTE",
     },
     {
       id: 2,
@@ -560,6 +711,7 @@ test("audit recompute valid-only writes exclude rejected audit rows", () => {
         score_status: "excluded_confidence",
         extraction_confidence: 0.69,
       },
+      decision: "REJECT",
     },
   ] as never;
 
@@ -589,6 +741,62 @@ test("match-prices LRU helper caps caches and refreshes recently used keys", () 
     ["overflow", 4],
   ]);
   assert.equal(setLruCacheEntry(cache, "ignored", 5, 0), false);
+});
+
+test("price repair uses bounded nearest-candle tolerance bands", () => {
+  const args = parseRepairPriceAtCallArgs([
+    "--write",
+    "--limit",
+    "10",
+    "--batch-size",
+    "5",
+    "--max-tolerance-minutes",
+    "15",
+    "--symbols",
+    "linkusdt,nearusdt",
+    "--audit-out",
+    ".tmp/price.jsonl",
+  ]);
+  assert.equal(args.write, true);
+  assert.equal(args.limit, 10);
+  assert.equal(args.batchSize, 5);
+  assert.equal(args.maxToleranceMinutes, 15);
+  assert.equal(args.fetchBinance, false);
+  assert.deepEqual(args.symbols, ["LINKUSDT", "NEARUSDT"]);
+  assert.equal(toleranceBand(60_000, 60_000), "exact_minute");
+  assert.equal(toleranceBand(60_000, 62_000), "exact_minute");
+  assert.equal(toleranceBand(60_000, 5 * 60_000), "within_5m");
+  assert.equal(toleranceBand(60_000, 31 * 60_000), "within_30m");
+  assert.equal(toleranceBand(60_000, 32 * 60_000), null);
+});
+
+test("symbol funnel audit focuses anomalous symbols and pricing blockers", () => {
+  const args = parseSymbolFunnelAuditArgs([
+    "--symbols",
+    "LINKUSDT,NEARUSDT,XRPUSDT",
+    "--json",
+    "--audit-out",
+    ".tmp/symbols.jsonl",
+  ]);
+  assert.deepEqual(args.symbols, ["LINKUSDT", "NEARUSDT", "XRPUSDT"]);
+  assert.equal(args.json, true);
+  assert.equal(args.auditOut, ".tmp/symbols.jsonl");
+  const sql = buildSymbolFunnelSql();
+  assert.match(sql, /missing_price_at_call/);
+  assert.match(sql, /missing_30d_eval/);
+  assert.match(sql, /low_confidence_validation_decision/);
+  assert.match(sql, /FROM candles/);
+});
+
+test("pipeline blocker dashboard exposes reason, symbol, creator, and stage views", () => {
+  assert.equal(normalizePipelineBlockerLimit(999), 100);
+  assert.match(callBlockerCaseSql("c"), /missing_price_at_call/);
+  assert.match(callBlockerCaseSql("c"), /low_confidence_score_ready_unvalidated/);
+  assert.match(pipelineStageCaseSql("blocker"), /validation/);
+  const sql = callsBlockedByReasonSql();
+  assert.match(sql, /WITH blocked AS/);
+  assert.match(sql, /WHERE NOT/);
+  assert.match(sql, /GROUP BY blocker/);
 });
 
 test("replaceStoredCallsForVideo statements preserve transactional SQL order", async () => {

@@ -15,6 +15,7 @@ export interface PromoteShadowArgs {
   readonly confirmRunId: string;
   readonly write: boolean;
   readonly allowStatuses: ReadonlySet<ShadowDiffStatus>;
+  readonly videoIds: ReadonlySet<number>;
   readonly limit: number;
   readonly markVideoExtracted: boolean;
   readonly auditOut: string;
@@ -29,6 +30,18 @@ function argValue(argv: readonly string[], flag: string): string | null {
 function positiveInt(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function positiveIntList(value: string | null): readonly number[] {
+  if (!value) return [];
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((part) => Number(part.trim()))
+        .filter((parsed) => Number.isInteger(parsed) && parsed > 0),
+    ),
+  );
 }
 
 function parseStatuses(value: string | null): ReadonlySet<ShadowDiffStatus> {
@@ -56,6 +69,11 @@ export function parsePromoteShadowArgs(argv = process.argv.slice(2)): PromoteSha
     confirmRunId,
     write: argv.includes("--write"),
     allowStatuses: parseStatuses(argValue(argv, "--allow-statuses")),
+    videoIds: new Set(
+      positiveIntList(
+        argValue(argv, "--video-ids") ?? argValue(argv, "--reviewed-video-ids"),
+      ),
+    ),
     limit: positiveInt(argValue(argv, "--limit"), Number.MAX_SAFE_INTEGER),
     markVideoExtracted: argv.includes("--mark-video-extracted"),
     auditOut: argValue(argv, "--audit-out") ?? diffIn.replace(/\.jsonl$/i, ".promote.jsonl"),
@@ -66,6 +84,9 @@ function assertWriteGuardrails(args: PromoteShadowArgs): void {
   if (!args.write) return;
   if (args.allowStatuses.size === 0) {
     throw new Error("--write requires explicit --allow-statuses (manual_review is never promotable)");
+  }
+  if (args.videoIds.size === 0) {
+    throw new Error("--write requires explicit --video-ids for reviewed promotion");
   }
 }
 
@@ -87,6 +108,7 @@ function auditPromotion(
     phase,
     action: details.action,
     reason: details.reason,
+    reviewed_video_ids: Array.from(args.videoIds),
     video: diff.video,
     status: diff.status,
     existing_count: diff.existing_count,
@@ -135,6 +157,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     const skipReason =
       diff.status === "manual_review"
         ? "manual_review"
+        : args.videoIds.size > 0 && !args.videoIds.has(diff.video.id)
+          ? "video_not_reviewed"
         : args.allowStatuses.size > 0 && !args.allowStatuses.has(diff.status)
           ? `status_not_allowed:${diff.status}`
           : !shadow.video.published_at
