@@ -66,3 +66,22 @@ test("Whop OAuth route emits canonical callback when public base URL is custom d
     "https://call-score.netlify.app/api/auth/whop/callback",
   );
 });
+
+
+test("Whop OAuth route accepts canonical host even when request origin protocol differs", async () => {
+  process.env.WHOP_OAUTH_BASE_URL = "https://call-score.netlify.app";
+  process.env.WHOP_CLIENT_ID = "app_test";
+
+  const response = await GET(
+    new NextRequest("http://call-score.netlify.app/api/auth/whop"),
+  );
+  const location = response.headers.get("location");
+  assert.ok(location);
+  assert.match(location, /^https:\/\/whop\.com\/oauth\?/);
+
+  const params = new URL(location).searchParams;
+  assert.equal(
+    params.get("redirect_uri"),
+    "https://call-score.netlify.app/api/auth/whop/callback",
+  );
+});

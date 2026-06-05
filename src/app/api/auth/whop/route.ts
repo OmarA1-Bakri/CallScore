@@ -18,7 +18,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     process.env.NODE_ENV === "production" || Boolean(process.env.WHOP_OAUTH_BASE_URL);
   if (
     enforceCanonicalHost &&
-    request.nextUrl.origin !== getWhopOAuthBaseUrl()
+    request.nextUrl.host !== new URL(getWhopOAuthBaseUrl()).host
   ) {
     return NextResponse.redirect(canonicalAuthUrl, { status: 307 });
   }
