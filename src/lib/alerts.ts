@@ -2,7 +2,7 @@
  * Per-creator alerts: watchlist + alerts_queue data layer.
  *
  * Required env vars (consumed indirectly via @/lib/db):
- *   - NEON_DATABASE_URL (or DATABASE_URL / POSTGRES_URL / POSTGRES_URL_NON_POOLING)
+ *   - DATABASE_URL or POSTGRES-compatible env vars; NEON_DATABASE_URL remains backup/legacy fallback
  *
  * Run `migrations/001-watchlists.sql` against the database before using.
  */

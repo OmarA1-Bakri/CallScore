@@ -57,8 +57,8 @@ const POLICY_SECTIONS: readonly PolicySection[] = [
     title: "Third-Party Services",
     content: [
       "We use the following third-party services to operate the platform:",
-      "Vercel: Hosting and deployment. Subject to Vercel's privacy policy.",
-      "Neon: PostgreSQL database hosting for storing creator scores and call data. No personal user data is stored in this database.",
+      "Netlify: Hosting and deployment. Subject to Netlify's privacy policy.",
+      "HH VM PostgreSQL/pgsql: Primary database for creator scores and call data. Neon may be retained only as backup/legacy compatibility. No personal user data is stored in this database.",
       "Whop: Payment processing for premium subscriptions. Subject to Whop's privacy policy.",
     ],
   },
