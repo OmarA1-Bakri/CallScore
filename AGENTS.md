@@ -7,18 +7,18 @@
      7|Project Context
      8|Project name: Crypto Tubers Tracked / `CallScore`
      9|Purpose: This repository is the Whop-distributed crypto YouTuber accuracy application. It discovers crypto creator videos, scrapes or imports transcripts, extracts price calls with LLMs, matches those calls against historical one-minute candle data, computes creator accuracy and alpha-style scores, and serves the ranked product through a Next.js web app with API routes, public pages, gated Whop functionality, alerts, and operational data pipelines.
-    10|Primary stack: TypeScript, Node 20, Next.js App Router, React, Tailwind CSS, Neon Postgres, Vercel, Docker for the Hermes worker runtime, Whop SDK, LLM extraction providers including Gemini/Ollama-compatible flows, Sentry monitoring, and script-driven data pipelines via `tsx` and `node --test`.
+    10|Primary stack: TypeScript, Node 20, Next.js App Router, React, Tailwind CSS, HH VM PostgreSQL/pgsql primary storage with Neon backup/legacy compatibility, Netlify hosting/scheduling, Docker for the Hermes worker runtime, Whop SDK, LLM extraction providers including Gemini/Ollama-compatible flows, Sentry monitoring, and script-driven data pipelines via `tsx` and `node --test`.
     11|Important directories and files:
     12|`src/app/` — Next.js App Router pages, layouts, and public application surfaces.
     13|`src/app/api/` — serverless-style API routes, cron enqueue endpoints, alerts, Whop/auth-adjacent endpoints, and public data routes.
     14|`src/lib/` — shared application logic: database access, scoring, pipeline queues, monitoring, ML verification, constants, and domain utilities.
     15|`src/scripts/` — standalone operational scripts for discovery, scraping, extraction, matching, scoring, migrations, audits, Hermes worker execution, Whop bootstrap, shadow extraction, and ML evaluation.
     16|`tests/` — Node test runner suites. Add new tests here and run them through the existing `npm test` cascade unless a narrower gate is justified first.
-    17|`migrations/` and `schema.sql` — Neon Postgres schema and ordered migrations. Treat production migrations and data rewrites as high-risk.
+    17|`migrations/` and `schema.sql` — PostgreSQL schema and ordered migrations. Production pgsql is primary; Neon is backup/legacy compatibility. Treat production migrations and data rewrites as high-risk.
     18|`docs/current-pipeline-entrypoints.md` — canonical data-refresh and shadow-extraction entrypoints. Prefer this over older script names.
     19|`docs/frontend-design-spec.md` and `.new-FE-design/` — current Editorial Terminal frontend design source of truth.
     20|`Dockerfile.hermes` — production worker image for the always-on Hermes pipeline worker.
-    21|`vercel.json` — Vercel cron and deployment configuration. Git deployments are disabled here; do not assume pushes auto-deploy.
+    21|`netlify.toml` — canonical Netlify build/scheduled-function configuration. `vercel.json` is deprecated compatibility config; do not treat Vercel as production deployment evidence.
     22|`CLAUDE.md` — historical repo-specific agent rules. This `AGENTS.md` supersedes it for tool-neutral agent operation, but preserve any still-valid domain gotchas.
     23|Primary commands:
     24|```bash
@@ -48,11 +48,11 @@
     48|```
     49|`manual_review` shadow rows are intentionally not promotable.
     50|Production systems and external services:
-    51|Neon Postgres — production database for creators, videos, transcripts, extracted calls, candles, scores, pipeline runs, jobs, and job events.
-    52|Vercel — web application host and cron scheduler. `vercel.json` disables git deployment by default and defines cron enqueue routes.
+    51|HH VM PostgreSQL/pgsql — primary production database for creators, videos, transcripts, extracted calls, candles, scores, pipeline runs, jobs, and job events. Neon is backup/legacy compatibility only.
+    52|Netlify — canonical web application host and scheduler. Vercel is deprecated and must not be treated as production deployment evidence.
     53|Hetzner / Hermes worker — always-on Docker worker execution environment for long-running pipeline jobs that should not run inside Vercel request limits.
     54|Whop — product distribution, products/plans/checkouts, app embedding, and membership/access gating.
-    55|`OmarA1-Bakri/Claude_Code_Automations` — companion automation control-plane repo that owns Whop/Vercel adoption, deployment, commerce launch automation, agent workflows, and Hetzner MCP runtime.
+    55|`OmarA1-Bakri/Claude_Code_Automations` — companion automation control-plane repo that owns Whop/Netlify deployment automation, legacy Vercel compatibility surfaces, commerce launch automation, agent workflows, and Hetzner MCP runtime.
     56|LLM providers — extraction, verification, and model bakeoff flows. Do not run large/open-ended LLM jobs without approval.
     57|Sentry — production and worker monitoring.
     58|Resend or email provider integrations — alerts and feedback email paths where configured.
@@ -63,10 +63,10 @@
     63|This repository is the application and data product. The companion repository `OmarA1-Bakri/Claude_Code_Automations` is the automation and agentic operations control-plane.
     64|Use this boundary:
     65|Implement product UI, API routes, database schema, scoring logic, extraction logic, pipeline jobs, and Hermes worker behavior in this repository.
-    66|Implement or modify Whop/Vercel adoption, Whop app scaffolding, audited deployment automation, MCP tools, commerce-launch automation, reusable agent workflows, and Hetzner control-plane logic in `Claude_Code_Automations`.
-    67|Do not duplicate the Whop pipeline plugin inside this repo. This repo may contain app-side Whop integration and bootstrap scripts, but the audited Whop/Vercel automation belongs in the companion repo.
+    66|Implement or modify Whop/Netlify deployment automation, legacy Vercel compatibility surfaces, Whop app scaffolding, audited deployment automation, MCP tools, commerce-launch automation, reusable agent workflows, and Hetzner control-plane logic in `Claude_Code_Automations`.
+    67|Do not duplicate the Whop pipeline plugin inside this repo. This repo may contain app-side Whop integration and bootstrap scripts, but audited Whop/Netlify deployment automation and legacy Vercel compatibility surfaces belong in the companion repo.
     68|If a change spans both repos, update both `AGENTS.md` files or explicitly state why only one side changed.
-    69|Never let an agent in this repo perform live Whop/Vercel provider mutations directly when the companion repo has an audited high-level tool for the task. Use the companion repo’s `whop.adopt`, `whop.deploy`, `whop.reconcile`, `whop.scaffold`, or `whop.commerceLaunch` workflow after explicit approval.
+    69|Never let an agent in this repo perform live Whop/Netlify provider mutations directly when the companion repo has an audited high-level tool for the task. Use the companion repo’s audited workflow after explicit approval; treat Vercel as deprecated unless explicitly approved for compatibility investigation.
     70|---
     71|Hard Rules — Non-Negotiable
     72|Violating these rules can cause lost data, bad rankings, broken paid access, corrupted history, exposed secrets, misleading reports, or production downtime.
@@ -94,8 +94,8 @@
     94|production runs of `compute-scores`, `match-prices`, `audit-recompute`, `backfill-*`, `reextract-low-confidence-videos`, `promote-creator-candidates`, `shadow:promote`, or candle guardrail repair commands
     95|any operation against production `DATABASE_URL` where the write set is not bounded and understood
     96|Production or shared infrastructure
-    97|Vercel deploys, promotions, cron changes, domain changes, or environment-variable changes
-    98|Neon branch deletion or database role/permission changes
+    97|Netlify deploys, promotions, cron changes, domain changes, or environment-variable changes
+    98|pgsql database role/permission changes or Neon branch deletion/backup mutation
     99|Whop product, plan, checkout, webhook, app, or access changes
    100|Hetzner worker restarts, Docker image replacement, queue purges, or systemd/service changes
    101|cache purges affecting users
@@ -143,7 +143,7 @@
    143|Current UI design is the Editorial Terminal direction in `docs/frontend-design-spec.md` and `.new-FE-design/`. Do not reintroduce the superseded green terminal design or generic rounded SaaS-card styling.
    144|UI guardrail tests enforce constraints such as no decorative Lucide icon headers, no rounded chrome, and single-H1 page shape. Do not fight the tests; align with the spec.
    145|`docs/current-pipeline-entrypoints.md` is the canonical pipeline reference. Older script names exist for compatibility and reproducibility only.
-   146|`vercel.json` has `deploymentEnabled: false`; do not assume a push deploys production.
+   146|Netlify is canonical; Vercel is deprecated and must not be treated as production deployment evidence. Do not assume a push deploys production.
    147|Hermes worker jobs should be idempotent, claim-safe, heartbeat-aware, and recoverable through `pipeline_runs`, `pipeline_jobs`, and `pipeline_job_events`.
    148|---
    149|4. Hermes Worker and Queue Rules
@@ -177,13 +177,13 @@
    177|Rules:
    178|Do not replace the canonical path with legacy wrappers unless deliberately testing compatibility.
    179|Do not run expensive extraction or transcript backfills open-ended. Use bounded batches, dry runs, or staging/test databases first.
-   180|Any pipeline script that writes to Neon must clearly state the target database, expected row count, write type, and rollback/repair plan before production execution.
+   180|Any pipeline script that writes to pgsql or Neon backup/legacy data must clearly state the target database, expected row count, write type, and rollback/repair plan before production execution.
    181|Prefer per-row or per-candidate error isolation over aborting whole batches when a single candidate is malformed.
    182|LLM JSON parsing must be defensive. Avoid batch-fatal parsing assumptions where one malformed model response kills the full job.
    183|For shadow extraction, review diffs before promotion and never promote `manual_review` rows.
    184|---
    185|6. Whop and Paid Access Rules
-   186|This app integrates with Whop, but audited Whop/Vercel automation lives in `Claude_Code_Automations`.
+   186|This app integrates with Whop, but audited Whop/Netlify deployment automation and legacy Vercel compatibility surfaces live in `Claude_Code_Automations`.
    187|Inside this repo:
    188|App-side Whop SDK/API use is allowed for product functionality, access checks, webhooks, bootstrap scripts, and route handling.
    189|`npm run whop:bootstrap` is a provider-mutating script. Treat it as production-impacting unless explicitly pointed at a safe test company/product.
@@ -252,7 +252,7 @@
    252|The canonical skills, plugins, and agent definitions live in the shared libraries under `~/cloned_libraries/`. These are the source of truth and must not be duplicated or forked into this repo.
    253|Rules:
    254|`~/cloned_libraries/hermes-library/skills/` is the primary skills library. All skill loading paths in `kilo.jsonc` already point here. Do not create ad-hoc skill files in the project `.kilo/skills/` directory; add or update skills in the library instead.
-   255|`~/cloned_libraries/whop_pipeline_plugin/skills/` provides Whop pipeline automation skills (deploy, adopt, etc.). These are companion-repo tools; use them for reference but prefer the companion repo for live Whop/Vercel mutations.
+   255|`~/cloned_libraries/whop_pipeline_plugin/skills/` provides Whop pipeline automation skills (deploy, adopt, etc.). These are companion-repo tools; use them for reference but prefer the companion repo for live Whop/Netlify mutations and legacy Vercel compatibility investigations only when explicitly approved.
    256|When a skill is missing or needs updating, modify it in the source library, not in the project config. Project-local skill overrides are a last resort.
    257|Agent definitions (`.kilo/agent/*.md`) and commands (`.kilo/command/*.md`) follow the same pattern: library-owned by default, project-level only for repo-specific overrides.
    258|

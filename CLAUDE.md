@@ -1,6 +1,6 @@
      1|# Crypto-Tuber Ranked
      2|
-     3|Crypto-Tuber Ranked is an accuracy tracker for crypto YouTubers — it scrapes their videos, extracts their price calls with LLMs, matches each call against historical 1-minute candles, and ranks creators by an alpha score. This repo is a single Next.js 14 app (App Router, TypeScript) with the public site under [src/app/](src/app/), serverless-style API routes under [src/app/api/](src/app/api/), shared logic under [src/lib/](src/lib/), and the scrape/extract/match/score pipeline as standalone scripts under [src/scripts/](src/scripts/). Storage is Neon Postgres ([schema.sql](schema.sql) + [migrations/](migrations/)); deploys are on Vercel ([vercel.json](vercel.json)).
+     3|Crypto-Tuber Ranked is an accuracy tracker for crypto YouTubers — it scrapes their videos, extracts their price calls with LLMs, matches each call against historical 1-minute candles, and ranks creators by an alpha score. This repo is a single Next.js 14 app (App Router, TypeScript) with the public site under [src/app/](src/app/), serverless-style API routes under [src/app/api/](src/app/api/), shared logic under [src/lib/](src/lib/), and the scrape/extract/match/score pipeline as standalone scripts under [src/scripts/](src/scripts/). Production storage is HH VM PostgreSQL/pgsql (`DATABASE_URL`/`POSTGRES_*`); Neon is backup/legacy compatibility only. Production deploys are on Netlify ([netlify.toml](netlify.toml)); Vercel is deprecated.
      4|
      5|---
      6|
@@ -20,9 +20,9 @@
     20|- `git branch -D`, deleting remote branches (`git push origin :branch`)
     21|- `git commit --amend` on already-pushed commits
     22|- `git tag -d` / force-pushing tags
-    23|- `rm -rf`, `DROP TABLE`, `TRUNCATE`, or any migration that destroys/rewrites rows in Neon
+    23|- `rm -rf`, `DROP TABLE`, `TRUNCATE`, or any migration that destroys/rewrites rows in production pgsql or Neon backup/legacy data
     24|- Re-running pipeline scripts that overwrite production data: `compute-scores`, `match-prices`, `audit-recompute`, `backfill-*`, `reextract-low-confidence-videos`, `promote-creator-candidates` against the prod `DATABASE_URL`
-    25|- Anything touching production: Vercel deploys/promotes, environment-variable changes, Neon branch deletes, DNS, Resend sender setup
+    25|- Anything touching production: Netlify deploys/promotes, environment-variable changes, pgsql role/schema changes, Neon branch deletes, DNS, Resend sender setup
     26|- Spending API quota on third parties (Gemini, Ollama Cloud, Firecrawl, SerpAPI, Whop, Resend) when the run is large or open-ended
     27|- Publishing packages, posting to GitHub/Slack/email, or anything visible to others
     28|
@@ -182,10 +182,10 @@
    182|- **Pipeline**: use the current entrypoint guide in [docs/current-pipeline-entrypoints.md](docs/current-pipeline-entrypoints.md). Prefer `discover:videos → scrape:v2 → extract:llm → match → score → consensus`; `npm run scrape` / `npm run extract` are legacy compatibility paths.
    183|- **Audits**: `npm run audit:recompute`, `npm run audit:coverage`, `npm run audit:global`.
    184|
-   185|Required environment (read from `.env.local` for dev; from Vercel env in prod):
+   185|Required environment (read from `.env.local` for dev; from Netlify/HH runtime env in prod):
    186|
-   187|- `DATABASE_URL` — Neon Postgres connection string. Pipeline scripts will hit whichever DB this points at; double-check before running anything mutating.
-   188|- `GEMINI_API_KEY` / `OLLAMA_API_KEY` (or `OLLAMA_TOKEN`) — used by `extract-calls*` scripts. Ollama Cloud is the default LLM provider. OpenRouter scripts (see `src/scripts/extract-calls-openrouter.ts` and `tests/extract-calls-openrouter.test.ts`) are retained for compatibility with legacy extraction/test flows but are deprecated and not the primary path.
+   187|- `DATABASE_URL` / `POSTGRES_*` — production pgsql connection settings. Neon URLs are backup/legacy compatibility only. Pipeline scripts will hit whichever DB this points at; double-check before running anything mutating.
+   188|- `GEMINI_API_KEY` / `OLLAMA_API_KEY` (or `OLLAMA_TOKEN`) — used by `extract-calls*` scripts. Use the canonical `extract:llm` path in `docs/current-pipeline-entrypoints.md`; openrouter scripts (see `src/scripts/extract-calls-openrouter.ts` and `tests/extract-calls-openrouter.test.ts`) are retained only for legacy compatibility/test flows.
    189|- `RESEND_API_KEY` — alerts and feedback emails.
    190|- Optional integrations: Whop (`WHOP_*`), Firecrawl, SerpAPI for global creator discovery.
    191|
