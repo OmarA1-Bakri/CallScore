@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { SITE_URL } from "@/lib/site";
 
 const OAUTH_STATE_COOKIE_NAME = "ctr_oauth_state";
 const OAUTH_STATE_TTL_SECONDS = 10 * 60;
@@ -42,9 +43,7 @@ export async function GET(): Promise<NextResponse> {
 function getRedirectUri(): string {
   const base =
     process.env.NEXT_PUBLIC_BASE_URL ??
-    (process.env.NODE_ENV === "production"
-      ? "https://call-score.com"
-      : "http://localhost:3000");
+    (process.env.NODE_ENV === "production" ? SITE_URL : "http://localhost:3000");
 
   return `${base}/api/auth/whop/callback`;
 }

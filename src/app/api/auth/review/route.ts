@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createSession } from "@/lib/auth";
+import { SITE_URL } from "@/lib/site";
 import { REVIEWABLE_TIERS, getReviewTier, normalizeNextPath } from "./helpers";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +18,11 @@ function timingSafeTokenEqual(provided: string | null, expected: string): boolea
 }
 
 function trustedBaseUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_BASE_URL ?? "https://www.call-score.com";
+  const configured = process.env.NEXT_PUBLIC_BASE_URL ?? SITE_URL;
   try {
     return new URL(configured).origin;
   } catch {
-    return "https://www.call-score.com";
+    return SITE_URL;
   }
 }
 
