@@ -139,6 +139,7 @@ export default async function CreatorPage({ params }: PageProps) {
   const hitRate = computeCreatorHitRate(allCalls);
   const currentTier = await getCurrentTier();
   const canExport = hasAccess(currentTier, "pro");
+  const canWatchCreator = hasAccess(currentTier, "pro");
 
   return (
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-8">
@@ -236,12 +237,16 @@ export default async function CreatorPage({ params }: PageProps) {
             {canExport ? "Export CSV" : "Export CSV · Pro"}
           </Link>
           <Link
-            href={`/settings/alerts?q=${encodeURIComponent(creator.youtube_handle)}`}
+            href={
+              canWatchCreator
+                ? `/settings/alerts?q=${encodeURIComponent(creator.youtube_handle)}`
+                : "/pricing"
+            }
             className="inline-block font-mono text-[12px] tracking-caps uppercase border border-ink-250 text-ink-700 hover:bg-ink-100 px-3 py-2 transition-colors"
             style={{ borderRadius: 2 }}
             prefetch={false}
           >
-            Watch creator · Pro
+            {canWatchCreator ? "Watch creator" : "Watch creator · Pro"}
           </Link>
         </div>
         {displayCalls.length > 0 ? (

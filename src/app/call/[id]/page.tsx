@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import CallDetailUpgradeCta from "@/components/commercial/CallDetailUpgradeCta";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
+import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { getLiveCallPriceJoinSql, getLiveCallPriceSelectSql } from "@/lib/live-call-pricing";
 import { SYMBOL_TICKERS } from "@/lib/constants";
 import { serializeCall } from "@/lib/public-serializer";
+import { hasAccess } from "@/lib/whop";
 import type { Call, Creator } from "@/lib/types";
 
 interface PageProps {
@@ -151,6 +153,8 @@ export default async function CallDetailPage({ params }: PageProps) {
       ? serializedCall.public_score.toFixed(1)
       : "—";
   const showLivePerformance = serializedCall.is_live_open && serializedCall.live_return !== null;
+  const currentTier = await getCurrentTier();
+  const showUpgradeCta = !hasAccess(currentTier, "pro");
 
   const return30dCellValue =
     serializedCall.return_30d !== null
@@ -320,7 +324,7 @@ export default async function CallDetailPage({ params }: PageProps) {
         subheadline="Upgrade when you want faster signal review, cleaner creator comparisons, and a stronger daily decision loop."
         buttonCopy="Review Pro upgrade"
         href="/pricing"
-        killSwitchActive
+        killSwitchActive={showUpgradeCta}
       />
 
       {/* 03 — source clip

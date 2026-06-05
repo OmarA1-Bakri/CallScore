@@ -352,11 +352,11 @@ export default async function HomePage({
                 <span aria-hidden="true">→</span>
               </Link>
               <Link
-                href="/methodology"
+                href="/pricing"
                 className="inline-flex justify-center border border-ink-300 text-ink-900 hover:border-accent/60 hover:text-accent font-mono text-[13px] tracking-caps uppercase px-7 py-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent"
                 style={{ borderRadius: 2 }}
               >
-                Explore methodology
+                Compare plans
               </Link>
             </div>
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-ink-600 font-sans text-[16px]">

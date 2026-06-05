@@ -3,6 +3,7 @@
 import type { FormEvent, ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
 import type { ApiKeyRequestRow, ApiKeyReveal, ApiKeyRow } from "@/lib/api-keys";
+import { SITE_URL } from "@/lib/site";
 
 interface ApiKeyManagerProps {
   readonly initialKeys: readonly ApiKeyRow[];
@@ -148,6 +149,16 @@ export default function ApiKeyManager({
     setCopyStatus("");
     await clearRevealCookie();
   }
+
+  const curlExample = `curl ${SITE_URL}/api/v1/leaderboard \\
+  -H "Authorization: Bearer <api_key>" \\
+  -H "Accept: application/json"`;
+  const fetchExample = `await fetch("${SITE_URL}/api/v1/calls", {
+  headers: {
+    Authorization: "Bearer <api_key>",
+    Accept: "application/json",
+  },
+});`;
 
   return (
     <div className="space-y-6">
@@ -380,20 +391,13 @@ export default function ApiKeyManager({
               <p className="mb-2 font-mono text-[11px] uppercase tracking-caps text-ink-500">
                 Curl
               </p>
-              <CodeBlock>{`curl https://www.call-score.com/api/v1/leaderboard \\
-  -H "Authorization: Bearer ctr_alpha_..." \\
-  -H "Accept: application/json"`}</CodeBlock>
+              <CodeBlock>{curlExample}</CodeBlock>
             </div>
             <div>
               <p className="mb-2 font-mono text-[11px] uppercase tracking-caps text-ink-500">
                 Fetch
               </p>
-              <CodeBlock>{`await fetch("https://www.call-score.com/api/v1/calls", {
-  headers: {
-    Authorization: "Bearer ctr_alpha_...",
-    Accept: "application/json",
-  },
-});`}</CodeBlock>
+              <CodeBlock>{fetchExample}</CodeBlock>
             </div>
           </div>
         </div>

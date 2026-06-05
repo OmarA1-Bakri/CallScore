@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth";
+import { SITE_URL } from "@/lib/site";
 import { getUserTier } from "@/lib/whop-access";
 
 const OAUTH_STATE_COOKIE_NAME = "ctr_oauth_state";
@@ -19,9 +20,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const baseUrl =
     process.env.NEXT_PUBLIC_BASE_URL ??
-    (process.env.NODE_ENV === "production"
-      ? "https://call-score.com"
-      : "http://localhost:3000");
+    (process.env.NODE_ENV === "production" ? SITE_URL : "http://localhost:3000");
 
   const redirectWithStateClear = (path: string): NextResponse => {
     const response = NextResponse.redirect(`${baseUrl}${path}`);
