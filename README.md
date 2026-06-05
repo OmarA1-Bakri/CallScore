@@ -5,5 +5,5 @@
 CallScore ranks crypto creators by historical, evidence-backed call performance — receipts over vibes.
 
 - **Live:** [call-score.com](https://call-score.com)
-- **Netlify:** [callscore.netlify.app](https://callscore.netlify.app)
+- **Netlify:** [call-score.netlify.app](https://call-score.netlify.app)
 - **Whop:** [CallScore on Whop](https://whop.com/apps/app_cDfDRY1cj8yQJZ)
