@@ -21,6 +21,11 @@ test("/pricing keeps the feature matrix table with 12 features", () => {
   assert.match(src, /const FEATURES/);
 });
 
+test("/pricing presents live 30d and 90d filters as paid features", () => {
+  assert.match(src, /Recent-performance filters \(30\/90d\)/);
+  assert.doesNotMatch(src, /30\/90d planned|Recent-performance filter \(30\/90d planned\)/);
+});
+
 test("/pricing does not use the `cat /docs/pricing.md` terminal-prompt header", () => {
   assert.doesNotMatch(src, /cat \/docs/);
 });

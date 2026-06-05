@@ -253,7 +253,9 @@ export default function CallHistory({
                     )}
                   </td>
                   <td className="px-4 py-3 text-center hidden md:table-cell">
-                    {call.target_status === "pending" ? (
+                    {call.validated_target_price === null ? (
+                      <span className="text-ink-600">--</span>
+                    ) : call.target_status === "pending" ? (
                       <span className="text-xs uppercase tracking-wider text-ink-600">
                         Pending 90d
                       </span>
