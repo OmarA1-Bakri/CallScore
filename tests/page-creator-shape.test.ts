@@ -26,7 +26,7 @@ test("creator page imports AlphaScoreBadge (not AlphaScoreBar — that's leaderb
 });
 
 test("creator page distinguishes directional wins from target hit rate", () => {
-  assert.match(src, /30d dir\. win/);
-  assert.match(src, /directional win rate at 30 days/);
+  assert.match(src, /direction win/);
+  assert.match(src, /directional win rate on resolved calls/);
   assert.match(src, /Target Hit Rate/);
 });

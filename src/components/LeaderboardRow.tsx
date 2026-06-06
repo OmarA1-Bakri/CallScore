@@ -60,7 +60,7 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
         {alpha.toFixed(1)}
         <span className="text-ink-500 text-[11px] ml-1">α</span>
       </td>
-      {/* 30d Δ */}
+      {/* Average alpha delta */}
       <td className="py-3 pr-4 text-right tabular-nums font-mono text-[13px]">
         <span className={delta30 >= 0 ? "text-pos" : "text-neg"}>
           {delta30 >= 0 ? "+" : ""}

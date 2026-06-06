@@ -17,7 +17,7 @@ test("Leaderboard exposes the 8-column spec subset", () => {
   // Spec headers (case-insensitive match on the rendered text).
   // Per Phase 2 scope: 8 of 11 dev-pack columns. Trend, Provenance, multi-select
   // checkbox are explicitly deferred — see Task 2 prompt. Last call label is replaced by Best coin for scored-call clarity.
-  for (const h of ["Rank", "Creator", "Alpha", "30d", "Win", "Tier", "Best coin"]) {
+  for (const h of ["Rank", "Creator", "Alpha", "Avg α", "Win", "Tier", "Best coin"]) {
     assert.match(src, new RegExp(`>\\s*${h}`, "i"), `header ${h} missing`);
   }
 });

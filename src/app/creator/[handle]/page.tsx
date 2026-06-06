@@ -171,7 +171,7 @@ export default async function CreatorPage({ params }: PageProps) {
           cells={[
             { k: "rank", v: stats?.accuracy_rank ?? "—" },
             { k: "alpha", v: alphaScore.toFixed(1) },
-            { k: "30d dir. win", v: `${(winRate * 100).toFixed(0)}%` },
+            { k: "direction win", v: `${(winRate * 100).toFixed(0)}%` },
             { k: "scored calls", v: scoredCallCount },
           ]}
         />
@@ -184,7 +184,7 @@ export default async function CreatorPage({ params }: PageProps) {
           <em className="italic text-accent">#{stats?.accuracy_rank ?? "—"}</em> on average alpha
           across {scoredCallCount} scored calls
           {scoredCallCount > 0
-            ? `, with a ${(winRate * 100).toFixed(0)}% directional win rate at 30 days`
+            ? `, with a ${(winRate * 100).toFixed(0)}% directional win rate on resolved calls`
             : ""}
           .
         </p>
@@ -204,7 +204,7 @@ export default async function CreatorPage({ params }: PageProps) {
             unit="target"
           />
           <MetricTile
-            label="Avg α 30d"
+            label="Avg α"
             value={`${avgAlpha30d >= 0 ? "+" : ""}${avgAlpha30d.toFixed(1)}`}
             unit="%"
             tone={avgAlpha30d >= 0 ? "pos" : "neg"}
@@ -253,7 +253,7 @@ export default async function CreatorPage({ params }: PageProps) {
           <>
             {scoredCallCount === 0 ? (
               <p className="mb-4 font-mono text-[12px] text-ink-500 tracking-wide">
-                No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or 30d/90d outcomes.
+                No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or outcome windows.
               </p>
             ) : null}
             <CallHistory
@@ -264,7 +264,7 @@ export default async function CreatorPage({ params }: PageProps) {
           </>
         ) : (
           <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-            No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or 30d/90d outcomes.
+            No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or outcome windows.
           </p>
         )}
       </EditorialSection>

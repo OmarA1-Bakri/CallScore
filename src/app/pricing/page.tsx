@@ -30,7 +30,7 @@ const FEATURES: readonly FeatureRow[] = [
   { label: "Methodology",                               free: "yes", pro: "yes", alpha: "yes", href: "/methodology" },
   { label: "Per-creator email alerts + queue",          free: "no",  pro: "yes", alpha: "yes", href: "/alerts" },
   { label: "Watchlists with creator management",        free: "no",  pro: "yes", alpha: "yes", href: "/alerts" },
-  { label: "Recent-performance filters (30/90d)",       free: "no",  pro: "yes", alpha: "yes", href: "/?period=90d" },
+  { label: "90-day recent-context filter",              free: "no",  pro: "yes", alpha: "yes", href: "/?period=90d" },
   { label: "CSV export of creator call history",        free: "no",  pro: "yes", alpha: "yes", href: "/pricing#plans" },
   { label: "Historical backtest simulator",             free: "no",  pro: "no",  alpha: "yes", href: "/backtest" },
   { label: "Anti-consensus alerts (Alpha preview)",     free: "no",  pro: "no",  alpha: "soon", href: "/alerts" },
