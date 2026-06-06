@@ -11,9 +11,12 @@ import {
 } from "../src/lib/public-methodology";
 import {
   getLeaderboardEligibilitySql,
+  getLeaderboardSampleThreshold,
   LOW_N_WARNING_CALLS,
   MIN_PUBLIC_LEADERBOARD_CALLS,
   OBSOLETE_LEADERBOARD_CALL_THRESHOLD,
+  RECENT_CONTEXT_LOW_N_WARNING_CALLS,
+  RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS,
 } from "../src/lib/leaderboard-eligibility";
 import {
   CREATOR_JUDGMENT_WINDOW_DAYS,
@@ -276,10 +279,31 @@ test("creator score averages reconcile with the per-call public components", () 
 });
 
 test("leaderboard requires a minimum public scored call sample", () => {
-  assert.equal(OBSOLETE_LEADERBOARD_CALL_THRESHOLD, 5);
-  assert.equal(MIN_PUBLIC_LEADERBOARD_CALLS, 5);
-  assert.equal(LOW_N_WARNING_CALLS, 15);
-  assert.equal(getLeaderboardEligibilitySql("cs"), "cs.total_calls >= 5");
+  assert.equal(OBSOLETE_LEADERBOARD_CALL_THRESHOLD, 25);
+  assert.equal(MIN_PUBLIC_LEADERBOARD_CALLS, 25);
+  assert.equal(LOW_N_WARNING_CALLS, 50);
+  assert.equal(getLeaderboardEligibilitySql("cs"), "cs.total_calls >= 25");
+  assert.equal(getLeaderboardEligibilitySql("cs", "all_time"), "cs.total_calls >= 25");
+});
+
+test("leaderboard sample floors are period-aware", () => {
+  assert.deepEqual(getLeaderboardSampleThreshold("all_time"), {
+    min_public_scored_calls: 25,
+    low_n_warning_calls: 50,
+    sample_floor_label: "N = public-scored calls in rolling 12 months",
+  });
+  assert.deepEqual(getLeaderboardSampleThreshold("90d"), {
+    min_public_scored_calls: RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS,
+    low_n_warning_calls: RECENT_CONTEXT_LOW_N_WARNING_CALLS,
+    sample_floor_label: "Recent context; lower sample floor applies",
+  });
+  assert.deepEqual(getLeaderboardSampleThreshold("30d"), {
+    min_public_scored_calls: RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS,
+    low_n_warning_calls: RECENT_CONTEXT_LOW_N_WARNING_CALLS,
+    sample_floor_label: "30 days · internal experimental sample view",
+  });
+  assert.equal(getLeaderboardEligibilitySql("cs", "90d"), "cs.total_calls >= 10");
+  assert.equal(getLeaderboardEligibilitySql("cs", "30d"), "cs.total_calls >= 10");
 });
 
 test("score-ready SQL can be reused without lowering the confidence gate", () => {

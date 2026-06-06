@@ -18,10 +18,12 @@
 import type { ReactElement } from "react";
 import LeaderboardRow from "./LeaderboardRow";
 import TierGate from "./TierGate";
+import type { LeaderboardSampleThreshold } from "@/lib/leaderboard-eligibility";
 import type { LeaderboardRow as Row } from "@/lib/types";
 
 interface LeaderboardProps {
   readonly rows: readonly Row[];
+  readonly sampleThreshold: LeaderboardSampleThreshold;
 }
 
 const HEADERS: ReadonlyArray<{ key: string; label: ReactElement; align: "left" | "right" | "center" }> = [
@@ -30,12 +32,15 @@ const HEADERS: ReadonlyArray<{ key: string; label: ReactElement; align: "left" |
   { key: "alpha", label: <>Alpha</>, align: "right" },
   { key: "delta", label: <>Avg α</>, align: "right" },
   { key: "win", label: <>Win %</>, align: "right" },
-  { key: "n", label: <>N</>, align: "right" },
+  { key: "n", label: <>N<span className="sr-only"> public-scored calls for the active sample window</span></>, align: "right" },
   { key: "tier", label: <>Tier</>, align: "center" },
   { key: "best", label: <>Best coin<span className="sr-only"> Best public-scored call symbol</span></>, align: "right" },
 ];
 
-function renderTable(rows: readonly Row[]): ReactElement {
+function renderTable(
+  rows: readonly Row[],
+  sampleThreshold: LeaderboardSampleThreshold,
+): ReactElement {
   return (
     <table className="w-full">
       <thead className="sticky top-0 bg-ink-50 z-sticky">
@@ -54,13 +59,21 @@ function renderTable(rows: readonly Row[]): ReactElement {
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => <LeaderboardRow key={row.creator.id} row={row} />)}
+        {rows.map((row) => (
+          <LeaderboardRow
+            key={row.creator.id}
+            row={row}
+            minPublicScoredCalls={sampleThreshold.min_public_scored_calls}
+            lowNWarningCalls={sampleThreshold.low_n_warning_calls}
+            sampleFloorLabel={sampleThreshold.sample_floor_label}
+          />
+        ))}
       </tbody>
     </table>
   );
 }
 
-export default function Leaderboard({ rows }: LeaderboardProps): ReactElement {
+export default function Leaderboard({ rows, sampleThreshold }: LeaderboardProps): ReactElement {
   const alpha = rows.filter((r) => r.tier_required === "alpha");
   const pro = rows.filter((r) => r.tier_required === "pro");
   const free = rows.filter((r) => r.tier_required === "free");
@@ -73,9 +86,9 @@ export default function Leaderboard({ rows }: LeaderboardProps): ReactElement {
         </span>
       </div>
       <div className="overflow-x-auto pb-2">
-        {alpha.length > 0 && <TierGate tier="alpha">{renderTable(alpha)}</TierGate>}
-        {pro.length > 0 && <TierGate tier="pro">{renderTable(pro)}</TierGate>}
-        {free.length > 0 && renderTable(free)}
+        {alpha.length > 0 && <TierGate tier="alpha">{renderTable(alpha, sampleThreshold)}</TierGate>}
+        {pro.length > 0 && <TierGate tier="pro">{renderTable(pro, sampleThreshold)}</TierGate>}
+        {free.length > 0 && renderTable(free, sampleThreshold)}
       </div>
       <div
         className="pointer-events-none absolute bottom-2 right-0 top-7 w-12 bg-gradient-to-l from-ink-0 to-transparent tab:hidden"

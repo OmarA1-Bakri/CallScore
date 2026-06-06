@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { noStoreHeaders } from "@/lib/http-cache";
 import { requireAlphaApiAccess } from "@/lib/premium";
-import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
+import {
+  getLeaderboardEligibilitySql,
+  getLeaderboardSampleThreshold,
+} from "@/lib/leaderboard-eligibility";
 import { getCallEligibilitySql } from "@/lib/public-methodology";
 import {
   CREATOR_JUDGMENT_WINDOW_DAYS,
@@ -54,7 +57,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "invalid_period" }, { status: 400, headers: noStoreHeaders() });
   }
   const period = periodParam as Period;
-  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+  const sampleThreshold = getLeaderboardSampleThreshold(period);
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
   const rawRows = await query(
     `SELECT cs.*, c.name, c.youtube_handle
      FROM creator_stats cs
@@ -81,6 +85,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         period,
         period_token: period,
         display_window_label: getDisplayWindowLabel(period),
+        min_public_scored_calls: sampleThreshold.min_public_scored_calls,
+        low_n_warning_calls: sampleThreshold.low_n_warning_calls,
+        sample_floor_label: sampleThreshold.sample_floor_label,
         window_days: getWindowDays(period),
         window_start: windowRange.window_start,
         window_end: windowRange.window_end,

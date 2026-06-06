@@ -41,8 +41,9 @@ test("Leaderboard renders score-Tier column distinct from auth-tier grouping", (
 });
 
 test("RankTierBadge separates obsolete rows from low-N warning rows", () => {
-  assert.match(rankTierSrc, /MIN_PUBLIC_LEADERBOARD_CALLS/);
-  assert.match(rankTierSrc, /LOW_N_WARNING_CALLS/);
+  assert.match(rankTierSrc, /minPublicScoredCalls/);
+  assert.match(rankTierSrc, /lowNWarningCalls/);
+  assert.match(rankTierSrc, /sampleFloorLabel/);
   assert.match(rankTierSrc, /Obsolete/);
   assert.match(rankTierSrc, /Low N/);
   assert.doesNotMatch(rankTierSrc, /totalCalls\s*<\s*50/);
