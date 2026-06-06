@@ -6,7 +6,10 @@ import { hasAccess } from "@/lib/whop";
 import { getUserTier } from "@/lib/whop-access";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
-import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
+import {
+  getLeaderboardEligibilitySql,
+  getLeaderboardSampleThreshold,
+} from "@/lib/leaderboard-eligibility";
 import { getCallEligibilitySql } from "@/lib/public-methodology";
 import {
   CREATOR_JUDGMENT_WINDOW_DAYS,
@@ -150,7 +153,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const period: Period = periodParam;
-    const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+    const sampleThreshold = getLeaderboardSampleThreshold(period);
+    const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
     if (period !== "all_time") {
       const auth = getRequestAuthContext(request);
       const userTier = auth.session?.tier ?? (await getUserTier(auth.accessToken, auth.session?.userId));
@@ -282,6 +286,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         period,
         period_token: period,
         display_window_label: getDisplayWindowLabel(period),
+        min_public_scored_calls: sampleThreshold.min_public_scored_calls,
+        low_n_warning_calls: sampleThreshold.low_n_warning_calls,
+        sample_floor_label: sampleThreshold.sample_floor_label,
         window_days: getWindowDays(period),
         window_start: windowRange.window_start,
         window_end: windowRange.window_end,

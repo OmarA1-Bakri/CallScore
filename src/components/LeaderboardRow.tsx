@@ -6,6 +6,9 @@ import RankTierBadge from "./RankTierBadge";
 
 interface LeaderboardRowProps {
   readonly row: Row;
+  readonly minPublicScoredCalls: number;
+  readonly lowNWarningCalls: number;
+  readonly sampleFloorLabel: string;
 }
 
 function getInitials(name: string): string {
@@ -17,7 +20,12 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactElement {
+export default function LeaderboardRow({
+  row,
+  minPublicScoredCalls,
+  lowNWarningCalls,
+  sampleFloorLabel,
+}: LeaderboardRowProps): ReactElement {
   const alpha = row.stats.alpha_score;
   const delta30 = row.stats.avg_alpha_30d;
   const winPct = (row.stats.win_rate * 100).toFixed(1);
@@ -80,6 +88,9 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
         <RankTierBadge
           rank={row.rank}
           totalCalls={row.stats.total_calls}
+          minPublicScoredCalls={minPublicScoredCalls}
+          lowNWarningCalls={lowNWarningCalls}
+          sampleFloorLabel={sampleFloorLabel}
         />
       </td>
       {/* Best coin — symbol from the best public-scored call */}

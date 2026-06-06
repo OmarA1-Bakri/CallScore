@@ -8,7 +8,10 @@ import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { getPublicCounts } from "@/lib/public-counts";
-import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
+import {
+  getLeaderboardEligibilitySql,
+  getLeaderboardSampleThreshold,
+} from "@/lib/leaderboard-eligibility";
 import { CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL, CREATOR_JUDGMENT_WINDOW_LABEL, RECENT_PUBLIC_SCORING_MATURITY_NOTE } from "@/lib/judgment-window";
 import { getCreatorTier } from "@/lib/creator-tier";
 import { hasAccess } from "@/lib/whop";
@@ -153,7 +156,8 @@ export default async function HomePage({
   const canUseRecent = hasAccess(currentTier, "pro");
   const period: Period = canUseRecent ? requestedPeriod : "all_time";
 
-  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+  const sampleThreshold = getLeaderboardSampleThreshold(period);
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
 
   // Fetch leaderboard from DB
   let leaderboard: LeaderboardRow[] = [];
@@ -300,7 +304,8 @@ export default async function HomePage({
         COALESCE(SUM(total_calls), 0)::text AS total_calls,
         CASE WHEN COUNT(*) > 0 THEN ROUND((AVG(win_rate) * 100)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
         COUNT(DISTINCT creator_id)::text AS creator_count
-      FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql}`,
+      FROM creator_stats cs WHERE cs.period = $1 AND ${leaderboardEligibleSql}`,
+      [period],
     );
     if (statsRows.length > 0) {
       totalCalls = Number(statsRows[0].total_calls) > 0 ? statsRows[0].total_calls : "0";
@@ -453,7 +458,7 @@ export default async function HomePage({
         <div className="flex flex-col tab:flex-row tab:items-end tab:justify-between gap-3 mb-4">
           <div className="space-y-1">
             <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-              Sorted by alpha; ties broken by Wilson lower bound.
+              {sampleThreshold.sample_floor_label}; floor {sampleThreshold.min_public_scored_calls}, Low N below {sampleThreshold.low_n_warning_calls}.
             </p>
             <p className="font-mono text-[11px] text-ink-500 tracking-wide max-w-[720px]">
               {RECENT_PUBLIC_SCORING_MATURITY_NOTE}
@@ -462,7 +467,7 @@ export default async function HomePage({
           <PeriodFilter value={period} canUseRecent={canUseRecent} />
         </div>
         {leaderboard.length > 0 ? (
-          <Leaderboard rows={leaderboard} />
+          <Leaderboard rows={leaderboard} sampleThreshold={sampleThreshold} />
         ) : (
           <div className="border-t border-ink-250 py-12 text-center">
             <p className="font-mono text-[12px] text-ink-500 tracking-wide">
