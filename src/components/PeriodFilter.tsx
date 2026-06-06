@@ -8,7 +8,6 @@ import type { Period } from "@/lib/types";
 const PERIODS: ReadonlyArray<{ readonly value: Period; readonly label: string }> = [
   { value: "all_time", label: CREATOR_JUDGMENT_WINDOW_LABEL },
   { value: "90d", label: "90 days · Pro" },
-  { value: "30d", label: "30 days · Pro" },
 ];
 
 interface PeriodFilterProps {
@@ -57,7 +56,7 @@ export default function PeriodFilter({ value, canUseRecent = true }: PeriodFilte
         })}
       </div>
       <p className="font-mono text-[10px] uppercase tracking-caps text-ink-500">
-        Viewing Last 12 months. 90-day and 30-day filters require Pro.
+        Viewing Last 12 months. The 90-day context filter requires Pro.
       </p>
     </div>
   );

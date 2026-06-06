@@ -28,7 +28,7 @@ const HEADERS: ReadonlyArray<{ key: string; label: ReactElement; align: "left" |
   { key: "rank", label: <>Rank</>, align: "left" },
   { key: "creator", label: <>Creator</>, align: "left" },
   { key: "alpha", label: <>Alpha</>, align: "right" },
-  { key: "delta", label: <>30d Δ</>, align: "right" },
+  { key: "delta", label: <>Avg α</>, align: "right" },
   { key: "win", label: <>Win %</>, align: "right" },
   { key: "n", label: <>N</>, align: "right" },
   { key: "tier", label: <>Tier</>, align: "center" },

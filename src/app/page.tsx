@@ -466,7 +466,7 @@ export default async function HomePage({
         ) : (
           <div className="border-t border-ink-250 py-12 text-center">
             <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-              No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or 30d/90d outcomes.
+              No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or outcome windows.
             </p>
           </div>
         )}
@@ -671,12 +671,12 @@ function MarketCallPreview({
         </div>
         <div className="border border-ink-200 bg-ink-50/70 p-4" style={{ borderRadius: 2 }}>
           <p className="font-mono text-[10px] text-ink-500 tracking-caps uppercase mb-2">
-            Avg 30d Delta
+            Avg Alpha Delta
           </p>
           <p className={`font-serif text-[43px] leading-none ${avgAlpha >= 0 ? "text-pos" : "text-neg"}`}>
             {formatSignedNumber(avgAlpha)}
           </p>
-          <p className="font-mono text-[11px] text-ink-500 mt-2">30d vs BTC</p>
+          <p className="font-mono text-[11px] text-ink-500 mt-2">vs BTC</p>
         </div>
       </div>
 
@@ -691,7 +691,6 @@ function MarketCallPreview({
           <div className="hidden tab:flex items-center gap-6 font-mono text-[11px] text-ink-500 tracking-caps uppercase">
             <span className="text-ink-900 border-b border-accent pb-1">{CREATOR_JUDGMENT_WINDOW_LABEL}</span>
             <span>90 Days · Pro</span>
-            <span>30 Days · Pro</span>
           </div>
         </div>
         <div className="overflow-hidden">
@@ -700,7 +699,7 @@ function MarketCallPreview({
               <span>rank</span>
               <span>creator</span>
               <span>alpha</span>
-              <span>30d Δ</span>
+              <span>Avg α</span>
               <span>win %</span>
               <span>best coin</span>
             </div>
@@ -753,7 +752,7 @@ function MarketCallPreview({
               })
             ) : (
               <div className="border-t border-ink-200 py-8 text-center font-mono text-[12px] text-ink-500 tracking-wide">
-                No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or 30d/90d outcomes.
+                No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or outcome windows.
               </div>
             )}
           </div>

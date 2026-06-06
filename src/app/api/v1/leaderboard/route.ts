@@ -22,7 +22,6 @@ interface LatestPublicCallDateRow {
 
 const GATED_PERIODS = [
   { period_token: "90d", display_window_label: "90 days", required_tier: "pro" },
-  { period_token: "30d", display_window_label: "30 days", required_tier: "pro" },
 ] as const;
 
 function getWindowDays(period: Period): number {
@@ -33,7 +32,7 @@ function getWindowDays(period: Period): number {
 
 function getDisplayWindowLabel(period: Period): string {
   if (period === "90d") return "90 days";
-  if (period === "30d") return "30 days";
+  if (period === "30d") return "30 days · internal experimental sample view";
   return CREATOR_JUDGMENT_WINDOW_LABEL;
 }
 
