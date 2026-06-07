@@ -24,17 +24,17 @@ interface BlockedCreator {
 
 async function getBlockedCreators(): Promise<BlockedCreator[]> {
   const rows = await query<BlockedCreator>(`
-    SELECT 
-      c.name, 
-      c.youtube_handle as handle, 
+    SELECT
+      c.name,
+      c.youtube_handle as handle,
       c.subscribers,
       COUNT(*) FILTER (WHERE v.transcript_status = 'failed')::int as blocked,
       COUNT(*) FILTER (WHERE v.transcript_status = 'available')::int as available,
       ROUND(
-        COUNT(*) FILTER (WHERE v.transcript_status = 'failed')::numeric 
+        COUNT(*) FILTER (WHERE v.transcript_status = 'failed')::numeric
         / NULLIF(COUNT(*), 0) * 100, 0
       )::int as pct_blocked
-    FROM videos v 
+    FROM videos v
     JOIN creators c ON v.creator_id = c.id
     WHERE v.transcript_status IN ('failed', 'available')
     GROUP BY c.name, c.youtube_handle, c.subscribers
