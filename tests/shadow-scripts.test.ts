@@ -13,6 +13,7 @@ import {
   main as promoteShadowMain,
   parsePromoteShadowArgs,
 } from "../src/scripts/promote-shadow-extractions";
+import { replaceStoredCallsForVideo } from "../src/scripts/script-helpers";
 
 test("shadow extraction defaults to all transcript recheck selection without production writes", () => {
   const args = parseShadowExtractArgs([
@@ -259,6 +260,117 @@ test("shadow promotion emits structured dry-run audit rows before any write", as
   assert.equal(rows[0].phase, "dry_run");
   assert.equal(rows[0].action, "promote");
   assert.equal(rows[0].video.id, 101);
+});
+
+test("shadow promotion write path can use an injected provider-portable transaction executor", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "shadow-promote-portable-"));
+  const shadowIn = join(dir, "shadow.jsonl");
+  const diffIn = join(dir, "diff.jsonl");
+  const auditOut = join(dir, "promote.jsonl");
+  const video = {
+    id: 101,
+    creator_id: 7,
+    creator_name: "Creator",
+    youtube_handle: "@Creator",
+    youtube_video_id: "yt101",
+    title: "BTC update",
+    published_at: "2026-01-01T00:00:00.000Z",
+    created_at: "2026-01-01T00:00:00.000Z",
+  };
+  const acceptedCall = {
+    symbol: "BTCUSDT",
+    direction: "bullish" as const,
+    call_type: "buy" as const,
+    entry_price: 100,
+    target_price: 125,
+    stop_loss: 90,
+    timeframe: "30d",
+    confidence: "high" as const,
+    strategy_type: "technical_analysis" as const,
+    raw_quote: "BTC higher",
+    extraction_confidence: 0.9,
+    specificity_score: 0.8,
+  };
+
+  writeFileSync(
+    shadowIn,
+    `${JSON.stringify({
+      record_type: "shadow_extraction",
+      ts: "2026-01-01T00:00:00.000Z",
+      run_id: "shadow-test",
+      provider: "ollama",
+      model: "kimi-k2.6",
+      fallback_model: null,
+      video,
+      transcript_sha256: "abc",
+      transcript_length: 100,
+      candidate_count: 1,
+      accepted_count: 1,
+      accepted_calls: [acceptedCall],
+      chunk_summary: {
+        chunk_count: 1,
+        covered_until_offset: 100,
+        reached_transcript_end: true,
+      },
+      error: null,
+    })}\n`,
+  );
+  writeFileSync(
+    diffIn,
+    `${JSON.stringify({
+      record_type: "shadow_diff",
+      ts: "2026-01-01T00:00:00.000Z",
+      run_id: "shadow-test",
+      video,
+      status: "changed_calls",
+      existing_count: 1,
+      accepted_count: 1,
+      unchanged_count: 0,
+      added: ["BTCUSDT bullish buy"],
+      removed: ["BTCUSDT bullish watch"],
+      reasons: [],
+    })}\n`,
+  );
+
+  const executed: string[] = [];
+  await promoteShadowMain(
+    [
+      "--shadow-in",
+      shadowIn,
+      "--diff-in",
+      diffIn,
+      "--confirm-run-id",
+      "shadow-test",
+      "--allow-statuses",
+      "changed_calls",
+      "--video-ids",
+      "101",
+      "--write",
+      "--audit-out",
+      auditOut,
+    ],
+    {
+      replaceStoredCallsForVideo: (options) =>
+        replaceStoredCallsForVideo(options, {
+          transaction: async (callback) =>
+            callback(async (sql) => {
+              executed.push(sql.replace(/\s+/g, " ").trim());
+              return [];
+            }),
+        }),
+    },
+  );
+
+  assert.deepEqual(
+    executed.map((sql) => sql.split(" ").slice(0, 3).join(" ")),
+    ["DELETE FROM calls", "INSERT INTO calls"],
+  );
+  const rows = readFileSync(auditOut, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => JSON.parse(line));
+  assert.equal(rows[0].phase, "before_write");
+  assert.equal(rows[1].phase, "after_write");
 });
 
 test("shadow promotion only promotes reviewed video IDs when an allowlist is present", async () => {

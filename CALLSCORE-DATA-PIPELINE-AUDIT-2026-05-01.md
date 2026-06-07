@@ -1,7 +1,12 @@
 # CallScore Data Pipeline Audit — 2026-05-01
 
+> Superseded infrastructure note (2026-06-07): this audit is historical evidence
+> from the May 2026 Neon-era pipeline. Current canonical production storage is
+> HH VM PostgreSQL/pgsql; Neon is backup/legacy compatibility only. See
+> `docs/legacy-infra-superseded.md`.
+
 Generated: 2026-05-01 19:10 UTC
-Database: Neon `neondb`
+Database at time of audit: Neon `neondb` (legacy; no longer canonical)
 Production checked: `https://www.call-score.com`
 
 ## Executive summary

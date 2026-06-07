@@ -23,6 +23,46 @@ const NEON_URL_ENV_KEYS = ["NEON_DATABASE_URL", "DATABASE_URL"] as const;
 type DatabaseEnv = Record<string, string | undefined>;
 type QueryExecutor = <T>(text: string, params?: unknown[]) => Promise<T[]>;
 
+export interface SqlStatement {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+}
+
+export type SqlExecutor = (
+  sql: string,
+  params?: readonly unknown[],
+) => Promise<unknown>;
+
+type TransactionCallback<T> = (execute: SqlExecutor) => Promise<T>;
+
+interface TransactionCapableNeonDb {
+  transaction<T>(
+    callback: (txn: SqlExecutor) => readonly Promise<T>[],
+  ): Promise<readonly T[]>;
+}
+
+interface PostgresQueryResult {
+  readonly rows?: readonly unknown[];
+}
+
+interface PostgresClientLike {
+  query(sql: string, params?: readonly unknown[]): Promise<PostgresQueryResult>;
+  release(): void;
+}
+
+interface PostgresPoolLike {
+  query(sql: string, params?: readonly unknown[]): Promise<PostgresQueryResult>;
+  connect(): Promise<PostgresClientLike>;
+}
+
+export interface TransactionOptions {
+  readonly provider?: DatabaseProvider;
+  readonly env?: DatabaseEnv;
+  readonly getNeonDb?: () => unknown;
+  readonly getPostgresPool?: () => Promise<PostgresPoolLike>;
+  readonly transaction?: <T>(callback: TransactionCallback<T>) => Promise<T>;
+}
+
 let providerCache: DatabaseProvider | null = null;
 let neonExecutor: QueryExecutor | null = null;
 let pgPool: Pool | null = null;
@@ -31,8 +71,11 @@ let pgPoolPromise: Promise<Pool> | null = null;
 function normalizeProvider(value: string | undefined): DatabaseProvider | null {
   if (!value) return null;
   const normalized = value.trim().toLowerCase();
-  if (normalized === "neon" || normalized === "postgres") return normalized;
-  throw new Error("Invalid DATABASE_PROVIDER. Expected 'neon' or 'postgres'.");
+  if (["postgres", "postgresql", "pgsql", "pg"].includes(normalized)) return "postgres";
+  if (normalized === "neon") return "neon";
+  throw new Error(
+    "Invalid DATABASE_PROVIDER. Expected 'neon', 'postgres', 'postgresql', 'pgsql', or 'pg'.",
+  );
 }
 
 function isLocalPostgresUrl(url: string): boolean {
@@ -59,14 +102,31 @@ function firstUrl(env: DatabaseEnv, keys: readonly string[]): string | null {
   return null;
 }
 
+function toMutableParams(params: readonly unknown[] | undefined): unknown[] {
+  return params ? [...params] : [];
+}
+
+function isTransactionCapableNeonDb(
+  db: unknown,
+): db is TransactionCapableNeonDb {
+  return Boolean(
+    db &&
+      typeof db === "object" &&
+      "transaction" in db &&
+      typeof (db as { transaction?: unknown }).transaction === "function",
+  );
+}
+
 export function resolveDatabaseProvider(
   env: DatabaseEnv = process.env,
 ): DatabaseProvider {
-  const explicit = normalizeProvider(env.DATABASE_PROVIDER);
+  const explicit = normalizeProvider(env.DATABASE_PROVIDER ?? env.DB_PROVIDER);
   if (explicit) return explicit;
 
   const databaseUrl = env.DATABASE_URL?.trim();
   if (databaseUrl && isLocalPostgresUrl(databaseUrl)) return "postgres";
+
+  if (!databaseUrl && firstUrl(env, POSTGRES_URL_ENV_KEYS)) return "postgres";
 
   // Backward compatibility: existing production/runtime defaults to Neon.
   return "neon";
@@ -88,7 +148,9 @@ export function resolveDatabaseUrl(
 
   const url = firstUrl(env, NEON_URL_ENV_KEYS);
   if (!url) {
-    throw new Error("Neon provider requires NEON_DATABASE_URL or DATABASE_URL.");
+    throw new Error(
+      `Database connection string is required. Checked: ${DATABASE_URL_ENV_KEYS.join(", ")}`,
+    );
   }
 
   if (env.DATABASE_PROVIDER === "neon" && env.DATABASE_URL && !env.NEON_DATABASE_URL && !isNeonCompatibleUrl(url)) {
@@ -117,7 +179,13 @@ async function getPgPool(url: string): Promise<Pool> {
       return pool;
     });
   }
-  return await pgPoolPromise!;
+  const poolPromise = pgPoolPromise as Promise<Pool>;
+  return await poolPromise;
+}
+
+async function getPostgresPoolLike(): Promise<PostgresPoolLike> {
+  const url = resolveDatabaseUrl(process.env, "postgres");
+  return await getPgPool(url);
 }
 
 export function getDb(): NeonQueryFunction<false, false> {
@@ -179,6 +247,60 @@ export async function query<T>(
     }
   }
   throw lastErr;
+}
+
+export async function withTransaction<T>(
+  callback: TransactionCallback<T>,
+  options: TransactionOptions = {},
+): Promise<T> {
+  if (options.transaction) {
+    return options.transaction(callback);
+  }
+
+  const provider = options.provider ?? resolveDatabaseProvider(options.env);
+  if (provider === "postgres") {
+    const pool = await (options.getPostgresPool ?? getPostgresPoolLike)();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await callback((statement, params) =>
+        client.query(statement, toMutableParams(params)),
+      );
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // Preserve the original transactional failure; rollback errors are secondary.
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  const db = (options.getNeonDb ?? getDb)();
+  if (!isTransactionCapableNeonDb(db)) {
+    throw new Error("Database client does not support transaction(callback)");
+  }
+
+  const results = await db.transaction((txn) => [
+    callback((statement, params) => txn(statement, toMutableParams(params))),
+  ]);
+  const [result] = results;
+  return result as T;
+}
+
+export async function executeStatementsInTransaction(
+  statements: readonly SqlStatement[],
+  options?: TransactionOptions,
+): Promise<void> {
+  await withTransaction(async (execute) => {
+    for (const statement of statements) {
+      await execute(statement.sql, statement.params);
+    }
+  }, options);
 }
 
 export async function closeDatabasePoolForTests(): Promise<void> {
