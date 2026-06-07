@@ -1,5 +1,5 @@
 -- CRYPTO-TUBER RANKED - Database Schema
--- Run against existing Neon DB (alongside candles table)
+-- Run against canonical HH pgsql database (alongside candles table); Neon is backup/legacy compatibility only.
 
 -- Creators: the 20 YouTube influencers we track
 CREATE TABLE IF NOT EXISTS creators (

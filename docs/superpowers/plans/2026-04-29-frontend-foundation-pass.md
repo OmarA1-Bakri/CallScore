@@ -857,7 +857,7 @@ git commit -m "refactor(frontend): replace out-of-palette colors with spec seman
 
 ## Task 8: Convert `Header` to a Server Component, extract `MobileMenu` client island
 
-[src/components/Header.tsx:1-28](../../../src/components/Header.tsx#L1-L28) is `"use client"` only because it `fetch`es `/api/auth/session` from a `useEffect`. This causes a flash-of-default-state on every navigation. Per Vercel React best practices, read the cookie via `cookies()` from `next/headers` server-side.
+[src/components/Header.tsx:1-28](../../../src/components/Header.tsx#L1-L28) is `"use client"` only because it `fetch`es `/api/auth/session` from a `useEffect`. This causes a flash-of-default-state on every navigation. Per React Server Component best practices, read the cookie via `cookies()` from `next/headers` server-side.
 
 **Files:**
 - Rewrite: `src/components/Header.tsx` (now RSC)

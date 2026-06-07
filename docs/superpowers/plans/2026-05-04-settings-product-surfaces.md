@@ -1,12 +1,14 @@
 # Settings Product Surfaces Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> Superseded infrastructure note (2026-06-07): this plan's early references to the Neon query helper are legacy context. Current canonical data storage is HH VM PostgreSQL/pgsql; Neon is backup/legacy compatibility only. See `docs/legacy-infra-superseded.md`.
 
 **Goal:** Turn the underdeveloped Pro/Alpha surfaces into credible, canonical product UI: alerts/watchlists, API access, webhooks, feedback, Backtest Lab, pricing parity, and settings IA.
 
 **Architecture:** Keep the existing Next.js App Router surfaces and server component pattern. Use existing data-layer functions where they already exist, add only small helper queries where the UI needs names/status/logs, and keep visual styling inside the canonical editorial-terminal system from `docs/frontend-design-spec.md`.
 
-**Tech Stack:** Next.js 14 App Router, React 18, TypeScript, Tailwind, existing Neon query helper, Recharts for Backtest Lab charts.
+**Tech Stack:** Next.js 14 App Router, React 18, TypeScript, Tailwind, existing pgsql query compatibility helper, Recharts for Backtest Lab charts.
 
 ---
 
