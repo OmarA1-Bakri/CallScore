@@ -1,6 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
-import { getDb } from "../lib/db";
+import {
+  executeStatementsInTransaction as executeDbStatementsInTransaction,
+  type SqlExecutor,
+  type SqlStatement,
+  type TransactionOptions,
+} from "../lib/db";
 import type {
   CallType,
   Direction,
@@ -30,10 +35,7 @@ interface ReplaceVideoCallsOptions {
   readonly markVideoExtracted?: boolean;
 }
 
-export interface SqlStatement {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-}
+export type { SqlStatement };
 
 const DELETE_VIDEO_CALLS_SQL = "DELETE FROM calls WHERE video_id = $1";
 const INSERT_CALL_SQL = `INSERT INTO calls (
@@ -170,14 +172,9 @@ export function buildReplaceStoredCallsStatements({
   ];
 }
 
-type TransactionExecutor = (
-  sql: string,
-  params?: readonly unknown[],
-) => Promise<unknown>;
-
 interface TransactionCapableDb {
   transaction<T>(
-    callback: (txn: TransactionExecutor) => readonly Promise<T>[],
+    callback: (txn: SqlExecutor) => readonly Promise<T>[],
   ): Promise<readonly T[]>;
 }
 
@@ -191,23 +188,30 @@ function isTransactionCapableDb(db: unknown): db is TransactionCapableDb {
 }
 
 export async function executeStatementsInTransaction(
-  db: TransactionCapableDb,
-  statements: readonly SqlStatement[],
+  dbOrStatements: TransactionCapableDb | readonly SqlStatement[],
+  statementsOrOptions?: readonly SqlStatement[] | TransactionOptions,
 ): Promise<void> {
-  await db.transaction((txn) =>
-    statements.map((statement) => txn(statement.sql, statement.params)),
+  if (isTransactionCapableDb(dbOrStatements)) {
+    const statements = statementsOrOptions as readonly SqlStatement[] | undefined;
+    if (!statements) throw new Error("SQL statements are required");
+    await dbOrStatements.transaction((txn) =>
+      statements.map((statement) => txn(statement.sql, statement.params)),
+    );
+    return;
+  }
+
+  await executeDbStatementsInTransaction(
+    dbOrStatements,
+    statementsOrOptions as TransactionOptions | undefined,
   );
 }
 
 export async function replaceStoredCallsForVideo(
   options: ReplaceVideoCallsOptions,
+  transactionOptions?: TransactionOptions,
 ): Promise<void> {
-  const db = getDb();
-  if (!isTransactionCapableDb(db)) {
-    throw new Error("Database client does not support transaction(callback)");
-  }
-  await executeStatementsInTransaction(
-    db,
+  await executeDbStatementsInTransaction(
     buildReplaceStoredCallsStatements(options),
+    transactionOptions,
   );
 }

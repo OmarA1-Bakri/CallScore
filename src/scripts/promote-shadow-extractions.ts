@@ -21,6 +21,12 @@ export interface PromoteShadowArgs {
   readonly auditOut: string;
 }
 
+type ReplaceStoredCallsForVideo = typeof replaceStoredCallsForVideo;
+
+interface PromoteShadowDependencies {
+  readonly replaceStoredCallsForVideo?: ReplaceStoredCallsForVideo;
+}
+
 function argValue(argv: readonly string[], flag: string): string | null {
   const i = argv.indexOf(flag);
   if (i < 0 || !argv[i + 1]) return null;
@@ -118,10 +124,14 @@ function auditPromotion(
   });
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(
+  argv = process.argv.slice(2),
+  deps: PromoteShadowDependencies = {},
+): Promise<void> {
   loadEnv();
   const args = parsePromoteShadowArgs(argv);
   assertWriteGuardrails(args);
+  const replaceCalls = deps.replaceStoredCallsForVideo ?? replaceStoredCallsForVideo;
 
   const shadowRecords = readJsonlFile<ShadowExtractedCallRecord>(args.shadowIn).filter(
     (record) => record.record_type === "shadow_extraction" && record.run_id === args.confirmRunId,
@@ -185,7 +195,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     });
 
     if (args.write) {
-      await replaceStoredCallsForVideo({
+      await replaceCalls({
         creatorId: shadow.video.creator_id,
         videoId: shadow.video.id,
         callDate: shadow.video.published_at,
