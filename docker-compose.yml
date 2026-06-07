@@ -7,6 +7,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env.hermes
+    environment:
+      ML_VERIFIER_PROVIDER: ollama
+      OLLAMA_HOST: http://127.0.0.1:11434
+      ML_VERIFIER_MODEL: qwen2.5:3b
     command: ["npm", "run", "pipeline:worker", "--", "--poll-ms", "15000"]
 
   hermes-worker-once:
@@ -17,6 +21,10 @@ services:
     profiles: ["debug"]
     env_file:
       - .env.hermes
+    environment:
+      ML_VERIFIER_PROVIDER: ollama
+      OLLAMA_HOST: http://127.0.0.1:11434
+      ML_VERIFIER_MODEL: qwen2.5:3b
     entrypoint: ["npm", "run", "pipeline:worker:once", "--"]
     command: ["--dry-run"]
 

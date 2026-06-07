@@ -6,6 +6,7 @@ import {
   getLeaderboardEligibilitySql,
   getLeaderboardSampleThreshold,
 } from "@/lib/leaderboard-eligibility";
+import { getLegacyCreatorExclusionSql } from "@/lib/legacy-creator-overrides";
 import { getCallEligibilitySql } from "@/lib/public-methodology";
 import {
   CREATOR_JUDGMENT_WINDOW_DAYS,
@@ -59,12 +60,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const period = periodParam as Period;
   const sampleThreshold = getLeaderboardSampleThreshold(period);
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
+  const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
   const rawRows = await query(
     `SELECT cs.*, c.name, c.youtube_handle
      FROM creator_stats cs
      JOIN creators c ON c.id = cs.creator_id
      WHERE cs.period = $1
        AND ${leaderboardEligibleSql}
+       AND ${legacyCreatorExclusionSql}
      ORDER BY cs.accuracy_rank ASC NULLS LAST`,
     [period],
   );
