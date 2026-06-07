@@ -2,6 +2,8 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   dedupeGlobalCreatorCandidates,
+  getCreatorCallSampleStatus,
+  getCreatorRankabilityStatus,
   getGlobalCreatorCandidates,
   normalizeCreatorHandle,
   type GlobalCreatorCandidateWithSource,
@@ -12,6 +14,12 @@ interface Args {
   readonly status: "approved" | "candidate" | "seeded" | "all";
   readonly minRelevance: number;
   readonly write: boolean;
+}
+
+export interface PromotionEvaluation {
+  readonly candidate: GlobalCreatorCandidateWithSource;
+  readonly eligible: boolean;
+  readonly reasons: readonly string[];
 }
 
 function parseArgs(argv: readonly string[]): Args {
@@ -36,18 +44,73 @@ function valueAfter(argv: readonly string[], flag: string): string | undefined {
   return index >= 0 ? argv[index + 1] : undefined;
 }
 
+function trackedCreatorHandleSet(): Set<string | null> {
+  return new Set(TRACKED_CREATORS.map((creator) => normalizeCreatorHandle(creator.youtube_handle)));
+}
+
+function matchesStatusFilter(candidate: GlobalCreatorCandidateWithSource, args: Args): boolean {
+  return args.status === "all" || candidate.status === args.status;
+}
+
+export function evaluatePromotionCandidate(
+  candidate: GlobalCreatorCandidateWithSource,
+  tracked: ReadonlySet<string | null> = trackedCreatorHandleSet(),
+  minRelevance = 0.75,
+): PromotionEvaluation {
+  const reasons: string[] = [];
+  const normalizedHandle = normalizeCreatorHandle(candidate.youtube_handle);
+  const sampleStatus = getCreatorCallSampleStatus(candidate);
+  const rankabilityStatus = getCreatorRankabilityStatus(candidate);
+
+  if (candidate.status !== "approved") reasons.push(`status=${candidate.status} (requires approved)`);
+  if (candidate.status === "rejected") reasons.push("candidate is rejected");
+  if (candidate.content_type !== "creator_calls") {
+    reasons.push(`content_type=${candidate.content_type} (requires creator_calls)`);
+  }
+  if (candidate.rankability_guess !== "high") {
+    reasons.push(`rankability_guess=${candidate.rankability_guess} (requires high)`);
+  }
+  if (rankabilityStatus !== "rankable_caller") {
+    reasons.push(`rankability_status=${rankabilityStatus} (requires rankable_caller)`);
+  }
+  if (sampleStatus !== "passed") {
+    reasons.push(`creator_call_sample_status=${sampleStatus} (requires passed)`);
+  }
+  if (!normalizedHandle) reasons.push("youtube_handle missing");
+  if (candidate.crypto_relevance_score < minRelevance) {
+    reasons.push(`crypto_relevance_score=${candidate.crypto_relevance_score} below ${minRelevance}`);
+  }
+  if (normalizedHandle && tracked.has(normalizedHandle)) reasons.push("already tracked");
+
+  return {
+    candidate,
+    eligible: reasons.length === 0,
+    reasons,
+  };
+}
+
+export function evaluatePromotionCandidates(
+  candidates: readonly GlobalCreatorCandidateWithSource[],
+  args: Args,
+): readonly PromotionEvaluation[] {
+  const tracked = trackedCreatorHandleSet();
+  return dedupeGlobalCreatorCandidates(candidates)
+    .filter((candidate) => matchesStatusFilter(candidate, args))
+    .map((candidate) => evaluatePromotionCandidate(candidate, tracked, args.minRelevance))
+    .sort((a, b) => {
+      if (a.eligible !== b.eligible) return a.eligible ? -1 : 1;
+      return b.candidate.crypto_relevance_score - a.candidate.crypto_relevance_score ||
+        a.candidate.name.localeCompare(b.candidate.name);
+    });
+}
+
 function selectPromotionCandidates(
   candidates: readonly GlobalCreatorCandidateWithSource[],
   args: Args,
 ): readonly GlobalCreatorCandidateWithSource[] {
-  const tracked = new Set(TRACKED_CREATORS.map((creator) => normalizeCreatorHandle(creator.youtube_handle)));
-  return dedupeGlobalCreatorCandidates(candidates)
-    .filter((candidate) => args.status === "all" || candidate.status === args.status)
-    .filter((candidate) => candidate.status !== "rejected")
-    .filter((candidate) => candidate.crypto_relevance_score >= args.minRelevance)
-    .filter((candidate) => Boolean(candidate.youtube_handle))
-    .filter((candidate) => !tracked.has(normalizeCreatorHandle(candidate.youtube_handle)))
-    .sort((a, b) => b.crypto_relevance_score - a.crypto_relevance_score || a.name.localeCompare(b.name));
+  return evaluatePromotionCandidates(candidates, args)
+    .filter((evaluation) => evaluation.eligible)
+    .map((evaluation) => evaluation.candidate);
 }
 
 function toTrackedCreatorLine(candidate: GlobalCreatorCandidateWithSource): string {
@@ -68,19 +131,29 @@ function writeTrackedCreators(candidates: readonly GlobalCreatorCandidateWithSou
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
-  const selected = selectPromotionCandidates(getGlobalCreatorCandidates(), args);
+  const evaluations = evaluatePromotionCandidates(getGlobalCreatorCandidates(), args);
+  const selected = evaluations.filter((evaluation) => evaluation.eligible).map((evaluation) => evaluation.candidate);
 
   console.log(`Promotion mode: ${args.write ? "WRITE" : "DRY RUN"}`);
+  console.log("Admission gate: approved + creator_calls + high + rankable_caller + passed + handle + not already tracked");
   console.log(`Selected ${selected.length} candidates not already in TRACKED_CREATORS`);
   for (const candidate of selected) {
     console.log(toTrackedCreatorLine(candidate));
+  }
+
+  const blocked = evaluations.filter((evaluation) => !evaluation.eligible);
+  if (blocked.length > 0) {
+    console.log(`Blocked ${blocked.length} candidates:`);
+    for (const evaluation of blocked) {
+      console.log(`- ${evaluation.candidate.name}: ${evaluation.reasons.join("; ")}`);
+    }
   }
 
   if (args.write) {
     writeTrackedCreators(selected);
     console.log("Updated src/lib/tracked-creators.ts");
   } else {
-    console.log("No files changed. Re-run with --write only after channel verification/sign-off.");
+    console.log("No files changed. Re-run with --write only after creator-call sample audit/sign-off.");
   }
 }
 

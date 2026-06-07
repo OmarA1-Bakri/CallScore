@@ -121,7 +121,7 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
   const periodFilter = getPeriodFilterSql("c", period);
   const subqueryPeriodFilter = getPeriodFilterSql("cl", period);
   const eligibleSql = getCallEligibilitySql("c");
-  const leaderboardEligibleSql = getLeaderboardEligibilitySql("creator_stats");
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("creator_stats", period);
 
   await query(
     `DELETE FROM creator_stats WHERE period = $1`,

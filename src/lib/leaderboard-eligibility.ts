@@ -1,21 +1,31 @@
-/** @deprecated Use MIN_PUBLIC_LEADERBOARD_CALLS for new leaderboard visibility checks. */
+/** @deprecated 5-call public leaderboard floor was retired after Data Integrity Audit. */
 export const OBSOLETE_LEADERBOARD_CALL_THRESHOLD = 5;
-// Keep the legacy threshold name and the public-facing alias tied together:
-// OBSOLETE_LEADERBOARD_CALL_THRESHOLD preserves older call sites while
-// MIN_PUBLIC_LEADERBOARD_CALLS states the product meaning for new code.
-export const MIN_PUBLIC_LEADERBOARD_CALLS = OBSOLETE_LEADERBOARD_CALL_THRESHOLD;
-export const LOW_N_WARNING_CALLS = 15;
+export const MIN_PUBLIC_LEADERBOARD_CALLS = 25;
+export const LOW_N_WARNING_CALLS = 50;
+export const MIN_PRO_90D_LEADERBOARD_CALLS = 10;
+export const LOW_N_90D_WARNING_CALLS = 20;
 
 const SAFE_SQL_IDENTIFIER = /^[a-z_][a-z0-9_]*$/i;
 
-/**
- * Returns a SQL expression checking leaderboard eligibility for a creator_stats alias.
- * The alias defaults to "cs", must pass SAFE_SQL_IDENTIFIER, and the threshold uses
- * MIN_PUBLIC_LEADERBOARD_CALLS.
- */
-export function getLeaderboardEligibilitySql(alias = "cs"): string {
+export function assertSafeSqlIdentifier(alias: string, label: string): void {
   if (!SAFE_SQL_IDENTIFIER.test(alias)) {
-    throw new Error(`Unsafe SQL alias for leaderboard eligibility: ${alias}`);
+    throw new Error(`Unsafe SQL alias for ${label}: ${alias}`);
   }
-  return `${alias}.total_calls >= ${MIN_PUBLIC_LEADERBOARD_CALLS}`;
+}
+
+export function getMinimumLeaderboardCalls(period = "all_time"): number {
+  return period === "90d" ? MIN_PRO_90D_LEADERBOARD_CALLS : MIN_PUBLIC_LEADERBOARD_CALLS;
+}
+
+export function getLowNWarningCalls(period = "all_time"): number {
+  return period === "90d" ? LOW_N_90D_WARNING_CALLS : LOW_N_WARNING_CALLS;
+}
+
+/**
+ * Returns SQL checking period-aware leaderboard sample-floor eligibility for a creator_stats alias.
+ * Legacy creator exclusion is applied separately where the creators table is joined.
+ */
+export function getLeaderboardEligibilitySql(alias = "cs", period = "all_time"): string {
+  assertSafeSqlIdentifier(alias, "leaderboard eligibility");
+  return `${alias}.total_calls >= ${getMinimumLeaderboardCalls(period)}`;
 }

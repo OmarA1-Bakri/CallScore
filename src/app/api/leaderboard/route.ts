@@ -7,6 +7,7 @@ import { getUserTier } from "@/lib/whop-access";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
 import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
+import { getLegacyCreatorExclusionSql } from "@/lib/legacy-creator-overrides";
 import { getRequestAuthContext } from "@/lib/auth";
 import { leaderboardQueryRowSchema, parseApiRows, type LeaderboardQueryRow } from "@/lib/api-schemas";
 import type {
@@ -113,7 +114,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const period: Period = periodParam;
-    const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+    const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
+    const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
     if (period !== "all_time") {
       const auth = getRequestAuthContext(request);
       const userTier = auth.session?.tier ?? (await getUserTier(auth.accessToken, auth.session?.userId));
@@ -157,6 +159,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
         AND ${leaderboardEligibleSql}
+        AND ${legacyCreatorExclusionSql}
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );

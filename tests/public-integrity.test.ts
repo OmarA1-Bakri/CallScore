@@ -11,9 +11,13 @@ import {
 } from "../src/lib/public-methodology";
 import {
   getLeaderboardEligibilitySql,
+  LOW_N_90D_WARNING_CALLS,
   LOW_N_WARNING_CALLS,
+  MIN_PRO_90D_LEADERBOARD_CALLS,
   MIN_PUBLIC_LEADERBOARD_CALLS,
   OBSOLETE_LEADERBOARD_CALL_THRESHOLD,
+  getLowNWarningCalls,
+  getMinimumLeaderboardCalls,
 } from "../src/lib/leaderboard-eligibility";
 import {
   CREATOR_JUDGMENT_WINDOW_DAYS,
@@ -275,11 +279,19 @@ test("creator score averages reconcile with the per-call public components", () 
   assert.equal(averages.scoredCount, 2);
 });
 
-test("leaderboard requires a minimum public scored call sample", () => {
+test("leaderboard requires the post-audit public scored call floors", () => {
   assert.equal(OBSOLETE_LEADERBOARD_CALL_THRESHOLD, 5);
-  assert.equal(MIN_PUBLIC_LEADERBOARD_CALLS, 5);
-  assert.equal(LOW_N_WARNING_CALLS, 15);
-  assert.equal(getLeaderboardEligibilitySql("cs"), "cs.total_calls >= 5");
+  assert.equal(MIN_PUBLIC_LEADERBOARD_CALLS, 25);
+  assert.equal(LOW_N_WARNING_CALLS, 50);
+  assert.equal(MIN_PRO_90D_LEADERBOARD_CALLS, 10);
+  assert.equal(LOW_N_90D_WARNING_CALLS, 20);
+  assert.equal(getMinimumLeaderboardCalls("all_time"), 25);
+  assert.equal(getLowNWarningCalls("all_time"), 50);
+  assert.equal(getLeaderboardEligibilitySql("cs", "all_time"), "cs.total_calls >= 25");
+  assert.equal(getMinimumLeaderboardCalls("90d"), 10);
+  assert.equal(getLowNWarningCalls("90d"), 20);
+  assert.equal(getLeaderboardEligibilitySql("cs", "90d"), "cs.total_calls >= 10");
+  assert.equal(getLeaderboardEligibilitySql("cs", "30d"), "cs.total_calls >= 25");
 });
 
 test("score-ready SQL can be reused without lowering the confidence gate", () => {

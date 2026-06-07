@@ -9,6 +9,7 @@ import { getCurrentTier } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { getPublicCounts } from "@/lib/public-counts";
 import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
+import { getLegacyCreatorExclusionSql } from "@/lib/legacy-creator-overrides";
 import { CREATOR_JUDGMENT_WINDOW_SHORT_LABEL } from "@/lib/judgment-window";
 import { getCreatorTier } from "@/lib/creator-tier";
 import { hasAccess } from "@/lib/whop";
@@ -153,7 +154,8 @@ export default async function HomePage({
   const canUseRecent = hasAccess(currentTier, "pro");
   const period: Period = canUseRecent ? requestedPeriod : "all_time";
 
-  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
+  const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
 
   // Fetch leaderboard from DB
   let leaderboard: LeaderboardRow[] = [];
@@ -190,6 +192,7 @@ export default async function HomePage({
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
         AND ${leaderboardEligibleSql}
+        AND ${legacyCreatorExclusionSql}
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );
@@ -300,7 +303,7 @@ export default async function HomePage({
         COALESCE(SUM(total_calls), 0)::text AS total_calls,
         CASE WHEN COUNT(*) > 0 THEN ROUND((AVG(win_rate) * 100)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
         COUNT(DISTINCT creator_id)::text AS creator_count
-      FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql}`,
+      FROM creator_stats cs JOIN creators c ON c.id = cs.creator_id WHERE cs.period = 'all_time' AND ${getLeaderboardEligibilitySql("cs", "all_time")} AND ${getLegacyCreatorExclusionSql("c")}`,
     );
     if (statsRows.length > 0) {
       totalCalls = Number(statsRows[0].total_calls) > 0 ? statsRows[0].total_calls : "0";
