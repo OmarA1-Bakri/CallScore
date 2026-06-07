@@ -4,20 +4,20 @@ import { DATABASE_URL_ENV_KEYS, resolveDatabaseUrl } from "../src/lib/db";
 
 test("resolveDatabaseUrl prefers canonical pgsql env vars before Neon fallback", () => {
   const resolved = resolveDatabaseUrl({
-    NEON_DATABASE_URL: "postgres://neon-primary",
-    DATABASE_URL: "postgres://database-url",
-    POSTGRES_URL: "postgres://postgres-url",
+    NEON_DATABASE_URL: "[REDACTED_DATABASE_URL]",
+    DATABASE_URL: "[REDACTED_DATABASE_URL]",
+    POSTGRES_URL: "[REDACTED_DATABASE_URL]",
   });
 
-  assert.equal(resolved, "postgres://database-url");
+  assert.equal(resolved, "[REDACTED_DATABASE_URL]");
 });
 
 test("resolveDatabaseUrl falls back to Postgres-compatible env vars", () => {
   const resolved = resolveDatabaseUrl({
-    POSTGRES_URL: "postgres://postgres-url",
+    POSTGRES_URL: "[REDACTED_DATABASE_URL]",
   });
 
-  assert.equal(resolved, "postgres://postgres-url");
+  assert.equal(resolved, "[REDACTED_DATABASE_URL]");
 });
 
 test("resolveDatabaseUrl throws a helpful error when no env is set", () => {

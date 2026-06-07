@@ -159,13 +159,68 @@ test("user-specific API routes opt out of shared caching", () => {
   }
 });
 
-test("public leaderboard API route preserves documented response envelope", () => {
+const leaderboardMetaFields = [
+  "total",
+  "period",
+  "period_token",
+  "display_window_label",
+  "min_public_scored_calls",
+  "low_n_warning_calls",
+  "sample_floor_label",
+  "window_days",
+  "window_start",
+  "window_end",
+  "latest_public_call_date",
+  "freshness_notes",
+  "gated_periods",
+  "data_maturity_note",
+] as const;
+
+function assertLeaderboardMetadataContract(source: string): void {
+  assert.match(source, /meta:\s*\{/);
+  for (const field of leaderboardMetaFields) {
+    assert.match(source, new RegExp(`${field}\\s*:`), `missing leaderboard meta.${field}`);
+  }
+  assert.match(source, /getLeaderboardSampleThreshold\(period\)/);
+}
+
+test("public leaderboard API route preserves post-PR24/PR25 metadata while excluding legacy polluted creators", () => {
   const source = readFileSync(join(root, "src/app/api/leaderboard/route.ts"), "utf8");
   assert.match(source, /data:\s*\{/);
   assert.match(source, /leaderboard/);
-  assert.match(source, /meta:\s*\{/);
-  assert.match(source, /period/);
   assert.match(source, /updated_at/);
+  assertLeaderboardMetadataContract(source);
+  assert.match(source, /getLegacyCreatorExclusionSql\("c"\)/);
+  assert.match(source, /AND \$\{legacyCreatorExclusionSql\}/);
+});
+
+test("v1 leaderboard API route preserves post-PR24/PR25 metadata while excluding legacy polluted creators", () => {
+  const source = readFileSync(join(root, "src/app/api/v1/leaderboard/route.ts"), "utf8");
+  assert.match(source, /data:\s*rows/);
+  assertLeaderboardMetadataContract(source);
+  assert.match(source, /getLegacyCreatorExclusionSql\("c"\)/);
+  assert.match(source, /AND \$\{legacyCreatorExclusionSql\}/);
+});
+
+test("legacy Altcoin Daily exclusion remains wired to buyer-facing leaderboard routes", () => {
+  const overrides = readFileSync(join(root, "src/lib/legacy-creator-overrides.ts"), "utf8");
+  const publicRoute = readFileSync(join(root, "src/app/api/leaderboard/route.ts"), "utf8");
+  const v1Route = readFileSync(join(root, "src/app/api/v1/leaderboard/route.ts"), "utf8");
+  assert.match(overrides, /@AltcoinDaily/);
+  assert.match(overrides, /excluded_pending_review/);
+  for (const source of [publicRoute, v1Route]) {
+    assertLeaderboardMetadataContract(source);
+    assert.match(source, /getLegacyCreatorExclusionSql\("c"\)/);
+    assert.match(source, /AND \$\{legacyCreatorExclusionSql\}/);
+  }
+});
+
+test("leaderboard threshold helper remains available for route metadata and period-aware floors", () => {
+  const source = readFileSync(join(root, "src/lib/leaderboard-eligibility.ts"), "utf8");
+  assert.match(source, /export function getLeaderboardSampleThreshold/);
+  assert.match(source, /min_public_scored_calls/);
+  assert.match(source, /low_n_warning_calls/);
+  assert.match(source, /sample_floor_label/);
 });
 
 test("public leaderboard API display ranks are sequential after public filtering", () => {

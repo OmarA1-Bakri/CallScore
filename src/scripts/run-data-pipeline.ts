@@ -7,14 +7,15 @@ import { loadEnv, runWithConcurrency, timestamp } from "./script-helpers";
 
 const DEFAULT_CREATORS = [
   "@AltcoinDaily",
-  "@DiscoverCrypto",
-  "@CryptoBanter",
+  "@DiscoverCrypto_",
+  "@CryptoBanterGroup",
   "@CryptosRUs",
-  "@AlexBecker",
+  "@AlexBeckersChannel",
 ] as const;
 
 const DEFAULT_SHADOW_PROVIDER = "ollama";
-const DEFAULT_SHADOW_MODEL = "kimi-k2.6";
+const DEFAULT_SHADOW_MODEL = "kimi-k2.6:cloud";
+const DEFAULT_SHADOW_FALLBACK_MODEL = "glm-5.1";
 const DEFAULT_SHADOW_REQUEST_TIMEOUT_MS = 180_000;
 const DEFAULT_SHADOW_AGENTS = 1;
 const MAX_SHADOW_AGENTS = 3;
@@ -208,7 +209,7 @@ export function parseDataPipelineArgs(
     shadowProvider:
       argValue(argv, "--shadow-provider") ?? DEFAULT_SHADOW_PROVIDER,
     shadowModel: argValue(argv, "--shadow-model") ?? DEFAULT_SHADOW_MODEL,
-    shadowFallbackModel: argValue(argv, "--shadow-fallback-model"),
+    shadowFallbackModel: argValue(argv, "--shadow-fallback-model") ?? DEFAULT_SHADOW_FALLBACK_MODEL,
     shadowRequestTimeoutMs: positiveInt(
       argValue(argv, "--shadow-request-timeout-ms"),
       DEFAULT_SHADOW_REQUEST_TIMEOUT_MS,

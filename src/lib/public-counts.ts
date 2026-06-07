@@ -7,6 +7,7 @@ import {
 } from "./public-methodology";
 import { TRACKED_CREATOR_COUNT } from "./tracked-creators";
 import { getLeaderboardEligibilitySql } from "./leaderboard-eligibility";
+import { getLegacyCreatorExclusionSql } from "./legacy-creator-overrides";
 import { getJudgmentWindowSql } from "./judgment-window";
 
 interface CountsRow {
@@ -71,7 +72,8 @@ export async function getPublicCounts(): Promise<PublicCounts> {
   const eligibleSql = getCallEligibilitySql("c");
   const scoreReadyIgnoringConfidenceSql = getScoreReadyIgnoringConfidenceSql("c");
   const judgmentWindowSql = getJudgmentWindowSql("c");
-  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", "all_time");
+  const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("cr");
   const rows = await query<CountsRow>(
     `SELECT
       COUNT(c.id) FILTER (WHERE ${judgmentWindowSql})::text AS tracked_calls,
@@ -137,8 +139,8 @@ export async function getPublicCounts(): Promise<PublicCounts> {
           AND (c.price_90d IS NULL OR c.hit_target IS NULL)
       )::text AS missing_target_calls,
       COUNT(c.id) FILTER (WHERE ${judgmentWindowSql} AND c.extraction_confidence < $1)::text AS excluded_low_confidence_calls,
-      (SELECT COUNT(*)::text FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql}) AS ranked_creators,
-      (SELECT COUNT(*)::text FROM creator_stats cs WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql} AND cs.avg_alpha_30d > 0) AS beat_btc_creators
+      (SELECT COUNT(*)::text FROM creator_stats cs JOIN creators cr ON cr.id = cs.creator_id WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql} AND ${legacyCreatorExclusionSql}) AS ranked_creators,
+      (SELECT COUNT(*)::text FROM creator_stats cs JOIN creators cr ON cr.id = cs.creator_id WHERE cs.period = 'all_time' AND ${leaderboardEligibleSql} AND ${legacyCreatorExclusionSql} AND cs.avg_alpha_30d > 0) AS beat_btc_creators
      FROM calls c`,
     [EXTRACTION_CONFIDENCE_THRESHOLD],
   );

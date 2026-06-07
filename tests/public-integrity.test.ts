@@ -13,8 +13,12 @@ import {
   getLeaderboardEligibilitySql,
   getLeaderboardSampleThreshold,
   LOW_N_WARNING_CALLS,
+  MIN_PRO_90D_LEADERBOARD_CALLS,
   MIN_PUBLIC_LEADERBOARD_CALLS,
   OBSOLETE_LEADERBOARD_CALL_THRESHOLD,
+  getLowNWarningCalls,
+  getMinimumLeaderboardCalls,
+  LOW_N_90D_WARNING_CALLS,
   RECENT_CONTEXT_LOW_N_WARNING_CALLS,
   RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS,
 } from "../src/lib/leaderboard-eligibility";
@@ -278,12 +282,22 @@ test("creator score averages reconcile with the per-call public components", () 
   assert.equal(averages.scoredCount, 2);
 });
 
-test("leaderboard requires a minimum public scored call sample", () => {
+test("leaderboard requires the post-audit public scored call floors", () => {
   assert.equal(OBSOLETE_LEADERBOARD_CALL_THRESHOLD, 25);
   assert.equal(MIN_PUBLIC_LEADERBOARD_CALLS, 25);
   assert.equal(LOW_N_WARNING_CALLS, 50);
+  assert.equal(MIN_PRO_90D_LEADERBOARD_CALLS, 10);
+  assert.equal(LOW_N_90D_WARNING_CALLS, 20);
+  assert.equal(RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS, 10);
+  assert.equal(RECENT_CONTEXT_LOW_N_WARNING_CALLS, 20);
+  assert.equal(getMinimumLeaderboardCalls("all_time"), 25);
+  assert.equal(getLowNWarningCalls("all_time"), 50);
   assert.equal(getLeaderboardEligibilitySql("cs"), "cs.total_calls >= 25");
   assert.equal(getLeaderboardEligibilitySql("cs", "all_time"), "cs.total_calls >= 25");
+  assert.equal(getMinimumLeaderboardCalls("90d"), 10);
+  assert.equal(getLowNWarningCalls("90d"), 20);
+  assert.equal(getLeaderboardEligibilitySql("cs", "90d"), "cs.total_calls >= 10");
+  assert.equal(getLeaderboardEligibilitySql("cs", "30d"), "cs.total_calls >= 10");
 });
 
 test("leaderboard sample floors are period-aware", () => {
