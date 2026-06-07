@@ -6,8 +6,18 @@ import { hasAccess } from "@/lib/whop";
 import { getUserTier } from "@/lib/whop-access";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
-import { getLeaderboardEligibilitySql } from "@/lib/leaderboard-eligibility";
+import {
+  getLeaderboardEligibilitySql,
+  getLeaderboardSampleThreshold,
+} from "@/lib/leaderboard-eligibility";
 import { getLegacyCreatorExclusionSql } from "@/lib/legacy-creator-overrides";
+import { getCallEligibilitySql } from "@/lib/public-methodology";
+import {
+  CREATOR_JUDGMENT_WINDOW_DAYS,
+  CREATOR_JUDGMENT_WINDOW_LABEL,
+  RECENT_PUBLIC_SCORING_MATURITY_NOTE,
+  getJudgmentWindowSql,
+} from "@/lib/judgment-window";
 import { getRequestAuthContext } from "@/lib/auth";
 import { leaderboardQueryRowSchema, parseApiRows, type LeaderboardQueryRow } from "@/lib/api-schemas";
 import type {
@@ -24,6 +34,36 @@ const VALID_PERIODS: readonly Period[] = ["all_time", "90d", "30d"] as const;
 interface PrevScoreRow {
   readonly creator_id: number;
   readonly alpha_score: number;
+}
+
+interface LatestPublicCallDateRow {
+  readonly latest_public_call_date: string | null;
+}
+
+const GATED_PERIODS = [
+  { period_token: "90d", display_window_label: "90 days", required_tier: "pro" },
+] as const;
+
+function getWindowDays(period: Period): number {
+  if (period === "90d") return 90;
+  if (period === "30d") return 30;
+  return CREATOR_JUDGMENT_WINDOW_DAYS;
+}
+
+function getDisplayWindowLabel(period: Period): string {
+  if (period === "90d") return "90 days";
+  if (period === "30d") return "30 days · internal experimental sample view";
+  return CREATOR_JUDGMENT_WINDOW_LABEL;
+}
+
+function getWindowRange(period: Period): { readonly window_start: string; readonly window_end: string } {
+  const windowEnd = new Date();
+  const windowStart = new Date(windowEnd);
+  windowStart.setUTCDate(windowStart.getUTCDate() - getWindowDays(period));
+  return {
+    window_start: windowStart.toISOString(),
+    window_end: windowEnd.toISOString(),
+  };
 }
 
 function isValidPeriod(value: string): value is Period {
@@ -114,6 +154,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const period: Period = periodParam;
+    const sampleThreshold = getLeaderboardSampleThreshold(period);
     const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
     const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
     if (period !== "all_time") {
@@ -165,6 +206,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
 
     const rows = parseApiRows(leaderboardQueryRowSchema, rawRows, "leaderboard");
+
+    const latestPublicCallRows = await query<LatestPublicCallDateRow>(
+      `SELECT MAX(c.call_date)::text AS latest_public_call_date
+       FROM calls c
+       WHERE ${getCallEligibilitySql("c")}
+         AND ${getJudgmentWindowSql("c")}`,
+    );
+    const latestPublicCallDate = latestPublicCallRows[0]?.latest_public_call_date ?? null;
+    const windowRange = getWindowRange(period);
 
     // Fetch previous period scores for trend calculation
     const prevPeriod: Period = period === "30d" ? "90d" : "all_time";
@@ -237,6 +287,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       meta: {
         total: leaderboard.length,
         period,
+        period_token: period,
+        display_window_label: getDisplayWindowLabel(period),
+        min_public_scored_calls: sampleThreshold.min_public_scored_calls,
+        low_n_warning_calls: sampleThreshold.low_n_warning_calls,
+        sample_floor_label: sampleThreshold.sample_floor_label,
+        window_days: getWindowDays(period),
+        window_start: windowRange.window_start,
+        window_end: windowRange.window_end,
+        latest_public_call_date: latestPublicCallDate,
+        freshness_notes: [RECENT_PUBLIC_SCORING_MATURITY_NOTE],
+        gated_periods: GATED_PERIODS,
+        data_maturity_note: RECENT_PUBLIC_SCORING_MATURITY_NOTE,
       },
     });
   } catch (error: unknown) {
