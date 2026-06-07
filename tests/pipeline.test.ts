@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { NextRequest } from "next/server";
 import {
   CLAIM_NEXT_PIPELINE_JOB_SQL,
+  candidateAdmissionRunKey,
   candleRefreshRunKey,
   computeScoresRunKey,
   matchPricesBatchRunKey,
@@ -27,6 +28,7 @@ import {
   runMlPromotionJob,
   validateMlPromotionGates,
 } from "../src/lib/ml-promotion";
+import { CREATOR_CANDIDATE_ADMISSION_JOB_TYPE } from "../src/lib/candidate-admission";
 import { POST as enqueueMlCron } from "../src/app/api/cron/ml/enqueue/route";
 import { POST as enqueueCandlesCron } from "../src/app/api/cron/candles/enqueue/route";
 import { POST as enqueueMatchCron } from "../src/app/api/cron/match/enqueue/route";
@@ -134,6 +136,7 @@ test("Phase 1 automation jobs use deterministic daily idempotency keys", () => {
   assert.equal(matchPricesBatchRunKey(now), "match-prices-batch:2026-05-05");
   assert.equal(computeScoresRunKey(now), "compute-scores:2026-05-05");
   assert.equal(mlPromotionRunKey(now), "ml-promotion:2026-05-05");
+  assert.equal(candidateAdmissionRunKey(now), "candidate-admission:2026-05-05");
 });
 
 test("Hermes worker advertises Phase 1 job types while keeping dry-run smoke support", () => {
@@ -142,6 +145,7 @@ test("Hermes worker advertises Phase 1 job types while keeping dry-run smoke sup
   assert.ok(SUPPORTED_JOB_TYPES.includes("match_prices_batch"));
   assert.ok(SUPPORTED_JOB_TYPES.includes("compute_scores"));
   assert.ok(SUPPORTED_JOB_TYPES.includes(PROMOTE_ML_VERIFIED_JOB_TYPE));
+  assert.ok(SUPPORTED_JOB_TYPES.includes(CREATOR_CANDIDATE_ADMISSION_JOB_TYPE));
 });
 
 test("Phase 1 job payload parsers keep bounded production-safe defaults", () => {
