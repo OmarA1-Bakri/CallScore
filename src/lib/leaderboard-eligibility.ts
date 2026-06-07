@@ -9,6 +9,10 @@ export const MIN_PUBLIC_LEADERBOARD_CALLS = OBSOLETE_LEADERBOARD_CALL_THRESHOLD;
 export const LOW_N_WARNING_CALLS = 50;
 export const RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS = 10;
 export const RECENT_CONTEXT_LOW_N_WARNING_CALLS = 20;
+// Backwards-compatible aliases retained for PR branches/tests that imported
+// the older Pro 90d threshold names.
+export const MIN_PRO_90D_LEADERBOARD_CALLS = RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS;
+export const LOW_N_90D_WARNING_CALLS = RECENT_CONTEXT_LOW_N_WARNING_CALLS;
 
 export interface LeaderboardSampleThreshold {
   readonly min_public_scored_calls: number;
@@ -42,15 +46,27 @@ export function getLeaderboardSampleThreshold(period: Period): LeaderboardSample
 
 const SAFE_SQL_IDENTIFIER = /^[a-z_][a-z0-9_]*$/i;
 
+export function assertSafeSqlIdentifier(alias: string, label: string): void {
+  if (!SAFE_SQL_IDENTIFIER.test(alias)) {
+    throw new Error(`Unsafe SQL alias for ${label}: ${alias}`);
+  }
+}
+
+export function getMinimumLeaderboardCalls(period: Period | "all_time" = "all_time"): number {
+  return getLeaderboardSampleThreshold(period).min_public_scored_calls;
+}
+
+export function getLowNWarningCalls(period: Period | "all_time" = "all_time"): number {
+  return getLeaderboardSampleThreshold(period).low_n_warning_calls;
+}
+
 /**
  * Returns a SQL expression checking leaderboard eligibility for a creator_stats alias.
  * The alias defaults to "cs", must pass SAFE_SQL_IDENTIFIER, and the threshold is
- * period-aware.
+ * period-aware. Legacy creator exclusion is applied separately where creators join.
  */
 export function getLeaderboardEligibilitySql(alias = "cs", period: Period = "all_time"): string {
-  if (!SAFE_SQL_IDENTIFIER.test(alias)) {
-    throw new Error(`Unsafe SQL alias for leaderboard eligibility: ${alias}`);
-  }
+  assertSafeSqlIdentifier(alias, "leaderboard eligibility");
   const threshold = getLeaderboardSampleThreshold(period);
   return `${alias}.total_calls >= ${threshold.min_public_scored_calls}`;
 }

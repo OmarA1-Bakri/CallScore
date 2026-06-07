@@ -10,6 +10,7 @@ import {
   getLeaderboardEligibilitySql,
   getLeaderboardSampleThreshold,
 } from "@/lib/leaderboard-eligibility";
+import { getLegacyCreatorExclusionSql } from "@/lib/legacy-creator-overrides";
 import { getCallEligibilitySql } from "@/lib/public-methodology";
 import {
   CREATOR_JUDGMENT_WINDOW_DAYS,
@@ -155,6 +156,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const period: Period = periodParam;
     const sampleThreshold = getLeaderboardSampleThreshold(period);
     const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
+    const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
     if (period !== "all_time") {
       const auth = getRequestAuthContext(request);
       const userTier = auth.session?.tier ?? (await getUserTier(auth.accessToken, auth.session?.userId));
@@ -198,6 +200,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
         AND ${leaderboardEligibleSql}
+        AND ${legacyCreatorExclusionSql}
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );

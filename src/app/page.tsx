@@ -12,6 +12,7 @@ import {
   getLeaderboardEligibilitySql,
   getLeaderboardSampleThreshold,
 } from "@/lib/leaderboard-eligibility";
+import { getLegacyCreatorExclusionSql } from "@/lib/legacy-creator-overrides";
 import { CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL, CREATOR_JUDGMENT_WINDOW_LABEL, RECENT_PUBLIC_SCORING_MATURITY_NOTE } from "@/lib/judgment-window";
 import { getCreatorTier } from "@/lib/creator-tier";
 import { hasAccess } from "@/lib/whop";
@@ -158,6 +159,7 @@ export default async function HomePage({
 
   const sampleThreshold = getLeaderboardSampleThreshold(period);
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
+  const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
 
   // Fetch leaderboard from DB
   let leaderboard: LeaderboardRow[] = [];
@@ -194,6 +196,7 @@ export default async function HomePage({
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
         AND ${leaderboardEligibleSql}
+        AND ${legacyCreatorExclusionSql}
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );
@@ -304,7 +307,7 @@ export default async function HomePage({
         COALESCE(SUM(total_calls), 0)::text AS total_calls,
         CASE WHEN COUNT(*) > 0 THEN ROUND((AVG(win_rate) * 100)::numeric, 1)::text ELSE '--' END AS avg_accuracy,
         COUNT(DISTINCT creator_id)::text AS creator_count
-      FROM creator_stats cs WHERE cs.period = $1 AND ${leaderboardEligibleSql}`,
+      FROM creator_stats cs JOIN creators c ON c.id = cs.creator_id WHERE cs.period = $1 AND ${leaderboardEligibleSql} AND ${legacyCreatorExclusionSql}`,
       [period],
     );
     if (statsRows.length > 0) {
