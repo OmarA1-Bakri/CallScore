@@ -104,3 +104,15 @@ test("checkout route preserves non-session query parameters", async () => {
     "https://whop.com/checkout/plan_123/?promo=alpha",
   );
 });
+
+test("checkout route does not append unverified return or cancel parameters", async () => {
+  process.env[CHECKOUT_ENV_KEY] = "https://whop.com/checkout/plan_123/";
+
+  const response = await GET(request("/api/checkout/pro?interval=monthly"), params("pro"));
+
+  assert.equal(response.status, 303);
+  assert.equal(
+    response.headers.get("location"),
+    "https://whop.com/checkout/plan_123/",
+  );
+});

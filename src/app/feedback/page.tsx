@@ -260,7 +260,7 @@ export default function FeedbackPage(): ReactElement {
                   onChange={(event) =>
                     updateField("contextUrl", event.target.value)
                   }
-                  placeholder="https://www.call-score.com/creator/... or pasted page context"
+                  placeholder="https://call-score.com/creator/... or pasted page context"
                   className="min-h-11 w-full border border-ink-250 bg-ink-0 px-3 font-mono text-body text-ink-800 placeholder:text-ink-500 focus:border-accent focus:outline-none"
                 />
               </div>
