@@ -163,7 +163,7 @@ test("data pipeline parses explicit bounds and skip flags", () => {
     "--price-match-start-after-id",
     "12345",
     "--verify-base-url",
-    "https://www.call-score.com",
+    "https://call-score.com",
     "--skip-shadow-diff",
     "--skip-secret-hygiene",
     "--skip-discover",
@@ -190,7 +190,7 @@ test("data pipeline parses explicit bounds and skip flags", () => {
   assert.equal(args.limitPriceMatches, 500);
   assert.equal(args.priceMatchBatchSize, 25);
   assert.equal(args.priceMatchStartAfterId, 12345);
-  assert.equal(args.verifyBaseUrl, "https://www.call-score.com");
+  assert.equal(args.verifyBaseUrl, "https://call-score.com");
   assert.equal(args.skipStages.has("secret-hygiene"), true);
   assert.equal(args.skipStages.has("shadow-diff"), true);
   assert.equal(args.skipStages.has("discover"), true);
@@ -415,9 +415,9 @@ test("consensus detection advances past the full anchored window", () => {
 test("public surface verification only fetches external URLs when explicitly requested", () => {
   assert.equal(parseVerifyPublicSurfaceArgs([]).baseUrl, null);
   assert.equal(
-    parseVerifyPublicSurfaceArgs(["--base-url", "https://www.call-score.com"])
+    parseVerifyPublicSurfaceArgs(["--base-url", "https://call-score.com"])
       .baseUrl,
-    "https://www.call-score.com",
+    "https://call-score.com",
   );
 });
 
@@ -611,7 +611,7 @@ test("data pipeline write mode executes shadow extraction, guarded promotion, an
     "2",
     "--rematch-all-prices",
     "--verify-base-url",
-    "https://www.call-score.com",
+    "https://call-score.com",
     "--write",
   ]);
   const commands = buildDataPipelineStageCommands(args);
@@ -627,7 +627,7 @@ test("data pipeline write mode executes shadow extraction, guarded promotion, an
   assert.equal(commands["evaluation-backfill"][0].includes("--all"), true);
   assert.equal(commands["evaluation-backfill"][0].includes("--batch-size"), true);
   assert.equal(
-    commands["verify-public-surface"][0].includes("https://www.call-score.com"),
+    commands["verify-public-surface"][0].includes("https://call-score.com"),
     true,
   );
 });

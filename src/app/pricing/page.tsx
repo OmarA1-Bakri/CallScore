@@ -179,6 +179,29 @@ export default function PricingPage(): ReactElement {
             { k: "refund", v: "30 days" },
           ]}
         />
+        <div className="mt-5 border border-ink-250 bg-ink-50 p-4 font-serif text-[17px] leading-relaxed text-ink-700">
+          After checkout, return to CallScore to confirm access and manage billing from Whop.
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[11px] uppercase tracking-caps">
+            <Link
+              href="/checkout/success"
+              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
+            >
+              Success handoff
+            </Link>
+            <Link
+              href="/checkout/cancelled"
+              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
+            >
+              Cancelled checkout
+            </Link>
+            <Link
+              href="/settings/billing"
+              className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
+            >
+              Billing help
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/* 01 — TIERS (asymmetric 1fr-1.2fr-1fr; pro is the editorial anchor) */}
