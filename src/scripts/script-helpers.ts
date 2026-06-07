@@ -184,7 +184,7 @@ interface TransactionCapableDb {
 function isTransactionCapableDb(db: unknown): db is TransactionCapableDb {
   return Boolean(
     db &&
-      typeof db === "object" &&
+      (typeof db === "object" || typeof db === "function") &&
       "transaction" in db &&
       typeof (db as { transaction?: unknown }).transaction === "function",
   );

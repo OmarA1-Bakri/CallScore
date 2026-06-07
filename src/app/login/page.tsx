@@ -12,15 +12,15 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    
+
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: username || undefined, password }),
     });
-    
+
     const data = await res.json();
-    
+
     if (res.ok) {
       router.push("/");
       router.refresh();

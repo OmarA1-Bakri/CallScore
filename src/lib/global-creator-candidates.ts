@@ -13,6 +13,29 @@ export const GLOBAL_CREATOR_CONTENT_TYPES = [
 ] as const;
 export type GlobalCreatorContentType = (typeof GLOBAL_CREATOR_CONTENT_TYPES)[number];
 
+export const CREATOR_CALL_SAMPLE_STATUSES = [
+  "not_reviewed",
+  "passed",
+  "failed",
+  "mixed_requires_audit",
+] as const;
+export type CreatorCallSampleStatus = (typeof CREATOR_CALL_SAMPLE_STATUSES)[number];
+
+export const CREATOR_RANKABILITY_STATUSES = [
+  "rankable_caller",
+  "news_commentary",
+  "third_party_aggregator",
+  "education_only",
+  "exchange_company",
+  "macro_commentary",
+  "mixed_requires_audit",
+  "rejected",
+] as const;
+export type CreatorRankabilityStatus = (typeof CREATOR_RANKABILITY_STATUSES)[number];
+
+export const DEFAULT_CREATOR_CALL_SAMPLE_STATUS: CreatorCallSampleStatus = "not_reviewed";
+export const DEFAULT_CREATOR_RANKABILITY_STATUS: CreatorRankabilityStatus = "rejected";
+
 export interface GlobalCreatorCandidate {
   readonly name: string;
   readonly youtube_handle: string | null;
@@ -26,6 +49,11 @@ export interface GlobalCreatorCandidate {
   readonly content_type: GlobalCreatorContentType;
   readonly crypto_relevance_score: number;
   readonly rankability_guess: "high" | "medium" | "low";
+  readonly creator_call_sample_status?: CreatorCallSampleStatus;
+  readonly rankability_status?: CreatorRankabilityStatus;
+  readonly rankability_reason?: string | null;
+  readonly rankability_source?: string | null;
+  readonly rankability_reviewed_at?: string | null;
   readonly status: GlobalCreatorStatus;
   readonly rejection_reason?: string | null;
 }
@@ -171,9 +199,34 @@ function validateCandidate(candidate: GlobalCreatorCandidate, sourceName: string
   if (!GLOBAL_CREATOR_CONTENT_TYPES.includes(candidate.content_type)) {
     throw new Error(`Candidate ${candidate.name} has invalid content_type ${candidate.content_type}`);
   }
+  getCreatorCallSampleStatus(candidate);
+  getCreatorRankabilityStatus(candidate);
+  if (candidate.rankability_reviewed_at && Number.isNaN(Date.parse(candidate.rankability_reviewed_at))) {
+    throw new Error(`Candidate ${candidate.name} has invalid rankability_reviewed_at ${candidate.rankability_reviewed_at}`);
+  }
   if (candidate.crypto_relevance_score < 0 || candidate.crypto_relevance_score > 1) {
     throw new Error(`Candidate ${candidate.name} crypto_relevance_score must be between 0 and 1`);
   }
+}
+
+export function getCreatorCallSampleStatus(
+  candidate: Pick<GlobalCreatorCandidate, "creator_call_sample_status">,
+): CreatorCallSampleStatus {
+  const status = candidate.creator_call_sample_status ?? DEFAULT_CREATOR_CALL_SAMPLE_STATUS;
+  if (!CREATOR_CALL_SAMPLE_STATUSES.includes(status)) {
+    throw new Error(`Invalid creator_call_sample_status: ${status}`);
+  }
+  return status;
+}
+
+export function getCreatorRankabilityStatus(
+  candidate: Pick<GlobalCreatorCandidate, "rankability_status">,
+): CreatorRankabilityStatus {
+  const status = candidate.rankability_status ?? DEFAULT_CREATOR_RANKABILITY_STATUS;
+  if (!CREATOR_RANKABILITY_STATUSES.includes(status)) {
+    throw new Error(`Invalid rankability_status: ${status}`);
+  }
+  return status;
 }
 
 function initCountRecord<const T extends readonly string[]>(keys: T): Record<T[number], number> {

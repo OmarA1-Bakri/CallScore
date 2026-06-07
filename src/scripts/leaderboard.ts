@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { query } from "../lib/db";
 import { getLeaderboardEligibilitySql } from "../lib/leaderboard-eligibility";
+import { getLegacyCreatorExclusionSql } from "../lib/legacy-creator-overrides";
 
 function loadEnv(): void {
   if (process.env.NEON_DATABASE_URL) return;
@@ -37,7 +38,8 @@ interface Row {
 
 async function main(): Promise<void> {
   loadEnv();
-  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+  const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", "all_time");
+  const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("cr");
   const rows = await query<Row>(
     `SELECT cr.name, cr.tier, cs.accuracy_rank, cs.alpha_score, cs.win_rate,
             cs.avg_alpha_30d, cs.avg_return_30d, cs.total_calls,
@@ -45,6 +47,7 @@ async function main(): Promise<void> {
      FROM creators cr
      JOIN creator_stats cs ON cs.creator_id = cr.id AND cs.period = 'all_time'
      WHERE ${leaderboardEligibleSql}
+       AND ${legacyCreatorExclusionSql}
        AND EXISTS (
          SELECT 1 FROM calls c WHERE c.creator_id = cr.id AND c.price_at_call IS NOT NULL
        )
@@ -79,6 +82,7 @@ async function main(): Promise<void> {
     `SELECT period, COUNT(*)::text as creator_count, AVG(alpha_score) as avg_alpha
      FROM creator_stats cs
      WHERE ${leaderboardEligibleSql}
+       AND EXISTS (SELECT 1 FROM creators cr WHERE cr.id = cs.creator_id AND ${legacyCreatorExclusionSql})
      GROUP BY period
      ORDER BY period`,
   );
