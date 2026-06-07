@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSession } from "@/lib/auth";
 import { getUserTier } from "@/lib/whop-access";
+import { getWhopOAuthBaseUrl, getWhopOAuthCallbackUrl } from "@/lib/whop-oauth";
 
 const OAUTH_STATE_COOKIE_NAME = "ctr_oauth_state";
 
@@ -17,11 +18,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const state = searchParams.get("state");
   const storedState = request.cookies.get(OAUTH_STATE_COOKIE_NAME)?.value;
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    (process.env.NODE_ENV === "production"
-      ? "https://call-score.com"
-      : "http://localhost:3000");
+  const baseUrl = getWhopOAuthBaseUrl();
 
   const redirectWithStateClear = (path: string): NextResponse => {
     const response = NextResponse.redirect(`${baseUrl}${path}`);
@@ -111,7 +108,7 @@ async function exchangeCodeForToken(
       code,
       client_id: clientId,
       client_secret: clientSecret,
-      redirect_uri: `${baseUrl}/api/auth/whop/callback`,
+      redirect_uri: getWhopOAuthCallbackUrl(),
     }),
   });
 

@@ -16,6 +16,7 @@ export type SerializableCallInput = Call & LiveCallPricingFields;
 export interface SerializedCall extends Call {
   readonly extraction_valid: boolean;
   readonly extraction_notes: readonly string[];
+  readonly validated_target_price: number | null;
   readonly score_status: CallScoreStatus;
   readonly public_score: number | null;
   readonly public_score_components: PublicScoreComponents | null;
@@ -87,6 +88,7 @@ export function serializeCall(
     ...call,
     extraction_valid: extraction.isValid,
     extraction_notes: extraction.reasons,
+    validated_target_price: extraction.targetPrice,
     score_status: scoreStatus,
     public_score: components?.total ?? null,
     public_score_components: components,

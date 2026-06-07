@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getAutonomyStatusSnapshot,
+  unavailableAutonomyStatusSnapshot,
+} from "@/lib/autonomy-status";
 import { getPipelineStatusSnapshot } from "@/lib/pipeline";
 
 export const runtime = "nodejs";
@@ -24,9 +28,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const snapshot = await getPipelineStatusSnapshot(limitFromRequest(request));
-  return NextResponse.json(
-    { ok: true, ...snapshot },
-    { headers: { "cache-control": "no-store" } },
-  );
+  try {
+    const [snapshot, autonomyStatus] = await Promise.all([
+      getPipelineStatusSnapshot(limitFromRequest(request)),
+      getAutonomyStatusSnapshot(),
+    ]);
+    return NextResponse.json(
+      { ok: true, autonomy_status: autonomyStatus, ...snapshot },
+      { headers: { "cache-control": "no-store" } },
+    );
+  } catch {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "status_unavailable",
+        autonomy_status: unavailableAutonomyStatusSnapshot(),
+      },
+      {
+        status: 503,
+        headers: { "cache-control": "no-store" },
+      },
+    );
+  }
 }

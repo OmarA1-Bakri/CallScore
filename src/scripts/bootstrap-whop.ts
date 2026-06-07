@@ -182,7 +182,7 @@ async function createMonthlyPlan(companyId: string, desired: TierPlanInput): Pro
 
 function printEnv(outputs: Record<string, string>): void {
   console.log("");
-  console.log("Set these in Vercel production/preview/development:");
+  console.log("Set these in Netlify production/deploy-preview/local environment:");
   for (const [key, value] of Object.entries(outputs).sort(([a], [b]) => a.localeCompare(b))) {
     console.log(`${key}=${value}`);
   }

@@ -1,13 +1,11 @@
 "use client";
 
-import {
-  LOW_N_WARNING_CALLS,
-  MIN_PUBLIC_LEADERBOARD_CALLS,
-} from "@/lib/leaderboard-eligibility";
-
 interface RankTierBadgeProps {
   readonly rank: number;
   readonly totalCalls: number;
+  readonly minPublicScoredCalls: number;
+  readonly lowNWarningCalls: number;
+  readonly sampleFloorLabel: string;
 }
 
 function getTier(rank: number): { label: string; color: string } {
@@ -16,15 +14,20 @@ function getTier(rank: number): { label: string; color: string } {
   return { label: "T3", color: "bg-ink-500/20 text-ink-600 border-ink-300/30" };
 }
 
-if (MIN_PUBLIC_LEADERBOARD_CALLS > LOW_N_WARNING_CALLS) {
-  throw new Error("MIN_PUBLIC_LEADERBOARD_CALLS must be <= LOW_N_WARNING_CALLS");
-}
-
-export default function RankTierBadge({ rank, totalCalls }: RankTierBadgeProps) {
+export default function RankTierBadge({
+  rank,
+  totalCalls,
+  minPublicScoredCalls,
+  lowNWarningCalls,
+  sampleFloorLabel,
+}: RankTierBadgeProps) {
+  if (minPublicScoredCalls > lowNWarningCalls) {
+    throw new Error("minPublicScoredCalls must be <= lowNWarningCalls");
+  }
   const tier = getTier(rank);
   // Ordering invariant: obsoleteData is the stricter floor, lowData covers the visible low-N band above it.
-  const obsoleteData = totalCalls < MIN_PUBLIC_LEADERBOARD_CALLS;
-  const lowData = !obsoleteData && totalCalls < LOW_N_WARNING_CALLS;
+  const obsoleteData = totalCalls < minPublicScoredCalls;
+  const lowData = !obsoleteData && totalCalls < lowNWarningCalls;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -36,7 +39,7 @@ export default function RankTierBadge({ rank, totalCalls }: RankTierBadgeProps) 
       {obsoleteData && (
         <span
           className="inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-medium bg-ink-100 text-ink-600 border border-ink-300/70"
-          title={`Only ${totalCalls} scored calls — below the ${MIN_PUBLIC_LEADERBOARD_CALLS}-call leaderboard floor`}
+          title={`Only ${totalCalls} public-scored calls — below the ${minPublicScoredCalls}-call floor. ${sampleFloorLabel}`}
         >
           Obsolete
         </span>
@@ -44,7 +47,7 @@ export default function RankTierBadge({ rank, totalCalls }: RankTierBadgeProps) 
       {lowData && (
         <span
           className="inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-medium bg-accent/10 text-accent border border-accent/20"
-          title={`Only ${totalCalls} scored calls — visible but still a low-N sample`}
+          title={`Only ${totalCalls} public-scored calls — visible but still below the ${lowNWarningCalls}-call low-N warning line. ${sampleFloorLabel}`}
         >
           Low N
         </span>

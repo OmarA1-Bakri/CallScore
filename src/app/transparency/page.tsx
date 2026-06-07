@@ -135,7 +135,7 @@ export default async function TransparencyPage() {
       <div className="border-t border-ink-250 py-8 mt-8">
         <Link
           href="/methodology"
-          className="inline-flex items-center gap-2 font-mono text-[13px] tracking-caps uppercase text-accent hover:underline underline-offset-4"
+          className="inline-flex items-center gap-2 font-mono text-[13px] tracking-caps uppercase text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent"
         >
           <span aria-hidden="true">←</span> How we score
         </Link>

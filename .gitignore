@@ -41,3 +41,6 @@ home-*-alpha-nav.png
 .env.prod.pull*
 .1env.prod.pulled*
 .env.production
+
+# Local Netlify folder
+.netlify

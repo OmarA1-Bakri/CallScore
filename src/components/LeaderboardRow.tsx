@@ -6,6 +6,9 @@ import RankTierBadge from "./RankTierBadge";
 
 interface LeaderboardRowProps {
   readonly row: Row;
+  readonly minPublicScoredCalls: number;
+  readonly lowNWarningCalls: number;
+  readonly sampleFloorLabel: string;
 }
 
 function getInitials(name: string): string {
@@ -17,11 +20,16 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactElement {
+export default function LeaderboardRow({
+  row,
+  minPublicScoredCalls,
+  lowNWarningCalls,
+  sampleFloorLabel,
+}: LeaderboardRowProps): ReactElement {
   const alpha = row.stats.alpha_score;
   const delta30 = row.stats.avg_alpha_30d;
   const winPct = (row.stats.win_rate * 100).toFixed(1);
-  const lastCall = row.best_call?.symbol?.replace("USDT", "") ?? "—";
+  const bestCoin = row.best_call?.symbol?.replace("USDT", "") ?? "—";
   const alphaTone = alpha >= 50 ? "text-pos" : alpha < 30 ? "text-neg" : "text-ink-700";
 
   return (
@@ -60,7 +68,7 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
         {alpha.toFixed(1)}
         <span className="text-ink-500 text-[11px] ml-1">α</span>
       </td>
-      {/* 30d Δ */}
+      {/* Average alpha delta */}
       <td className="py-3 pr-4 text-right tabular-nums font-mono text-[13px]">
         <span className={delta30 >= 0 ? "text-pos" : "text-neg"}>
           {delta30 >= 0 ? "+" : ""}
@@ -80,10 +88,13 @@ export default function LeaderboardRow({ row }: LeaderboardRowProps): ReactEleme
         <RankTierBadge
           rank={row.rank}
           totalCalls={row.stats.total_calls}
+          minPublicScoredCalls={minPublicScoredCalls}
+          lowNWarningCalls={lowNWarningCalls}
+          sampleFloorLabel={sampleFloorLabel}
         />
       </td>
-      {/* Last call — most recent scored symbol */}
-      <td className="py-3 text-right font-mono text-[12px] text-ink-600">{lastCall}</td>
+      {/* Best coin — symbol from the best public-scored call */}
+      <td className="py-3 text-right font-mono text-[12px] text-ink-600">{bestCoin}</td>
     </tr>
   );
 }

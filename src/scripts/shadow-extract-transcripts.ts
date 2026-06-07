@@ -6,7 +6,7 @@ import {
 import { buildRunId, hashTranscript, writeJsonFile, writeJsonlRecord, type ShadowExtractedCallRecord, type ShadowExtractionRunMetadata } from "../lib/shadow-extraction";
 import type { Video } from "../lib/types";
 import { extractWithModelFallback, parseOpenRouterExtractionArgs, type OpenRouterArgs } from "./extract-calls-openrouter";
-import { loadEnv, sleep, timestamp } from "./script-helpers";
+import { loadEnv, runWithConcurrency, sleep, timestamp } from "./script-helpers";
 
 type ShadowVideo = Video & { creator_id: number; creator_name: string; youtube_handle: string };
 
@@ -232,24 +232,21 @@ async function processShadowVideos(
   videos: readonly ShadowVideo[],
 ): Promise<ShadowVideoResult> {
   const totals = { processed: 0, failed: 0, accepted: 0 };
-  const batchSize = Math.max(1, args.videoAgents);
 
-  for (let index = 0; index < videos.length; index += batchSize) {
-    const batch = videos.slice(index, index + batchSize);
-    const results = await Promise.all(
-      batch.map((video, offset) =>
-        processShadowVideo(args, video, index + offset, videos.length),
-      ),
-    );
+  const results = await runWithConcurrency(
+    videos,
+    args.videoAgents,
+    async (video, index) => {
+      const result = await processShadowVideo(args, video, index, videos.length);
+      if (index + 1 < videos.length && args.gapMs > 0) await sleep(args.gapMs);
+      return result;
+    },
+  );
 
-    for (const result of results) {
-      totals.processed += result.processed;
-      totals.failed += result.failed;
-      totals.accepted += result.accepted;
-    }
-
-    if (index + batch.length < videos.length && args.gapMs > 0)
-      await sleep(args.gapMs);
+  for (const result of results) {
+    totals.processed += result.processed;
+    totals.failed += result.failed;
+    totals.accepted += result.accepted;
   }
 
   return totals;
@@ -263,7 +260,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const videos = await loadShadowVideos(args);
   console.log(
-    `[${timestamp()}] shadow extract ${args.execute ? "EXECUTE" : "DRY-RUN"}: run=${args.runId}, videos=${videos.length}, provider=${args.provider}, model=${args.model}, videoAgents=${args.videoAgents}, chunkAgents=${args.chunkAgents}, out=${args.shadowOut}`,
+    `[${timestamp()}] shadow extract ${args.execute ? "EXECUTE" : "DRY-RUN"}: run=${args.runId}, videos=${videos.length}, provider=${args.provider}, model=${args.model}, videoAgents=${args.videoAgents}, chunkAgents=${args.chunkAgents}, modelAttempts=${args.modelAttempts}, out=${args.shadowOut}`,
   );
 
   const { processed, failed, accepted: totalAccepted } = await processShadowVideos(

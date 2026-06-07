@@ -2,12 +2,12 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import type { ReactElement } from "react";
-import { CREATOR_JUDGMENT_WINDOW_SHORT_LABEL } from "@/lib/judgment-window";
+import { CREATOR_JUDGMENT_WINDOW_LABEL } from "@/lib/judgment-window";
 import type { Period } from "@/lib/types";
 
 const PERIODS: ReadonlyArray<{ readonly value: Period; readonly label: string }> = [
-  { value: "all_time", label: CREATOR_JUDGMENT_WINDOW_SHORT_LABEL },
-  { value: "90d", label: "90 days" },
+  { value: "all_time", label: CREATOR_JUDGMENT_WINDOW_LABEL },
+  { value: "90d", label: "90 days · Pro" },
 ];
 
 interface PeriodFilterProps {
@@ -32,8 +32,9 @@ export default function PeriodFilter({ value, canUseRecent = true }: PeriodFilte
   }
 
   return (
-    <div role="tablist" aria-label="Period filter" className="inline-flex border-b border-ink-250">
-      {PERIODS.map((p) => {
+    <div className="flex flex-col items-start tab:items-end gap-1.5">
+      <div role="tablist" aria-label="Period filter" className="inline-flex border-b border-ink-250">
+        {PERIODS.map((p) => {
         const active = value === p.value;
         return (
           <button
@@ -52,7 +53,11 @@ export default function PeriodFilter({ value, canUseRecent = true }: PeriodFilte
             {p.label}
           </button>
         );
-      })}
+        })}
+      </div>
+      <p className="font-mono text-[10px] uppercase tracking-caps text-ink-500">
+        Viewing Last 12 months. The 90-day context filter requires Pro.
+      </p>
     </div>
   );
 }

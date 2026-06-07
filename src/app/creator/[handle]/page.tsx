@@ -139,6 +139,7 @@ export default async function CreatorPage({ params }: PageProps) {
   const hitRate = computeCreatorHitRate(allCalls);
   const currentTier = await getCurrentTier();
   const canExport = hasAccess(currentTier, "pro");
+  const canWatchCreator = hasAccess(currentTier, "pro");
 
   return (
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8 py-8">
@@ -170,7 +171,7 @@ export default async function CreatorPage({ params }: PageProps) {
           cells={[
             { k: "rank", v: stats?.accuracy_rank ?? "—" },
             { k: "alpha", v: alphaScore.toFixed(1) },
-            { k: "win rate", v: `${(winRate * 100).toFixed(0)}%` },
+            { k: "direction win", v: `${(winRate * 100).toFixed(0)}%` },
             { k: "scored calls", v: scoredCallCount },
           ]}
         />
@@ -183,7 +184,7 @@ export default async function CreatorPage({ params }: PageProps) {
           <em className="italic text-accent">#{stats?.accuracy_rank ?? "—"}</em> on average alpha
           across {scoredCallCount} scored calls
           {scoredCallCount > 0
-            ? `, with a ${(winRate * 100).toFixed(0)}% directional hit rate at 30 days`
+            ? `, with a ${(winRate * 100).toFixed(0)}% directional win rate on resolved calls`
             : ""}
           .
         </p>
@@ -198,12 +199,12 @@ export default async function CreatorPage({ params }: PageProps) {
         <div className="grid grid-cols-2 tab:grid-cols-4 gap-4">
           <AlphaScoreBadge score={alphaScore} size="lg" />
           <MetricTile
-            label="Hit Rate"
+            label="Target Hit Rate"
             value={`${(hitRate * 100).toFixed(0)}%`}
-            unit="hit"
+            unit="target"
           />
           <MetricTile
-            label="Avg α 30d"
+            label="Avg α"
             value={`${avgAlpha30d >= 0 ? "+" : ""}${avgAlpha30d.toFixed(1)}`}
             unit="%"
             tone={avgAlpha30d >= 0 ? "pos" : "neg"}
@@ -217,7 +218,11 @@ export default async function CreatorPage({ params }: PageProps) {
       </EditorialSection>
 
       {/* 03 — calls */}
-      <EditorialSection index="03" title={<>Recent <em className="italic text-accent">calls</em>.</>}>
+      <EditorialSection
+        index="03"
+        title={<>Recent call <em className="italic text-accent">history</em>.</>}
+        meta={<>latest 50 tracked calls<br />Last 12 months · newest first</>}
+      >
         <div className="mb-4 flex flex-wrap gap-2">
           <Link
             href={
@@ -232,23 +237,34 @@ export default async function CreatorPage({ params }: PageProps) {
             {canExport ? "Export CSV" : "Export CSV · Pro"}
           </Link>
           <Link
-            href={`/settings/alerts?q=${encodeURIComponent(creator.youtube_handle)}`}
+            href={
+              canWatchCreator
+                ? `/settings/alerts?q=${encodeURIComponent(creator.youtube_handle)}`
+                : "/pricing"
+            }
             className="inline-block font-mono text-[12px] tracking-caps uppercase border border-ink-250 text-ink-700 hover:bg-ink-100 px-3 py-2 transition-colors"
             style={{ borderRadius: 2 }}
             prefetch={false}
           >
-            Watch creator · Pro
+            {canWatchCreator ? "Watch creator" : "Watch creator · Pro"}
           </Link>
         </div>
         {displayCalls.length > 0 ? (
-          <CallHistory
-            calls={displayCalls}
-            totalCount={trackedCallCount}
-            scoredCount={scoredCallCount}
-          />
+          <>
+            {scoredCallCount === 0 ? (
+              <p className="mb-4 font-mono text-[12px] text-ink-500 tracking-wide">
+                No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or outcome windows.
+              </p>
+            ) : null}
+            <CallHistory
+              calls={displayCalls}
+              totalCount={trackedCallCount}
+              scoredCount={scoredCallCount}
+            />
+          </>
         ) : (
           <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-            No calls tracked yet for this creator.
+            No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or outcome windows.
           </p>
         )}
       </EditorialSection>

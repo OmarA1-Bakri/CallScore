@@ -4,11 +4,11 @@ import type { Pool } from "pg";
 export type DatabaseProvider = "neon" | "postgres";
 
 export const DATABASE_URL_ENV_KEYS = [
-  "NEON_DATABASE_URL",
   "DATABASE_URL",
   "POSTGRES_URL",
   "POSTGRES_URL_NON_POOLING",
   "POSTGRES_PRISMA_URL",
+  "NEON_DATABASE_URL",
 ] as const;
 
 const POSTGRES_URL_ENV_KEYS = [

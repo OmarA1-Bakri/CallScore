@@ -1,1 +1,1 @@
-export const SITE_URL = "https://www.call-score.com";
+export const SITE_URL = "https://call-score.netlify.app";

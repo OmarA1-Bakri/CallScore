@@ -23,6 +23,8 @@ function getScoreLabel(call: SerializedCall): string {
   }
   if (call.score_status === "excluded_confidence") return "Unscored";
   if (call.score_status === "invalid_extraction") return "Invalid";
+  if (call.horizon_status_30d === "pending") return "Pending 30d";
+  if (call.target_status === "pending" || call.horizon_status_90d === "pending") return "Pending 90d";
   return "Pending";
 }
 
@@ -90,12 +92,13 @@ export default function CallHistory({
   return (
     <div className="border border-ink-200 overflow-hidden">
       <div className="p-4 border-b border-ink-200">
-        <h2 className="text-ink-900 font-semibold text-sm">Call History</h2>
+        <h2 className="text-ink-900 font-semibold text-sm">Recent call history</h2>
         <p className="text-ink-500 text-xs mt-1">
-          {totalCount !== undefined && totalCount > calls.length
+          {totalCount !== undefined
             ? `Showing ${calls.length} of ${totalCount} tracked calls`
-            : `${calls.length} tracked calls`}
-          {scoredCount !== undefined ? ` · ${scoredCount} scored` : ""}
+            : `Showing ${calls.length} tracked calls`}
+          {scoredCount !== undefined ? ` · ${scoredCount} public-scored` : ""}
+          {" · Last 12 months"}
         </p>
       </div>
 
@@ -196,12 +199,12 @@ export default function CallHistory({
                       >
                         {formatSignedPercent(call.live_return)}
                         <span className="ml-1 text-[10px] uppercase tracking-wider text-ink-600">
-                          live
+                          Live 30d
                         </span>
                       </span>
                     ) : call.horizon_status_30d === "pending" ? (
                       <span className="text-xs uppercase tracking-wider text-ink-600">
-                        Pending
+                        Pending 30d
                       </span>
                     ) : call.return_30d !== null ? (
                       <span
@@ -228,12 +231,12 @@ export default function CallHistory({
                       >
                         {formatSignedPercent(call.live_alpha)}
                         <span className="ml-1 text-[10px] uppercase tracking-wider text-ink-600">
-                          live
+                          Live 30d
                         </span>
                       </span>
                     ) : call.horizon_status_30d === "pending" ? (
                       <span className="text-xs uppercase tracking-wider text-ink-600">
-                        Pending
+                        Pending 30d
                       </span>
                     ) : call.alpha_30d !== null ? (
                       <span
@@ -250,9 +253,11 @@ export default function CallHistory({
                     )}
                   </td>
                   <td className="px-4 py-3 text-center hidden md:table-cell">
-                    {call.target_status === "pending" ? (
+                    {call.validated_target_price === null ? (
+                      <span className="text-ink-600">--</span>
+                    ) : call.target_status === "pending" ? (
                       <span className="text-xs uppercase tracking-wider text-ink-600">
-                        Pending
+                        Pending 90d
                       </span>
                     ) : call.hit_target === true ? (
                       <span aria-hidden="true" className="text-pos">✓</span>

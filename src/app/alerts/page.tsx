@@ -17,7 +17,7 @@ export const metadata = {
 
 const MONITORING_SCOPE = [
   "New ranked creator calls",
-  "Resolved 30d and 90d outcomes",
+  "Resolved outcome updates",
   "Watchlist creator movement",
   "Anti-consensus preview events",
 ];
