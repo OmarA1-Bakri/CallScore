@@ -1,5 +1,6 @@
 import { throwIfCronDeadlineExceeded } from "@/app/api/cron/deadline";
 import { TRACKED_SYMBOLS } from "./constants";
+import { CREATOR_CANDIDATE_ADMISSION_JOB_TYPE } from "./candidate-admission";
 import { query } from "./db";
 import { createHash } from "node:crypto";
 
@@ -173,6 +174,10 @@ export function mlPromotionRunKey(now = new Date()): string {
   return dailyRunKey("ml-promotion", now);
 }
 
+export function candidateAdmissionRunKey(now = new Date()): string {
+  return dailyRunKey("candidate-admission", now);
+}
+
 export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
   readonly run: PipelineRun;
   readonly job: PipelineJob;
@@ -312,6 +317,35 @@ export async function enqueueComputeScoresJob(input: {
       queued_by: "netlify-scheduled",
     },
     maxAttempts: 2,
+    signal: input.signal,
+  });
+}
+
+export async function enqueueCandidateAdmissionJob(input: {
+  readonly maxRecords?: number;
+  readonly minAutoApproveRelevance?: number;
+  readonly minNeedsReviewRelevance?: number;
+  readonly now?: Date;
+  readonly signal?: AbortSignal;
+} = {}): Promise<{ readonly run: PipelineRun; readonly job: PipelineJob }> {
+  const runKey = candidateAdmissionRunKey(input.now);
+  return enqueuePipelineJob({
+    runKey,
+    runType: "candidate-admission",
+    jobType: CREATOR_CANDIDATE_ADMISSION_JOB_TYPE,
+    priority: 60,
+    idempotencyKey: runKey,
+    payload: {
+      mode: "decision_record_only",
+      max_records: input.maxRecords ?? 50,
+      min_auto_approve_relevance: input.minAutoApproveRelevance ?? 0.85,
+      min_needs_review_relevance: input.minNeedsReviewRelevance ?? 0.7,
+      writes_tracked_creators: false,
+      publishes_buyer_facing_rankings: false,
+      operator_export_required: true,
+      queued_by: "pipeline",
+    },
+    maxAttempts: 1,
     signal: input.signal,
   });
 }
