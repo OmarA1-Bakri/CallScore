@@ -28,6 +28,12 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.call-score.com" }],
+        destination: "https://call-score.com/:path*",
+        permanent: true,
+      },
+      {
         source: "/discover",
         destination: "/",
         permanent: true,
@@ -35,16 +41,6 @@ const nextConfig = {
       {
         source: "/experiences/:experienceId",
         destination: "/",
-        permanent: true,
-      },
-    ];
-  },
-  async redirects() {
-    return [
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: "call-score.com" }],
-        destination: "https://www.call-score.com/:path*",
         permanent: true,
       },
     ];

@@ -22,7 +22,7 @@ export default async function BillingSettingsPage() {
     <SettingsShell
       active="billing"
       title="Billing"
-      description="See the current plan, understand the Whop-managed checkout path, and route upgrade or refund requests without inventing account tooling."
+      description="See the current plan, understand the Whop-managed checkout path, and route upgrade, cancellation, or refund requests without inventing account tooling."
       tier={tier}
       primaryAction={{
         label: nextUpgradeLabel(tier),
@@ -58,8 +58,11 @@ export default async function BillingSettingsPage() {
             </p>
             <p className="mt-4 font-serif text-[18px] leading-relaxed text-ink-700">
               {session
-                ? `This session is on the ${tier} plan. Checkout, renewals, and access grants are managed through Whop, not inside CallScore.`
-                : "Checkout, renewals, and access grants are managed through the surrounding Whop account, not inside CallScore."}
+                ? `This session is on the ${tier} plan. Checkout, renewals, cancellation, and access grants are managed through Whop, not inside CallScore.`
+                : "Checkout, renewals, cancellation, and access grants are managed through the surrounding Whop account, not inside CallScore."}
+            </p>
+            <p className="mt-4 font-serif text-[18px] leading-relaxed text-ink-700">
+              You can manage or cancel billing from Whop at any time.
             </p>
             <dl className="mt-4 space-y-3 font-mono text-[12px]">
               <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
@@ -69,6 +72,10 @@ export default async function BillingSettingsPage() {
               <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
                 <dt className="uppercase tracking-caps text-ink-500">Billing system</dt>
                 <dd className="text-right text-ink-800">Whop-managed</dd>
+              </div>
+              <div className="flex justify-between gap-4 border-b border-ink-200 pb-2">
+                <dt className="uppercase tracking-caps text-ink-500">Cancel subscription</dt>
+                <dd className="text-right text-ink-800">Whop account</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="uppercase tracking-caps text-ink-500">Refund requests</dt>
@@ -83,7 +90,8 @@ export default async function BillingSettingsPage() {
             </p>
             <p className="mt-4 font-serif text-[18px] leading-relaxed text-ink-700">
               The public policy remains a 30-day refund window. Use the feedback form with the
-              email used at checkout so support can match the Whop purchase record.
+              email used at checkout so support can match the Whop purchase record. To cancel,
+              open Whop billing and manage the CallScore subscription from your Whop account.
             </p>
           </div>
         </section>
@@ -103,14 +111,21 @@ export default async function BillingSettingsPage() {
             </Link>
 
             <Link
-              href="/settings/account"
+              href="/checkout/success"
               className="inline-flex min-h-11 items-center justify-center border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900"
             >
-              Account status
+              Confirm access
             </Link>
 
+            <a
+              href="https://whop.com/hub"
+              className="inline-flex min-h-11 items-center justify-center border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900"
+            >
+              Open Whop billing
+            </a>
+
             <Link
-              href="/feedback"
+              href="/feedback?context=/settings/billing"
               className="inline-flex min-h-11 items-center justify-center border border-ink-300 px-4 font-mono text-mono-sm uppercase tracking-caps text-ink-700 transition-colors hover:border-ink-500 hover:text-ink-900"
             >
               Request refund
