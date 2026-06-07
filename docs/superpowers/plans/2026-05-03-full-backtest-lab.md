@@ -1,12 +1,14 @@
 # Full Backtest Lab Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> Superseded infrastructure note (2026-06-07): this plan's early references to Neon SQL are legacy context. Current canonical data storage is HH VM PostgreSQL/pgsql; Neon is backup/legacy compatibility only. See `docs/legacy-infra-superseded.md`.
 
 **Goal:** Build a first-class backtesting lab where Alpha users can choose any creators, simulate a combined portfolio, switch weighting modes, and compare results against BTC/ETH benchmarks.
 
 **Architecture:** Keep the existing per-creator backtest intact and add a portfolio-level engine in `src/lib/portfolio-backtest.ts`. The lab page and API both call that engine; configuration is shareable via URL query params rather than a new persistence table.
 
-**Tech Stack:** Next.js App Router, React server components, Neon SQL via existing `query()`, Node test runner with `tsx`, Tailwind design tokens.
+**Tech Stack:** Next.js App Router, React server components, canonical pgsql via existing `query()` compatibility adapter, Node test runner with `tsx`, Tailwind design tokens.
 
 ---
 

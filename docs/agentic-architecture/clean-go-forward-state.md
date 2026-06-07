@@ -5,6 +5,11 @@ Canonical runtime host: `hermes-agent-box` / HH VM
 Canonical runtime repo: `/opt/crypto-tuber-ranked`
 WSL backup root: `/home/omar/backups/callscore-vm-canonical/`
 
+> Infrastructure supersession note (2026-06-07): Netlify and call-score.com are
+> canonical for hosting/scheduling; HH VM PostgreSQL/pgsql is the canonical
+> primary database. Older Neon references below are legacy evidence from the
+> 2026-05-26 repair and do not make Neon canonical.
+
 ## Target architecture
 
 ```text
@@ -18,7 +23,7 @@ HERMES (CEO Orchestrator)
 │   ├── WHOP Pillar
 │   ├── WORKPLANE Pillar
 │   └── CALLSCORE Product Pillar
-└── Pipeline Worker (Docker, Neon)
+└── Pipeline Worker (Docker, HH pgsql primary; Neon backup/legacy only)
 ```
 
 ## Operating cadence
@@ -34,7 +39,7 @@ Every new implementation phase uses this cadence:
 
 - HH VM repo is the canonical runtime checkout.
 - HH worker runs from Docker image `crypto-tuber-ranked-hermes-worker:latest` built from `/opt/crypto-tuber-ranked`.
-- Neon schema has the ML verifier reason-code lookup table and FK active.
+- HH pgsql schema has the ML verifier reason-code lookup table and FK active; the May repair also recorded legacy Neon evidence.
 - The stale `ml_verification_runs_reason_code_check` constraint is removed.
 - Worker smoke jobs can be enqueued, claimed, and completed in dry-run mode.
 - WSL checkout keeps the development mirror plus local backup snapshots.
@@ -56,7 +61,7 @@ HH verification after fixes:
 - Worker log emitted `worker_start` and `database_ok`.
 - `docker compose --profile debug run --rm hermes-worker-once --dry-run` completed a `hermes_smoke_test` job.
 - Container targeted tests for extraction defaults and dashboard route: 36 pass, 0 fail.
-- Neon postflight query: `invalid_reason_codes = 0`.
+- Legacy Neon postflight query: `invalid_reason_codes = 0`.
 
 Primary evidence logs live under `/home/omar/.omx/logs/` on WSL and HH, including:
 
@@ -71,7 +76,7 @@ Before production repair/restart, the run captured:
 - HH pre-canonical repo backup: `/opt/crypto-tuber-ranked.pre-canonical-20260526T063909Z`
 - WSL rsync backup: `/home/omar/backups/callscore-vm-canonical/20260526T061241Z`
 - Docker rollback image tag path: `/home/omar/.omx/logs/callscore-worker-rollback-image-tag.txt`
-- Neon pre-repair schema dump: `/home/omar/.omx/logs/ml-verifier-reason-code-schema-before.sql`
+- Legacy Neon pre-repair schema dump: `/home/omar/.omx/logs/ml-verifier-reason-code-schema-before.sql`
 - Production command log: `/home/omar/.omx/logs/agentic-architecture-clean-go-forward-commands-20260526T062829Z.md`
 
 ## Go-forward rules

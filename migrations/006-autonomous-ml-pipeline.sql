@@ -1,5 +1,5 @@
 -- CRYPTO-TUBER RANKED :: migration 006 :: autonomous ML pipeline
--- Durable Neon-backed queue/orchestration state for Vercel-scheduled,
+-- Durable pgsql-backed queue/orchestration state for Netlify-scheduled,
 -- Hermes/Hetzner-executed audit-only ML verifier work.
 --
 -- Safe to re-run: all CREATE statements use IF NOT EXISTS and partial
