@@ -1,5 +1,11 @@
 # CRYPTO-TUBER RANKED v2 - Design Specification
 
+> Superseded infrastructure note (2026-06-07): this April design is retained
+> for historical product context only. Its Vercel/Neon hosting and database
+> assumptions are superseded by `docs/legacy-infra-superseded.md`: Netlify and
+> call-score.com are canonical for hosting/scheduling, HH VM PostgreSQL/pgsql is
+> primary storage, and Neon is backup/legacy compatibility only.
+
 **Date:** 2026-04-06
 **Status:** Approved (autonomous build)
 
@@ -53,7 +59,7 @@ When 3+ top-10 creators make the same directional call on the same coin within a
 ## Architecture
 
 ```
-YouTube --> yt-dlp (transcripts) --> Claude API (2-pass extraction) --> Neon DB (price matching) --> Scoring Engine --> Next.js Frontend
+YouTube --> yt-dlp (transcripts) --> Claude API (2-pass extraction) --> HH pgsql primary (price matching) --> Scoring Engine --> Next.js Frontend
                                                                                                                           |
                                                                                                                      Whop (payments)
 ```
@@ -64,13 +70,13 @@ YouTube --> yt-dlp (transcripts) --> Claude API (2-pass extraction) --> Neon DB 
 |-----------|-----------|
 | Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
 | Backend/API | Next.js API Routes |
-| Database | Neon PostgreSQL (existing 18.7M candles + new tables) |
+| Database | Superseded: originally Neon PostgreSQL. Current canonical primary is HH VM PostgreSQL/pgsql; Neon is backup/legacy compatibility only. |
 | Transcript extraction | yt-dlp (Python CLI, called from Node) |
 | AI call extraction | Claude API (Anthropic SDK) |
 | Charts | Recharts |
 | Payments & access | Whop SDK |
-| Hosting | Vercel |
-| Automation | Vercel Cron + Rube recipes |
+| Hosting | Superseded: originally Vercel. Current canonical host is Netlify for `call-score.com`. |
+| Automation | Superseded: originally Vercel Cron + Rube recipes. Current canonical scheduler is Netlify plus Hermes/Hetzner worker. |
 
 ## Database Schema
 
