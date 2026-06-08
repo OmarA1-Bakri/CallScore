@@ -1,4 +1,4 @@
-import { NETLIFY_FALLBACK_URL } from "./site";
+import { PUBLIC_APP_PRODUCTION_URL } from "./site";
 
 type Env = Record<string, string | undefined>;
 
@@ -10,7 +10,7 @@ export function getWhopOAuthBaseUrl(env: Env = process.env): string {
   const explicit = env.WHOP_OAUTH_BASE_URL?.trim();
   if (explicit) return trimTrailingSlash(explicit);
 
-  if (env.NODE_ENV === "production") return NETLIFY_FALLBACK_URL;
+  if (env.NODE_ENV === "production") return PUBLIC_APP_PRODUCTION_URL;
 
   return trimTrailingSlash(env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000");
 }
