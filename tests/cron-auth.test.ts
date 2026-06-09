@@ -20,9 +20,15 @@ function request(authorization?: string): NextRequest {
 }
 
 test("verifyCronSecret accepts a bearer token when the server env has surrounding whitespace", () => {
-  process.env.CRON_SECRET = "cron-secret-value\n";
+  process.env.CRON_SECRET = "\n cron-secret-value \n";
 
   assert.equal(verifyCronSecret(request("Bearer cron-secret-value")), true);
+});
+
+test("verifyCronSecret does not trim the incoming bearer token", () => {
+  process.env.CRON_SECRET = "\n cron-secret-value \n";
+
+  assert.equal(verifyCronSecret(request("Bearer cron-secret-value ")), false);
 });
 
 test("verifyCronSecret rejects an incorrect bearer token", () => {
@@ -33,6 +39,12 @@ test("verifyCronSecret rejects an incorrect bearer token", () => {
 
 test("verifyCronSecret rejects requests when CRON_SECRET is missing", () => {
   delete process.env.CRON_SECRET;
+
+  assert.equal(verifyCronSecret(request("Bearer cron-secret-value")), false);
+});
+
+test("verifyCronSecret rejects requests when CRON_SECRET is blank after normalization", () => {
+  process.env.CRON_SECRET = " \n\t ";
 
   assert.equal(verifyCronSecret(request("Bearer cron-secret-value")), false);
 });
