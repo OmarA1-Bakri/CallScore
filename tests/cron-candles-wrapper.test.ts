@@ -32,12 +32,19 @@ function mockFetch(response: Response): FetchCall[] {
   return calls;
 }
 
+async function responseJson(response: Response): Promise<unknown> {
+  return await response.json();
+}
+
 test("cron-candles wrapper fails safely when HH endpoint is missing", async () => {
   delete process.env[endpointKey];
   process.env[credentialKey] = "unit-test-credential";
   const calls = mockFetch(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
-  await assert.rejects(handler(), /HH_ENQUEUE_URL/);
+  const response = await handler();
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await responseJson(response), { ok: false, error: "hh_enqueue_exception" });
   assert.equal(calls.length, 0);
 });
 
@@ -46,18 +53,23 @@ test("cron-candles wrapper fails safely when HH credential is missing", async ()
   delete process.env[credentialKey];
   const calls = mockFetch(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
-  await assert.rejects(handler(), /HH_ENQUEUE_SECRET/);
+  const response = await handler();
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(await responseJson(response), { ok: false, error: "hh_enqueue_exception" });
   assert.equal(calls.length, 0);
 });
 
-test("cron-candles wrapper posts candle refresh payload to HH enqueue", async () => {
+test("cron-candles wrapper returns 200 and posts candle refresh payload to HH enqueue", async () => {
   setRequiredEnv();
   process.env.HH_ENQUEUE_SYMBOLS = "xlmusdt";
   process.env.HH_ENQUEUE_MAX_REQUESTS_PER_SYMBOL = "1";
   const calls = mockFetch(new Response(JSON.stringify({ ok: true, job: { id: 1 } }), { status: 200 }));
 
-  await handler();
+  const response = await handler();
 
+  assert.equal(response.status, 200);
+  assert.deepEqual(await responseJson(response), { ok: true, function: "cron-candles-enqueue" });
   assert.equal(calls.length, 1);
   const call = calls[0];
   assert.equal(call.input, "https://hh.example.test/internal/callscore/enqueue");
@@ -84,8 +96,9 @@ test("cron-candles wrapper default payload does not require database env", async
   delete process.env.NEON_DATABASE_URL;
   const calls = mockFetch(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
-  await handler();
+  const response = await handler();
 
+  assert.equal(response.status, 200);
   assert.equal(calls.length, 1);
   assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
     type: "candle_refresh",
@@ -97,9 +110,28 @@ test("cron-candles wrapper default payload does not require database env", async
   });
 });
 
-test("cron-candles wrapper surfaces non-2xx HH response safely", async () => {
+test("cron-candles wrapper returns safe 502 response for non-2xx HH response", async () => {
   setRequiredEnv();
   mockFetch(new Response("safe upstream failure detail", { status: 502 }));
 
-  await assert.rejects(handler(), /HH enqueue HTTP 502: safe upstream failure detail/);
+  const response = await handler();
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(await responseJson(response), { ok: false, error: "hh_enqueue_failed", status: 502 });
+});
+
+test("cron-candles wrapper returns safe 504 response for HH timeout", async () => {
+  setRequiredEnv();
+  process.env.HH_ENQUEUE_TIMEOUT_MS = "1";
+  global.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+    await new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    });
+    throw new Error("unreachable");
+  }) as typeof fetch;
+
+  const response = await handler();
+
+  assert.equal(response.status, 504);
+  assert.deepEqual(await responseJson(response), { ok: false, error: "hh_enqueue_timeout" });
 });
