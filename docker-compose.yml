@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile.hermes
     image: crypto-tuber-ranked-hermes-worker:latest
     restart: unless-stopped
+    network_mode: host
     env_file:
       - .env.hermes
     environment:
