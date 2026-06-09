@@ -2,6 +2,13 @@ const FUNCTION_NAME = "cron-candles-enqueue";
 const DEFAULT_TIMEOUT_MS = 15000;
 const DEFAULT_MAX_REQUESTS_PER_SYMBOL = 25;
 
+function jsonResponse(body, status) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 function envValue(name) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`[${FUNCTION_NAME}] missing required env ${name}`);
@@ -39,17 +46,18 @@ async function safeErrorBody(response) {
 }
 
 export default async function handler() {
-  const url = envValue("HH_ENQUEUE_URL");
-  const credential = envValue(["HH_ENQUEUE", "SECRET"].join("_"));
-  const timeoutMs = positiveInt(process.env.HH_ENQUEUE_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  const headers = new Headers();
-  headers.set(["Authori", "zation"].join(""), ["Bearer", credential].join(" "));
-  headers.set("Content-Type", "application/json");
-  headers.set("Accept", "application/json");
-
+  let timeout;
   try {
+    const url = envValue("HH_ENQUEUE_URL");
+    const credential = envValue(["HH_ENQUEUE", "SECRET"].join("_"));
+    const timeoutMs = positiveInt(process.env.HH_ENQUEUE_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+    const controller = new AbortController();
+    timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const headers = new Headers();
+    headers.set(["Authori", "zation"].join(""), ["Bearer", credential].join(" "));
+    headers.set("Content-Type", "application/json");
+    headers.set("Accept", "application/json");
+
     console.log(`[${FUNCTION_NAME}] calling HH enqueue`);
     const response = await fetch(url, {
       method: "POST",
@@ -59,9 +67,17 @@ export default async function handler() {
     });
     console.log(`[${FUNCTION_NAME}] status ${response.status}`);
     if (!response.ok) {
-      throw new Error(`HH enqueue HTTP ${response.status}: ${await safeErrorBody(response)}`);
+      await safeErrorBody(response);
+      return jsonResponse({ ok: false, error: "hh_enqueue_failed", status: response.status }, 502);
     }
+
+    return jsonResponse({ ok: true, function: FUNCTION_NAME }, 200);
+  } catch (error) {
+    const status = error instanceof Error && error.name === "AbortError" ? 504 : 500;
+    const code = status === 504 ? "hh_enqueue_timeout" : "hh_enqueue_exception";
+    console.log(`[${FUNCTION_NAME}] ${code}`);
+    return jsonResponse({ ok: false, error: code }, status);
   } finally {
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
   }
 }
