@@ -192,7 +192,7 @@ function buildLeaderboardRow(
   row: LeaderboardQueryRow,
   index: number,
   prevScoreMap = new Map<number, number>(),
-  selfCorrectionMap = new Map<number, SelfCorrectionSummary>(),
+  selfCorrectionMap: ReadonlyMap<number, SelfCorrectionSummary> = new Map<number, SelfCorrectionSummary>(),
 ): LeaderboardRow {
   const rank = asNumber(row.rank ?? index + 1);
   const creatorId = asNumber(row.creator_id);
