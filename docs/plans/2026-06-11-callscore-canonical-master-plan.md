@@ -1,4 +1,4 @@
-# CallScore Canonical Master Plan — Fully Updated With Local P0 Patch Status
+# CallScore Canonical Master Plan — Fully Updated With Merged Safety + Revenue-Ops Baseline Status
 
 **Base plan date:** 2026-06-10
 **Local update date:** 2026-06-11
@@ -86,7 +86,9 @@ This master plan incorporates:
 - Leaderboard root-cause / fix-readiness audit.
 - Codex handover plan for leaderboard remediation.
 - Operator product policy that Altcoin Daily is categorically excluded because it is a news/media channel, not a target creator.
-- 2026-06-11 local Codex P0 read API safety patch on branch `callscore/leaderboard-read-api-safety-contract`.
+- 2026-06-11 merged PR #40 read API/frontend safety contract (`b18cc9e`).
+- 2026-06-11 merged PR #41 shared creator eligibility/exclusion policy (`5673c25`).
+- 2026-06-11 Whop-auto certification pack branch `callscore/whop-auto-certification-ops`.
 
 Thread boundaries:
 
@@ -1221,13 +1223,13 @@ Certification target:
 | CERTIFY GLOBAL CALL VOLUME EXISTS | YES |
 | CERTIFY CREATOR_STATS SEMANTICS SAFE | NO |
 | CERTIFY LOW-N RANKING BLOCKED | MERGED READ/API + HOMEPAGE PATCH YES via PR #40; PRODUCTION NOT CERTIFIED |
-| CERTIFY ALTCOIN DAILY EXCLUDED FROM RANKINGS | MERGED READ/API + HOMEPAGE PATCH YES via PR #40; STATS-WRITER/PRODUCTION NOT CERTIFIED |
+| CERTIFY ALTCOIN DAILY EXCLUDED FROM RANKINGS | MERGED READ/API + HOMEPAGE PATCH YES via PR #40; SHARED POLICY MERGED YES via PR #41; STATS-WRITER/PRODUCTION NOT CERTIFIED |
 | CERTIFY 30D PERIOD SAFE | MERGED READ/API DISABLE YES via PR #40; PRODUCTION NOT CERTIFIED; METHODOLOGY REDESIGN PENDING |
 | CERTIFY READ API SAFE BUCKET CONTRACT | MERGED YES via PR #40 (`b18cc9e`); DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
 | CERTIFY FRONTEND SAFE BUCKET DISPLAY | MERGED YES via PR #40 (`b18cc9e`); HOMEPAGE USES `officialRankedRows`; DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
 | CERTIFY WHOP MANIFEST CLEAN | YES |
 | CERTIFY WHOP COMMERCE ENV READY | YES |
-| CERTIFY WHOP COMMERCE LIVE | PARTIAL |
+| CERTIFY WHOP COMMERCE LIVE | PARTIAL; WHOP-AUTO CERTIFICATION PACK LOCAL PATCH IN PROGRESS; PROVIDER PROOF REQUIRED |
 | CERTIFY PROVIDER DRIFT CLOSED | NO |
 | CERTIFY AUTONOMOUS REVENUE | NO |
 
@@ -1491,25 +1493,64 @@ Important certification boundary:
 PR #40 productionizes the code path in git, but does **not** by itself certify runtime production behavior. Certification still requires provider/runtime proof that the production frontend and HH read API are running the merged code and that live responses satisfy the bucket contract.
 
 
-## 17B. Shared Creator Eligibility Policy Patch Update — 2026-06-11
+## 17B. Shared Creator Eligibility Policy Merge Update — 2026-06-11
 
-After PR #40 merged, the next implementation branch is `callscore/revenue-ops-baseline-plan-policy`.
+PR #41, **Centralize creator ranking eligibility policy**, has been merged to `master`.
 
-Current local patch scope:
+- Merge commit: `5673c256f8c3ab12126162fd283e7652d98ed759`
+- Branch commit: `0df49cff58f2f0f1e31e27f30805c534a4ef2efc`
+- Status: MERGED YES
+- Canonical host deploy status: REQUIRES VERIFICATION
+- Production runtime certification: not applicable for stats-writer until a future writer patch consumes the policy and an approved recompute is performed.
 
-- Add `src/lib/creator-eligibility-policy.mjs` as the canonical shared product policy utility.
-- Add `src/lib/creator-eligibility-policy.d.ts` for TypeScript consumers.
-- Move Altcoin Daily and non-target/news/media/aggregation/contaminated/duplicate/ambiguous creator exclusion logic out of leaderboard-specific code.
-- Keep `src/lib/leaderboard-safety.mjs` as the read/API classifier while importing and re-exporting shared policy functions for compatibility.
-- Add `tests/creator-eligibility-policy.test.mjs`.
+Merged scope:
+
+- Added `src/lib/creator-eligibility-policy.mjs` as the canonical shared product policy utility.
+- Added `src/lib/creator-eligibility-policy.d.ts` for TypeScript consumers.
+- Moved Altcoin Daily and non-target/news/media/aggregation/contaminated/duplicate/ambiguous creator exclusion logic out of leaderboard-specific code.
+- Kept `src/lib/leaderboard-safety.mjs` as the read/API classifier while importing and re-exporting shared policy functions for compatibility.
+- Added `tests/creator-eligibility-policy.test.mjs`.
+
+Validation before merge:
+
+- `node --test tests/creator-eligibility-policy.test.mjs tests/leaderboard-safety.test.mjs` — pass
+- `node --import tsx --test tests/home-read-api-contract.test.ts tests/page-home-shape.test.ts tests/leaderboard-shape.test.ts` — pass
+- `npm test` — pass
+- `npm run lint` — pass
+- `npm run typecheck` — pass
+- `npm run build` — pass
+- `node --check src/lib/creator-eligibility-policy.mjs` — pass
+- `node --check src/lib/leaderboard-safety.mjs` — pass
+
+Provider status observed before merge:
+
+- Netlify deploy preview for PR #41: success (`https://deploy-preview-41--call-score.netlify.app`)
+- Vercel status: failing because account is blocked; Vercel remains deprecated and non-canonical.
 
 Status boundary:
 
-- Local patch: IN PROGRESS / validated locally
+- Shared policy: MERGED YES
+- Production read/API/UI behavior: still requires live endpoint/homepage certification after deployment.
+- Stats-writer enforcement: not yet; future patch must consume this policy in rank assignment before approved recompute.
+
+## 17C. Whop-Auto Certification Pack Update — 2026-06-11
+
+After PR #41 merged, the next implementation branch is `callscore/whop-auto-certification-ops`.
+
+Current local patch scope:
+
+- Add `docs/ops/whop-auto-certification.md` as the non-mutating Whop commerce-live proof pack.
+- Extend checkout route tests so all four revenue plan checkout URLs are covered: pro monthly, pro annual, alpha monthly, alpha annual.
+- Add Whop webhook route tests for unsigned rejection, signed JSON acknowledgement, and invalid JSON rejection.
+- Add a certification-pack test that keeps required Whop proof points anchored in docs.
+
+Status boundary:
+
+- Local patch: IN PROGRESS / validation pending
 - PR: not opened yet
 - Merge: not yet
-- Production certification: not applicable until merged/deployed and runtime validated
-- Stats-writer enforcement: not yet; future patch must consume this policy in rank assignment before approved recompute.
+- Live Whop provider proof: not certified
+- Whop pricing/product/plan/payment settings: not mutated
 
 
 ## 18. Next UltraGoal — Revenue-Operations Certification Bridge
@@ -1961,11 +2002,11 @@ Explicit approval is required before:
 | Homepage leaderboard correctness | MERGED SAFETY CONTRACT YES via PR #40; LIVE PRODUCTION NOT CERTIFIED |
 | Frontend bucket display | MERGED YES via PR #40; DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
 | `creator_stats` semantics | NO — repair plan required |
-| Altcoin Daily exclusion | MERGED READ/API/UI POLICY YES via PR #40; PRODUCTION/STATS-WRITER NOT CERTIFIED |
+| Altcoin Daily exclusion | MERGED READ/API/UI POLICY YES via PR #40; SHARED POLICY MERGED YES via PR #41; PRODUCTION/STATS-WRITER NOT CERTIFIED |
 | Low-N ranking block | MERGED READ/API/UI POLICY YES via PR #40; STATS-WRITER/PRODUCTION NOT CERTIFIED |
 | 30d safety | MERGED API/UI DISABLE YES via PR #40; METHODOLOGY REDESIGN PENDING; PRODUCTION NOT CERTIFIED |
-| Whop commerce | PARTIAL |
-| Whop-auto | NO / NOT CERTIFIED |
+| Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK LOCAL PATCH IN PROGRESS; PROVIDER PROOF REQUIRED |
+| Whop-auto | NO / NOT CERTIFIED; CERTIFICATION PACK LOCAL PATCH IN PROGRESS |
 | Hermes worker | LOCAL LOOP PROOF YES; scheduled production proof still required |
 | Scheduled jobs | PARTIAL — wrapper code exists; controlled production proof pending |
 | Art of War loop | NO / NOT CERTIFIED |

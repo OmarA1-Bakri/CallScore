@@ -5,19 +5,24 @@ import { GET } from "../src/app/api/checkout/[tier]/route";
 
 const CHECKOUT_ENV_KEY = "WHOP_CHECKOUT_URL_PRO_MONTHLY";
 const ALPHA_CHECKOUT_ENV_KEY = "WHOP_CHECKOUT_URL_ALPHA_ANNUAL";
-const originalCheckoutUrl = process.env[CHECKOUT_ENV_KEY];
-const originalAlphaCheckoutUrl = process.env[ALPHA_CHECKOUT_ENV_KEY];
+const CHECKOUT_ENV_KEYS = [
+  "WHOP_CHECKOUT_URL_PRO_MONTHLY",
+  "WHOP_CHECKOUT_URL_PRO_ANNUAL",
+  "WHOP_CHECKOUT_URL_ALPHA_MONTHLY",
+  "WHOP_CHECKOUT_URL_ALPHA_ANNUAL",
+] as const;
+const originalCheckoutUrls = Object.fromEntries(
+  CHECKOUT_ENV_KEYS.map((key) => [key, process.env[key]]),
+);
 
 afterEach(() => {
-  if (originalCheckoutUrl === undefined) {
-    delete process.env[CHECKOUT_ENV_KEY];
-  } else {
-    process.env[CHECKOUT_ENV_KEY] = originalCheckoutUrl;
-  }
-  if (originalAlphaCheckoutUrl === undefined) {
-    delete process.env[ALPHA_CHECKOUT_ENV_KEY];
-  } else {
-    process.env[ALPHA_CHECKOUT_ENV_KEY] = originalAlphaCheckoutUrl;
+  for (const key of CHECKOUT_ENV_KEYS) {
+    const original = originalCheckoutUrls[key];
+    if (original === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = original;
+    }
   }
 });
 
@@ -64,6 +69,44 @@ test("checkout route supports alpha annual checkout URLs", async () => {
     "https://whop.example/checkout/alpha-annual",
   );
   assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+test("checkout route supports the full Whop revenue plan inventory", async () => {
+  const cases = [
+    {
+      envKey: "WHOP_CHECKOUT_URL_PRO_MONTHLY",
+      path: "/api/checkout/pro?interval=monthly",
+      tier: "pro",
+      url: "https://whop.example/checkout/pro-monthly",
+    },
+    {
+      envKey: "WHOP_CHECKOUT_URL_PRO_ANNUAL",
+      path: "/api/checkout/pro?interval=annual",
+      tier: "pro",
+      url: "https://whop.example/checkout/pro-annual",
+    },
+    {
+      envKey: "WHOP_CHECKOUT_URL_ALPHA_MONTHLY",
+      path: "/api/checkout/alpha?interval=monthly",
+      tier: "alpha",
+      url: "https://whop.example/checkout/alpha-monthly",
+    },
+    {
+      envKey: "WHOP_CHECKOUT_URL_ALPHA_ANNUAL",
+      path: "/api/checkout/alpha?interval=annual",
+      tier: "alpha",
+      url: "https://whop.example/checkout/alpha-annual",
+    },
+  ] as const;
+
+  for (const { envKey, path, tier, url } of cases) {
+    process.env[envKey] = url;
+    const response = await GET(request(path), params(tier));
+
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.get("location"), url);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  }
 });
 
 test("checkout route redirects to feedback when a valid checkout URL is missing", async () => {
