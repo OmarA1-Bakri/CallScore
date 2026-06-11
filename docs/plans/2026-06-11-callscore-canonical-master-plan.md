@@ -333,6 +333,63 @@ Fresh evidence captured on 2026-06-11 after PR #53:
 - Whop commerce remains `PARTIAL / PROVIDER PROOF REQUIRED` until live dashboard settings, product/plan inventory, entitlement/revocation behavior, and webhook/event persistence requirements are certified.
 - Art of War autonomous growth loop is the next planning target only after Whop provider proof is closed or explicitly blocked by provider approval. Public external growth actions remain forbidden until commerce is certified.
 
+
+### 0.6 2026-06-11 Session Closeout — Current Done/Remaining State
+
+```text
+CURRENT MASTER: 4745e6e6bfebaf74554c54034b3fe58f87dad341
+LATEST MERGED PR: #54 — RECORD NEXT-PHASE WHOP CERTIFICATION BOUNDARY
+DATA SAFETY / LEADERBOARD METHODOLOGY: CERTIFIED
+TRANSCRIPT COMPLETION: BLOCKED ONLY BY FRESH VALID YOUTUBE COOKIE
+WHOP-AUTO: STARTED; ROUTE/AUTH/WEBHOOK REPO PROOF PASS; PROVIDER PROOF REQUIRED
+ART OF WAR: NEXT AFTER WHOP PROVIDER PROOF; NO EXTERNAL AUTONOMOUS GROWTH ACTIONS YET
+```
+
+Work completed in this session:
+
+1. Preserved the current final transcript gate instead of retry-hammering YouTube:
+   - Runtime cookie wiring remains present at `/opt/callscore/secrets/youtube-cookies.txt` on the host and `/run/secrets/youtube-cookies.txt` in the Hermes worker container.
+   - A redacted cookie sweep found no newer approved cookie source.
+   - The installed cookie is still invalid/stale because the one-video slow-YT-DLP canary remains classified as `bot_verification_required`.
+   - No bounded transcript catch-up was run after the failed canary.
+
+2. Started Whop-auto commerce certification safely:
+   - Public checkout routes for pro monthly, pro annual, alpha monthly, and alpha annual returned `303` redirects to Whop with `cache-control: no-store`.
+   - Public Whop OAuth start returned a Whop redirect using canonical callback `https://call-score.com/api/auth/whop/callback`.
+   - Public session route returned `200` with `cache-control: no-store`.
+   - Local Whop route/auth/webhook/post-checkout/site-url/certification tests passed 34/34.
+   - No Whop provider mutation, live purchase, pricing/payment change, secret rotation, infrastructure change, production DB mutation, or external growth action occurred.
+
+3. Updated and merged documentation:
+   - PR #54 merged to `master`.
+   - `docs/ops/whop-auto-certification.md` now records public route proof and provider-proof gaps.
+   - This canonical master plan now records the cookie gate, Whop certification-start evidence, and Art of War boundary.
+
+Fresh verification evidence from this session:
+
+- `git diff --check`: pass.
+- Whop certification test pack: pass, 34/34.
+- `npm test`: pass.
+- `npm run lint`: pass.
+- `npm run typecheck`: pass.
+- `npm run build`: pass.
+- `npm run freshness:check -- --read-api-base https://ops-bridge.call-score.com/api/read` with `.env.hermes` loaded: `WARN`, blockers `[]`; warnings are only transcript credential/bot-verification related.
+- Public HH read API buckets remain native and safe:
+  - `12m`: official 42;
+  - `all_time`: official 36;
+  - `90d`: official 53;
+  - `30d`: official 0, `PENDING_MATURITY`;
+  - `unsafeOfficial=[]`;
+  - `leaderboard.rows == officialRankedRows`.
+
+Canonical remaining work from here, in order:
+
+1. **Fresh YouTube cookie canary** — replace `/opt/callscore/secrets/youtube-cookies.txt` with a fresh valid Netscape-format YouTube cookie file, keep `600 root:root`, recreate/restart only the Hermes worker if needed, and run exactly one slow-YT-DLP video canary first.
+2. **Bounded transcript catch-up** — only after canary success, run the 25-video current-window catch-up with concurrency 1, 20s gap, lock/backoff enabled; then extraction, matching/scoring, source-safe recompute, freshness check, API/homepage certification.
+3. **Whop provider-proof certification** — certify Whop dashboard settings, product/plan inventory, callback/success/cancel URLs, entitlement/revocation behavior, and webhook/event persistence requirements without mutating pricing/payment unless separately approved.
+4. **Art of War autonomous growth loop** — after Whop provider proof closes or is explicitly provider-blocked, prepare and then execute only approval-safe growth-loop actions; no public external growth/ads/outreach before commerce certification.
+5. **Autonomous revenue certification** — only after data freshness and Whop commerce proof are closed can CallScore move from `NO` to a revenue-autonomy certification candidate.
+
 ## 1. Source Of Truth
 
 This master plan incorporates:
@@ -355,6 +412,7 @@ This master plan incorporates:
 - 2026-06-11 merged PR #45 methodology/rubric certification audit and public-copy patch (`93e87d9`).
 - 2026-06-11 merged PR #47 public count/copy clarification (`010eafef`).
 - 2026-06-11 runtime certification: native HH read API buckets certified after `callscore-read-api.service` restart; PR #49 recovered DB writer privileges, RSS discovery, scoring, source-safe stats, and native buckets; PR #50 merged slow-YT-DLP daily cadence and remains blocked only by a working YouTube cookie/credential path.
+- 2026-06-11 merged PR #54 next-phase Whop certification boundary (`4745e6e`): public Whop checkout/OAuth route proof passes, repo Whop tests pass, provider proof remains required, and Art of War remains gated behind commerce certification.
 
 Thread boundaries:
 
@@ -806,8 +864,8 @@ Updated order and current status:
 | P6 | Identity normalization | Pending |
 | P7 | Remaining public read API rollout beyond homepage | Pending |
 | P8 | Controlled scheduled candles enqueue proof | Pending |
-| P9 | Whop live commerce proof | Pending |
-| P10 | Art of War autonomous growth loop certification | Pending |
+| P9 | Whop live commerce proof | IN PROGRESS — public route/auth proof pass; provider dashboard, entitlement, and webhook/event proof required |
+| P10 | Art of War autonomous growth loop certification | READY PLANNING NEXT / BLOCKED ON WHOP PROVIDER PROOF; no public external actions yet |
 
 ---
 
