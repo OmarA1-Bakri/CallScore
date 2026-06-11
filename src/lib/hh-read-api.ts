@@ -1,9 +1,11 @@
+import type { ReadApiLeaderboardContract } from "@/lib/home-read-api-contract";
 import type { PublicCounts } from "@/lib/public-counts";
 import type { Period } from "@/lib/types";
 
-export interface HhHomePayload {
+export interface HhHomePayload extends ReadApiLeaderboardContract<unknown> {
   readonly ok: boolean;
   readonly counts?: Partial<PublicCounts> | Record<string, unknown>;
+  readonly publicCounts?: Partial<PublicCounts> | Record<string, unknown>;
   readonly leaderboard?: {
     readonly period?: Period | string;
     readonly rows?: readonly unknown[];

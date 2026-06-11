@@ -14,8 +14,14 @@ import {
   getLeaderboardSampleThreshold,
 } from "@/lib/leaderboard-eligibility";
 import { getLegacyCreatorExclusionSql } from "@/lib/legacy-creator-overrides";
+import {
+  getLeaderboardEmptyMessage,
+  getOfficialRankedReadApiRows,
+  type ReadApiLeaderboardContract,
+} from "@/lib/home-read-api-contract";
 import { CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL, CREATOR_JUDGMENT_WINDOW_LABEL, RECENT_PUBLIC_SCORING_MATURITY_NOTE } from "@/lib/judgment-window";
 import { getCreatorTier } from "@/lib/creator-tier";
+import { toReadApiLeaderboardContract } from "@/lib/leaderboard-safety.mjs";
 import { hasAccess } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
@@ -93,6 +99,7 @@ interface LeaderboardQueryRow {
   readonly worst_call_score: number | string | null;
   readonly worst_call_date: string | null;
   readonly worst_call_direction: string | null;
+  readonly latest_video_date: string | null;
 }
 
 interface PageProps {
@@ -121,6 +128,11 @@ function normalizePublicCounts(input: unknown): PublicCounts {
     if (typeof value === "number" || typeof value === "string") counts[key] = asNumber(value);
   }
   return counts;
+}
+
+interface HomeReadApiResponse extends ReadApiLeaderboardContract<LeaderboardQueryRow> {
+  readonly publicCounts?: Partial<PublicCounts> | Record<string, unknown>;
+  readonly counts?: Partial<PublicCounts> | Record<string, unknown>;
 }
 
 function buildCreator(row: LeaderboardQueryRow): Creator {
@@ -191,10 +203,10 @@ function buildCallSummary(
 function buildLeaderboardRow(
   row: LeaderboardQueryRow,
   index: number,
-  prevScoreMap = new Map<number, number>(),
+  prevScoreMap: ReadonlyMap<number, number> = new Map<number, number>(),
   selfCorrectionMap: ReadonlyMap<number, SelfCorrectionSummary> = new Map<number, SelfCorrectionSummary>(),
 ): LeaderboardRow {
-  const rank = asNumber(row.rank ?? index + 1);
+  const rank = index + 1;
   const creatorId = asNumber(row.creator_id);
   const previousScore = prevScoreMap.get(creatorId);
   const selfCorrection = selfCorrectionMap.get(creatorId);
@@ -212,6 +224,14 @@ function buildLeaderboardRow(
   };
 }
 
+function buildLeaderboardRows(
+  rows: readonly LeaderboardQueryRow[],
+  prevScoreMap: ReadonlyMap<number, number> = new Map<number, number>(),
+  selfCorrectionMap: ReadonlyMap<number, SelfCorrectionSummary> = new Map<number, SelfCorrectionSummary>(),
+): LeaderboardRow[] {
+  return rows.map((row, index) => buildLeaderboardRow(row, index, prevScoreMap, selfCorrectionMap));
+}
+
 export default async function HomePage({ searchParams: searchParamsPromise }: PageProps): Promise<ReactElement> {
   const searchParams = await searchParamsPromise;
   const periodParam = searchParams.period ?? "all_time";
@@ -226,13 +246,15 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
 
   let leaderboard: LeaderboardRow[] = [];
   let publicCounts: PublicCounts | null = null;
+  let leaderboardEmptyContract: Pick<ReadApiLeaderboardContract<unknown>, "emptyReason"> | null = null;
 
   if (hhReadEnabled) {
-    const hhHome = await fetchHhHome(period, 100).catch(() => null);
-    const rows = hhHome?.leaderboard?.rows;
-    if (hhHome?.counts && Array.isArray(rows)) {
-      publicCounts = normalizePublicCounts(hhHome.counts);
-      leaderboard = rows.map((row, index) => buildLeaderboardRow(row as LeaderboardQueryRow, index));
+    const readApiHome = (await fetchHhHome(period, 100).catch(() => null)) as HomeReadApiResponse | null;
+    if (readApiHome) {
+      publicCounts = normalizePublicCounts(readApiHome.publicCounts ?? readApiHome.counts);
+      leaderboardEmptyContract = { emptyReason: readApiHome.emptyReason ?? null };
+      const readApiOfficialRows = getOfficialRankedReadApiRows(readApiHome);
+      leaderboard = buildLeaderboardRows(readApiOfficialRows);
     }
   } else {
     try {
@@ -252,6 +274,7 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
           c.accuracy_rank AS creator_accuracy_rank,
           c.last_scraped_at AS creator_last_scraped_at,
           c.created_at AS creator_created_at,
+          latest.latest_video_date,
           bc.symbol AS best_call_symbol,
           bc.return_30d AS best_call_return,
           bc.score AS best_call_score,
@@ -264,6 +287,11 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
           wc.direction AS worst_call_direction
         FROM creator_stats cs
         JOIN creators c ON c.id = cs.creator_id
+        LEFT JOIN LATERAL (
+          SELECT MAX(v.published_at) AS latest_video_date
+          FROM videos v
+          WHERE v.creator_id = c.id
+        ) latest ON TRUE
         LEFT JOIN calls bc ON bc.id = cs.best_call_id
         LEFT JOIN calls wc ON wc.id = cs.worst_call_id
         WHERE cs.period = $1
@@ -272,6 +300,9 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
         ORDER BY cs.accuracy_rank ASC NULLS LAST`,
         [period],
       );
+      const safeContract = toReadApiLeaderboardContract(period, rows, { period });
+      leaderboardEmptyContract = { emptyReason: safeContract.emptyReason };
+      const officialRows = getOfficialRankedReadApiRows(safeContract);
       const prevPeriod: Period = period === "30d" ? "90d" : "all_time";
       const prevScores =
         period !== "all_time"
@@ -282,7 +313,7 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
           : [];
       const prevScoreMap = new Map(prevScores.map((r) => [r.creator_id, r.alpha_score]));
       const selfCorrectionMap = await computeAllSelfCorrectionAggregates().catch(() => new Map<number, SelfCorrectionSummary>());
-      leaderboard = rows.map((row, index) => buildLeaderboardRow(row, index, prevScoreMap, selfCorrectionMap));
+      leaderboard = buildLeaderboardRows(officialRows, prevScoreMap, selfCorrectionMap);
     } catch (err) {
       if (process.env.NODE_ENV === "development") throw err;
     }
@@ -299,6 +330,7 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
   }
 
   publicCounts = publicCounts ?? (hhReadEnabled ? DEFAULT_PUBLIC_COUNTS : await getPublicCounts().catch(() => DEFAULT_PUBLIC_COUNTS));
+  const officialRankedCreatorCount = leaderboard.length;
   const totalCalls = String(publicCounts.publicScoredCalls || publicCounts.scoredCalls || 0);
 
   return (
@@ -358,7 +390,7 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
             totalCalls={totalCalls}
             creatorCount={publicCounts.trackedCreators}
             beatBtcCreators={publicCounts.beatBtcCreators}
-            rankedCreators={publicCounts.rankedCreators}
+            rankedCreators={officialRankedCreatorCount}
             liveOpenCalls={publicCounts.liveOpenCalls}
             excludedLowConfidenceCalls={publicCounts.excludedLowConfidenceCalls}
             confidencePassCalls={publicCounts.confidencePassCalls}
@@ -380,7 +412,7 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
         </ul>
       </EditorialSection>
 
-      <EditorialSection id="leaderboard" index="02" title={<>The ranking, <em className="italic text-accent">by alpha</em>.</>} meta={<>{publicCounts.rankedCreators} ranked creators · {totalCalls} public-scored calls<br />{CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL}</>}>
+      <EditorialSection id="leaderboard" index="02" title={<>The ranking, <em className="italic text-accent">by alpha</em>.</>} meta={<>{officialRankedCreatorCount} ranked creators · {totalCalls} public-scored calls<br />{CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL}</>}>
         <div className="flex flex-col tab:flex-row tab:items-end tab:justify-between gap-3 mb-4">
           <div className="space-y-1">
             <p className="font-mono text-[12px] text-ink-500 tracking-wide">{sampleThreshold.sample_floor_label}; floor {sampleThreshold.min_public_scored_calls}, Low N below {sampleThreshold.low_n_warning_calls}.</p>
@@ -391,7 +423,7 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
         {leaderboard.length > 0 ? (
           <Leaderboard rows={leaderboard} sampleThreshold={sampleThreshold} />
         ) : (
-          <div className="border-t border-ink-250 py-12 text-center"><p className="font-mono text-[12px] text-ink-500 tracking-wide">No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or outcome windows.</p></div>
+          <div className="border-t border-ink-250 py-12 text-center"><p className="font-mono text-[12px] text-ink-500 tracking-wide">{getLeaderboardEmptyMessage(leaderboardEmptyContract)}</p></div>
         )}
       </EditorialSection>
 
