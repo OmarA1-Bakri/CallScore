@@ -6,9 +6,29 @@ Scope: CallScore Whop checkout, OAuth, entitlement, webhook, and revenue-event o
 
 ## Certification Verdict
 
-`CERTIFY WHOP COMMERCE LIVE: PARTIAL / REQUIRES PROVIDER PROOF`
+`CERTIFY WHOP COMMERCE LIVE: PARTIAL / ROUTE PROOF PASS / PROVIDER PROOF REQUIRED`
 
 Repository code has canonical-domain checkout, OAuth, session-tier, and webhook primitives. This pack does not certify live Whop dashboard configuration, live payments, or live entitlement behavior until provider-safe proof is collected.
+
+
+## 2026-06-11 Safe Certification Start Evidence
+
+Status: `WHOP-AUTO CERTIFICATION STARTED — REPO TESTS PASS; PUBLIC ROUTE PROOF PASS; PROVIDER PROOF STILL REQUIRED`.
+
+Fresh non-mutating evidence collected on 2026-06-11:
+
+- Local Whop certification route/auth/webhook tests passed: `node --import tsx --test tests/checkout-route.test.ts tests/whop-oauth.test.ts tests/auth.test.ts tests/premium.test.ts tests/whop-webhook-route.test.ts tests/post-checkout-ux.test.ts tests/site-url.test.ts tests/whop-certification-pack.test.ts` -> 34/34 passing.
+- Public checkout route probes on `https://call-score.com` returned `303` and `cache-control: no-store` for:
+  - `/api/checkout/pro?interval=monthly`;
+  - `/api/checkout/pro?interval=annual`;
+  - `/api/checkout/alpha?interval=monthly`;
+  - `/api/checkout/alpha?interval=annual`.
+- Each checkout route redirects to a Whop-hosted checkout URL and does not forward stale `session=` query state.
+- Public OAuth start probe returned a Whop OAuth redirect using canonical callback `https://call-score.com/api/auth/whop/callback`.
+- Public session route returned `200` with `cache-control: no-store`.
+- No Whop provider mutation, payment/pricing change, secret rotation, infrastructure change, live purchase, or production DB mutation was performed.
+
+Certification remains partial because the repo/runtime evidence still does not prove live Whop dashboard settings, live entitlement/revocation behavior, or whether signed webhook events must be persisted for the certified product surface.
 
 ## Non-Mutating Rules
 
@@ -136,6 +156,7 @@ Expected:
 ## Current Remaining Gaps
 
 - Live Whop dashboard settings are not provider-certified in this repo patch.
-- Live checkout URLs are not publicly verified here.
-- Persistent revenue/event logging is not implemented in the current webhook route.
+- Live checkout routes are publicly verified from `https://call-score.com`; provider dashboard inventory/settings still require provider proof.
+- Persistent revenue/event logging is not implemented in the current webhook route; certification must decide whether live Whop access checks are sufficient or whether signed event persistence is required.
 - Entitlement mirror/revocation behavior needs a certified live or fixture-backed proof.
+- Art of War autonomous growth work remains gated on Whop commerce certification; no public growth actions should run before that gate is closed.
