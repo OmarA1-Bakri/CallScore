@@ -75,52 +75,62 @@ Visitor
 ### 0.1 2026-06-11 Data Pipeline / Website Data Recovery Certification Update
 
 ```text
-END-TO-END DATA FRESHNESS CERTIFICATION: NO
-DATA/WORKER/FRESHNESS REMEDIATION COMPLETE: NO
+END-TO-END DATA FRESHNESS CERTIFICATION: PARTIAL / EXTERNAL TRANSCRIPT CREDENTIAL REQUIRED
+DATA/WORKER/FRESHNESS REMEDIATION COMPLETE: PARTIAL
 HH READ API NATIVE BUCKET CONTRACT: CERTIFIED
-PUBLIC HOMEPAGE SAFETY: CERTIFIED SAFE DISPLAY, DATA FRESHNESS NOT CERTIFIED
+PUBLIC HOMEPAGE SAFETY: CERTIFIED SAFE DISPLAY
+SOURCE CREATOR_STATS RANK SAFETY: CERTIFIED AFTER 2026-06-11 RECOMPUTE
 ```
 
 Runtime evidence captured on 2026-06-11:
 
-- Repo/runtime path: `/opt/crypto-tuber-ranked` on `master` at `010eafef5c40a2677b8dbe3f1d46c1f5aee8d40e` before local recovery patches.
-- `callscore-read-api.service` was restarted only after code was already present on master; public HH read API now serves native bucket keys for `all_time`, `12m`, `90d`, and `30d`.
-- Native HH read API proof:
+- Repo/runtime path: `/opt/crypto-tuber-ranked`; recovery work is on branch `callscore/data-pipeline-full-recovery` from master `e0ad13dbe160001f6588f6e03577e54e4d6411f7`.
+- Public HH read API serves native bucket keys for `all_time`, `12m`, `90d`, and `30d`.
+- Native HH read API proof after recovery:
   - `leaderboard.rows == officialRankedRows` for public responses.
   - `officialRankedRows` has `unsafeOfficial = []`.
   - `30d` returns `officialRankedRows = []` and `emptyReason = PENDING_MATURITY`.
-  - `all_time` official count remains 17 under current source data and safety gates.
-- Worker proof:
-  - `callscore-enqueue.service`: active/running.
-  - `callscore-read-api.service`: active/running after approved restart.
-  - Docker/node Hermes worker process: running.
-  - `pipeline:worker:once --dry-run` created, claimed, and completed `hermes_smoke_test` job `1820` on 2026-06-11.
-- Freshness remains stale:
-  - latest video inserted: 2026-06-01.
-  - latest transcript attempt: 2026-06-03.
-  - latest call inserted/scored: 2026-05-25.
-  - latest creator_stats update: 2026-06-09.
-- Pipeline root causes found:
-  - Legacy discovery stage used `yt-dlp` and is blocked by YouTube bot verification.
-  - RSS/API discovery path works and is being made the default pipeline discovery stage.
-  - Runtime DB role `callscore_app` can read `videos` but lacks `INSERT`/`UPDATE` on `videos` and lacks `INSERT` on `calls`; RSS discovery write canary failed with `permission denied for table videos`.
-  - No SerpAPI/Youtube Data API transcript provider env was present; yt-dlp transcript/detail path is also bot-blocked.
-- Source ranking safety local patch status:
-  - `creator_stats` writer patch is local only: official source ranks must require thresholds, freshness, period validity, and Altcoin Daily exclusion before recompute.
-  - Production recompute was not run because upstream freshness is not restored and DB write privileges/provider blockers remain.
-- New operator self-check primitive is local only: `npm run freshness:check -- --read-api-base https://ops-bridge.call-score.com/api/read` after sourcing `.env.hermes`.
+  - `all_time` official count remains 17 after source-safe recompute.
+- Worker/service proof:
+  - `callscore-enqueue.service`: active/running and restarted to load expanded enqueue types.
+  - `callscore-read-api.service`: active/running with native bucket contract.
+  - Docker Hermes worker was rebuilt/recreated from current code and is running.
+  - Real non-smoke jobs `match_prices_batch` and `compute_scores` were created, claimed, and completed on 2026-06-11.
+- DB writer privilege recovery:
+  - Existing role `callscore_app` now has minimum application-path write privileges for `videos`, `calls`, `pipeline_jobs`, `pipeline_job_events`, and `creator_stats`.
+  - `calls.DELETE` is intentionally granted because the existing extraction application path replaces stored calls for a video inside a transaction.
+  - Required sequence `USAGE`/`SELECT` grants were applied for inserts.
+  - No broad superuser/admin grant, ownership change, DROP, TRUNCATE, or manual business-data repair SQL was used.
+- Pipeline recovery evidence:
+  - RSS video discovery canary succeeded for `@CryptosRUs`.
+  - Full RSS discovery catch-up ran across 196 creators and wrote 1,232 eligible video rows; `videos_total` is now 15,476 and latest video inserted is 2026-06-11.
+  - A legacy transcript-provider constraint edge case was fixed and verified with `thatmartiniguy` RSS canary.
+  - Transcript canary now records explicit `provider_credentials_missing` failures instead of silently leaving stale queue items.
+  - Extraction canary inserted two calls through the application path.
+  - Price-match canary matched the two mature extracted calls.
+  - Source-safe `npm run score` recompute ran after catch-up; `creator_stats` updated on 2026-06-11.
+- Source rank safety after recompute:
+  - `30d` ranked rows: 0.
+  - `all_time` ranked rows: 17; low-N official ranks: 0; zero-call official ranks: 0.
+  - `90d` ranked rows: 17; low-N official ranks: 0; zero-call official ranks: 0.
+  - Altcoin Daily official source ranks: 0.
+- Freshness self-check:
+  - `npm run freshness:check -- --read-api-base https://ops-bridge.call-score.com/api/read` reports current DB timestamps, non-smoke jobs, grants, source unsafe ranks, native read API status, and transcript provider warnings.
+  - Current result is `WARN`, not `PASS`, because transcript provider credentials are absent and canary attempts are classified as `provider_credentials_missing`.
 
-Current blocker superseding the old read-contract blocker:
+Remaining hard blocker before complete end-to-end freshness certification:
 
 ```text
-DATA PIPELINE WRITER PERMISSIONS AND TRANSCRIPT PROVIDER ACCESS ARE BLOCKING FRESHNESS RECOVERY.
+A WORKING TRANSCRIPT PROVIDER CREDENTIAL/PATH IS REQUIRED.
 ```
 
-Approval-gated/external remediation required before full recovery:
+Accepted provider paths:
 
-1. Grant or provide the correct application writer role for existing pipeline paths so they can write `videos`, `calls`, and required extraction/transcript fields. Do not use ad hoc manual SQL mutation without an explicit reviewed GRANT/rollback plan.
-2. Provide a working transcript provider path: SerpAPI/Youtube Data API key, approved yt-dlp cookies/runtime configuration, or another approved transcript provider.
-3. After writer/provider access is repaired, run bounded canaries, then catch-up, then stats recompute using the source-safety writer patch.
+1. `SERPAPI_API_KEY` or supported aliases (`SERPAPI_TOKEN`, `SERPAI_TOKEN`, `SERP_API_KEY`, `SERPAPI_KEY`) for the existing transcript waterfall.
+2. A working approved yt-dlp cookies configuration via `YTDLP_COOKIES_PATH` / `YTDLP_COOKIES` or `YTDLP_COOKIES_FROM_BROWSER`.
+3. A new approved transcript provider integration that can store transcripts without committing or printing secrets.
+
+After provider access is supplied, rerun transcript catch-up, extraction catch-up, scoring, source-safe stats recompute, and API/homepage certification.
 
 ---
 ## 1. Source Of Truth
@@ -2248,29 +2258,33 @@ Explicit approval is required before:
 
 | Certification | Status |
 | --- | --- |
-| Canonical repo / branch | YES — `OmarA1-Bakri/CallScore` / `master` |
-| Netlify production | YES canonical; latest reported deploy still requires provider recheck |
-| `HH_READ_API_BASE` | REPORTED YES — requires Thread 2 provider verification for final cert |
-| HH PostgreSQL / pgsql | YES as canonical DB; read-only recheck required before final bridge cert |
+| Canonical repo / branch | YES — `OmarA1-Bakri/CallScore` / `master`; recovery patch branch `callscore/data-pipeline-full-recovery` |
+| Netlify production | YES canonical; latest deploy/provider status requires Thread 2 recheck after PR merge |
+| `HH_READ_API_BASE` | REPORTED YES / VERIFIED VIA PUBLIC READ API — final provider env recheck still Thread 2 |
+| HH PostgreSQL / pgsql | CERTIFIED — local HH PostgreSQL `callscore` via `callscore_app` on `::1:5432` |
 | Neon canonical | NO |
-| Read API safety contract | CERTIFIED — native HH runtime bucket keys live publicly after 2026-06-11 read API restart; `leaderboard.rows` is a safe alias |
-| Homepage leaderboard correctness | SAFE DISPLAY CERTIFIED; data freshness NOT certified |
-| Frontend bucket display | CERTIFIED SAFE; can consume native buckets and retains compatibility fallback |
-| `creator_stats` semantics | PARTIAL / LOCAL PATCH — source ranking safety patched locally; recompute NOT run; period semantics still require approved repair |
-| Altcoin Daily exclusion | READ/API/UI CERTIFIED; SOURCE WRITER LOCAL PATCH ONLY; existing DB still has unsafe source rank until approved recompute |
-| Low-N ranking block | READ/API/UI CERTIFIED; SOURCE WRITER LOCAL PATCH ONLY; existing DB still has unsafe source ranks until approved recompute |
-| 30d safety | CERTIFIED in HH read API/UI as `PENDING_MATURITY`; methodology redesign remains APPROVAL-GATED |
+| DB writer privileges | RECOVERED/CERTIFIED — minimum grants applied to `callscore_app` for pipeline application paths |
+| Transcript provider path | EXTERNAL CREDENTIAL REQUIRED — canary classifies `provider_credentials_missing`; no working SerpAPI/Youtube API/yt-dlp cookie path present |
+| Scheduler/job cadence | PARTIAL RECOVERED — HH enqueue supports `candle_refresh`, `match_prices_batch`, `compute_scores`, `ml_verifier_batch`; real non-smoke jobs processed today; Netlify wrapper deployment/provider cadence still requires provider verification |
+| Worker active processing | CERTIFIED — real `match_prices_batch` and `compute_scores` jobs completed on 2026-06-11; Docker worker rebuilt from current code |
+| Video discovery freshness | RECOVERED — RSS catch-up wrote 1,232 eligible rows; latest video inserted 2026-06-11; 148 creators fresh within 30d |
+| Transcript freshness | PARTIAL/BLOCKED — attempts run today and classify missing provider; transcript acquisition still needs credential/path |
+| Call extraction freshness | PARTIAL RECOVERED — canary inserted two calls through app path; full catch-up depends on transcript provider |
+| Price matching/scoring freshness | PARTIAL RECOVERED — canary matched mature calls; source-safe recompute ran 2026-06-11 |
+| `creator_stats` source safety | CERTIFIED — recompute produced 0 Altcoin Daily official ranks, 0 low-N official ranks, 0 zero-call official ranks, 30d official rows 0 |
+| Read API safety contract | CERTIFIED — native HH runtime bucket keys live publicly; `leaderboard.rows` is a safe alias |
+| Homepage leaderboard correctness | CERTIFIED SAFE DISPLAY; current-data certification remains PARTIAL until transcript catch-up completes |
+| Frontend bucket display | CERTIFIED SAFE; consumes native buckets and retains compatibility fallback |
+| Altcoin Daily exclusion | CERTIFIED in read/API/UI and source `creator_stats` after recompute |
+| Low-N ranking block | CERTIFIED in read/API/UI and source `creator_stats` after recompute |
+| 30d safety | CERTIFIED as `PENDING_MATURITY`; methodology redesign remains APPROVAL-GATED |
+| Official creator count | 17 after recovery/recompute — accepted as current strict-source output pending transcript-provider catch-up |
+| Website count correctness | PARTIAL — public API counts safe; final current-coverage count certification requires transcript catch-up |
+| Freshness self-check | LOCAL PATCH YES / WARN — command reports grants, jobs, timestamps, source unsafe ranks, native buckets, and transcript credential warning |
 | Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
-| Whop-auto | PARTIAL; CERTIFICATION PACK MERGED YES via PR #42; LIVE PROVIDER PROOF REQUIRED |
-| Hermes worker | YES running; processed smoke job 1820 on 2026-06-11; full data catch-up blocked upstream |
-| Scheduled jobs | NO/PARTIAL — enqueue/worker can process jobs, but no current scheduler cadence for data freshness; latest non-smoke job 2026-06-09 |
-| Call scoring methodology | PARTIAL — implemented and public copy merged via PR #45; lifecycle/value split pending |
-| Creator ranking methodology | PARTIAL — official bucket thresholds documented/merged via PR #45; stats writer alignment pending |
-| 17 official creator explanation | YES under current stale source data: 17 official, 27 provisional, 100 watchlist, 20 stale, 1 excluded; final count pending freshness recovery/recompute |
-| Public methodology page accuracy | MERGED YES via PR #45 (`93e87d9`); deploy/certification pending |
+| Whop-auto | PARTIAL; LIVE PROVIDER PROOF REQUIRED after data freshness blocker is removed |
 | Art of War loop | NO / NOT CERTIFIED |
-| Data freshness certification | NO — blocked by DB writer permissions on videos/calls and missing/blocked transcript provider |
-| Freshness self-check | LOCAL PATCH YES — `npm run freshness:check` added, requires `.env.hermes` sourced |
+| Data freshness certification | PARTIAL — DB writer/video discovery/worker/source ranks recovered; transcript provider credential remains the hard blocker |
 | Autonomous revenue | NO |
 
 ---

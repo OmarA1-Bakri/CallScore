@@ -175,6 +175,11 @@ export async function upsertVideo(
        transcript_status = CASE
          WHEN videos.transcript IS NOT NULL AND videos.transcript <> '' THEN 'available'
          ELSE COALESCE(videos.transcript_status, 'pending')
+       END,
+       transcript_provider = CASE
+         WHEN videos.transcript IS NOT NULL AND videos.transcript <> ''
+           THEN COALESCE(videos.transcript_provider, EXCLUDED.transcript_provider, 'legacy')
+         ELSE COALESCE(videos.transcript_provider, EXCLUDED.transcript_provider)
        END`,
     [creator.id, video.youtube_video_id, video.title, video.published_at],
   );

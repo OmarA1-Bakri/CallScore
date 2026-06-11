@@ -47,6 +47,7 @@ import {
   extractRequestedSubtitleUrl,
   parseBackfillTranscriptsArgs,
   stripCaptionText,
+  ytDlpAuthArgs,
 } from "../src/scripts/backfill-transcripts";
 import {
   COVERAGE_AUDIT_SECTION_NAMES,
@@ -374,6 +375,8 @@ test("transcript status migration gates provider waterfall state", async () => {
   assert.match(queries[0] ?? "", /transcript_status, transcript_attempts, transcript_provider/);
   assert.match(queries[0] ?? "", /WHEN videos\.transcript IS NOT NULL AND videos\.transcript <> '' THEN 'available'/);
   assert.match(queries[0] ?? "", /ELSE COALESCE\(videos\.transcript_status, 'pending'\)/);
+  assert.match(queries[0] ?? "", /transcript_provider = CASE/);
+  assert.match(queries[0] ?? "", /COALESCE\(videos\.transcript_provider, EXCLUDED\.transcript_provider, 'legacy'\)/);
 });
 
 test("match-prices skips work under advisory-lock contention", async () => {
@@ -476,6 +479,20 @@ test("transcript backfill is dry-run and bounded by default", () => {
   assert.equal(args.fallbackYtDlp, false);
   assert.equal(args.auditOut, ".tmp/transcripts.jsonl");
   assert.equal(args.write, false);
+});
+
+
+
+test("transcript backfill supports redacted yt-dlp auth env hooks", () => {
+  assert.deepEqual(ytDlpAuthArgs({}), []);
+  assert.deepEqual(ytDlpAuthArgs({ YTDLP_COOKIES_PATH: "/run/secrets/youtube.cookies" }), [
+    "--cookies",
+    "/run/secrets/youtube.cookies",
+  ]);
+  assert.deepEqual(ytDlpAuthArgs({ YTDLP_COOKIES_FROM_BROWSER: "chromium:Default" }), [
+    "--cookies-from-browser",
+    "chromium:Default",
+  ]);
 });
 
 test("yt-dlp requested_subtitles output is dereferenced instead of stored as transcript text", () => {
