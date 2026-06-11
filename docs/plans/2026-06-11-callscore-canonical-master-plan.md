@@ -71,6 +71,58 @@ Visitor
 
 ---
 
+
+### 0.1 2026-06-11 Data Pipeline / Website Data Recovery Certification Update
+
+```text
+END-TO-END DATA FRESHNESS CERTIFICATION: NO
+DATA/WORKER/FRESHNESS REMEDIATION COMPLETE: NO
+HH READ API NATIVE BUCKET CONTRACT: CERTIFIED
+PUBLIC HOMEPAGE SAFETY: CERTIFIED SAFE DISPLAY, DATA FRESHNESS NOT CERTIFIED
+```
+
+Runtime evidence captured on 2026-06-11:
+
+- Repo/runtime path: `/opt/crypto-tuber-ranked` on `master` at `010eafef5c40a2677b8dbe3f1d46c1f5aee8d40e` before local recovery patches.
+- `callscore-read-api.service` was restarted only after code was already present on master; public HH read API now serves native bucket keys for `all_time`, `12m`, `90d`, and `30d`.
+- Native HH read API proof:
+  - `leaderboard.rows == officialRankedRows` for public responses.
+  - `officialRankedRows` has `unsafeOfficial = []`.
+  - `30d` returns `officialRankedRows = []` and `emptyReason = PENDING_MATURITY`.
+  - `all_time` official count remains 17 under current source data and safety gates.
+- Worker proof:
+  - `callscore-enqueue.service`: active/running.
+  - `callscore-read-api.service`: active/running after approved restart.
+  - Docker/node Hermes worker process: running.
+  - `pipeline:worker:once --dry-run` created, claimed, and completed `hermes_smoke_test` job `1820` on 2026-06-11.
+- Freshness remains stale:
+  - latest video inserted: 2026-06-01.
+  - latest transcript attempt: 2026-06-03.
+  - latest call inserted/scored: 2026-05-25.
+  - latest creator_stats update: 2026-06-09.
+- Pipeline root causes found:
+  - Legacy discovery stage used `yt-dlp` and is blocked by YouTube bot verification.
+  - RSS/API discovery path works and is being made the default pipeline discovery stage.
+  - Runtime DB role `callscore_app` can read `videos` but lacks `INSERT`/`UPDATE` on `videos` and lacks `INSERT` on `calls`; RSS discovery write canary failed with `permission denied for table videos`.
+  - No SerpAPI/Youtube Data API transcript provider env was present; yt-dlp transcript/detail path is also bot-blocked.
+- Source ranking safety local patch status:
+  - `creator_stats` writer patch is local only: official source ranks must require thresholds, freshness, period validity, and Altcoin Daily exclusion before recompute.
+  - Production recompute was not run because upstream freshness is not restored and DB write privileges/provider blockers remain.
+- New operator self-check primitive is local only: `npm run freshness:check -- --read-api-base https://ops-bridge.call-score.com/api/read` after sourcing `.env.hermes`.
+
+Current blocker superseding the old read-contract blocker:
+
+```text
+DATA PIPELINE WRITER PERMISSIONS AND TRANSCRIPT PROVIDER ACCESS ARE BLOCKING FRESHNESS RECOVERY.
+```
+
+Approval-gated/external remediation required before full recovery:
+
+1. Grant or provide the correct application writer role for existing pipeline paths so they can write `videos`, `calls`, and required extraction/transcript fields. Do not use ad hoc manual SQL mutation without an explicit reviewed GRANT/rollback plan.
+2. Provide a working transcript provider path: SerpAPI/Youtube Data API key, approved yt-dlp cookies/runtime configuration, or another approved transcript provider.
+3. After writer/provider access is repaired, run bounded canaries, then catch-up, then stats recompute using the source-safety writer patch.
+
+---
 ## 1. Source Of Truth
 
 This master plan incorporates:
@@ -91,6 +143,8 @@ This master plan incorporates:
 - 2026-06-11 merged PR #42 Whop-auto commerce certification pack (`8d9d9b2`).
 - 2026-06-11 merged PR #44 homepage legacy HH compatibility restore (`ad942fdf`).
 - 2026-06-11 merged PR #45 methodology/rubric certification audit and public-copy patch (`93e87d9`).
+- 2026-06-11 merged PR #47 public count/copy clarification (`010eafef`).
+- 2026-06-11 runtime certification: native HH read API buckets certified after `callscore-read-api.service` restart; data freshness recovery blocked by DB writer permissions and transcript provider access.
 
 Thread boundaries:
 
@@ -2199,22 +2253,24 @@ Explicit approval is required before:
 | `HH_READ_API_BASE` | REPORTED YES — requires Thread 2 provider verification for final cert |
 | HH PostgreSQL / pgsql | YES as canonical DB; read-only recheck required before final bridge cert |
 | Neon canonical | NO |
-| Read API safety contract | MERGED YES via PR #40 (`b18cc9e`); live HH runtime still legacy flat rows after PR #44; NATIVE RUNTIME NOT CERTIFIED |
-| Homepage leaderboard correctness | DEPLOYED / REPORTED SAFE via PR #44 compatibility bucketing; native HH bucket contract still pending |
-| Frontend bucket display | DEPLOYED / REPORTED SAFE via PR #44; uses compatibility bucketing for legacy HH payload |
-| `creator_stats` semantics | NO — writer/source threshold and period semantics repair still required; no recompute performed |
-| Altcoin Daily exclusion | MERGED READ/API/UI POLICY YES via PR #40; SHARED POLICY MERGED YES via PR #41; PRODUCTION/STATS-WRITER NOT CERTIFIED |
-| Low-N ranking block | MERGED READ/API/UI POLICY YES via PR #40; STATS-WRITER/PRODUCTION NOT CERTIFIED |
-| 30d safety | MERGED API/UI DISABLE YES; methodology redesign APPROVAL-GATED; production native HH bucket proof pending |
+| Read API safety contract | CERTIFIED — native HH runtime bucket keys live publicly after 2026-06-11 read API restart; `leaderboard.rows` is a safe alias |
+| Homepage leaderboard correctness | SAFE DISPLAY CERTIFIED; data freshness NOT certified |
+| Frontend bucket display | CERTIFIED SAFE; can consume native buckets and retains compatibility fallback |
+| `creator_stats` semantics | PARTIAL / LOCAL PATCH — source ranking safety patched locally; recompute NOT run; period semantics still require approved repair |
+| Altcoin Daily exclusion | READ/API/UI CERTIFIED; SOURCE WRITER LOCAL PATCH ONLY; existing DB still has unsafe source rank until approved recompute |
+| Low-N ranking block | READ/API/UI CERTIFIED; SOURCE WRITER LOCAL PATCH ONLY; existing DB still has unsafe source ranks until approved recompute |
+| 30d safety | CERTIFIED in HH read API/UI as `PENDING_MATURITY`; methodology redesign remains APPROVAL-GATED |
 | Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
 | Whop-auto | PARTIAL; CERTIFICATION PACK MERGED YES via PR #42; LIVE PROVIDER PROOF REQUIRED |
-| Hermes worker | LOCAL LOOP PROOF YES; scheduled production proof still required |
-| Scheduled jobs | PARTIAL — wrapper code exists; controlled production proof pending |
+| Hermes worker | YES running; processed smoke job 1820 on 2026-06-11; full data catch-up blocked upstream |
+| Scheduled jobs | NO/PARTIAL — enqueue/worker can process jobs, but no current scheduler cadence for data freshness; latest non-smoke job 2026-06-09 |
 | Call scoring methodology | PARTIAL — implemented and public copy merged via PR #45; lifecycle/value split pending |
 | Creator ranking methodology | PARTIAL — official bucket thresholds documented/merged via PR #45; stats writer alignment pending |
-| 17 official creator explanation | MERGED YES via PR #45 — live HH compatibility bucketing explains 17 official from 100 legacy rows |
+| 17 official creator explanation | YES under current stale source data: 17 official, 27 provisional, 100 watchlist, 20 stale, 1 excluded; final count pending freshness recovery/recompute |
 | Public methodology page accuracy | MERGED YES via PR #45 (`93e87d9`); deploy/certification pending |
 | Art of War loop | NO / NOT CERTIFIED |
+| Data freshness certification | NO — blocked by DB writer permissions on videos/calls and missing/blocked transcript provider |
+| Freshness self-check | LOCAL PATCH YES — `npm run freshness:check` added, requires `.env.hermes` sourced |
 | Autonomous revenue | NO |
 
 ---

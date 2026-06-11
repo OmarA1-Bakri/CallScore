@@ -4,7 +4,10 @@ import {
   getCallEligibilitySql,
   getCallScoreStatus,
 } from "./public-methodology";
-import { getLeaderboardEligibilitySql } from "./leaderboard-eligibility";
+import {
+  getCreatorStatsOfficialThreshold,
+  getCreatorStatsOfficialEligibilitySql,
+} from "./creator-stats-eligibility";
 import { getPeriodFilterSql } from "./judgment-window";
 import type { Call, Period } from "./types";
 
@@ -121,7 +124,6 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
   const periodFilter = getPeriodFilterSql("c", period);
   const subqueryPeriodFilter = getPeriodFilterSql("cl", period);
   const eligibleSql = getCallEligibilitySql("c");
-  const leaderboardEligibleSql = getLeaderboardEligibilitySql("creator_stats", period);
 
   await query(
     `DELETE FROM creator_stats WHERE period = $1`,
@@ -214,18 +216,34 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
     [period],
   );
 
+  const officialThreshold = getCreatorStatsOfficialThreshold(period);
+  if (officialThreshold === null) return;
+
+  const officialEligibilitySql = getCreatorStatsOfficialEligibilitySql({
+    statsAlias: "cs_inner",
+    creatorAlias: "cr_inner",
+    freshnessAlias: "vf",
+  });
+
   await query(
     `UPDATE creator_stats cs
      SET accuracy_rank = ranked.rank
      FROM (
        SELECT
-         id,
+         cs_inner.id,
          ROW_NUMBER() OVER (
-           PARTITION BY period
-           ORDER BY alpha_score DESC, win_rate DESC, total_calls DESC, creator_id ASC
+           PARTITION BY cs_inner.period
+           ORDER BY cs_inner.alpha_score DESC, cs_inner.win_rate DESC, cs_inner.total_calls DESC, cs_inner.creator_id ASC
          ) AS rank
-       FROM creator_stats
-       WHERE period = $1 AND ${leaderboardEligibleSql}
+       FROM creator_stats cs_inner
+       JOIN creators cr_inner ON cr_inner.id = cs_inner.creator_id
+       LEFT JOIN (
+         SELECT creator_id, MAX(published_at) AS latest_video_date
+         FROM videos
+         GROUP BY creator_id
+       ) vf ON vf.creator_id = cr_inner.id
+       WHERE cs_inner.period = $1
+         AND ${officialEligibilitySql}
      ) ranked
      WHERE cs.id = ranked.id`,
     [period],

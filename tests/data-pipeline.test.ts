@@ -95,10 +95,10 @@ test("data pipeline defaults to safe local dry-run for top creators", () => {
   assert.equal(args.write, false);
   assert.deepEqual(args.creators, [
     "@AltcoinDaily",
-    "@DiscoverCrypto",
-    "@CryptoBanter",
+    "@DiscoverCrypto_",
+    "@CryptoBanterGroup",
     "@CryptosRUs",
-    "@AlexBecker",
+    "@AlexBeckersChannel",
   ]);
   assert.equal(args.limitVideos, 250);
   assert.equal(args.limitLlmVideos, 100);
@@ -107,7 +107,7 @@ test("data pipeline defaults to safe local dry-run for top creators", () => {
   assert.equal(args.maxCandleRequestsPerSymbol, 25);
   assert.match(args.shadowRunId, /^pipeline-/);
   assert.equal(args.shadowProvider, "ollama");
-  assert.equal(args.shadowModel, "kimi-k2.6");
+  assert.equal(args.shadowModel, "kimi-k2.6:cloud");
   assert.equal(args.shadowRequestTimeoutMs, 180_000);
   assert.equal(args.shadowAgents, 1);
   assert.equal(args.shadowVideoAgents, 1);
@@ -568,6 +568,15 @@ test("data pipeline wires shadow commands safely in dry-run mode", () => {
     ),
   );
   assert.deepEqual(commands["evaluation-backfill"], []);
+  assert.ok(
+    commands.discover[0].includes("src/scripts/discover-videos-rss-api.ts"),
+  );
+  assert.ok(commands.discover[0].includes("--source"));
+  assert.ok(commands.discover[0].includes("auto"));
+  assert.equal(
+    commands.discover[0].includes("src/scripts/discover-videos-365.ts"),
+    false,
+  );
 });
 
 test("data pipeline command pool starts the next item when a lane frees", async () => {
