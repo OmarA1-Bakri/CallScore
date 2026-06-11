@@ -390,6 +390,63 @@ Canonical remaining work from here, in order:
 4. **Art of War autonomous growth loop** — after Whop provider proof closes or is explicitly provider-blocked, prepare and then execute only approval-safe growth-loop actions; no public external growth/ads/outreach before commerce certification.
 5. **Autonomous revenue certification** — only after data freshness and Whop commerce proof are closed can CallScore move from `NO` to a revenue-autonomy certification candidate.
 
+
+### 0.7 2026-06-11 Final Transcript + Whop Provider-Proof Run — Evidence And Remaining Gates
+
+```text
+CURRENT MASTER: 252790939014c82a275773221111e84149f5e0ff
+LATEST MERGED PR: #55 — RECORD CANONICAL SESSION CLOSEOUT
+DATA SAFETY / LEADERBOARD METHODOLOGY: CERTIFIED
+TRANSCRIPT COMPLETION: BLOCKED BY FRESH VALID YOUTUBE COOKIE
+WHOP-AUTO: ROUTE/CODE PROOF PASS; LIVE PROVIDER PROOF BLOCKED BY DASHBOARD URL DRIFT + INVENTORY READ SCOPE
+ART OF WAR: READY TO PLAN ONLY AFTER WHOP PROVIDER PROOF CLOSES OR IS EXPLICITLY ACCEPTED AS PROVIDER-BLOCKED
+```
+
+Fresh evidence captured in this run:
+
+1. Transcript cookie gate rechecked without exposing secrets:
+   - Host cookie path exists at `/opt/callscore/secrets/youtube-cookies.txt`, mode `600`, owner `root:root`, size non-zero.
+   - Hermes worker container can read its mounted `YTDLP_COOKIES_PATH`.
+   - Redacted candidate sweep found only the installed host file and the same-sized `/srv/whop-auto/workspace/crypto-tuber-ranked/cookies.txt`; no newer approved cookie source was available.
+   - Freshness self-check remains `WARN`, blockers `[]`, with warnings limited to transcript credential missing failures and yt-dlp bot verification failures.
+   - Because no fresh cookie source was available, no additional YT-DLP canary or 25-video catch-up was run; this avoids retry-hammering YouTube with a known rejected cookie.
+
+2. Public Whop route/code proof revalidated:
+   - Whop certification pack passed 18/18.
+   - Expanded Whop/auth/premium/webhook/post-checkout/site-url tests passed 34/34.
+   - Live public checkout routes returned `303` to Whop with `cache-control: no-store` for pro monthly, pro annual, alpha monthly, and alpha annual.
+   - Invalid checkout tier/interval returned `400` with `cache-control: no-store`.
+   - Public OAuth start returned a Whop redirect whose request-level callback is `https://call-score.com/api/auth/whop/callback`.
+   - Public `/api/auth/session` returned `200` with `cache-control: no-store`.
+
+3. Live Whop provider read was attempted using the approved local Whop-auto provider-read context, with secrets redacted:
+   - Whop app read succeeded for the repo manifest app `app_xAovzIphKgXtmM`; that app is `unlisted` and configured for `https://automation.call-score.com`, with redirect URI `https://automation.call-score.com/api/auth/whop/callback`.
+   - Whop app read also succeeded for the public OAuth client/app id observed from production redirects, `app_cDfDRY1cj8yQJZ`; that app is `live` but provider dashboard state still points at `https://call-score.netlify.app` and redirect URI `https://call-score.netlify.app/api/auth/whop/callback`.
+   - Product, plan, checkout-configuration, and webhook inventory reads returned `401` with the available provider-read key, so product/plan inventory and webhook dashboard state are not provider-certified from this context.
+   - No Whop pricing/payment/product/plan/webhook/app-setting mutation was performed.
+
+Whop provider-proof blockers are now exact, not broad:
+
+1. Update/verify the production Whop app used by `NEXT_PUBLIC_WHOP_APP_ID=app_cDfDRY1cj8yQJZ` so provider dashboard settings use:
+   - base/site URL: `https://call-score.com`
+   - OAuth callback: `https://call-score.com/api/auth/whop/callback`
+   - no active `call-score.netlify.app`, Vercel preview, localhost, or dev callback URL.
+2. Provide provider dashboard proof or an API key/scope that can read products, plans, checkout configurations, webhooks, and entitlements for the CallScore company/app.
+3. Verify the four live checkout route plan IDs against provider inventory:
+   - pro monthly: `plan_NAa2zmHBIx6Qo`
+   - pro annual: `plan_iHti858gVSzcY`
+   - alpha monthly: `plan_AdlVrE9OqVNAv`
+   - alpha annual: `plan_ryBHTb0Ui27PE`
+4. Prove entitlement/revocation behavior with a non-destructive Whop test account, sandbox/test mode, or provider-safe fixture tied to live provider state.
+5. Webhook persistence decision remains: current app verifies signed Whop webhook delivery and treats Whop live access checks as entitlement source-of-truth; durable local revenue/event persistence is deferred until provider inventory/webhook proof is available or commercial ops requires a local revenue ledger.
+
+Canonical remaining order after this run:
+
+1. **Fresh YouTube cookie** — install a fresh valid Netscape-format YouTube cookie at `/opt/callscore/secrets/youtube-cookies.txt`, mode `600`, owner `root:root`; recreate/restart only Hermes worker if needed; then run exactly one slow-YT-DLP transcript canary.
+2. **Bounded transcript catch-up** — only after the one-video canary passes, run the 25-video current-window catch-up, extraction, matching/scoring, source-safe recompute, freshness self-check, API/homepage certification.
+3. **Whop provider-proof closure** — fix/verify provider dashboard URL drift for the live app, obtain product/plan/webhook/entitlement provider read proof, and certify commerce without mutating pricing/payment/live plans unless separately approved.
+4. **Art of War** — move from planning to autonomous growth-loop execution only after Whop provider proof closes or the operator explicitly accepts the provider gate as blocked and bounded.
+
 ## 1. Source Of Truth
 
 This master plan incorporates:
@@ -864,8 +921,8 @@ Updated order and current status:
 | P6 | Identity normalization | Pending |
 | P7 | Remaining public read API rollout beyond homepage | Pending |
 | P8 | Controlled scheduled candles enqueue proof | Pending |
-| P9 | Whop live commerce proof | IN PROGRESS — public route/auth proof pass; provider dashboard, entitlement, and webhook/event proof required |
-| P10 | Art of War autonomous growth loop certification | READY PLANNING NEXT / BLOCKED ON WHOP PROVIDER PROOF; no public external actions yet |
+| P9 | Whop live commerce proof | BLOCKED ON PROVIDER ACTION — public route/auth/code proof pass; live provider app dashboard URL drift found (`call-score.netlify.app` / `automation.call-score.com` vs `call-score.com`), and product/plan/webhook/entitlement reads return 401 with available key |
+| P10 | Art of War autonomous growth loop certification | READY PLANNING NEXT / BLOCKED ON WHOP PROVIDER PROOF; no public external actions until Whop provider dashboard/inventory/entitlement proof closes |
 
 ---
 
@@ -1478,19 +1535,19 @@ Current status:
 
 - Whop manifest clean: YES
 - Whop env key readiness: YES
-- Whop commerce live proof: PARTIAL / ROUTE PROOF PASS / PROVIDER PROOF REQUIRED
+- Whop commerce live proof: PARTIAL / ROUTE+CODE PROOF PASS / PROVIDER ACTION REQUIRED FOR DASHBOARD URL DRIFT + INVENTORY READ SCOPE
 
 Still required:
 
-1. Verify Whop OAuth callback URL: `https://call-score.com/api/auth/whop/callback` — PUBLIC ROUTE PROOF PASS 2026-06-11
+1. Verify Whop OAuth callback URL: `https://call-score.com/api/auth/whop/callback` — PUBLIC ROUTE PROOF PASS 2026-06-11; PROVIDER DASHBOARD BLOCKED because live Whop app read shows `https://call-score.netlify.app/api/auth/whop/callback` and manifest app read shows `https://automation.call-score.com/api/auth/whop/callback`
 2. Verify checkout URLs for:
    - pro monthly — PUBLIC ROUTE PROOF PASS 2026-06-11
    - pro annual — PUBLIC ROUTE PROOF PASS 2026-06-11
    - alpha monthly — PUBLIC ROUTE PROOF PASS 2026-06-11
    - alpha annual — PUBLIC ROUTE PROOF PASS 2026-06-11
-3. Verify user entitlement path with non-destructive test account or provider-safe proof.
-4. Verify success/cancel routes resolve to canonical production domain.
-5. Verify no stale development/provider URLs remain in Whop app settings.
+3. Verify user entitlement path with non-destructive test account or provider-safe proof — BLOCKED ON PROVIDER TEST ACCOUNT / READ ACCESS.
+4. Verify success/cancel routes resolve to canonical production domain — PUBLIC APP ROUTE PROOF PASS; PROVIDER DASHBOARD RETURN/CANCEL INVENTORY STILL REQUIRES READ ACCESS.
+5. Verify no stale development/provider URLs remain in Whop app settings — FAIL/BLOCKED: provider reads show live app `app_cDfDRY1cj8yQJZ` still configured with `call-score.netlify.app`; update provider dashboard to `call-score.com`.
 6. Do not mutate pricing/payment/plans without explicit approval.
 
 Certification target:
@@ -2539,9 +2596,9 @@ Explicit approval is required before:
 | Official creator count | 12m/default 42, all_time 36, 90d 53, 30d 0 after eligibility recalibration and recompute; transcript catch-up may change future counts only after valid cookie recovery |
 | Website count correctness | CERTIFIED for current HH API/source semantics; final transcript-current coverage still depends on valid cookie catch-up |
 | Freshness self-check | WARN — command reports grants, jobs, daily timer status, transcript backlog/status, timestamps, source unsafe ranks, native buckets, and exact invalid-cookie/bot warnings |
-| Whop commerce | PARTIAL / ROUTE PROOF PASS; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; 2026-06-11 public checkout/OAuth route proof and 34/34 route/auth/webhook tests pass; LIVE PROVIDER DASHBOARD + ENTITLEMENT PROOF REQUIRED |
-| Whop-auto | IN PROGRESS / PROVIDER PROOF REQUIRED; safe certification started, public checkout/OAuth proof passes; no provider mutation or live purchase performed |
-| Art of War loop | READY PLANNING NEXT / NOT CERTIFIED; external autonomous growth execution blocked until Whop provider proof closes |
+| Whop commerce | PARTIAL / ROUTE+CODE PROOF PASS; provider app reads succeeded but found dashboard URL drift (`call-score.netlify.app` on live app and `automation.call-score.com` on manifest app); product/plan/webhook/entitlement inventory reads return 401 with available key; PROVIDER ACTION REQUIRED |
+| Whop-auto | BLOCKED ON PROVIDER ACTION / READ SCOPE; public checkout/OAuth/code proof passes; update live Whop app URLs and provide inventory/entitlement read proof; no provider mutation or live purchase performed |
+| Art of War loop | READY PLANNING NEXT / NOT CERTIFIED; external autonomous growth execution blocked until Whop provider dashboard/inventory/entitlement proof closes |
 | Data freshness certification | PARTIAL — DB writer/video discovery/worker/source ranks/daily cadence recovered; slow-YT-DLP transcript success remains blocked by invalid/stale cookie bot verification |
 | Autonomous revenue | NO |
 
