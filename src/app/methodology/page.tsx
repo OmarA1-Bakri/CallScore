@@ -7,11 +7,18 @@ import {
   SCORE_WEIGHTS,
 } from "@/lib/public-methodology";
 import { TRACKED_CREATOR_COUNT } from "@/lib/tracked-creators";
+import {
+  CALL_SCORE_LIFECYCLE_STATES,
+  CREATOR_RANKING_STATES,
+  CURRENT_CREATOR_RANKING_METHOD,
+  OFFICIAL_CREATOR_THRESHOLDS,
+  RECOMMENDED_CREATOR_RANK_SCORE_V2,
+} from "@/lib/methodology-rubric";
 
 export const metadata: Metadata = {
   title: "Methodology — CallScore",
   description:
-    "Our scoring methodology: one public Alpha Score formula, confidence-gated extraction, and real market-data verification.",
+    "Our scoring methodology: public Call Score components, creator ranking eligibility, bucket states, and current methodology limits.",
   alternates: { canonical: "/methodology" },
 };
 
@@ -34,8 +41,8 @@ const PIPELINE_STEPS: readonly PipelineStep[] = [
   { name: "Scrape", detail: "Auto-generated subtitles, daily" },
   { name: "Extract", detail: "AI identifies actionable predictions" },
   { name: "Match", detail: "Each call ↔ Binance candles" },
-  { name: "Score", detail: "5 components → 0–100" },
-  { name: "Rank", detail: "Avg Alpha across scored calls" },
+  { name: "Score", detail: "5 components → 0–100 Call Score" },
+  { name: "Rank", detail: "Creator Rank Score + eligibility buckets" },
 ] as const;
 
 interface ScoreRow {
@@ -48,22 +55,22 @@ const SCORE_ROWS: readonly ScoreRow[] = [
   {
     label: "Direction correct",
     max: SCORE_WEIGHTS.direction,
-    how: "Bullish call + price up at 30d (or vice versa).",
+    how: "30d move must clear the direction threshold: bullish > +2%, bearish < -2%, neutral within ±10%.",
   },
   {
     label: "Alpha over BTC",
     max: SCORE_WEIGHTS.alpha,
-    how: `Each 1% excess return = ${(SCORE_WEIGHTS.alpha / 10).toFixed(1)}pt, capped at ${SCORE_WEIGHTS.alpha}.`,
+    how: `BTC-relative 30d alpha contributes up to ${SCORE_WEIGHTS.alpha} points; current implementation floors negative alpha at 0 in the public 0–100 score.`,
   },
   {
     label: "Specificity",
     max: SCORE_WEIGHTS.specificity,
-    how: "Entry, target, stop-loss, timeframe (¼ each).",
+    how: "Entry, target, stop-loss, and timeframe can each add credit; current data is mostly target-driven.",
   },
   {
     label: "Regime difficulty",
     max: SCORE_WEIGHTS.regime,
-    how: "Bullish in bear / bearish in bull = max.",
+    how: "Contrarian calls receive more credit through the stored regime_difficulty field.",
   },
   {
     label: "Target hit",
@@ -78,13 +85,12 @@ interface TierRow {
   readonly read: string;
 }
 
-// Alpha-Score thresholds per current `compute-scores` output. S/A/B/C
-// banding is the public dev-pack contract for tier badges.
+// Call Score thresholds for S/A/B/C public tier badges.
 const TIERS: readonly TierRow[] = [
-  { tier: "S", range: "70 – 100", read: "Elite — beats BTC consistently with high specificity." },
-  { tier: "A", range: "55 – 69",  read: "Strong — directional edge, partial specificity." },
-  { tier: "B", range: "40 – 54",  read: "Mixed — directional hit but thin alpha." },
-  { tier: "C", range: "0 – 39",   read: "Underperforming — frequent misses or low-conviction." },
+  { tier: "S", range: "70 – 100", read: "Elite individual-call score, not a guarantee of creator rank." },
+  { tier: "A", range: "55 – 69",  read: "Strong call-level outcome with directional edge." },
+  { tier: "B", range: "40 – 54",  read: "Mixed call-level result; some edge but incomplete score components." },
+  { tier: "C", range: "0 – 39",   read: "Weak call-level result or insufficient component evidence." },
 ] as const;
 
 /* ------------------------------------------------------------------ */
@@ -112,8 +118,10 @@ export default function MethodologyPage(): ReactElement {
           <em className="italic font-normal text-accent">In public.</em>
         </h1>
         <p className="font-serif text-[20px] text-ink-700 leading-relaxed max-w-[760px]">
-          One formula, five components, capped 0–100. Every score reproducible
-          from the published pipeline.{" "}
+          Call Score is a 0–100 score for one matured market call. Creator
+          ranking is a separate eligibility-and-ranking contract that uses
+          sample size, exclusions, freshness, and bucket states before anyone
+          appears as official.{" "}
           <em className="italic text-accent">If a number looks wrong, audit me.</em>
         </p>
         <MetaStrip
@@ -219,10 +227,113 @@ export default function MethodologyPage(): ReactElement {
         </div>
       </EditorialSection>
 
-      {/* 04 — tier ranges */}
+      {/* 04 — rank contract */}
       <EditorialSection
         index="04"
-        title={<>Tier <em className="italic text-accent">ranges</em>.</>}
+        title={<>Creator <em className="italic text-accent">rank</em> contract.</>}
+        meta={<>official / provisional / watchlist / stale / excluded</>}
+      >
+        <div className="grid grid-cols-1 tab:grid-cols-2 gap-6">
+          <div>
+            <h3 className="font-serif text-[21px] text-ink-900 font-medium mb-2">
+              Call Score ≠ Creator Rank Score
+            </h3>
+            <p className="font-serif text-[16px] text-ink-700 leading-relaxed mb-4">
+              Call Score scores one matured prediction. Creator Rank Score ranks a creator
+              only after official eligibility gates pass. The current writer stores average
+              Call Score in <code className="font-mono text-[13px]">{CURRENT_CREATOR_RANKING_METHOD.scoreField}</code>,
+              then orders by score, win rate, sample size, and creator id. The legacy column
+              name is misleading: it is not raw average alpha.
+            </p>
+            <ul className="font-mono text-[12px] text-ink-600 leading-relaxed space-y-1">
+              {CURRENT_CREATOR_RANKING_METHOD.rankOrder.map((rule) => (
+                <li key={rule}>→ {rule}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-serif text-[21px] text-ink-900 font-medium mb-2">
+              Official thresholds
+            </h3>
+            <table className="w-full font-mono text-[12px]">
+              <tbody>
+                {Object.entries(OFFICIAL_CREATOR_THRESHOLDS).map(([period, rule]) => (
+                  <tr key={period} className="border-b border-ink-200">
+                    <td className="py-2 text-ink-900">{rule.label}</td>
+                    <td className="py-2 text-ink-700">
+                      {rule.officialEnabled
+                        ? `${rule.officialMinCalls}+ official calls`
+                        : `disabled: ${rule.emptyReason}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="font-serif text-[15px] text-ink-700 leading-relaxed mt-4">
+              The 30d official leaderboard stays disabled until the maturity methodology is
+              redesigned. Current safe behavior is <code className="font-mono text-[13px]">PENDING_MATURITY</code>,
+              not a fake zero-call ranking.
+            </p>
+          </div>
+        </div>
+      </EditorialSection>
+
+      {/* 05 — creator states */}
+      <EditorialSection
+        index="05"
+        title={<>Creator <em className="italic text-accent">states</em>.</>}
+        meta={<>public-safe buckets</>}
+      >
+        <div className="grid grid-cols-1 tab:grid-cols-2 desk:grid-cols-3 gap-4">
+          {CREATOR_RANKING_STATES.map((state) => (
+            <div key={state.state} className="border-t border-ink-250 pt-3">
+              <div className="font-mono text-[11px] text-ink-500 tracking-caps uppercase mb-1">
+                {state.bucket}
+              </div>
+              <h3 className="font-serif text-[19px] text-ink-900 font-medium mb-1">
+                {state.label}
+              </h3>
+              <p className="font-serif text-[15px] text-ink-700 leading-relaxed">
+                {state.definition}
+              </p>
+            </div>
+          ))}
+        </div>
+      </EditorialSection>
+
+      {/* 06 — lifecycle */}
+      <EditorialSection
+        index="06"
+        title={<>Score <em className="italic text-accent">lifecycle</em>.</>}
+        meta={<>status is separate from value</>}
+      >
+        <p className="font-serif text-[16px] text-ink-700 leading-relaxed mb-5 max-w-[760px]">
+          A real scored call can eventually have a value of 0. The long-term
+          methodology separates score lifecycle from score value. Today some
+          writer/count paths still use stored score 0 as an unscored placeholder,
+          so the read layer is conservative until a schema/recompute migration is approved.
+        </p>
+        <ol className="grid grid-cols-1 tab:grid-cols-2 gap-4">
+          {CALL_SCORE_LIFECYCLE_STATES.map((state, i) => (
+            <li key={state.state} className="border-t border-ink-250 pt-3">
+              <div className="font-mono text-[11px] text-ink-500 tracking-caps uppercase mb-1">
+                state {String(i + 1).padStart(2, "0")} · {state.state}
+              </div>
+              <div className="font-serif text-[18px] text-ink-900 font-medium mb-1">
+                {state.label}
+              </div>
+              <div className="font-serif text-[15px] text-ink-700 leading-relaxed">
+                {state.definition}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </EditorialSection>
+
+      {/* 07 — tier ranges */}
+      <EditorialSection
+        index="07"
+        title={<>Call-score <em className="italic text-accent">bands</em>.</>}
         meta={<>S / A / B / C bands</>}
       >
         <table className="w-full font-mono text-[13px]">
@@ -232,7 +343,7 @@ export default function MethodologyPage(): ReactElement {
                 Tier
               </th>
               <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 w-32">
-                Alpha range
+                Score range
               </th>
               <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-6">
                 Reading
@@ -255,21 +366,47 @@ export default function MethodologyPage(): ReactElement {
         </table>
       </EditorialSection>
 
-      {/* 05 — audit me */}
+      {/* 08 — methodology v2 */}
       <EditorialSection
-        index="05"
+        index="08"
+        title={<>Methodology <em className="italic text-accent">v2</em>.</>}
+        meta={<>approval-gated</>}
+      >
+        <div className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[760px] space-y-4">
+          <p>
+            Current official rankings are intentionally conservative. The next formula should
+            use a sample-adjusted Creator Rank Score rather than a noisy raw average, but that
+            change requires explicit methodology approval and an approved stats recompute.
+          </p>
+          <p className="font-mono text-[13px] text-ink-600 not-italic">
+            {RECOMMENDED_CREATOR_RANK_SCORE_V2.sampleAdjustedFormula}
+          </p>
+          <ul className="font-mono text-[12px] text-ink-600 leading-relaxed space-y-1">
+            {RECOMMENDED_CREATOR_RANK_SCORE_V2.components.map((component) => (
+              <li key={component.label}>
+                {component.weight}% · {component.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </EditorialSection>
+
+      {/* 09 — audit me */}
+      <EditorialSection
+        index="09"
         title={<><em className="italic text-accent">Audit</em> me.</>}
-        meta={<>Reproducible · open source</>}
+        meta={<>Reproducible · source available for audit on request</>}
       >
         <div className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[680px] space-y-4">
           <p>
-            The recompute pipeline is reproducible. Every score traces to a
-            transcript line, a Binance candle range, and a deterministic
-            formula. There is no hand-tuned weighting per creator.
+            The recompute pipeline is designed to be reproducible. Every public
+            score should trace to a transcript line, a Binance candle range, a
+            lifecycle status, and a deterministic formula. There is no
+            hand-tuned weighting per creator.
           </p>
           <p>
-            Disagree with a number? The source is published; clone it, rerun
-            the score, and tell us where it diverges.
+            Disagree with a number? Request the audit trail, rerun the score
+            against the documented formula, and tell us where it diverges.
           </p>
           <AuditLinks />
         </div>

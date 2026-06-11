@@ -181,7 +181,7 @@ export default async function CreatorPage({ params }: PageProps) {
       <EditorialSection index="01" title={<><em className="italic text-accent">Why</em> this rank.</>}>
         <p className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[680px]">
           {creator.name} ranks{" "}
-          <em className="italic text-accent">#{stats?.accuracy_rank ?? "—"}</em> on average alpha
+          <em className="italic text-accent">#{stats?.accuracy_rank ?? "—"}</em> by creator score
           across {scoredCallCount} scored calls
           {scoredCallCount > 0
             ? `, with a ${(winRate * 100).toFixed(0)}% directional win rate on resolved calls`
