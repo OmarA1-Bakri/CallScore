@@ -88,7 +88,7 @@ This master plan incorporates:
 - Operator product policy that Altcoin Daily is categorically excluded because it is a news/media channel, not a target creator.
 - 2026-06-11 merged PR #40 read API/frontend safety contract (`b18cc9e`).
 - 2026-06-11 merged PR #41 shared creator eligibility/exclusion policy (`5673c25`).
-- 2026-06-11 Whop-auto certification pack branch `callscore/whop-auto-certification-ops`.
+- 2026-06-11 merged PR #42 Whop-auto commerce certification pack (`8d9d9b2`).
 
 Thread boundaries:
 
@@ -1229,7 +1229,7 @@ Certification target:
 | CERTIFY FRONTEND SAFE BUCKET DISPLAY | MERGED YES via PR #40 (`b18cc9e`); HOMEPAGE USES `officialRankedRows`; DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
 | CERTIFY WHOP MANIFEST CLEAN | YES |
 | CERTIFY WHOP COMMERCE ENV READY | YES |
-| CERTIFY WHOP COMMERCE LIVE | PARTIAL; WHOP-AUTO CERTIFICATION PACK LOCAL PATCH IN PROGRESS; PROVIDER PROOF REQUIRED |
+| CERTIFY WHOP COMMERCE LIVE | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
 | CERTIFY PROVIDER DRIFT CLOSED | NO |
 | CERTIFY AUTONOMOUS REVENUE | NO |
 
@@ -1533,23 +1533,43 @@ Status boundary:
 - Production read/API/UI behavior: still requires live endpoint/homepage certification after deployment.
 - Stats-writer enforcement: not yet; future patch must consume this policy in rank assignment before approved recompute.
 
-## 17C. Whop-Auto Certification Pack Update — 2026-06-11
+## 17C. Whop-Auto Certification Pack Merge Update — 2026-06-11
 
-After PR #41 merged, the next implementation branch is `callscore/whop-auto-certification-ops`.
+PR #42, **Add Whop-auto commerce certification pack**, has been merged to `master`.
 
-Current local patch scope:
+- Merge commit: `8d9d9b24185c40790bdd894b5cc8b09a8a514760`
+- Branch commit: `32262ee7886644fb56d38130eaeece1f482f44ab`
+- Status: MERGED YES
+- Canonical host deploy status: REQUIRES VERIFICATION
+- Live Whop provider proof: REQUIRES VERIFICATION
 
-- Add `docs/ops/whop-auto-certification.md` as the non-mutating Whop commerce-live proof pack.
-- Extend checkout route tests so all four revenue plan checkout URLs are covered: pro monthly, pro annual, alpha monthly, alpha annual.
-- Add Whop webhook route tests for unsigned rejection, signed JSON acknowledgement, and invalid JSON rejection.
-- Add a certification-pack test that keeps required Whop proof points anchored in docs.
+Merged scope:
+
+- Added `docs/ops/whop-auto-certification.md` as the non-mutating Whop commerce-live proof pack.
+- Extended checkout route tests so all four revenue plan checkout URLs are covered: pro monthly, pro annual, alpha monthly, alpha annual.
+- Added Whop webhook route tests for unsigned rejection, signed JSON acknowledgement, and invalid JSON rejection.
+- Added a certification-pack test that keeps required Whop proof points anchored in docs.
+
+Validation before merge:
+
+- `node --import tsx --test tests/checkout-route.test.ts tests/whop-webhook-route.test.ts tests/whop-certification-pack.test.ts tests/whop-oauth.test.ts tests/auth.test.ts tests/premium.test.ts tests/post-checkout-ux.test.ts tests/site-url.test.ts` — pass
+- `git diff --check` — pass
+- `npm test` — pass
+- `npm run lint` — pass
+- `npm run typecheck` — pass
+- `npm run build` — pass
+
+Provider status observed before merge:
+
+- Netlify deploy preview for PR #42: success (`https://deploy-preview-42--call-score.netlify.app`)
+- Vercel status: failing because account is blocked; Vercel remains deprecated and non-canonical.
 
 Status boundary:
 
-- Local patch: IN PROGRESS / validation pending
-- PR: not opened yet
-- Merge: not yet
-- Live Whop provider proof: not certified
+- Certification pack: MERGED YES
+- Live Whop dashboard settings: not provider-certified by this repo patch
+- Live checkout URLs: not provider-certified by this repo patch
+- Live entitlement: not provider-certified by this repo patch
 - Whop pricing/product/plan/payment settings: not mutated
 
 
@@ -2005,8 +2025,8 @@ Explicit approval is required before:
 | Altcoin Daily exclusion | MERGED READ/API/UI POLICY YES via PR #40; SHARED POLICY MERGED YES via PR #41; PRODUCTION/STATS-WRITER NOT CERTIFIED |
 | Low-N ranking block | MERGED READ/API/UI POLICY YES via PR #40; STATS-WRITER/PRODUCTION NOT CERTIFIED |
 | 30d safety | MERGED API/UI DISABLE YES via PR #40; METHODOLOGY REDESIGN PENDING; PRODUCTION NOT CERTIFIED |
-| Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK LOCAL PATCH IN PROGRESS; PROVIDER PROOF REQUIRED |
-| Whop-auto | NO / NOT CERTIFIED; CERTIFICATION PACK LOCAL PATCH IN PROGRESS |
+| Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
+| Whop-auto | PARTIAL; CERTIFICATION PACK MERGED YES via PR #42; LIVE PROVIDER PROOF REQUIRED |
 | Hermes worker | LOCAL LOOP PROOF YES; scheduled production proof still required |
 | Scheduled jobs | PARTIAL — wrapper code exists; controlled production proof pending |
 | Art of War loop | NO / NOT CERTIFIED |
