@@ -1659,6 +1659,99 @@ Certification deltas:
 Approval gates remain unchanged: no production DB mutation, migration, stats recompute, extraction rerun, HH restart, provider mutation, or methodology-changing live ranking recompute without explicit approval.
 
 
+
+## 17F. End-To-End Data Freshness And Worker Certification — 2026-06-11
+
+Status: READ-ONLY CERTIFICATION COMPLETE / DATA FRESHNESS NOT CERTIFIED.
+
+Scope:
+
+- Repo/worktree inspected on `master` at `15233ab06ca12b4b137bddd5181a057a19a12ff1`.
+- HH runtime inspected read-only: systemd status, process list, Docker status/log tail, public HH read API, public homepage, and SELECT-only PostgreSQL audit.
+- No production DB mutation, migration, recompute, extraction rerun, enqueue, restart, deploy, provider change, secret change, or destructive git operation was performed.
+
+Runtime/service findings:
+
+- `callscore-enqueue.service`: active/running since 2026-06-09 18:37:22 BST.
+- `callscore-read-api.service`: active/running since 2026-06-09 20:29:00 BST, but live public route still returns the legacy flat `leaderboard.rows` contract.
+- `hermes-worker.service`: systemd wrapper active/exited; Docker container and `node --import tsx src/scripts/hermes-worker.ts --poll-ms 15000` process are running.
+- Worker DB connectivity proof: Docker log shows `worker_start` and `database_ok` on 2026-06-11 05:49:37Z.
+- Queue proof: latest persisted pipeline job/event is job `1819`, `candle_refresh`, succeeded at 2026-06-09 17:37:33Z. No newer persisted pipeline job was found.
+
+HH PostgreSQL findings:
+
+- DB identity: `callscore` / `public` on `::1:5432` via `callscore_app`.
+- Creators in DB: 197 total, 178 with videos, 95 with calls, 84 with positive creator_stats.
+- Videos: 14,611 total; latest published video 2026-05-31T23:16:01Z; latest inserted video 2026-06-01T00:00:24Z.
+- Video freshness: 145 creators fresh within 30d, 154 within 90d, 158 within 180d, 39 stale/missing by latest video date.
+- Transcripts: 9,299 videos with transcript; latest transcript attempt 2026-06-03T07:18:51Z; only 3 of 1,353 videos published in the last 30 days have transcripts/extraction complete.
+- Calls: 16,023 raw calls; latest call date 2026-05-15T00:00:00Z; latest call insert 2026-05-25T03:05:35Z.
+- Scoring: 8,589 calls meet extraction confidence `>= 0.70`; 7,947 calls meet the temporary public predicate `score > 0 AND extraction_confidence >= 0.70`; latest public-scored call date 2026-05-08T19:14:38Z; latest public-scored insert 2026-05-25T03:04:45Z.
+- `creator_stats`: latest update 2026-06-09T02:05:37Z. `all_time` has 197 rows, 58 ranked rows, 33 rows with `total_calls >= 25`, 113 zero-call rows, and 139 null-rank rows. `30d` has 197 rows, 0 ranked rows, and all rows zero-call/null-rank.
+
+Current public read/API findings:
+
+- `https://ops-bridge.call-score.com/api/read/home?period=all_time|12m|90d|30d` returns HTTP 200 but still exposes legacy keys only: `ok`, `counts`, `leaderboard`.
+- Native bucket keys are not present in the HH runtime response.
+- Legacy `counts` are stale/unsafe in runtime: `publicScoredCalls=16023`, `scoredCalls=16023`, `confidencePassCalls=14801`, matching the old `score IS NOT NULL` / `extraction_confidence >= 0.65` semantics rather than the merged safety predicate.
+- Homepage remains safe because Netlify frontend compatibility bucketing reclassifies legacy rows before rendering official rankings.
+
+17 official creator explanation from HH DB + current classifier:
+
+For `all_time` creator_stats rows, applying the current safety classifier with DB freshness fields produces:
+
+- total rows: 197
+- officialRankedRows: 17
+- provisionalRows: 27
+- watchlistRows: 132
+- staleRows: 20
+- excludedRows: 1
+- pendingMaturityRows: 0
+- publicEligibleCalls represented by classified creator_stats rows: 2,357
+
+The official set is small because official rows must be non-excluded, non-stale, non-null-rank, above the all-time threshold of 50 calls, and above the hard floor of 25 calls. The largest exclusion examples remain correct:
+
+- Altcoin Daily is excluded by policy but still has `creator_stats` ranks at source for all_time/90d, so source-writer and recompute repair remain required.
+- Alex Becker is stale and low-N, therefore not official.
+- MoneyZG, Crypto Inspector, and other low-N ranked source rows are provisional/watchlist, not official.
+
+Verdict on 17 official creators:
+
+`PARTIAL / NOT FINAL-CERTIFIED`.
+
+The 17-count is methodologically valid under the current read/UI safety gates, but end-to-end data freshness is not certified. Recent videos are not consistently converting into transcripts/extractions/calls/scores, and the HH read API runtime is still legacy. The official count may be correct as a safety output, but it is not yet certified as a complete current-market coverage output.
+
+Public count mismatch resolution:
+
+- Homepage `197 creators tracked` is DB-derived from HH PostgreSQL `COUNT(*) FROM creators`.
+- Methodology-page `123` was the repo-maintained static seed/admission baseline from `TRACKED_CREATOR_COUNT`.
+- Public copy should not label the seed-list count as live tracked creators. It is now labelled as `creator seed list` with explanatory copy.
+- OpenGraph static card removed stale scored-call style counting and now avoids fake live-count claims.
+
+Updated certification deltas:
+
+| Certification | Status |
+| --- | --- |
+| Worker process running | YES — Docker/node worker process running and DB connection OK |
+| Scheduled jobs current today | NO — latest persisted job was 2026-06-09T17:37:27Z |
+| Videos fresh today | PARTIAL — latest video inserted 2026-06-01; latest published 2026-05-31 |
+| Transcripts fresh today | NO — latest transcript attempt 2026-06-03; 30d transcript/extraction coverage is 3/1,353 |
+| Calls fresh today | NO — latest call inserted 2026-05-25; latest call date 2026-05-15 |
+| Scoring fresh today | NO — latest public-scored call insert 2026-05-25 |
+| `creator_stats` fresh today | PARTIAL — latest stats update 2026-06-09, but source semantics still unsafe and source ranks include excluded/low-N rows |
+| HH read API native bucket contract | NO — runtime still legacy flat `leaderboard.rows` |
+| Homepage current data safe | YES for public official rendering through compatibility bucketing |
+| Homepage current data freshness certified | NO |
+| 17 official creators acceptable | PARTIAL — methodologically safe, not complete-market certified |
+| Public counts/copy consistency | LOCAL PATCH YES — methodology seed-list label and OpenGraph static count claim corrected |
+
+Required next hard target:
+
+`Pipeline Freshness Recovery Plan` — after explicit approval, repair the stopped/stale upstream pipeline without recompute-by-surprise: prove scheduler enqueue cadence, restore transcript/extraction job production, then run an approval-gated freshness catch-up and separately approval-gated stats recompute.
+
+Approval gates remain unchanged: no production DB mutation, migration, stats recompute, extraction rerun, enqueue, HH restart, provider mutation, or methodology-changing live ranking recompute without explicit approval.
+
+
 ## 18. Next UltraGoal — Revenue-Operations Certification Bridge
 
 ### Title

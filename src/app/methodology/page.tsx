@@ -128,13 +128,16 @@ export default function MethodologyPage(): ReactElement {
           cells={[
             { k: "components", v: "5" },
             { k: "candles", v: "18.7M" },
-            { k: "creators tracked", v: TRACKED_CREATOR_COUNT },
+            { k: "creator seed list", v: TRACKED_CREATOR_COUNT },
             {
               k: "extraction floor",
               v: `${Math.round(EXTRACTION_CONFIDENCE_THRESHOLD * 100)}%`,
             },
           ]}
         />
+        <p className="mt-4 max-w-[760px] font-mono text-[11px] uppercase tracking-caps text-ink-500">
+          The seed-list count is the repo-maintained creator admission baseline. The homepage tracked-creator count is live HH PostgreSQL coverage and may be higher after runtime ingestion.
+        </p>
       </section>
 
       {/* 01 — pipeline */}
