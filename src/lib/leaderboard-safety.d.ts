@@ -1,4 +1,8 @@
 declare module "@/lib/leaderboard-safety.mjs" {
+  export function normalizeCreatorIdentity(row?: Record<string, unknown>): { name: string; compactName: string; handle: string; channelId: string; aliases?: readonly string[] };
+  export function isExcludedCreator(row?: Record<string, unknown>): boolean;
+  export function isTargetCreatorClass(row?: Record<string, unknown>): boolean;
+  export function getExclusionReason(row?: Record<string, unknown>): string;
   export function toReadApiLeaderboardContract<Row>(
     period: string,
     rows?: readonly Row[],

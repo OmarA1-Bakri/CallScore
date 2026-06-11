@@ -40,6 +40,7 @@ test("normalizeCreatorIdentity canonicalizes name, handle, and channel id", () =
       compactName: "altcoindaily",
       handle: "altcoindaily",
       channelId: "ucblhgkvy-bjpcawebgtnfbw",
+      aliases: [],
     },
   );
 });
