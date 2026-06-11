@@ -24,8 +24,17 @@ function whopApiBase(): string {
   );
 }
 
-function alphaPlanId(): string | undefined {
-  return process.env.WHOP_ALPHA_PLAN_ID ?? process.env.WHOP_ELITE_PLAN_ID;
+function proAccessResourceId(): string | undefined {
+  return process.env.WHOP_PRO_PRODUCT_ID ?? process.env.WHOP_PRO_PLAN_ID;
+}
+
+function alphaAccessResourceId(): string | undefined {
+  return (
+    process.env.WHOP_ALPHA_PRODUCT_ID ??
+    process.env.WHOP_ELITE_PRODUCT_ID ??
+    process.env.WHOP_ALPHA_PLAN_ID ??
+    process.env.WHOP_ELITE_PLAN_ID
+  );
 }
 
 function isRecord(data: unknown): data is Record<string, unknown> {
@@ -113,8 +122,8 @@ async function findAccessibleTier(
   credential: AccessCredential | null,
 ): Promise<Tier | null> {
   const checks: readonly TierAccessCheck[] = [
-    { tier: "alpha", resourceId: alphaPlanId() },
-    { tier: "pro", resourceId: process.env.WHOP_PRO_PLAN_ID },
+    { tier: "alpha", resourceId: alphaAccessResourceId() },
+    { tier: "pro", resourceId: proAccessResourceId() },
   ];
 
   for (const check of checks) {

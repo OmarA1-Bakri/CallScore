@@ -11,6 +11,7 @@ import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { getCurrentTier } from "@/lib/auth";
 import { creatorHandlePath, findCreatorByHandle } from "@/lib/creator-handles";
 import { query } from "@/lib/db";
+import { fetchHhCreator } from "@/lib/hh-read-api";
 import { CREATOR_JUDGMENT_WINDOW_LABEL, getJudgmentWindowSql } from "@/lib/judgment-window";
 import { getLiveCallPriceJoinSql, getLiveCallPriceSelectSql } from "@/lib/live-call-pricing";
 import { hasAccess } from "@/lib/whop";
@@ -29,7 +30,29 @@ interface PageProps {
 }
 
 const getCreatorByHandle = cache(async (handle: string): Promise<Creator | null> => {
+  const readApiProfile = await fetchHhCreator<Creator, CreatorStats, Call>(handle, "all_time", 1).catch(() => null);
+  if (readApiProfile?.creator) return readApiProfile.creator;
   return findCreatorByHandle<Creator>(handle);
+});
+
+interface CreatorProfile {
+  readonly creator: Creator;
+  readonly stats: CreatorStats | null;
+  readonly calls: readonly Call[] | null;
+}
+
+const getCreatorProfileByHandle = cache(async (handle: string): Promise<CreatorProfile | null> => {
+  const readApiProfile = await fetchHhCreator<Creator, CreatorStats, Call>(handle, "all_time", 50).catch(() => null);
+  if (readApiProfile?.creator) {
+    return {
+      creator: readApiProfile.creator,
+      stats: readApiProfile.stats ?? null,
+      calls: Array.isArray(readApiProfile.calls) ? readApiProfile.calls : [],
+    };
+  }
+
+  const creator = await findCreatorByHandle<Creator>(handle);
+  return creator ? { creator, stats: null, calls: null } : null;
 });
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -61,45 +84,51 @@ export default async function CreatorPage({ params }: PageProps) {
   const handle = decodeURIComponent(rawHandle);
 
   // Fetch creator — handle missing table gracefully
-  let creator: Creator;
+  let profile: CreatorProfile;
   try {
-    const resolvedCreator = await getCreatorByHandle(handle);
-    if (!resolvedCreator) {
+    const resolvedProfile = await getCreatorProfileByHandle(handle);
+    if (!resolvedProfile) {
       notFound();
     }
-    creator = resolvedCreator;
+    profile = resolvedProfile;
   } catch {
     notFound();
   }
 
+  const { creator } = profile;
+
   // Fetch creator stats (all_time period stores the rolling creator judgment window).
-  let stats: CreatorStats | null = null;
-  try {
-    const statsRows = await query<CreatorStats>(
-      `SELECT * FROM creator_stats WHERE creator_id = $1 AND period = 'all_time' LIMIT 1`,
-      [creator.id],
-    );
-    stats = statsRows.length > 0 ? statsRows[0] : null;
-  } catch {
-    // Stats table may not exist yet
+  let stats: CreatorStats | null = profile.stats;
+  if (!stats) {
+    try {
+      const statsRows = await query<CreatorStats>(
+        `SELECT * FROM creator_stats WHERE creator_id = $1 AND period = 'all_time' LIMIT 1`,
+        [creator.id],
+      );
+      stats = statsRows.length > 0 ? statsRows[0] : null;
+    } catch {
+      // Stats table may not exist yet
+    }
   }
 
   // Fetch judgment-window calls so creator aggregates and call history use the
   // same level-playing-field window as the leaderboard.
   const CALL_LIMIT = 50;
-  let allCalls: Call[] = [];
-  try {
-    allCalls = await query<Call>(
-      `SELECT c.*, ${getLiveCallPriceSelectSql()}
-       FROM calls c
-       ${getLiveCallPriceJoinSql("c")}
-       WHERE c.creator_id = $1
-         AND ${getJudgmentWindowSql("c")}
-       ORDER BY call_date DESC`,
-      [creator.id],
-    );
-  } catch {
-    // Calls table may not exist yet
+  let allCalls: readonly Call[] = profile.calls ?? [];
+  if (!profile.calls) {
+    try {
+      allCalls = await query<Call>(
+        `SELECT c.*, ${getLiveCallPriceSelectSql()}
+         FROM calls c
+         ${getLiveCallPriceJoinSql("c")}
+         WHERE c.creator_id = $1
+           AND ${getJudgmentWindowSql("c")}
+         ORDER BY call_date DESC`,
+        [creator.id],
+      );
+    } catch {
+      // Calls table may not exist yet
+    }
   }
 
   const serializedCalls = serializeCalls(allCalls);

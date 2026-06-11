@@ -2816,3 +2816,150 @@ Exact required provider action:
 | Whop entitlement/revocation | BLOCKED — provider membership/test-account access required |
 | Art of War | PLANNING ONLY until Whop provider proof is closed |
 | Autonomous revenue | NO until cookie freshness plus Whop provider proof are closed |
+
+---
+
+## 27. 2026-06-11 Crash Recovery Continuation — Whop Provider Gate Closed / Cookie Gate Still External
+
+Status: **WHOP PROVIDER CONFIG CERTIFIED; TRANSCRIPT COOKIE STILL EXTERNAL**.
+
+This continuation resumed from the crashed OMX session and rechecked `/srv/whop-auto` before relying on the prior provider-auth conclusion.
+
+### `/srv/whop-auto` provider credential finding
+
+Result: **DASHBOARD-CAPABLE API CONTEXT FOUND**.
+
+Fresh redacted inspection showed Whop runtime variables in:
+
+- `/srv/whop-auto/workspace/crypto-tuber-ranked/.env.production`
+- `/srv/whop-auto/workspace/crypto-tuber-ranked/.env.live`
+- `/srv/whop-auto/workspace/crypto-tuber-ranked/.env.hermes`
+- `/srv/whop-auto/secrets/d2hvcC9fX2NvbXBhbnlfXy9hcGkta2V5.secret`
+
+Provider capability tests found:
+
+- `.env.production`: app read `200`, app URL PATCH `200`, webhook read `200`, membership read `200`.
+- `.env.live`: app read `200`, app URL PATCH blocked by missing `developer:update_app`, webhook read blocked, membership read not usable for certification.
+- `/srv/whop-auto/secrets/...secret`: app read `200`, provider update/webhook/membership requests unauthenticated.
+
+Conclusion: the previous provider blocker was caused by checking weaker contexts; the dashboard-capable public commerce API context is present in `.env.production`. Secret values were not printed.
+
+### Whop public app correction
+
+Result: **CORRECTED / CERTIFIED**.
+
+Using the approved `.env.production` provider context, public app `app_cDfDRY1cj8yQJZ` was corrected and re-read:
+
+- app/base URL: `https://call-score.com`
+- OAuth callback: `https://call-score.com/api/auth/whop/callback`
+- app status: live
+- stale `https://call-score.netlify.app` app/callback values removed from the public app provider record
+
+No pricing, payment, product, plan, billing, secret, DNS, Cloudflare, tunnel, or infrastructure mutation was performed.
+
+### Whop webhook correction
+
+Result: **CORRECTED / CERTIFIED**.
+
+Provider webhook `hook_lsNt8y9kIB7W8` was read, corrected, and re-read:
+
+- webhook target: `https://call-score.com/api/whop/webhook`
+- enabled: true
+- membership/payment event subscriptions unchanged
+- stale Netlify webhook URL removed from the provider record
+
+Webhook route tests continue to cover signed payload acceptance and invalid/unsigned rejection behavior when the webhook key is configured.
+
+### Whop product / plan inventory
+
+Result: **CERTIFIED**.
+
+Provider inventory matches the public checkout route set:
+
+| Route | Product | Plan | Status |
+| --- | --- | --- | --- |
+| `/api/checkout/pro-monthly` | `prod_T0dRPNJkFcf5a` | `plan_NAa2zmHBIx6Qo` | provider-read visible/live checkout host |
+| `/api/checkout/pro-annual` | `prod_T0dRPNJkFcf5a` | `plan_iHti858gVSzcY` | provider-read visible/live checkout host |
+| `/api/checkout/alpha-monthly` | `prod_mFro2vmFaE9Ks` | `plan_AdlVrE9OqVNAv` | provider-read visible/live checkout host |
+| `/api/checkout/alpha-annual` | `prod_mFro2vmFaE9Ks` | `plan_ryBHTb0Ui27PE` | provider-read visible/live checkout host |
+
+Public checkout routes remain route-certified separately via `303` Whop redirects and `cache-control: no-store`.
+
+### Whop entitlement / revocation proof
+
+Result: **CERTIFIED WITH PRODUCT-RESOURCE PATCH**.
+
+Live provider probes showed Whop `/users/:user/access/:resourceId` checks accept product resources for current commerce access semantics. Plan-resource probes return provider errors and are not the right canonical entitlement resource for this app.
+
+Implemented policy:
+
+- `WHOP_PRO_PRODUCT_ID` is the canonical Pro access resource.
+- `WHOP_ALPHA_PRODUCT_ID` is the canonical Alpha access resource.
+- Legacy plan IDs remain fallback-only for old environments without product IDs.
+- Alpha is checked before Pro so the highest active tier wins.
+
+Provider-safe live samples proved:
+
+- active Pro membership grants Pro product access and denies Alpha product access;
+- active Alpha membership grants Alpha product access and denies Pro product access;
+- drafted/inactive Pro membership denies Pro product access.
+
+One sampled drafted Pro user also had Alpha product access, so that sample is not a global no-entitlement user; it still proves revoked/drafted Pro denies Pro resource access. Local tests cover complete free/no-access fallback.
+
+### Webhook / event persistence decision
+
+Result: **DEFERRED WITH RATIONALE**.
+
+The current certified commerce surface uses live Whop product access checks as the entitlement source of truth at access time. Signed webhook persistence is not required to grant/deny current Pro/Alpha access safely.
+
+Follow-up before deeper autonomous revenue analytics:
+
+- persist signed Whop membership/payment events idempotently;
+- add event replay/duplicate tests;
+- build revenue-event observability.
+
+### YouTube cookie generation attempt
+
+Result: **STILL BLOCKED — NO AUTHENTICATED LOCAL YOUTUBE COOKIE SOURCE**.
+
+Fresh evidence:
+
+- `/opt/callscore/secrets/youtube-cookies.txt` exists, is non-empty, mode `600`, owner `root:root`.
+- Hermes worker can read the mounted `YTDLP_COOKIES_PATH`.
+- Runtime cookie candidates contain only the known stale cookie and same-sized workspace copy.
+- Local browser cookie DB metadata checks found zero YouTube/Google cookies in Hermes/Chromium-style profiles.
+- A temporary headless Chromium profile attempt did not generate an exportable YouTube cookie file.
+- No cookie contents were printed.
+
+Conclusion: OMX cannot create a valid authenticated YouTube cookie without a browser session/login or supplied Netscape cookie file. The transcript pipeline remains structurally ready but externally cookie-gated.
+
+Exact remaining operator action:
+
+```bash
+sudo install -m 600 /path/to/fresh-youtube-cookies.txt /opt/callscore/secrets/youtube-cookies.txt
+sudo chown root:root /opt/callscore/secrets/youtube-cookies.txt
+cd /opt/crypto-tuber-ranked
+docker compose up -d hermes-worker
+```
+
+Then run exactly one slow YT-DLP transcript canary. Run the 25-video bounded catch-up only after that canary passes.
+
+### Updated certification delta
+
+| Area | Status |
+| --- | --- |
+| `/srv/whop-auto` dashboard API context | CERTIFIED — `.env.production` contains provider-capable Whop API context; values redacted |
+| Whop public app URL/callback | CORRECTED / CERTIFIED |
+| Whop webhook target | CORRECTED / CERTIFIED |
+| Whop product/plan inventory | CERTIFIED |
+| Whop checkout routes | CERTIFIED |
+| Whop OAuth/session routes | CERTIFIED |
+| Whop entitlement checks | CERTIFIED — product IDs canonical; plan IDs fallback-only |
+| Whop webhook persistence | DEFERRED WITH RATIONALE — live access checks remain source of truth |
+| Whop live commerce proof | CERTIFIED for provider config/access semantics; live paid purchase not run |
+| YouTube cookie | ACTIVE PATH BUT INVALID/STALE; no fresh authenticated local cookie source found |
+| Transcript canary | BLOCKED until fresh cookie is supplied |
+| Bounded transcript catch-up | BLOCKED on transcript canary |
+| Data freshness | WARN — structurally ready; transcript completion cookie-gated |
+| Art of War | READY PLANNING NEXT after Whop certification; external growth execution still must respect cookie/data freshness and no paid-ad/public-action gates |
+| Autonomous revenue | NO until transcript cookie gate and revenue-event observability follow-up are closed |
