@@ -616,13 +616,13 @@ export function buildDataPipelineStageCommands(
         ...writeFlag,
       ]),
     ],
-    discover: creatorCommands("src/scripts/discover-videos-365.ts", [
+    discover: creatorCommands("src/scripts/discover-videos-rss-api.ts", [
+      "--source",
+      "auto",
       "--limit-videos",
       String(args.limitVideos),
       "--since-days",
       String(args.sinceDays),
-      "--audit-out",
-      auditFile(args, "discover"),
     ]),
     transcripts: creatorCommands("src/scripts/scrape-transcripts-v2.ts", [
       "--limit-videos",
