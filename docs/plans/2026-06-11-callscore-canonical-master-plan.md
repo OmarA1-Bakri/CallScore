@@ -90,7 +90,7 @@ This master plan incorporates:
 - 2026-06-11 merged PR #41 shared creator eligibility/exclusion policy (`5673c25`).
 - 2026-06-11 merged PR #42 Whop-auto commerce certification pack (`8d9d9b2`).
 - 2026-06-11 merged PR #44 homepage legacy HH compatibility restore (`ad942fdf`).
-- 2026-06-11 methodology/rubric certification audit and public-copy patch (`callscore/methodology-rubric-certification`).
+- 2026-06-11 merged PR #45 methodology/rubric certification audit and public-copy patch (`93e87d9`).
 
 Thread boundaries:
 
@@ -1601,9 +1601,13 @@ Important boundary:
 
 ## 17E. Methodology / Rubric Certification Update — 2026-06-11
 
-Current task branch: `callscore/methodology-rubric-certification`.
+PR #45, **Clarify CallScore methodology and creator rank contract**, has been merged to `master`.
 
-Status: LOCAL PATCH YES / PR PENDING.
+- Merge commit: `93e87d9bc9b649b421571f0314fa6def290fddd1`
+- Branch commit: `e0bf4a8429f8e0f7daf8a78bb9c4fb91ba1d77b2`
+- Status: MERGED YES
+- Canonical host deploy status: REQUIRES VERIFICATION
+- Production methodology-page certification: DEPLOYED REQUIRES VERIFICATION
 
 Scope:
 
@@ -1645,8 +1649,8 @@ Certification deltas:
 | --- | --- |
 | Call scoring methodology | PARTIAL — implemented and now documented more accurately; lifecycle/value split pending |
 | Creator ranking methodology | PARTIAL — read/UI eligibility strict; stats writer/source alignment pending |
-| 17 official creator explanation | LOCAL PATCH YES — documented from live HH compatibility bucketing |
-| Public methodology page accuracy | LOCAL PATCH YES — PR pending |
+| 17 official creator explanation | MERGED YES via PR #45 — documented from live HH compatibility bucketing |
+| Public methodology page accuracy | MERGED YES via PR #45 (`93e87d9`); deploy/certification pending |
 | Score lifecycle vs score value | NO / APPROVAL-GATED — requires schema/writer/recompute plan |
 | Native HH read API bucket contract | MERGED CODE; RUNTIME NOT CERTIFIED |
 | Homepage compatibility bucketing | DEPLOYED / REPORTED SAFE; keep until native HH buckets are live |
@@ -2113,10 +2117,10 @@ Explicit approval is required before:
 | Whop-auto | PARTIAL; CERTIFICATION PACK MERGED YES via PR #42; LIVE PROVIDER PROOF REQUIRED |
 | Hermes worker | LOCAL LOOP PROOF YES; scheduled production proof still required |
 | Scheduled jobs | PARTIAL — wrapper code exists; controlled production proof pending |
-| Call scoring methodology | PARTIAL — implemented and public copy patched locally; lifecycle/value split pending |
-| Creator ranking methodology | PARTIAL — official bucket thresholds documented locally; stats writer alignment pending |
-| 17 official creator explanation | LOCAL PATCH YES — live HH compatibility bucketing explains 17 official from 100 legacy rows |
-| Public methodology page accuracy | LOCAL PATCH YES — PR pending |
+| Call scoring methodology | PARTIAL — implemented and public copy merged via PR #45; lifecycle/value split pending |
+| Creator ranking methodology | PARTIAL — official bucket thresholds documented/merged via PR #45; stats writer alignment pending |
+| 17 official creator explanation | MERGED YES via PR #45 — live HH compatibility bucketing explains 17 official from 100 legacy rows |
+| Public methodology page accuracy | MERGED YES via PR #45 (`93e87d9`); deploy/certification pending |
 | Art of War loop | NO / NOT CERTIFIED |
 | Autonomous revenue | NO |
 
