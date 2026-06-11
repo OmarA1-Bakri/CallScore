@@ -89,6 +89,8 @@ This master plan incorporates:
 - 2026-06-11 merged PR #40 read API/frontend safety contract (`b18cc9e`).
 - 2026-06-11 merged PR #41 shared creator eligibility/exclusion policy (`5673c25`).
 - 2026-06-11 merged PR #42 Whop-auto commerce certification pack (`8d9d9b2`).
+- 2026-06-11 merged PR #44 homepage legacy HH compatibility restore (`ad942fdf`).
+- 2026-06-11 methodology/rubric certification audit and public-copy patch (`callscore/methodology-rubric-certification`).
 
 Thread boundaries:
 
@@ -1573,6 +1575,86 @@ Status boundary:
 - Whop pricing/product/plan/payment settings: not mutated
 
 
+
+## 17D. Homepage Legacy HH Compatibility Restore — 2026-06-11
+
+PR #44, **Restore homepage data from legacy HH read payload**, has been merged to `master`.
+
+- Merge commit: `ad942fdf0579d11faf6a93b4063fdd78a4a6c507`
+- Status: MERGED YES
+- Production homepage status: VERIFIED HTTP 200 after merge
+- Native HH read API bucket status: NO — live HH read API still returns legacy flat `leaderboard.rows`
+- Homepage safety status: DEPLOYED / REPORTED SAFE through compatibility bucketing
+
+Verified live behavior after PR #44:
+
+- Homepage returns HTTP 200.
+- Homepage shows creators again; safe examples visible include Cilinix Crypto, Crypto Rover, CryptosRUs, Lark Davis, Discover Crypto, and Crypto Banter.
+- Unsafe examples are absent from the public official leaderboard: Altcoin Daily, Alex Becker, MoneyZG, Crypto Inspector.
+- “No official ranked creators” no longer appears.
+
+Important boundary:
+
+- The homepage is currently safe because it re-buckets legacy HH rows before rendering.
+- The HH read API runtime still needs native bucketed contract deployment/restart/certification.
+- The compatibility path must not be removed until `officialRankedRows`, `provisionalRows`, `watchlistRows`, `staleRows`, `excludedRows`, and `pendingMaturityRows` are served natively by HH read API in production.
+
+## 17E. Methodology / Rubric Certification Update — 2026-06-11
+
+Current task branch: `callscore/methodology-rubric-certification`.
+
+Status: LOCAL PATCH YES / PR PENDING.
+
+Scope:
+
+- Audited implemented call scoring, creator ranking, read API safety, homepage compatibility, and public methodology copy.
+- Added `docs/methodology-rubric-certification.md` as the current methodology audit and approval-gated v2 plan.
+- Added `src/lib/methodology-rubric.ts` to define public methodology states, official thresholds, current ranking method, and v2 recommendation without changing production ranking behavior.
+- Updated `/methodology` copy to distinguish Call Score from Creator Rank Score and to document official/provisional/watchlist/stale/excluded/pending-maturity states.
+- Added `tests/methodology-rubric.test.ts`.
+
+Current methodology verdict:
+
+```text
+17 official creators: ACCEPTABLE WITH PRODUCT COPY CHANGES.
+```
+
+Reason:
+
+A small official leaderboard is commercially acceptable when official ranking is explicitly presented as a strict eligibility state rather than the full tracked-creator universe. Live HH legacy all_time payload has 100 rows. Frontend compatibility bucketing classifies:
+
+- officialRankedRows: 17
+- provisionalRows: 29
+- watchlistRows: 53
+- excludedRows: 1
+- staleRows: 0, because legacy HH payload does not include freshness fields
+- pendingMaturityRows: 0 for all_time
+
+Known methodology gaps:
+
+- HH read API runtime still does not serve native buckets.
+- `creator_stats.alpha_score` currently stores average 0–100 Call Score despite legacy naming.
+- Stats writer thresholds are not aligned with read/UI safety thresholds.
+- Score lifecycle and score value are still conflated in writer/count paths because stored `score = 0` can mean unscored placeholder.
+- 30d official ranking remains disabled and methodology redesign is approval-gated.
+- Creator-owned call attribution needs first-class lifecycle/policy support before methodology v2 certification.
+
+Certification deltas:
+
+| Certification | Status |
+| --- | --- |
+| Call scoring methodology | PARTIAL — implemented and now documented more accurately; lifecycle/value split pending |
+| Creator ranking methodology | PARTIAL — read/UI eligibility strict; stats writer/source alignment pending |
+| 17 official creator explanation | LOCAL PATCH YES — documented from live HH compatibility bucketing |
+| Public methodology page accuracy | LOCAL PATCH YES — PR pending |
+| Score lifecycle vs score value | NO / APPROVAL-GATED — requires schema/writer/recompute plan |
+| Native HH read API bucket contract | MERGED CODE; RUNTIME NOT CERTIFIED |
+| Homepage compatibility bucketing | DEPLOYED / REPORTED SAFE; keep until native HH buckets are live |
+| 30d methodology | APPROVAL-GATED; official ranking disabled |
+
+Approval gates remain unchanged: no production DB mutation, migration, stats recompute, extraction rerun, HH restart, provider mutation, or methodology-changing live ranking recompute without explicit approval.
+
+
 ## 18. Next UltraGoal — Revenue-Operations Certification Bridge
 
 ### Title
@@ -1992,9 +2074,11 @@ Explicit approval is required before:
 
 ### Current risks
 
-- Local safety patches are not production-certified.
-- `npm run typecheck` and `npm run build` are blocked by pre-existing dependency/type issues.
+- HH read API runtime still serves legacy flat `leaderboard.rows`; native bucket contract is merged in repo but not runtime-certified.
+- Homepage compatibility bucketing is live/reported safe, but must remain until HH native buckets are certified.
+- Methodology/rubric certification is local patch only until PR merge/deploy.
 - `creator_stats` semantics remain unsafe at source until writer patch and approved recompute.
+- Score lifecycle and score value remain conflated in writer/count paths.
 - 30d methodology remains undefined beyond “official disabled.”
 - Whop commerce proof is partial.
 - Art of War loop is not certified.
@@ -2018,17 +2102,21 @@ Explicit approval is required before:
 | `HH_READ_API_BASE` | REPORTED YES — requires Thread 2 provider verification for final cert |
 | HH PostgreSQL / pgsql | YES as canonical DB; read-only recheck required before final bridge cert |
 | Neon canonical | NO |
-| Read API safety contract | MERGED YES via PR #40 (`b18cc9e`); DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
-| Homepage leaderboard correctness | MERGED SAFETY CONTRACT YES via PR #40; LIVE PRODUCTION NOT CERTIFIED |
-| Frontend bucket display | MERGED YES via PR #40; DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
-| `creator_stats` semantics | NO — repair plan required |
+| Read API safety contract | MERGED YES via PR #40 (`b18cc9e`); live HH runtime still legacy flat rows after PR #44; NATIVE RUNTIME NOT CERTIFIED |
+| Homepage leaderboard correctness | DEPLOYED / REPORTED SAFE via PR #44 compatibility bucketing; native HH bucket contract still pending |
+| Frontend bucket display | DEPLOYED / REPORTED SAFE via PR #44; uses compatibility bucketing for legacy HH payload |
+| `creator_stats` semantics | NO — writer/source threshold and period semantics repair still required; no recompute performed |
 | Altcoin Daily exclusion | MERGED READ/API/UI POLICY YES via PR #40; SHARED POLICY MERGED YES via PR #41; PRODUCTION/STATS-WRITER NOT CERTIFIED |
 | Low-N ranking block | MERGED READ/API/UI POLICY YES via PR #40; STATS-WRITER/PRODUCTION NOT CERTIFIED |
-| 30d safety | MERGED API/UI DISABLE YES via PR #40; METHODOLOGY REDESIGN PENDING; PRODUCTION NOT CERTIFIED |
+| 30d safety | MERGED API/UI DISABLE YES; methodology redesign APPROVAL-GATED; production native HH bucket proof pending |
 | Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
 | Whop-auto | PARTIAL; CERTIFICATION PACK MERGED YES via PR #42; LIVE PROVIDER PROOF REQUIRED |
 | Hermes worker | LOCAL LOOP PROOF YES; scheduled production proof still required |
 | Scheduled jobs | PARTIAL — wrapper code exists; controlled production proof pending |
+| Call scoring methodology | PARTIAL — implemented and public copy patched locally; lifecycle/value split pending |
+| Creator ranking methodology | PARTIAL — official bucket thresholds documented locally; stats writer alignment pending |
+| 17 official creator explanation | LOCAL PATCH YES — live HH compatibility bucketing explains 17 official from 100 legacy rows |
+| Public methodology page accuracy | LOCAL PATCH YES — PR pending |
 | Art of War loop | NO / NOT CERTIFIED |
 | Autonomous revenue | NO |
 
