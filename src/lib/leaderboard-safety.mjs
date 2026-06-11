@@ -82,6 +82,10 @@ function hasFreshnessProof(row = {}) {
   return parseValidDate(latestFreshnessDate(row)) !== null;
 }
 
+function requiresFreshnessProof(options = {}) {
+  return options.requireFreshnessProof !== false;
+}
+
 export function classifyLeaderboardRow(row = {}, options = {}) {
   const period = rowPeriod(row, options.period);
   const totalCalls = numberValue(row.total_calls ?? row.totalCalls);
@@ -113,7 +117,7 @@ export function classifyLeaderboardRow(row = {}, options = {}) {
     !isNullishRank(rank) &&
     totalCalls > 0 &&
     totalCalls >= officialThreshold &&
-    hasFreshnessProof(row) &&
+    (!requiresFreshnessProof(options) || hasFreshnessProof(row)) &&
     isTargetCreatorClass(row)
   ) {
     return {
@@ -125,7 +129,7 @@ export function classifyLeaderboardRow(row = {}, options = {}) {
   if (
     totalCalls > 0 &&
     totalCalls >= getProvisionalThreshold(period) &&
-    hasFreshnessProof(row) &&
+    (!requiresFreshnessProof(options) || hasFreshnessProof(row)) &&
     isTargetCreatorClass(row)
   ) {
     return {

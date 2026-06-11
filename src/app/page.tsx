@@ -254,7 +254,19 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
       publicCounts = normalizePublicCounts(readApiHome.publicCounts ?? readApiHome.counts);
       leaderboardEmptyContract = { emptyReason: readApiHome.emptyReason ?? null };
       const readApiOfficialRows = getOfficialRankedReadApiRows(readApiHome);
+      const legacySafeContract = readApiOfficialRows.length === 0 && Array.isArray(readApiHome.leaderboard?.rows)
+        ? toReadApiLeaderboardContract(period, readApiHome.leaderboard.rows, {
+            period,
+            requireFreshnessProof: false,
+          })
+        : null;
+      if (legacySafeContract) {
+        leaderboardEmptyContract = { emptyReason: legacySafeContract.emptyReason };
+      }
       leaderboard = buildLeaderboardRows(readApiOfficialRows);
+      if (leaderboard.length === 0 && legacySafeContract) {
+        leaderboard = buildLeaderboardRows(getOfficialRankedReadApiRows(legacySafeContract));
+      }
     }
   } else {
     try {
