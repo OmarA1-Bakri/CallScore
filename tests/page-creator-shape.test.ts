@@ -12,9 +12,16 @@ test("creator page uses editorial primitives", () => {
 
 test("creator page preserves notFound and query fetches", () => {
   assert.match(src, /notFound\(\)/);
+  assert.match(src, /fetchHhCreator<Creator, CreatorStats, Call>/);
   assert.match(src, /findCreatorByHandle<Creator>/);
   assert.match(src, /query<CreatorStats>/);
   assert.match(src, /query<Call>/);
+});
+
+test("creator page prefers HH read API before direct DB fallback", () => {
+  assert.match(src, /const readApiProfile = await fetchHhCreator<Creator, CreatorStats, Call>/);
+  assert.match(src, /if \(readApiProfile\?\.creator\)/);
+  assert.match(src, /calls: Array\.isArray\(readApiProfile\.calls\) \? readApiProfile\.calls : \[\]/);
 });
 
 test("creator page does not use rounded-{lg,xl}", () => {
