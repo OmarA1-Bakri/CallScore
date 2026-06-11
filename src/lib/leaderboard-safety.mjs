@@ -12,17 +12,22 @@ export {
   normalizeCreatorIdentity,
 } from "./creator-eligibility-policy.mjs";
 
-const ABSOLUTE_OFFICIAL_CALL_FLOOR = 25;
 const OFFICIAL_THRESHOLDS = Object.freeze({
+  all_time: 24,
+  "12m": 12,
+  "90d": 3,
+  "30d": Number.POSITIVE_INFINITY,
+});
+const CERTIFIED_THRESHOLDS = Object.freeze({
   all_time: 50,
   "12m": 25,
-  "90d": 25,
+  "90d": 10,
   "30d": Number.POSITIVE_INFINITY,
 });
 const PROVISIONAL_THRESHOLDS = Object.freeze({
-  all_time: 10,
-  "12m": 10,
-  "90d": 5,
+  all_time: 6,
+  "12m": 6,
+  "90d": 1,
   "30d": Number.POSITIVE_INFINITY,
 });
 const STALE_AFTER_DAYS = 180;
@@ -60,13 +65,23 @@ function assertSafeSqlIdentifier(alias) {
 
 export function getOfficialThreshold(period = "all_time") {
   const threshold = OFFICIAL_THRESHOLDS[period] ?? OFFICIAL_THRESHOLDS.all_time;
-  return threshold === Number.POSITIVE_INFINITY
-    ? threshold
-    : Math.max(threshold, ABSOLUTE_OFFICIAL_CALL_FLOOR);
+  return threshold;
+}
+
+export function getCertifiedThreshold(period = "all_time") {
+  return CERTIFIED_THRESHOLDS[period] ?? CERTIFIED_THRESHOLDS.all_time;
 }
 
 function getProvisionalThreshold(period = "all_time") {
   return PROVISIONAL_THRESHOLDS[period] ?? PROVISIONAL_THRESHOLDS.all_time;
+}
+
+function confidenceTier(period, totalCalls) {
+  if (period === "30d") return "pending_maturity";
+  if (totalCalls >= getCertifiedThreshold(period)) return "certified";
+  if (totalCalls >= getOfficialThreshold(period)) return "official";
+  if (totalCalls >= getProvisionalThreshold(period)) return "provisional";
+  return "watchlist";
 }
 
 export function isStaleCreator(row = {}, options = {}) {
@@ -123,6 +138,7 @@ export function classifyLeaderboardRow(row = {}, options = {}) {
     return {
       bucket: "officialRankedRows",
       reason: null,
+      confidenceTier: confidenceTier(period, totalCalls),
     };
   }
 
@@ -135,6 +151,7 @@ export function classifyLeaderboardRow(row = {}, options = {}) {
     return {
       bucket: "provisionalRows",
       reason: isNullishRank(rank) ? "NULL_RANK" : "LOW_SAMPLE",
+      confidenceTier: confidenceTier(period, totalCalls),
     };
   }
 
@@ -149,6 +166,7 @@ function withSafetyMetadata(row, classification) {
     ...row,
     safetyBucket: classification.bucket,
     safetyReason: classification.reason,
+    confidenceTier: classification.confidenceTier,
     ...(classification.bucket === "excludedRows"
       ? { exclusionReason: classification.reason }
       : {}),

@@ -39,9 +39,12 @@ test("methodology rubric defines every public-safe creator bucket", () => {
 });
 
 test("official thresholds match the commercial-safety read contract", () => {
-  assert.equal(OFFICIAL_CREATOR_THRESHOLDS.all_time.officialMinCalls, 50);
-  assert.equal(OFFICIAL_CREATOR_THRESHOLDS["12m"].officialMinCalls, 25);
-  assert.equal(OFFICIAL_CREATOR_THRESHOLDS["90d"].officialMinCalls, 25);
+  assert.equal(OFFICIAL_CREATOR_THRESHOLDS.all_time.officialMinCalls, 24);
+  assert.equal(OFFICIAL_CREATOR_THRESHOLDS.all_time.certifiedMinCalls, 50);
+  assert.equal(OFFICIAL_CREATOR_THRESHOLDS["12m"].officialMinCalls, 12);
+  assert.equal(OFFICIAL_CREATOR_THRESHOLDS["12m"].certifiedMinCalls, 25);
+  assert.equal(OFFICIAL_CREATOR_THRESHOLDS["90d"].officialMinCalls, 3);
+  assert.equal(OFFICIAL_CREATOR_THRESHOLDS["90d"].certifiedMinCalls, 10);
   assert.equal(OFFICIAL_CREATOR_THRESHOLDS["30d"].officialEnabled, false);
   assert.equal(OFFICIAL_CREATOR_THRESHOLDS["30d"].emptyReason, "PENDING_MATURITY");
 });
@@ -56,8 +59,8 @@ test("current creator rank method documents legacy alpha_score naming risk", () 
   );
 });
 
-test("recommended v2 rank formula is approval gated", () => {
-  assert.match(RECOMMENDED_CREATOR_RANK_SCORE_V2.approvalGate, /explicit methodology approval/);
+test("sample-adjusted rank formula is recompute gated", () => {
+  assert.match(RECOMMENDED_CREATOR_RANK_SCORE_V2.approvalGate, /source-safe stats writer/);
   assert.equal(
     RECOMMENDED_CREATOR_RANK_SCORE_V2.components.reduce(
       (sum, component) => sum + component.weight,
@@ -85,6 +88,8 @@ test("public methodology page explains bucketed official ranking contract", () =
     );
   }
   assert.match(src, /PENDING_MATURITY/);
+  assert.match(src, /sample-adjusted Creator Rank Score/);
+  assert.match(src, /certified/);
   assert.doesNotMatch(src, /Avg Alpha across scored calls/);
   assert.doesNotMatch(src, /open source/);
 });

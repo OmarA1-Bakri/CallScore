@@ -6,7 +6,8 @@ import { CREATOR_JUDGMENT_WINDOW_LABEL } from "@/lib/judgment-window";
 import type { Period } from "@/lib/types";
 
 const PERIODS: ReadonlyArray<{ readonly value: Period; readonly label: string }> = [
-  { value: "all_time", label: CREATOR_JUDGMENT_WINDOW_LABEL },
+  { value: "12m", label: CREATOR_JUDGMENT_WINDOW_LABEL },
+  { value: "all_time", label: "All time" },
   { value: "90d", label: "90 days · Pro" },
 ];
 
@@ -20,12 +21,12 @@ export default function PeriodFilter({ value, canUseRecent = true }: PeriodFilte
   const searchParams = useSearchParams();
 
   function handleClick(period: Period): void {
-    if (!canUseRecent && period !== "all_time") {
+    if (!canUseRecent && (period === "90d" || period === "30d")) {
       router.push("/pricing");
       return;
     }
     const params = new URLSearchParams(searchParams.toString());
-    if (period === "all_time") params.delete("period");
+    if (period === "12m") params.delete("period");
     else params.set("period", period);
     const qs = params.toString();
     router.push(qs ? `/?${qs}` : "/");

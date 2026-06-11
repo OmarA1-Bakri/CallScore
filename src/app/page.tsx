@@ -31,9 +31,11 @@ import type {
   Call,
   LeaderboardRow,
   ConsensusSignal,
+  CreatorConfidenceTier,
   Period,
   Tier,
 } from "@/lib/types";
+import { getCreatorConfidenceTier } from "@/lib/creator-stats-eligibility";
 
 export const metadata: Metadata = {
   title: "Crypto Market Calls Tracker | Score Alpha. Find Edge — CallScore",
@@ -42,7 +44,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-const VALID_PERIODS: readonly Period[] = ["all_time", "90d", "30d"];
+const VALID_PERIODS: readonly Period[] = ["12m", "all_time", "90d", "30d"];
 
 type SelfCorrectionSummary = {
   readonly score?: number;
@@ -100,6 +102,7 @@ interface LeaderboardQueryRow {
   readonly worst_call_date: string | null;
   readonly worst_call_direction: string | null;
   readonly latest_video_date: string | null;
+  readonly confidenceTier?: CreatorConfidenceTier;
 }
 
 interface PageProps {
@@ -200,6 +203,12 @@ function buildCallSummary(
   } as Call;
 }
 
+function readApiConfidenceTier(value: unknown): CreatorConfidenceTier | undefined {
+  return value === "certified" || value === "official" || value === "provisional" || value === "watchlist" || value === "pending_maturity"
+    ? value
+    : undefined;
+}
+
 function buildLeaderboardRow(
   row: LeaderboardQueryRow,
   index: number,
@@ -221,6 +230,7 @@ function buildLeaderboardRow(
     selfCorrectionScore: selfCorrection?.score ?? 0,
     revisionCount: selfCorrection?.revisionCount ?? 0,
     selfCorrectionTier: selfCorrection?.tier ?? "rarely",
+    confidenceTier: readApiConfidenceTier(row.confidenceTier) ?? getCreatorConfidenceTier(row.period, asNumber(row.total_calls)),
   };
 }
 
@@ -234,11 +244,13 @@ function buildLeaderboardRows(
 
 export default async function HomePage({ searchParams: searchParamsPromise }: PageProps): Promise<ReactElement> {
   const searchParams = await searchParamsPromise;
-  const periodParam = searchParams.period ?? "all_time";
-  const requestedPeriod: Period = (VALID_PERIODS as readonly string[]).includes(periodParam) ? (periodParam as Period) : "all_time";
+  const periodParam = searchParams.period ?? "12m";
+  const requestedPeriod: Period = (VALID_PERIODS as readonly string[]).includes(periodParam) ? (periodParam as Period) : "12m";
   const currentTier = await getCurrentTier();
   const canUseRecent = hasAccess(currentTier, "pro");
-  const period: Period = canUseRecent ? requestedPeriod : "all_time";
+  const period: Period = requestedPeriod === "90d" || requestedPeriod === "30d"
+    ? (canUseRecent ? requestedPeriod : "12m")
+    : requestedPeriod;
   const sampleThreshold = getLeaderboardSampleThreshold(period);
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
   const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
@@ -315,7 +327,7 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
       const safeContract = toReadApiLeaderboardContract(period, rows, { period });
       leaderboardEmptyContract = { emptyReason: safeContract.emptyReason };
       const officialRows = getOfficialRankedReadApiRows(safeContract);
-      const prevPeriod: Period = period === "30d" ? "90d" : "all_time";
+      const prevPeriod: Period = period === "30d" ? "90d" : period === "90d" ? "12m" : "all_time";
       const prevScores =
         period !== "all_time"
           ? await query<{ creator_id: number; alpha_score: number }>(

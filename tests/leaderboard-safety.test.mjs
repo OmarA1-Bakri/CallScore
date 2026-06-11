@@ -45,7 +45,7 @@ test("normalizeCreatorIdentity canonicalizes name, handle, and channel id", () =
   );
 });
 
-test("isExcludedCreator hard-excludes Altcoin Daily identifier variants", () => {
+test("isExcludedCreator hard-excludes policy identifier variants", () => {
   for (const candidate of [
     { name: "Altcoin Daily" },
     { name: "altcoin daily" },
@@ -58,17 +58,28 @@ test("isExcludedCreator hard-excludes Altcoin Daily identifier variants", () => 
     assert.equal(isExcludedCreator(candidate), true, JSON.stringify(candidate));
   }
 
+  for (const candidate of [
+    { name: "Alex Becker's Channel" },
+    { youtube_handle: "@AlexBeckersChannel" },
+    { name: "MoneyZG" },
+    { youtube_handle: "@MoneyZG" },
+    { name: "Crypto Inspector" },
+  ]) {
+    assert.equal(isExcludedCreator(candidate), true, JSON.stringify(candidate));
+  }
+
   assert.equal(isExcludedCreator({ name: "Valid Alpha", youtube_handle: "@ValidAlpha" }), false);
 });
 
 test("classifyLeaderboardRow blocks excluded, stale, low-N, null-rank, and zero-call official rows", () => {
   assert.equal(classifyLeaderboardRow(row({ name: "Altcoin Daily" }), { now: NOW }).bucket, "excludedRows");
   assert.equal(
-    classifyLeaderboardRow(row({ name: "Alex Becker's Channel", youtube_handle: "@AlexBeckersChannel", total_calls: 24, accuracy_rank: 1, latest_video_date: "2025-10-11T00:00:00.000Z" }), { now: NOW }).bucket,
+    classifyLeaderboardRow(row({ name: "Old Alpha", youtube_handle: "@OldAlpha", total_calls: 24, accuracy_rank: 1, latest_video_date: "2025-10-11T00:00:00.000Z" }), { now: NOW }).bucket,
     "staleRows",
   );
-  assert.equal(classifyLeaderboardRow(row({ name: "MoneyZG", total_calls: 12, accuracy_rank: 2 }), { now: NOW }).bucket, "provisionalRows");
-  assert.equal(classifyLeaderboardRow(row({ name: "Crypto Inspector", total_calls: 8, accuracy_rank: 3 }), { now: NOW }).bucket, "watchlistRows");
+  assert.equal(classifyLeaderboardRow(row({ name: "Valid Monthly Creator", total_calls: 12, accuracy_rank: 2, period: "12m" }), { now: NOW }).bucket, "officialRankedRows");
+  assert.equal(classifyLeaderboardRow(row({ name: "Valid 90D Creator", total_calls: 3, accuracy_rank: 3, period: "90d" }), { now: NOW }).bucket, "officialRankedRows");
+  assert.equal(classifyLeaderboardRow(row({ name: "Valid Provisional", total_calls: 6, accuracy_rank: 4 }), { now: NOW }).bucket, "provisionalRows");
   assert.equal(classifyLeaderboardRow(row({ accuracy_rank: null }), { now: NOW }).bucket, "provisionalRows");
   assert.equal(classifyLeaderboardRow(row({ total_calls: 0 }), { now: NOW }).bucket, "watchlistRows");
   assert.equal(classifyLeaderboardRow(row(), { now: NOW }).bucket, "officialRankedRows");
@@ -85,9 +96,9 @@ test("invalid freshness dates are not freshness proof for official rows", () => 
 });
 
 test("thresholds enforce hard commercial floor", () => {
-  assert.equal(getOfficialThreshold("all_time"), 50);
-  assert.equal(getOfficialThreshold("12m"), 25);
-  assert.equal(getOfficialThreshold("90d"), 25);
+  assert.equal(getOfficialThreshold("all_time"), 24);
+  assert.equal(getOfficialThreshold("12m"), 12);
+  assert.equal(getOfficialThreshold("90d"), 3);
   assert.equal(getOfficialThreshold("30d"), Number.POSITIVE_INFINITY);
 });
 
@@ -95,7 +106,7 @@ test("bucketLeaderboardRows returns safe buckets and counts", () => {
   const buckets = bucketLeaderboardRows(
     [
       row({ name: "Altcoin Daily", total_calls: 429, accuracy_rank: 19 }),
-      row({ name: "Alex Becker's Channel", youtube_handle: "@AlexBeckersChannel", total_calls: 24, accuracy_rank: 1, latest_video_date: "2025-10-11T00:00:00.000Z" }),
+      row({ name: "Old Alpha", youtube_handle: "@OldAlpha", total_calls: 24, accuracy_rank: 1, latest_video_date: "2025-10-11T00:00:00.000Z" }),
       row({ name: "MoneyZG", total_calls: 12, accuracy_rank: 2 }),
       row({ name: "Crypto Inspector", total_calls: 8, accuracy_rank: 3 }),
       row({ name: "Valid Alpha", total_calls: 75, accuracy_rank: 4 }),
@@ -106,14 +117,14 @@ test("bucketLeaderboardRows returns safe buckets and counts", () => {
   );
 
   assert.deepEqual(buckets.officialRankedRows.map((item) => item.name), ["Valid Alpha"]);
-  assert.deepEqual(buckets.excludedRows.map((item) => item.name), ["Altcoin Daily"]);
+  assert.deepEqual(buckets.excludedRows.map((item) => item.name), ["Altcoin Daily", "MoneyZG", "Crypto Inspector"]);
   assert.equal(buckets.excludedRows[0].exclusionReason, "EXCLUDED_MEDIA_NEWS_CHANNEL");
-  assert.deepEqual(buckets.staleRows.map((item) => item.name), ["Alex Becker's Channel"]);
-  assert.deepEqual(buckets.provisionalRows.map((item) => item.name), ["MoneyZG", "Null Rank"]);
-  assert.deepEqual(buckets.watchlistRows.map((item) => item.name), ["Crypto Inspector", "Zero Calls"]);
+  assert.deepEqual(buckets.staleRows.map((item) => item.name), ["Old Alpha"]);
+  assert.deepEqual(buckets.provisionalRows.map((item) => item.name), ["Null Rank"]);
+  assert.deepEqual(buckets.watchlistRows.map((item) => item.name), ["Zero Calls"]);
   assert.equal(buckets.counts.officialRankedCreators, 1);
-  assert.equal(buckets.counts.excludedCreators, 1);
-  assert.equal(buckets.counts.publicEligibleCalls, 199);
+  assert.equal(buckets.counts.excludedCreators, 3);
+  assert.equal(buckets.counts.publicEligibleCalls, 179);
 });
 
 test("30d period disables official leaderboard and moves rows to pending maturity", () => {
@@ -173,6 +184,8 @@ test("legacy HH rows can be safely bucketed without freshness proof during front
 
   assert.deepEqual(response.officialRankedRows.map((item) => item.name), ["Valid Legacy Creator"]);
   assert.equal(response.excludedRows.some((item) => item.name === "Altcoin Daily"), true);
+  assert.equal(response.excludedRows.some((item) => item.name === "Alex Becker's Channel"), true);
+  assert.equal(response.excludedRows.some((item) => item.name === "MoneyZG"), true);
   assert.equal(response.officialRankedRows.some((item) => item.name === "Altcoin Daily"), false);
   assert.equal(response.officialRankedRows.some((item) => item.name === "Alex Becker's Channel"), false);
   assert.equal(response.officialRankedRows.some((item) => item.name === "MoneyZG"), false);

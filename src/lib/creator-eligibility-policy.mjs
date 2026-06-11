@@ -29,6 +29,11 @@ export const TARGET_CREATOR_CRITERIA = Object.freeze([
 ]);
 
 const ALTCOIN_DAILY_CHANNEL_IDS = new Set(["ucblhgkvy-bjpcawebgtnfbw"]);
+const POLICY_EXCLUDED_IDENTITIES = new Map([
+  ["alexbeckerschannel", EXCLUSION_REASONS.NON_TARGET_CREATOR],
+  ["moneyzg", EXCLUSION_REASONS.NON_TARGET_CREATOR],
+  ["cryptoinspector", EXCLUSION_REASONS.NON_TARGET_CREATOR],
+]);
 
 function normalizeText(value) {
   return String(value ?? "")
@@ -38,7 +43,7 @@ function normalizeText(value) {
 }
 
 function compactText(value) {
-  return normalizeText(value).replace(/^@+/, "").replace(/[\s_-]+/g, "");
+  return normalizeText(value).replace(/^@+/, "").replace(/[^a-z0-9]+/g, "");
 }
 
 export function normalizeCreatorIdentity(row = {}) {
@@ -84,6 +89,18 @@ export function getCreatorExclusion(row = {}) {
     return {
       excluded: true,
       reason: EXCLUSION_REASONS.MEDIA_NEWS_CHANNEL,
+      source: "hard_policy",
+    };
+  }
+
+  const identity = normalizeCreatorIdentity(row);
+  const policyReason = POLICY_EXCLUDED_IDENTITIES.get(identity.compactName)
+    ?? POLICY_EXCLUDED_IDENTITIES.get(identity.handle)
+    ?? identity.aliases.map((alias) => POLICY_EXCLUDED_IDENTITIES.get(alias)).find(Boolean);
+  if (policyReason) {
+    return {
+      excluded: true,
+      reason: policyReason,
       source: "hard_policy",
     };
   }

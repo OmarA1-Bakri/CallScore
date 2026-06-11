@@ -1,11 +1,14 @@
 "use client";
 
+import type { CreatorConfidenceTier } from "@/lib/types";
+
 interface RankTierBadgeProps {
   readonly rank: number;
   readonly totalCalls: number;
   readonly minPublicScoredCalls: number;
   readonly lowNWarningCalls: number;
   readonly sampleFloorLabel: string;
+  readonly confidenceTier?: CreatorConfidenceTier;
 }
 
 function getTier(rank: number): { label: string; color: string } {
@@ -20,6 +23,7 @@ export default function RankTierBadge({
   minPublicScoredCalls,
   lowNWarningCalls,
   sampleFloorLabel,
+  confidenceTier,
 }: RankTierBadgeProps) {
   if (minPublicScoredCalls > lowNWarningCalls) {
     throw new Error("minPublicScoredCalls must be <= lowNWarningCalls");
@@ -36,6 +40,22 @@ export default function RankTierBadge({
       >
         {tier.label}
       </span>
+      {confidenceTier === "certified" && (
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-medium bg-pos/10 text-pos border border-pos/20"
+          title={`Certified creator sample: ${totalCalls} mature qualifying calls. ${sampleFloorLabel}`}
+        >
+          Certified
+        </span>
+      )}
+      {confidenceTier === "official" && lowData && (
+        <span
+          className="inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-medium bg-accent/10 text-accent border border-accent/20"
+          title={`Official but below certified sample size: ${totalCalls} mature qualifying calls. ${sampleFloorLabel}`}
+        >
+          Official
+        </span>
+      )}
       {obsoleteData && (
         <span
           className="inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-medium bg-ink-100 text-ink-600 border border-ink-300/70"
@@ -44,7 +64,7 @@ export default function RankTierBadge({
           Obsolete
         </span>
       )}
-      {lowData && (
+      {lowData && confidenceTier !== "official" && (
         <span
           className="inline-flex items-center px-1.5 py-0.5 rounded-none text-[11px] font-medium bg-accent/10 text-accent border border-accent/20"
           title={`Only ${totalCalls} public-scored calls — visible but still below the ${lowNWarningCalls}-call low-N warning line. ${sampleFloorLabel}`}

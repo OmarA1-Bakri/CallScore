@@ -91,6 +91,7 @@ export default function LeaderboardRow({
           minPublicScoredCalls={minPublicScoredCalls}
           lowNWarningCalls={lowNWarningCalls}
           sampleFloorLabel={sampleFloorLabel}
+          confidenceTier={row.confidenceTier}
         />
       </td>
       {/* Best coin — symbol from the best public-scored call */}

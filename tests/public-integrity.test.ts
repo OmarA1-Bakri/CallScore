@@ -283,41 +283,49 @@ test("creator score averages reconcile with the per-call public components", () 
 });
 
 test("leaderboard requires the post-audit public scored call floors", () => {
-  assert.equal(OBSOLETE_LEADERBOARD_CALL_THRESHOLD, 25);
-  assert.equal(MIN_PUBLIC_LEADERBOARD_CALLS, 25);
+  assert.equal(OBSOLETE_LEADERBOARD_CALL_THRESHOLD, 24);
+  assert.equal(MIN_PUBLIC_LEADERBOARD_CALLS, 24);
   assert.equal(LOW_N_WARNING_CALLS, 50);
-  assert.equal(MIN_PRO_90D_LEADERBOARD_CALLS, 10);
-  assert.equal(LOW_N_90D_WARNING_CALLS, 20);
-  assert.equal(RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS, 10);
-  assert.equal(RECENT_CONTEXT_LOW_N_WARNING_CALLS, 20);
-  assert.equal(getMinimumLeaderboardCalls("all_time"), 25);
+  assert.equal(MIN_PRO_90D_LEADERBOARD_CALLS, 3);
+  assert.equal(LOW_N_90D_WARNING_CALLS, 10);
+  assert.equal(RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS, 3);
+  assert.equal(RECENT_CONTEXT_LOW_N_WARNING_CALLS, 10);
+  assert.equal(getMinimumLeaderboardCalls("all_time"), 24);
   assert.equal(getLowNWarningCalls("all_time"), 50);
-  assert.equal(getLeaderboardEligibilitySql("cs"), "cs.total_calls >= 25");
-  assert.equal(getLeaderboardEligibilitySql("cs", "all_time"), "cs.total_calls >= 25");
-  assert.equal(getMinimumLeaderboardCalls("90d"), 10);
-  assert.equal(getLowNWarningCalls("90d"), 20);
-  assert.equal(getLeaderboardEligibilitySql("cs", "90d"), "cs.total_calls >= 10");
-  assert.equal(getLeaderboardEligibilitySql("cs", "30d"), "cs.total_calls >= 10");
+  assert.equal(getLeaderboardEligibilitySql("cs"), "cs.total_calls >= 24");
+  assert.equal(getLeaderboardEligibilitySql("cs", "all_time"), "cs.total_calls >= 24");
+  assert.equal(getMinimumLeaderboardCalls("12m"), 12);
+  assert.equal(getLowNWarningCalls("12m"), 25);
+  assert.equal(getLeaderboardEligibilitySql("cs", "12m"), "cs.total_calls >= 12");
+  assert.equal(getMinimumLeaderboardCalls("90d"), 3);
+  assert.equal(getLowNWarningCalls("90d"), 10);
+  assert.equal(getLeaderboardEligibilitySql("cs", "90d"), "cs.total_calls >= 3");
+  assert.equal(getLeaderboardEligibilitySql("cs", "30d"), "FALSE");
 });
 
 test("leaderboard sample floors are period-aware", () => {
   assert.deepEqual(getLeaderboardSampleThreshold("all_time"), {
-    min_public_scored_calls: 25,
+    min_public_scored_calls: 24,
     low_n_warning_calls: 50,
-    sample_floor_label: "N = public-scored calls in rolling 12 months",
+    sample_floor_label: "All-time official floor; certified at 50+ mature qualifying calls",
+  });
+  assert.deepEqual(getLeaderboardSampleThreshold("12m"), {
+    min_public_scored_calls: 12,
+    low_n_warning_calls: 25,
+    sample_floor_label: "12 months · one mature qualifying call per month; certified at 25+",
   });
   assert.deepEqual(getLeaderboardSampleThreshold("90d"), {
     min_public_scored_calls: RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS,
     low_n_warning_calls: RECENT_CONTEXT_LOW_N_WARNING_CALLS,
-    sample_floor_label: "Recent context; lower sample floor applies",
+    sample_floor_label: "90-day recent form; lower-confidence official floor; certified at 10+",
   });
   assert.deepEqual(getLeaderboardSampleThreshold("30d"), {
     min_public_scored_calls: RECENT_CONTEXT_MIN_PUBLIC_LEADERBOARD_CALLS,
     low_n_warning_calls: RECENT_CONTEXT_LOW_N_WARNING_CALLS,
-    sample_floor_label: "30 days · internal experimental sample view",
+    sample_floor_label: "30 days · pending maturity; official ranking disabled",
   });
-  assert.equal(getLeaderboardEligibilitySql("cs", "90d"), "cs.total_calls >= 10");
-  assert.equal(getLeaderboardEligibilitySql("cs", "30d"), "cs.total_calls >= 10");
+  assert.equal(getLeaderboardEligibilitySql("cs", "90d"), "cs.total_calls >= 3");
+  assert.equal(getLeaderboardEligibilitySql("cs", "30d"), "FALSE");
 });
 
 test("score-ready SQL can be reused without lowering the confidence gate", () => {
@@ -331,7 +339,8 @@ test("creator judgment window is a rolling 12-month period", () => {
   assert.equal(CREATOR_JUDGMENT_WINDOW_DAYS, 365);
   assert.equal(CREATOR_JUDGMENT_WINDOW_LABEL, "Last 12 months");
   assert.equal(getJudgmentWindowSql("c"), "c.call_date >= NOW() - INTERVAL '365 days'");
-  assert.equal(getPeriodFilterSql("c", "all_time"), "AND c.call_date >= NOW() - INTERVAL '365 days'");
+  assert.equal(getPeriodFilterSql("c", "all_time"), "");
+  assert.equal(getPeriodFilterSql("c", "12m"), "AND c.call_date >= NOW() - INTERVAL '365 days'");
   assert.equal(getPeriodFilterSql("c", "90d"), "AND c.call_date >= NOW() - INTERVAL '90 days'");
   assert.equal(getPeriodFilterSql("c", "30d"), "AND c.call_date >= NOW() - INTERVAL '30 days'");
 });

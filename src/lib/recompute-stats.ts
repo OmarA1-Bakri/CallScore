@@ -7,6 +7,8 @@ import {
 import {
   getCreatorStatsOfficialThreshold,
   getCreatorStatsOfficialEligibilitySql,
+  getCreatorStatsSamplePriorN,
+  CREATOR_STATS_DEFAULT_BASELINE_SCORE,
 } from "./creator-stats-eligibility";
 import { getPeriodFilterSql } from "./judgment-window";
 import type { Call, Period } from "./types";
@@ -217,7 +219,8 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
   );
 
   const officialThreshold = getCreatorStatsOfficialThreshold(period);
-  if (officialThreshold === null) return;
+  const priorN = getCreatorStatsSamplePriorN(period);
+  if (officialThreshold === null || priorN === null) return;
 
   const officialEligibilitySql = getCreatorStatsOfficialEligibilitySql({
     statsAlias: "cs_inner",
@@ -225,18 +228,31 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
     freshnessAlias: "vf",
   });
 
+  // Rank official creators with a sample-adjusted Creator Rank Score so newly eligible
+  // lower-frequency creators are pulled toward the period baseline instead of dominating by variance.
   await query(
-    `UPDATE creator_stats cs
+    `WITH baseline AS (
+       SELECT COALESCE(AVG(alpha_score) FILTER (WHERE total_calls > 0), $3::float8) AS score
+       FROM creator_stats
+       WHERE period = $1
+     )
+     UPDATE creator_stats cs
      SET accuracy_rank = ranked.rank
      FROM (
        SELECT
          cs_inner.id,
          ROW_NUMBER() OVER (
            PARTITION BY cs_inner.period
-           ORDER BY cs_inner.alpha_score DESC, cs_inner.win_rate DESC, cs_inner.total_calls DESC, cs_inner.creator_id ASC
+           ORDER BY
+             ((cs_inner.alpha_score * cs_inner.total_calls) + (baseline.score * $2::float8)) / NULLIF(cs_inner.total_calls + $2::float8, 0) DESC,
+             cs_inner.alpha_score DESC,
+             cs_inner.win_rate DESC,
+             cs_inner.total_calls DESC,
+             cs_inner.creator_id ASC
          ) AS rank
        FROM creator_stats cs_inner
        JOIN creators cr_inner ON cr_inner.id = cs_inner.creator_id
+       CROSS JOIN baseline
        LEFT JOIN (
          SELECT creator_id, MAX(published_at) AS latest_video_date
          FROM videos
@@ -246,7 +262,7 @@ export async function recomputeCreatorStats(period: Period): Promise<void> {
          AND ${officialEligibilitySql}
      ) ranked
      WHERE cs.id = ranked.id`,
-    [period],
+    [period, priorN, CREATOR_STATS_DEFAULT_BASELINE_SCORE],
   );
 }
 
@@ -272,6 +288,7 @@ export interface RecomputeAllStatsMetrics {
 export async function recomputeAllStats(): Promise<RecomputeAllStatsMetrics> {
   const scoredCalls = await recomputeCallScores();
   await recomputeCreatorStats("all_time");
+  await recomputeCreatorStats("12m");
   await recomputeCreatorStats("90d");
   await recomputeCreatorStats("30d");
   await syncCreatorSnapshots();

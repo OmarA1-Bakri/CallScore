@@ -97,25 +97,29 @@ export type CreatorRankingState =
 export const OFFICIAL_CREATOR_THRESHOLDS = {
   all_time: {
     label: "All time",
-    officialMinCalls: 50,
-    provisionalMinCalls: 10,
+    officialMinCalls: 24,
+    certifiedMinCalls: 50,
+    provisionalMinCalls: 6,
     officialEnabled: true,
   },
   "12m": {
     label: "12m",
-    officialMinCalls: 25,
-    provisionalMinCalls: 10,
+    officialMinCalls: 12,
+    certifiedMinCalls: 25,
+    provisionalMinCalls: 6,
     officialEnabled: true,
   },
   "90d": {
     label: "90d",
-    officialMinCalls: 25,
-    provisionalMinCalls: 5,
+    officialMinCalls: 3,
+    certifiedMinCalls: 10,
+    provisionalMinCalls: 1,
     officialEnabled: true,
   },
   "30d": {
     label: "30d",
     officialMinCalls: null,
+    certifiedMinCalls: null,
     provisionalMinCalls: null,
     officialEnabled: false,
     emptyReason: "PENDING_MATURITY",
@@ -127,18 +131,18 @@ export type OfficialCreatorPeriod = keyof typeof OFFICIAL_CREATOR_THRESHOLDS;
 export const CURRENT_CREATOR_RANKING_METHOD = {
   scoreField: "creator_stats.alpha_score",
   currentMeaning:
-    "Current writer semantics store average 0–100 Call Score in the legacy alpha_score column, then rank by alpha_score, win_rate, total_calls, and creator_id.",
-  rankOrder: ["alpha_score DESC", "win_rate DESC", "total_calls DESC", "creator_id ASC"],
+    "Current writer semantics store average 0–100 Call Score in the legacy alpha_score column, then assign rank with a sample-adjusted Creator Rank Score before raw score, win rate, sample size, and creator id tie-breakers.",
+  rankOrder: ["sample_adjusted_score DESC", "alpha_score DESC", "win_rate DESC", "total_calls DESC", "creator_id ASC"],
   limitations: [
     "The alpha_score column name is misleading because it is not raw average alpha.",
-    "The stats writer source thresholds are not yet aligned with the stricter read/UI safety contract.",
+    "The alpha_score storage column remains a legacy name; rank order now uses sample-adjusted score computed during source recompute.",
     "A stored score of 0 is currently used as an unscored placeholder in some writer/count paths, so methodology v2 must separate score_status from score_value.",
   ],
 } as const;
 
 export const RECOMMENDED_CREATOR_RANK_SCORE_V2 = {
   approvalGate:
-    "Changing live ranking formula requires explicit methodology approval, stats-writer patch, and approved production recompute.",
+    "Live ranking formula is implemented through the source-safe stats writer and remains subject to regression tests plus approved production recompute.",
   priorN: 25,
   sampleAdjustedFormula:
     "(creator_raw_score * N + global_baseline_score * prior_N) / (N + prior_N)",
