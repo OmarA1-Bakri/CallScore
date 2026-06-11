@@ -4,6 +4,10 @@ import {
   buildDataPipelineStageCommands,
   parseDataPipelineArgs,
 } from "../src/scripts/run-data-pipeline";
+import {
+  buildDailyPipelineCommands,
+  parseDailyPipelineArgs,
+} from "../src/scripts/run-daily-pipeline";
 import { getNextConsensusWindowStart } from "../src/scripts/detect-consensus";
 import {
   buildCycleCommand,
@@ -475,8 +479,11 @@ test("transcript backfill is dry-run and bounded by default", () => {
   ]);
   assert.equal(args.creator, "@A");
   assert.equal(args.limit, 7);
-  assert.equal(args.concurrency, 50);
-  assert.equal(args.fallbackYtDlp, false);
+  assert.equal(args.concurrency, 3);
+  assert.equal(args.fallbackYtDlp, true);
+  assert.equal(args.ytDlpSleepSeconds, 20);
+  assert.equal(args.ytDlpMaxSleepSeconds, 60);
+  assert.equal(args.stopOnProviderBlock, true);
   assert.equal(args.auditOut, ".tmp/transcripts.jsonl");
   assert.equal(args.write, false);
 });
@@ -489,6 +496,7 @@ test("transcript backfill supports redacted yt-dlp auth env hooks", () => {
     "--cookies",
     "/run/secrets/youtube.cookies",
   ]);
+  assert.equal(ytDlpAuthArgs({ YTDLP_COOKIES: "# Netscape\n.example" }).length, 0);
   assert.deepEqual(ytDlpAuthArgs({ YTDLP_COOKIES_FROM_BROWSER: "chromium:Default" }), [
     "--cookies-from-browser",
     "chromium:Default",
@@ -507,6 +515,23 @@ test("yt-dlp requested_subtitles output is dereferenced instead of stored as tra
     ),
     "hello world",
   );
+});
+
+
+
+test("daily pipeline defaults to slow bounded transcript cadence", () => {
+  const args = parseDailyPipelineArgs(["--write", "--transcript-limit", "25", "--transcript-concurrency", "9"]);
+  assert.equal(args.write, true);
+  assert.equal(args.transcriptLimit, 25);
+  assert.equal(args.transcriptConcurrency, 1);
+  assert.equal(args.transcriptGapMs, 20_000);
+
+  const commands = buildDailyPipelineCommands(args);
+  const transcriptCommand = commands.find((command) => command.name === "slow-transcripts")?.command ?? [];
+  assert.ok(transcriptCommand.includes("src/scripts/backfill-transcripts.ts"));
+  assert.ok(transcriptCommand.includes("--concurrency"));
+  assert.ok(transcriptCommand.includes("1"));
+  assert.ok(transcriptCommand.includes("--retry-cooldown-hours"));
 });
 
 test("data pipeline wires shadow commands safely in dry-run mode", () => {

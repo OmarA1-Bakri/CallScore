@@ -54,7 +54,8 @@
     "repair:price-at-call": "node --import tsx src/scripts/repair-price-at-call.ts",
     "audit:symbol-funnel": "node --import tsx src/scripts/audit-symbol-funnel.ts",
     "audit:blockers": "node --import tsx src/scripts/audit-call-blockers.ts",
-    "freshness:check": "node --import tsx src/scripts/callscore-freshness-check.ts"
+    "freshness:check": "node --import tsx src/scripts/callscore-freshness-check.ts",
+    "pipeline:daily": "node --import tsx src/scripts/run-daily-pipeline.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

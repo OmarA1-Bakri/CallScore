@@ -84,7 +84,7 @@ SOURCE CREATOR_STATS RANK SAFETY: CERTIFIED AFTER 2026-06-11 RECOMPUTE
 
 Runtime evidence captured on 2026-06-11:
 
-- Repo/runtime path: `/opt/crypto-tuber-ranked`; recovery work is on branch `callscore/data-pipeline-full-recovery` from master `e0ad13dbe160001f6588f6e03577e54e4d6411f7`.
+- Repo/runtime path: `/opt/crypto-tuber-ranked`; recovery work merged through master `c459fc5448b27195231e2292a3be1706156b6b81`; slow-YT-DLP cadence patch is the next local patch from that base.
 - Public HH read API serves native bucket keys for `all_time`, `12m`, `90d`, and `30d`.
 - Native HH read API proof after recovery:
   - `leaderboard.rows == officialRankedRows` for public responses.
@@ -132,6 +132,76 @@ Accepted provider paths:
 
 After provider access is supplied, rerun transcript catch-up, extraction catch-up, scoring, source-safe stats recompute, and API/homepage certification.
 
+
+
+### 0.2 2026-06-11 Slow YT-DLP Transcript Cadence Update
+
+```text
+CANONICAL TRANSCRIPT PATH: SLOW YT-DLP
+SLOW YT-DLP CODE SAFETY: PR #50 PATCH YES
+DAILY PIPELINE TIMER: INSTALLED / ACTIVE / CERTIFIED
+TRANSCRIPT ACQUISITION: BLOCKED BY YOUTUBE BOT VERIFICATION UNTIL COOKIE PATH IS PROVIDED
+DATA/WORKER/FRESHNESS REMEDIATION: PARTIAL — EXACT COOKIE GATE REMAINS
+```
+
+Runtime evidence captured on 2026-06-11 after the PR #49 recovery baseline:
+
+- Repo/runtime path: `/opt/crypto-tuber-ranked`; base master `c459fc5448b27195231e2292a3be1706156b6b81`; slow-YT-DLP cadence patch is PR #50.
+- Slow transcript runner defaults are now intentionally conservative:
+  - canonical provider path: `yt-dlp` subtitle/caption retrieval only; no video download; no playlist expansion;
+  - default transcript batch limit: 25;
+  - default transcript concurrency: 1;
+  - default sleep interval: 20 seconds;
+  - default max sleep interval: 60 seconds;
+  - retry cooldown: 24 hours;
+  - stale provider-block retry: 7 days;
+  - lock file: `/tmp/callscore-slow-ytdlp-transcripts.lock`;
+  - provider/rate-limit/bot errors stop the batch instead of hammering YouTube.
+- Supported redacted credential paths remain:
+  - `YTDLP_COOKIES_PATH=/absolute/path/to/youtube-cookies.txt`;
+  - `YTDLP_COOKIES=<secure cookie file content via runtime env>`;
+  - `YTDLP_COOKIES_FROM_BROWSER=<yt-dlp supported browser profile spec>`.
+- A daily cadence is installed and active on HH:
+  - systemd timer: `callscore-daily-pipeline.timer`;
+  - service: `callscore-daily-pipeline.service`;
+  - schedule: daily around 03:20 local time with randomized delay;
+  - command: `npm run pipeline:daily -- --write --read-api-base https://ops-bridge.call-score.com/api/read --transcript-limit 25 --transcript-concurrency 1 --transcript-gap-ms 20000 --limit-creators 250 --limit-videos 10 --since-days 45 --extract-limit 50 --match-limit 500 --match-batch-size 100`;
+  - environment: `.env.hermes` plus redacted runtime env;
+  - non-overlap lock: `/tmp/callscore-daily-pipeline.lock`.
+- Manual daily canary completed safely on 2026-06-11:
+  - RSS discovery upserted bounded recent video rows;
+  - slow-YT-DLP transcript canary attempted one current video and stopped on `bot_verification_required`;
+  - extraction processed two eligible local videos and inserted two calls;
+  - price matching ran on the bounded set;
+  - `compute_scores` ran and refreshed `creator_stats`;
+  - freshness check returned `WARN` with no blockers and explicit transcript warnings.
+- Current DB proof after canary:
+  - videos: 15,476; latest video inserted 2026-06-11 10:19:54+01;
+  - raw calls: 16,027; latest call inserted 2026-06-11 10:54:25+01;
+  - latest transcript attempt 2026-06-11 10:54:14+01;
+  - latest transcript success remains 2026-05-25 16:01:08+01;
+  - latest `creator_stats` update 2026-06-11 10:54:48+01;
+  - source unsafe ranks: 0; Altcoin Daily official source ranks: 0.
+- Public HH API proof after canary:
+  - `all_time`: official 17, provisional 27, watchlist 100, stale 20, excluded 1, pending 0, `unsafeOfficial = []`;
+  - `30d`: `emptyReason = PENDING_MATURITY`, official 0;
+  - `leaderboard.rows == officialRankedRows`.
+
+Exact remaining credential gate:
+
+```text
+YouTube currently rejects unauthenticated yt-dlp transcript canaries with bot verification.
+Provide one approved runtime-only credential path without committing or printing secrets:
+
+1. YTDLP_COOKIES_PATH=/absolute/path/to/youtube-cookies.txt
+2. YTDLP_COOKIES_FROM_BROWSER=<yt-dlp supported browser spec available to the worker>
+3. YTDLP_COOKIES=<redacted Netscape cookie file content via secure runtime env>
+
+After this is supplied, rerun the same daily command with --transcript-limit 25, confirm at least one transcript success, then allow the daily drain to reduce the backlog safely.
+```
+
+Transcript backlog as of this update is visible in the freshness self-check. Current largest classes are pending/no transcript, legacy YouTube rate/captcha failures, transcript-disabled videos, and the new explicit `bot_verification_required` canary failures. The backlog is not to be cleared by a single large run; it must drain through the daily bounded slow-YT-DLP cadence.
+
 ---
 ## 1. Source Of Truth
 
@@ -154,7 +224,7 @@ This master plan incorporates:
 - 2026-06-11 merged PR #44 homepage legacy HH compatibility restore (`ad942fdf`).
 - 2026-06-11 merged PR #45 methodology/rubric certification audit and public-copy patch (`93e87d9`).
 - 2026-06-11 merged PR #47 public count/copy clarification (`010eafef`).
-- 2026-06-11 runtime certification: native HH read API buckets certified after `callscore-read-api.service` restart; data freshness recovery blocked by DB writer permissions and transcript provider access.
+- 2026-06-11 runtime certification: native HH read API buckets certified after `callscore-read-api.service` restart; PR #49 recovered DB writer privileges, RSS discovery, scoring, source-safe stats, and native buckets; PR #50 activates slow-YT-DLP daily cadence and remains blocked only by a working YouTube cookie/credential path.
 
 Thread boundaries:
 
@@ -2264,12 +2334,12 @@ Explicit approval is required before:
 | HH PostgreSQL / pgsql | CERTIFIED — local HH PostgreSQL `callscore` via `callscore_app` on `::1:5432` |
 | Neon canonical | NO |
 | DB writer privileges | RECOVERED/CERTIFIED — minimum grants applied to `callscore_app` for pipeline application paths |
-| Transcript provider path | EXTERNAL CREDENTIAL REQUIRED — canary classifies `provider_credentials_missing`; no working SerpAPI/Youtube API/yt-dlp cookie path present |
-| Scheduler/job cadence | PARTIAL RECOVERED — HH enqueue supports `candle_refresh`, `match_prices_batch`, `compute_scores`, `ml_verifier_batch`; real non-smoke jobs processed today; Netlify wrapper deployment/provider cadence still requires provider verification |
+| Transcript provider path | BLOCKED BY COOKIE/BOT VERIFICATION — slow YT-DLP is canonical and code-supported; canary without a working cookie path records `bot_verification_required` |
+| Scheduler/job cadence | INSTALLED / ACTIVE / CERTIFIED — `callscore-daily-pipeline.timer` runs bounded RSS discovery, slow transcripts, extraction, matching, scoring, and freshness check daily; Netlify wrapper cadence remains separate provider verification |
 | Worker active processing | CERTIFIED — real `match_prices_batch` and `compute_scores` jobs completed on 2026-06-11; Docker worker rebuilt from current code |
 | Video discovery freshness | RECOVERED — RSS catch-up wrote 1,232 eligible rows; latest video inserted 2026-06-11; 148 creators fresh within 30d |
-| Transcript freshness | PARTIAL/BLOCKED — attempts run today and classify missing provider; transcript acquisition still needs credential/path |
-| Call extraction freshness | PARTIAL RECOVERED — canary inserted two calls through app path; full catch-up depends on transcript provider |
+| Transcript freshness | BLOCKED BY COOKIE — attempts run today through slow YT-DLP and classify `bot_verification_required`; transcript success remains stale until a working cookie path is supplied |
+| Call extraction freshness | PARTIAL RECOVERED — daily canary inserted two calls through app path; full transcript-driven catch-up depends on working YT-DLP cookies |
 | Price matching/scoring freshness | PARTIAL RECOVERED — canary matched mature calls; source-safe recompute ran 2026-06-11 |
 | `creator_stats` source safety | CERTIFIED — recompute produced 0 Altcoin Daily official ranks, 0 low-N official ranks, 0 zero-call official ranks, 30d official rows 0 |
 | Read API safety contract | CERTIFIED — native HH runtime bucket keys live publicly; `leaderboard.rows` is a safe alias |
@@ -2278,13 +2348,13 @@ Explicit approval is required before:
 | Altcoin Daily exclusion | CERTIFIED in read/API/UI and source `creator_stats` after recompute |
 | Low-N ranking block | CERTIFIED in read/API/UI and source `creator_stats` after recompute |
 | 30d safety | CERTIFIED as `PENDING_MATURITY`; methodology redesign remains APPROVAL-GATED |
-| Official creator count | 17 after recovery/recompute — accepted as current strict-source output pending transcript-provider catch-up |
+| Official creator count | 17 after latest canary/recompute — unchanged because no new transcript success; accepted as current strict-source output pending slow-YT-DLP cookie recovery |
 | Website count correctness | PARTIAL — public API counts safe; final current-coverage count certification requires transcript catch-up |
-| Freshness self-check | LOCAL PATCH YES / WARN — command reports grants, jobs, timestamps, source unsafe ranks, native buckets, and transcript credential warning |
+| Freshness self-check | PR #50 PATCH YES / WARN — command reports grants, jobs, daily timer status, transcript backlog/status, timestamps, source unsafe ranks, native buckets, and exact YT-DLP bot/cookie warnings |
 | Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
 | Whop-auto | PARTIAL; LIVE PROVIDER PROOF REQUIRED after data freshness blocker is removed |
 | Art of War loop | NO / NOT CERTIFIED |
-| Data freshness certification | PARTIAL — DB writer/video discovery/worker/source ranks recovered; transcript provider credential remains the hard blocker |
+| Data freshness certification | PARTIAL — DB writer/video discovery/worker/source ranks/daily cadence recovered; slow-YT-DLP transcript success remains blocked by cookie/bot verification |
 | Autonomous revenue | NO |
 
 ---

@@ -1,10 +1,21 @@
 import { execFile } from "node:child_process";
+import { closeSync, mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { query } from "../lib/db";
 import { writeJsonlRecord } from "../lib/shadow-extraction";
 import { loadEnv, sleep, timestamp } from "./script-helpers";
 
 const execFileAsync = promisify(execFile);
+
+const DEFAULT_TRANSCRIPT_BATCH_LIMIT = 25;
+const DEFAULT_TRANSCRIPT_CONCURRENCY = 1;
+const DEFAULT_YTDLP_SLEEP_SECONDS = 20;
+const DEFAULT_YTDLP_MAX_SLEEP_SECONDS = 60;
+const DEFAULT_RETRY_COOLDOWN_HOURS = 24;
+const DEFAULT_STALE_RETRY_DAYS = 7;
+const DEFAULT_LOCK_FILE = "/tmp/callscore-slow-ytdlp-transcripts.lock";
 
 export interface BackfillTranscriptsArgs {
   readonly creator: string | null;
@@ -13,6 +24,13 @@ export interface BackfillTranscriptsArgs {
   readonly concurrency: number;
   readonly gapMs: number;
   readonly fallbackYtDlp: boolean;
+  readonly useSerpApi: boolean;
+  readonly ytDlpSleepSeconds: number;
+  readonly ytDlpMaxSleepSeconds: number;
+  readonly retryCooldownHours: number;
+  readonly staleRetryDays: number;
+  readonly stopOnProviderBlock: boolean;
+  readonly lockFile: string;
   readonly write: boolean;
   readonly auditOut: string | null;
 }
@@ -34,10 +52,20 @@ interface TranscriptResult {
   readonly detail?: string;
 }
 
+type TranscriptFailureReason =
+  | "provider_credentials_missing"
+  | "providers_returned_no_transcript"
+  | "no_captions"
+  | "bot_verification_required"
+  | "rate_limited"
+  | "failed_retryable"
+  | "failed_terminal";
+
 interface TranscriptFailure {
-  readonly reason: "provider_credentials_missing" | "providers_returned_no_transcript";
+  readonly reason: TranscriptFailureReason;
   readonly status: "failed";
   readonly provider: "none" | "serpapi+yt-dlp" | "serpapi" | "yt-dlp";
+  readonly detail?: string;
 }
 
 type TranscriptFetch =
@@ -55,14 +83,40 @@ function positiveInt(value: string | null, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
+function nonNegativeInt(value: string | null, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
 export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): BackfillTranscriptsArgs {
+  const requestedConcurrency = positiveInt(argValue(argv, "--concurrency"), DEFAULT_TRANSCRIPT_CONCURRENCY);
+  const sleepSeconds = positiveInt(
+    argValue(argv, "--yt-dlp-sleep-seconds") ?? process.env.YTDLP_SLEEP_INTERVAL_SECONDS ?? null,
+    DEFAULT_YTDLP_SLEEP_SECONDS,
+  );
   return {
     creator: argValue(argv, "--creator"),
-    limit: positiveInt(argValue(argv, "--limit"), 100),
-    offset: Math.max(0, positiveInt(argValue(argv, "--offset"), 0)),
-    concurrency: Math.min(50, positiveInt(argValue(argv, "--concurrency"), 5)),
-    gapMs: Math.max(0, positiveInt(argValue(argv, "--gap-ms"), 0)),
-    fallbackYtDlp: argv.includes("--fallback-yt-dlp"),
+    limit: positiveInt(argValue(argv, "--limit") ?? process.env.TRANSCRIPT_BATCH_LIMIT ?? null, DEFAULT_TRANSCRIPT_BATCH_LIMIT),
+    offset: nonNegativeInt(argValue(argv, "--offset"), 0),
+    concurrency: Math.min(3, requestedConcurrency),
+    gapMs: nonNegativeInt(argValue(argv, "--gap-ms"), sleepSeconds * 1000),
+    fallbackYtDlp: !argv.includes("--no-yt-dlp"),
+    useSerpApi: argv.includes("--serpapi"),
+    ytDlpSleepSeconds: sleepSeconds,
+    ytDlpMaxSleepSeconds: positiveInt(
+      argValue(argv, "--yt-dlp-max-sleep-seconds") ?? process.env.YTDLP_MAX_SLEEP_INTERVAL_SECONDS ?? null,
+      DEFAULT_YTDLP_MAX_SLEEP_SECONDS,
+    ),
+    retryCooldownHours: positiveInt(
+      argValue(argv, "--retry-cooldown-hours") ?? process.env.TRANSCRIPT_RETRY_COOLDOWN_HOURS ?? null,
+      DEFAULT_RETRY_COOLDOWN_HOURS,
+    ),
+    staleRetryDays: positiveInt(
+      argValue(argv, "--stale-retry-days") ?? process.env.TRANSCRIPT_STALE_RETRY_DAYS ?? null,
+      DEFAULT_STALE_RETRY_DAYS,
+    ),
+    stopOnProviderBlock: !argv.includes("--continue-after-provider-block"),
+    lockFile: argValue(argv, "--lock-file") ?? process.env.TRANSCRIPT_LOCK_FILE ?? DEFAULT_LOCK_FILE,
     write: argv.includes("--write") && !argv.includes("--dry-run"),
     auditOut: argValue(argv, "--audit-out"),
   };
@@ -144,19 +198,49 @@ export function extractRequestedSubtitleUrl(text: string): string | null {
   return match?.[1].replace(/\\u0026/g, "&") ?? null;
 }
 
+export function ytdlpCredentialConfigured(env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean(env.YTDLP_COOKIES_PATH ?? env.YTDLP_COOKIES ?? env.YTDLP_COOKIES_FROM_BROWSER);
+}
+
 export function ytDlpAuthArgs(env: Record<string, string | undefined> = process.env): string[] {
-  const cookies = env.YTDLP_COOKIES_PATH ?? env.YTDLP_COOKIES ?? null;
-  if (cookies) return ["--cookies", cookies];
+  const cookiesPath = env.YTDLP_COOKIES_PATH ?? null;
+  if (cookiesPath) return ["--cookies", cookiesPath];
+  const cookies = env.YTDLP_COOKIES ?? null;
+  if (cookies && !cookies.includes("\n")) return ["--cookies", cookies];
   const browser = env.YTDLP_COOKIES_FROM_BROWSER ?? null;
   if (browser) return ["--cookies-from-browser", browser];
   return [];
 }
 
-async function fetchViaYtDlp(videoId: string): Promise<TranscriptResult | null> {
+function createInlineCookiesFile(env: Record<string, string | undefined> = process.env): { readonly args: readonly string[]; readonly cleanup: () => void } {
+  const cookies = env.YTDLP_COOKIES;
+  if (!cookies || !cookies.includes("\n")) return { args: [], cleanup: () => undefined };
+  const dir = mkdtempSync(join(tmpdir(), "callscore-ytdlp-cookies-"));
+  const file = join(dir, "cookies.txt");
+  writeFileSync(file, cookies, { mode: 0o600 });
+  return {
+    args: ["--cookies", file],
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+function classifyYtDlpFailure(text: string): TranscriptFailureReason {
+  const lower = text.toLowerCase();
+  if (lower.includes("sign in to confirm") || lower.includes("not a bot") || lower.includes("bot")) return "bot_verification_required";
+  if (lower.includes("too many requests") || lower.includes("rate limit") || lower.includes("http error 429")) return "rate_limited";
+  if (lower.includes("subtitles") || lower.includes("no captions") || lower.includes("no automatic captions")) return "no_captions";
+  if (lower.includes("private video") || lower.includes("video unavailable") || lower.includes("this video is unavailable")) return "failed_terminal";
+  return "failed_retryable";
+}
+
+async function fetchViaYtDlp(videoId: string, args: BackfillTranscriptsArgs): Promise<TranscriptFetch> {
+  const inlineCookies = createInlineCookiesFile();
   try {
+    const authArgs = inlineCookies.args.length > 0 ? inlineCookies.args : ytDlpAuthArgs();
     const { stdout } = await execFileAsync(process.env.YTDLP_BIN ?? "yt-dlp", [
-      ...ytDlpAuthArgs(),
+      ...authArgs,
       "--skip-download",
+      "--no-playlist",
       "--no-warnings",
       "--quiet",
       "--write-auto-subs",
@@ -165,33 +249,46 @@ async function fetchViaYtDlp(videoId: string): Promise<TranscriptResult | null> 
       "en.*,en",
       "--sub-format",
       "vtt",
+      "--sleep-requests",
+      String(args.ytDlpSleepSeconds),
+      "--sleep-interval",
+      String(args.ytDlpSleepSeconds),
+      "--max-sleep-interval",
+      String(args.ytDlpMaxSleepSeconds),
+      "--retries",
+      "2",
+      "--fragment-retries",
+      "2",
       "--print",
       "requested_subtitles",
       `https://www.youtube.com/watch?v=${videoId}`,
-    ], { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 });
+    ], { timeout: 180_000, maxBuffer: 10 * 1024 * 1024 });
     const subtitleUrl = extractRequestedSubtitleUrl(stdout);
     const captionText = subtitleUrl
-      ? await fetch(subtitleUrl, { signal: AbortSignal.timeout(20_000) }).then((response) => response.ok ? response.text() : "")
+      ? await fetch(subtitleUrl, { signal: AbortSignal.timeout(30_000) }).then((response) => response.ok ? response.text() : "")
       : stdout;
     const text = stripCaptionText(captionText);
-    if (text.length < 200) return null;
-    return { text, quality: transcriptQuality(text), source: "yt-dlp" };
-  } catch {
-    return null;
+    if (text.length < 200) {
+      return { ok: false, failure: { reason: "no_captions", status: "failed", provider: "yt-dlp" } };
+    }
+    return { ok: true, transcript: { text, quality: transcriptQuality(text), source: "yt-dlp", detail: "slow-ytdlp" } };
+  } catch (error) {
+    const maybeError = error as { stderr?: string; stdout?: string; message?: string };
+    const detail = `${maybeError.stderr ?? ""}\n${maybeError.stdout ?? ""}\n${maybeError.message ?? ""}`.slice(0, 500);
+    return { ok: false, failure: { reason: classifyYtDlpFailure(detail), status: "failed", provider: "yt-dlp", detail } };
+  } finally {
+    inlineCookies.cleanup();
   }
 }
 
-async function fetchTranscript(videoId: string, fallbackYtDlp: boolean): Promise<TranscriptFetch> {
-  const hasSerp = Boolean(serpApiKey());
+async function fetchTranscript(videoId: string, args: BackfillTranscriptsArgs): Promise<TranscriptFetch> {
+  const hasSerp = args.useSerpApi && Boolean(serpApiKey());
   if (hasSerp) {
     const serp = await fetchViaSerpApi(videoId);
     if (serp) return { ok: true, transcript: serp };
   }
-  if (fallbackYtDlp) {
-    const ytDlp = await fetchViaYtDlp(videoId);
-    if (ytDlp) return { ok: true, transcript: ytDlp };
-  }
-  if (!hasSerp && !fallbackYtDlp) {
+  if (args.fallbackYtDlp) return fetchViaYtDlp(videoId, args);
+  if (!hasSerp) {
     return { ok: false, failure: { reason: "provider_credentials_missing", status: "failed", provider: "none" } };
   }
   return {
@@ -199,7 +296,7 @@ async function fetchTranscript(videoId: string, fallbackYtDlp: boolean): Promise
     failure: {
       reason: "providers_returned_no_transcript",
       status: "failed",
-      provider: hasSerp && fallbackYtDlp ? "serpapi+yt-dlp" : hasSerp ? "serpapi" : "yt-dlp",
+      provider: hasSerp && args.fallbackYtDlp ? "serpapi+yt-dlp" : hasSerp ? "serpapi" : "yt-dlp",
     },
   };
 }
@@ -220,7 +317,15 @@ async function markTranscriptFailure(videoId: number, failure: TranscriptFailure
 
 async function loadMissingTranscriptVideos(args: BackfillTranscriptsArgs): Promise<MissingTranscriptVideo[]> {
   const params: unknown[] = [];
-  const filters = ["v.published_at IS NOT NULL", "(v.transcript IS NULL OR length(v.transcript) = 0)"];
+  const filters = [
+    "v.published_at IS NOT NULL",
+    "(v.transcript IS NULL OR length(v.transcript) = 0)",
+    `(v.transcript_last_attempt_at IS NULL
+      OR v.transcript_last_attempt_at < NOW() - ($1::int * INTERVAL '1 hour')
+      OR (v.transcript_error IN ('provider_credentials_missing','bot_verification_required','rate_limited')
+          AND v.transcript_last_attempt_at < NOW() - ($2::int * INTERVAL '1 day')))`,
+  ];
+  params.push(args.retryCooldownHours, args.staleRetryDays);
   if (args.creator) {
     params.push(args.creator);
     filters.push(`lower(c.youtube_handle) = lower($${params.length})`);
@@ -243,74 +348,107 @@ function audit(args: BackfillTranscriptsArgs, row: Record<string, unknown>): voi
   writeJsonlRecord(args.auditOut, row);
 }
 
+function acquireLock(lockFile: string): () => void {
+  mkdirSync(dirname(lockFile), { recursive: true });
+  const fd = openSync(lockFile, "wx");
+  writeFileSync(fd, `${process.pid}\n${new Date().toISOString()}\n`);
+  return () => {
+    closeSync(fd);
+    rmSync(lockFile, { force: true });
+  };
+}
+
+function isProviderBlock(reason: TranscriptFailureReason): boolean {
+  return reason === "provider_credentials_missing" || reason === "bot_verification_required" || reason === "rate_limited";
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
   const args = parseBackfillTranscriptsArgs(argv);
-  const videos = await loadMissingTranscriptVideos(args);
-  console.log(`[${timestamp()}] transcript backfill ${args.write ? "WRITE" : "DRY-RUN"}: videos=${videos.length}, limit=${args.limit}, offset=${args.offset}, concurrency=${args.concurrency}`);
+  let releaseLock: (() => void) | null = null;
+  try {
+    releaseLock = acquireLock(args.lockFile);
+  } catch {
+    console.error(`[${timestamp()}] transcript backfill skipped: lock held at ${args.lockFile}`);
+    process.exitCode = 75;
+    return;
+  }
 
-  let written = 0;
-  let failed = 0;
-  for (let index = 0; index < videos.length; index += args.concurrency) {
-    const chunk = videos.slice(index, index + args.concurrency);
-    const results = await Promise.all(chunk.map(async (video) => ({
-      video,
-      transcript: await fetchTranscript(video.youtube_video_id, args.fallbackYtDlp),
-    })));
+  try {
+    const videos = await loadMissingTranscriptVideos(args);
+    console.log(`[${timestamp()}] slow yt-dlp transcript backfill ${args.write ? "WRITE" : "DRY-RUN"}: videos=${videos.length}, limit=${args.limit}, offset=${args.offset}, concurrency=${args.concurrency}, gapMs=${args.gapMs}, lock=${args.lockFile}`);
 
-    for (const { video, transcript } of results) {
-      if (!transcript.ok) {
-        failed++;
-        await markTranscriptFailure(video.id, transcript.failure, args.write);
+    let written = 0;
+    let failed = 0;
+    let providerBlocked = false;
+    for (let index = 0; index < videos.length; index += args.concurrency) {
+      const chunk = videos.slice(index, index + args.concurrency);
+      const results = await Promise.all(chunk.map(async (video) => ({
+        video,
+        transcript: await fetchTranscript(video.youtube_video_id, args),
+      })));
+
+      for (const { video, transcript } of results) {
+        if (!transcript.ok) {
+          failed++;
+          await markTranscriptFailure(video.id, transcript.failure, args.write);
+          audit(args, {
+            record_type: "transcript_backfill",
+            ts: timestamp(),
+            mode: args.write ? "WRITE" : "DRY",
+            status: transcript.failure.status,
+            reason: transcript.failure.reason,
+            provider: transcript.failure.provider,
+            video_id: video.id,
+            creator_id: video.creator_id,
+            youtube_video_id: video.youtube_video_id,
+            creator: video.youtube_handle,
+          });
+          console.log(`[${timestamp()}] ${transcript.failure.status} ${video.youtube_video_id} ${video.creator_name} reason=${transcript.failure.reason}`);
+          if (args.stopOnProviderBlock && isProviderBlock(transcript.failure.reason)) providerBlocked = true;
+          continue;
+        }
+
+        if (args.write) {
+          await query(
+            `UPDATE videos
+             SET transcript = $1, transcript_quality = $2, calls_extracted = false,
+                 transcript_status = 'available', transcript_provider = $4, transcript_error = NULL,
+                 transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
+                 transcript_last_attempt_at = NOW()
+             WHERE id = $3 AND (transcript IS NULL OR length(transcript) = 0)`,
+            [transcript.transcript.text, transcript.transcript.quality, video.id, transcript.transcript.source],
+          );
+        }
+        written++;
         audit(args, {
           record_type: "transcript_backfill",
           ts: timestamp(),
           mode: args.write ? "WRITE" : "DRY",
-          status: transcript.failure.status,
-          reason: transcript.failure.reason,
-          provider: transcript.failure.provider,
+          status: args.write ? "updated" : "would_update",
           video_id: video.id,
           creator_id: video.creator_id,
           youtube_video_id: video.youtube_video_id,
           creator: video.youtube_handle,
+          transcript_chars: transcript.transcript.text.length,
+          transcript_quality: transcript.transcript.quality,
+          source: transcript.transcript.source,
+          detail: transcript.transcript.detail,
         });
-        console.log(`[${timestamp()}] ${transcript.failure.status} ${video.youtube_video_id} ${video.creator_name} reason=${transcript.failure.reason}`);
-        continue;
+        console.log(`[${timestamp()}] ${args.write ? "updated" : "would-update"} ${video.youtube_video_id} source=${transcript.transcript.source} chars=${transcript.transcript.text.length}`);
       }
 
-      if (args.write) {
-        await query(
-          `UPDATE videos
-           SET transcript = $1, transcript_quality = $2, calls_extracted = false,
-               transcript_status = 'available', transcript_provider = $4, transcript_error = NULL,
-               transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
-               transcript_last_attempt_at = NOW()
-           WHERE id = $3 AND (transcript IS NULL OR length(transcript) = 0)`,
-          [transcript.transcript.text, transcript.transcript.quality, video.id, transcript.transcript.source],
-        );
+      if (providerBlocked) {
+        console.error(`[${timestamp()}] transcript backfill stopped after provider/rate-limit blocker to avoid yt-dlp stampede`);
+        break;
       }
-      written++;
-      audit(args, {
-        record_type: "transcript_backfill",
-        ts: timestamp(),
-        mode: args.write ? "WRITE" : "DRY",
-        status: args.write ? "updated" : "would_update",
-        video_id: video.id,
-        creator_id: video.creator_id,
-        youtube_video_id: video.youtube_video_id,
-        creator: video.youtube_handle,
-        transcript_chars: transcript.transcript.text.length,
-        transcript_quality: transcript.transcript.quality,
-        source: transcript.transcript.source,
-        detail: transcript.transcript.detail,
-      });
-      console.log(`[${timestamp()}] ${args.write ? "updated" : "would-update"} ${video.youtube_video_id} source=${transcript.transcript.source} chars=${transcript.transcript.text.length}`);
+      if (args.gapMs > 0 && index + args.concurrency < videos.length) await sleep(args.gapMs);
     }
 
-    if (args.gapMs > 0 && index + args.concurrency < videos.length) await sleep(args.gapMs);
+    console.log(`[${timestamp()}] transcript backfill complete: ${written} ${args.write ? "updated" : "would-update"}, ${failed} failed`);
+  } finally {
+    releaseLock?.();
   }
-
-  console.log(`[${timestamp()}] transcript backfill complete: ${written} ${args.write ? "updated" : "would-update"}, ${failed} terminal`);
 }
 
 if (require.main === module) {

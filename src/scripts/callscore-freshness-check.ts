@@ -1,5 +1,9 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { query } from "../lib/db";
 import { loadEnv } from "./script-helpers";
+
+const execFileAsync = promisify(execFile);
 
 interface Args {
   readonly readApiBase: string | null;
@@ -15,6 +19,17 @@ export function parseFreshnessCheckArgs(argv = process.argv.slice(2)): Args {
   return {
     readApiBase: argValue(argv, "--read-api-base") ?? process.env.HH_READ_API_BASE ?? null,
   };
+}
+
+
+async function systemdTimerStatus(): Promise<Record<string, unknown>> {
+  try {
+    const { stdout } = await execFileAsync("systemctl", ["is-active", "callscore-daily-pipeline.timer"], { timeout: 5_000 });
+    return { unit: "callscore-daily-pipeline.timer", active: stdout.trim() === "active", state: stdout.trim() };
+  } catch (error) {
+    const maybe = error as { stdout?: string; stderr?: string; message?: string };
+    return { unit: "callscore-daily-pipeline.timer", active: false, state: (maybe.stdout ?? maybe.stderr ?? maybe.message ?? "unknown").trim() };
+  }
 }
 
 function ageHours(value: string | null): number | null {
@@ -60,7 +75,10 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
       (SELECT MAX(updated_at)::text FROM pipeline_jobs WHERE status = 'succeeded' AND type = 'compute_scores') AS latest_compute_scores_completed,
       (SELECT MAX(created_at)::text FROM videos) AS latest_video_inserted,
       (SELECT MAX(transcript_last_attempt_at)::text FROM videos) AS latest_transcript_attempt,
+      (SELECT MAX(transcript_last_attempt_at)::text FROM videos WHERE transcript_status = 'available' AND NULLIF(BTRIM(transcript), '') IS NOT NULL) AS latest_transcript_success,
       (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'provider_credentials_missing') AS transcript_provider_missing_failures,
+      (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'bot_verification_required') AS transcript_bot_verification_failures,
+      (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'rate_limited') AS transcript_rate_limited_failures,
       (SELECT MAX(created_at)::text FROM calls) AS latest_call_inserted,
       GREATEST(
         COALESCE((SELECT MAX(updated_at) FROM pipeline_jobs WHERE status = 'succeeded' AND type = 'compute_scores'), '-infinity'::timestamptz),
@@ -88,6 +106,35 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
        AND table_name IN ('videos','calls','creator_stats','pipeline_jobs','pipeline_job_events')
      ORDER BY table_name, privilege_type`,
   );
+  const transcriptBacklog = await query<{ status: string; error: string; count: string; recent_30d: string; recent_90d: string }>(
+    `WITH normalized AS (
+       SELECT
+         COALESCE(transcript_status, 'missing') AS status,
+         CASE
+           WHEN transcript_error IS NULL OR transcript_error = '' THEN 'none'
+           WHEN transcript_error = 'provider_credentials_missing' THEN 'provider_credentials_missing'
+           WHEN transcript_error = 'bot_verification_required' THEN 'bot_verification_required'
+           WHEN transcript_error = 'rate_limited' THEN 'rate_limited'
+           WHEN transcript_error ILIKE '%too many requests%' OR transcript_error ILIKE '%captcha%' THEN 'legacy_youtube_rate_or_captcha'
+           WHEN transcript_error ILIKE '%disabled%' THEN 'transcript_disabled'
+           WHEN transcript_error ILIKE '%unavailable%' THEN 'transcript_unavailable'
+           ELSE 'other_failed'
+         END AS error,
+         published_at
+       FROM videos
+       WHERE transcript IS NULL OR length(transcript) = 0
+     )
+     SELECT
+       status,
+       error,
+       COUNT(*)::text AS count,
+       COUNT(*) FILTER (WHERE published_at >= NOW() - INTERVAL '30 days')::text AS recent_30d,
+       COUNT(*) FILTER (WHERE published_at >= NOW() - INTERVAL '90 days')::text AS recent_90d
+     FROM normalized
+     GROUP BY status, error
+     ORDER BY COUNT(*) DESC`,
+  );
+  const dailyTimer = await systemdTimerStatus();
 
   const timestamps = {
     latestJobCreated: freshness?.latest_job_created ?? null,
@@ -97,6 +144,7 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     latestComputeScoresCompleted: freshness?.latest_compute_scores_completed ?? null,
     latestVideoInserted: freshness?.latest_video_inserted ?? null,
     latestTranscriptAttempt: freshness?.latest_transcript_attempt ?? null,
+    latestTranscriptSuccess: freshness?.latest_transcript_success ?? null,
     latestCallInserted: freshness?.latest_call_inserted ?? null,
     latestScoringUpdate: freshness?.latest_scoring_update ?? null,
     latestCreatorStatsUpdate: freshness?.latest_creator_stats_update ?? null,
@@ -105,6 +153,8 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
   const readApi = await fetchReadApi(args.readApiBase);
   const unsafeRankCount = Number(unsafeSourceRanks?.unsafe_ranked_rows ?? 0);
   const transcriptProviderMissingFailures = Number(freshness?.transcript_provider_missing_failures ?? 0);
+  const transcriptBotVerificationFailures = Number(freshness?.transcript_bot_verification_failures ?? 0);
+  const transcriptRateLimitedFailures = Number(freshness?.transcript_rate_limited_failures ?? 0);
   const requiredGrants = new Map([
     ["videos", ["SELECT", "INSERT", "UPDATE"]],
     ["calls", ["SELECT", "INSERT", "UPDATE", "DELETE"]],
@@ -127,6 +177,7 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     ...(unsafeRankCount > 0 ? [`unsafeSourceRanks=${unsafeRankCount}`] : []),
     ...((readApi && readApi.nativeBuckets !== true) ? ["readApi.nativeBuckets=false"] : []),
     ...(missingGrants.length > 0 ? [`missingGrants=${missingGrants.join(",")}`] : []),
+    ...(dailyTimer.active === false ? ["dailyTimer.active=false"] : []),
   ];
   const warnings = [
     ...(ages.latestTranscriptAttempt === null || Number(ages.latestTranscriptAttempt) > 24
@@ -134,6 +185,12 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
       : []),
     ...(transcriptProviderMissingFailures > 0
       ? [`transcript provider credential missing failures=${transcriptProviderMissingFailures}`]
+      : []),
+    ...(transcriptBotVerificationFailures > 0
+      ? [`yt-dlp bot verification failures=${transcriptBotVerificationFailures}`]
+      : []),
+    ...(transcriptRateLimitedFailures > 0
+      ? [`yt-dlp rate limited failures=${transcriptRateLimitedFailures}`]
       : []),
   ];
 
@@ -147,6 +204,16 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     ageHours: ages,
     unsafeSourceRanks: unsafeRankCount,
     transcriptProviderMissingFailures,
+    transcriptBotVerificationFailures,
+    transcriptRateLimitedFailures,
+    transcriptBacklog: transcriptBacklog.map((row) => ({
+      status: row.status,
+      error: row.error,
+      count: Number(row.count),
+      recent30d: Number(row.recent_30d),
+      recent90d: Number(row.recent_90d),
+    })),
+    dailyTimer,
     grants,
     readApi,
   };
