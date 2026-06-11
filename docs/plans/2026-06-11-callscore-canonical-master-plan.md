@@ -273,8 +273,8 @@ Final status after this recalibration:
 
 Readiness:
 
-- Whop-auto readiness: `READY NEXT` for commerce certification after public read API restart/deploy certification.
-- Art of War readiness: `READY NEXT` after commerce certification, with transcript gate tracked as an operational warning rather than methodology blocker.
+- Whop-auto readiness: `IN PROGRESS / PROVIDER PROOF REQUIRED`; repo tests and public checkout/OAuth route proof pass, but live provider dashboard and entitlement proof remain open.
+- Art of War readiness: `READY PLANNING NEXT / BLOCKED ON WHOP PROVIDER PROOF` before public external growth execution.
 - Autonomous revenue status: `NO` until commerce/growth loops are certified.
 
 ---
@@ -307,6 +307,31 @@ Exact remaining operator action:
 After replacement, run the one-video transcript canary first. Only if it succeeds, run the bounded 25-video current-window catch-up and then source-safe recompute/API/homepage certification.
 
 ---
+
+
+### 0.5 2026-06-11 Next-Phase Execution Handoff — Cookie Gate, Whop Start, Art of War Boundary
+
+```text
+YT-DLP COOKIE REPLACEMENT: NOT COMPLETED — NO NEW VALID COOKIE SOURCE FOUND
+TRANSCRIPT CANARY STATUS: BLOCKED BY INVALID COOKIE / BOT VERIFICATION
+WHOP-AUTO CERTIFICATION: STARTED — REPO TESTS PASS; PUBLIC CHECKOUT/OAUTH ROUTE PROOF PASS; PROVIDER PROOF REQUIRED
+ART OF WAR NEXT GOAL: PREPARE AFTER WHOP PROVIDER PROOF; NO EXTERNAL GROWTH ACTIONS YET
+```
+
+Fresh evidence captured on 2026-06-11 after PR #53:
+
+- Runtime cookie wiring is present but still uses the previously rejected candidate: host file `/opt/callscore/secrets/youtube-cookies.txt`, mode `600`, owner `root:root`; Docker worker sees a non-empty mounted cookie path at `/run/secrets/youtube-cookies.txt`.
+- A redacted sweep found no newer approved YouTube cookie source. The installed cookie remains invalid for YouTube transcript access because the one-video canary classifies `bot_verification_required`.
+- Do not run bounded transcript catch-up until a fresh one-video canary succeeds. Exact next transcript action remains: replace `/opt/callscore/secrets/youtube-cookies.txt` with a fresh valid Netscape-format YouTube cookie file, keep mode `600` and owner `root:root`, recreate/restart only the Hermes worker if needed, then run the one-video canary.
+- Freshness self-check with `.env.hermes` loaded returns `WARN` with no blockers. Warnings are exactly transcript provider credential missing failures and yt-dlp bot verification failures; daily timer remains active; source unsafe ranks remain 0; native read API buckets remain certified.
+- Whop certification has started safely:
+  - Whop route/auth/webhook certification tests passed, 34/34.
+  - Public checkout route probes returned `303` and `cache-control: no-store` for pro monthly, pro annual, alpha monthly, and alpha annual.
+  - Public OAuth start redirects to Whop using canonical callback `https://call-score.com/api/auth/whop/callback`.
+  - Public session route returns `200` with `cache-control: no-store`.
+  - No Whop provider mutation, live purchase, pricing/payment change, secret rotation, infrastructure mutation, or production DB mutation was performed.
+- Whop commerce remains `PARTIAL / PROVIDER PROOF REQUIRED` until live dashboard settings, product/plan inventory, entitlement/revocation behavior, and webhook/event persistence requirements are certified.
+- Art of War autonomous growth loop is the next planning target only after Whop provider proof is closed or explicitly blocked by provider approval. Public external growth actions remain forbidden until commerce is certified.
 
 ## 1. Source Of Truth
 
@@ -1395,16 +1420,16 @@ Current status:
 
 - Whop manifest clean: YES
 - Whop env key readiness: YES
-- Whop commerce live proof: PARTIAL / NOT FULLY CERTIFIED
+- Whop commerce live proof: PARTIAL / ROUTE PROOF PASS / PROVIDER PROOF REQUIRED
 
 Still required:
 
-1. Verify Whop OAuth callback URL: `https://call-score.com/api/auth/whop/callback`
+1. Verify Whop OAuth callback URL: `https://call-score.com/api/auth/whop/callback` — PUBLIC ROUTE PROOF PASS 2026-06-11
 2. Verify checkout URLs for:
-   - pro monthly
-   - pro annual
-   - alpha monthly
-   - alpha annual
+   - pro monthly — PUBLIC ROUTE PROOF PASS 2026-06-11
+   - pro annual — PUBLIC ROUTE PROOF PASS 2026-06-11
+   - alpha monthly — PUBLIC ROUTE PROOF PASS 2026-06-11
+   - alpha annual — PUBLIC ROUTE PROOF PASS 2026-06-11
 3. Verify user entitlement path with non-destructive test account or provider-safe proof.
 4. Verify success/cancel routes resolve to canonical production domain.
 5. Verify no stale development/provider URLs remain in Whop app settings.
@@ -2456,9 +2481,9 @@ Explicit approval is required before:
 | Official creator count | 12m/default 42, all_time 36, 90d 53, 30d 0 after eligibility recalibration and recompute; transcript catch-up may change future counts only after valid cookie recovery |
 | Website count correctness | CERTIFIED for current HH API/source semantics; final transcript-current coverage still depends on valid cookie catch-up |
 | Freshness self-check | WARN — command reports grants, jobs, daily timer status, transcript backlog/status, timestamps, source unsafe ranks, native buckets, and exact invalid-cookie/bot warnings |
-| Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
-| Whop-auto | PARTIAL; LIVE PROVIDER PROOF REQUIRED after data freshness blocker is removed |
-| Art of War loop | NO / NOT CERTIFIED |
+| Whop commerce | PARTIAL / ROUTE PROOF PASS; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; 2026-06-11 public checkout/OAuth route proof and 34/34 route/auth/webhook tests pass; LIVE PROVIDER DASHBOARD + ENTITLEMENT PROOF REQUIRED |
+| Whop-auto | IN PROGRESS / PROVIDER PROOF REQUIRED; safe certification started, public checkout/OAuth proof passes; no provider mutation or live purchase performed |
+| Art of War loop | READY PLANNING NEXT / NOT CERTIFIED; external autonomous growth execution blocked until Whop provider proof closes |
 | Data freshness certification | PARTIAL — DB writer/video discovery/worker/source ranks/daily cadence recovered; slow-YT-DLP transcript success remains blocked by invalid/stale cookie bot verification |
 | Autonomous revenue | NO |
 
