@@ -55,10 +55,18 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     `SELECT
       (SELECT MAX(created_at)::text FROM pipeline_jobs) AS latest_job_created,
       (SELECT MAX(updated_at)::text FROM pipeline_jobs WHERE status = 'succeeded') AS latest_job_completed,
+      (SELECT MAX(created_at)::text FROM pipeline_jobs WHERE type <> 'hermes_smoke_test') AS latest_non_smoke_job_created,
+      (SELECT MAX(updated_at)::text FROM pipeline_jobs WHERE status = 'succeeded' AND type <> 'hermes_smoke_test') AS latest_non_smoke_job_completed,
+      (SELECT MAX(updated_at)::text FROM pipeline_jobs WHERE status = 'succeeded' AND type = 'compute_scores') AS latest_compute_scores_completed,
       (SELECT MAX(created_at)::text FROM videos) AS latest_video_inserted,
       (SELECT MAX(transcript_last_attempt_at)::text FROM videos) AS latest_transcript_attempt,
+      (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'provider_credentials_missing') AS transcript_provider_missing_failures,
       (SELECT MAX(created_at)::text FROM calls) AS latest_call_inserted,
-      (SELECT MAX(GREATEST(created_at, COALESCE(price_repaired_at, created_at)))::text FROM calls WHERE score <> 0) AS latest_scoring_update,
+      GREATEST(
+        COALESCE((SELECT MAX(updated_at) FROM pipeline_jobs WHERE status = 'succeeded' AND type = 'compute_scores'), '-infinity'::timestamptz),
+        COALESCE((SELECT MAX(updated_at) FROM creator_stats), '-infinity'::timestamptz),
+        COALESCE((SELECT MAX(GREATEST(created_at, COALESCE(price_repaired_at, created_at))) FROM calls WHERE score <> 0), '-infinity'::timestamptz)
+      )::text AS latest_scoring_update,
       (SELECT MAX(updated_at)::text FROM creator_stats) AS latest_creator_stats_update`,
   );
   const [unsafeSourceRanks] = await query<{ unsafe_ranked_rows: string }>(
@@ -84,21 +92,63 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
   const timestamps = {
     latestJobCreated: freshness?.latest_job_created ?? null,
     latestJobCompleted: freshness?.latest_job_completed ?? null,
+    latestNonSmokeJobCreated: freshness?.latest_non_smoke_job_created ?? null,
+    latestNonSmokeJobCompleted: freshness?.latest_non_smoke_job_completed ?? null,
+    latestComputeScoresCompleted: freshness?.latest_compute_scores_completed ?? null,
     latestVideoInserted: freshness?.latest_video_inserted ?? null,
     latestTranscriptAttempt: freshness?.latest_transcript_attempt ?? null,
     latestCallInserted: freshness?.latest_call_inserted ?? null,
     latestScoringUpdate: freshness?.latest_scoring_update ?? null,
     latestCreatorStatsUpdate: freshness?.latest_creator_stats_update ?? null,
   };
+  const ages = Object.fromEntries(Object.entries(timestamps).map(([key, value]) => [key, ageHours(value)]));
+  const readApi = await fetchReadApi(args.readApiBase);
+  const unsafeRankCount = Number(unsafeSourceRanks?.unsafe_ranked_rows ?? 0);
+  const transcriptProviderMissingFailures = Number(freshness?.transcript_provider_missing_failures ?? 0);
+  const requiredGrants = new Map([
+    ["videos", ["SELECT", "INSERT", "UPDATE"]],
+    ["calls", ["SELECT", "INSERT", "UPDATE", "DELETE"]],
+    ["creator_stats", ["SELECT", "INSERT", "UPDATE"]],
+    ["pipeline_jobs", ["SELECT", "INSERT", "UPDATE"]],
+    ["pipeline_job_events", ["SELECT", "INSERT"]],
+  ]);
+  const actualGrants = new Map<string, Set<string>>();
+  for (const grant of grants) {
+    const set = actualGrants.get(grant.table_name) ?? new Set<string>();
+    set.add(grant.privilege_type);
+    actualGrants.set(grant.table_name, set);
+  }
+  const missingGrants = [...requiredGrants.entries()].flatMap(([table, privileges]) =>
+    privileges
+      .filter((privilege) => !actualGrants.get(table)?.has(privilege))
+      .map((privilege) => `${table}.${privilege}`),
+  );
+  const blockers = [
+    ...(unsafeRankCount > 0 ? [`unsafeSourceRanks=${unsafeRankCount}`] : []),
+    ...((readApi && readApi.nativeBuckets !== true) ? ["readApi.nativeBuckets=false"] : []),
+    ...(missingGrants.length > 0 ? [`missingGrants=${missingGrants.join(",")}`] : []),
+  ];
+  const warnings = [
+    ...(ages.latestTranscriptAttempt === null || Number(ages.latestTranscriptAttempt) > 24
+      ? ["transcript attempts are stale or unavailable"]
+      : []),
+    ...(transcriptProviderMissingFailures > 0
+      ? [`transcript provider credential missing failures=${transcriptProviderMissingFailures}`]
+      : []),
+  ];
 
   return {
     generatedAt: new Date().toISOString(),
+    status: blockers.length > 0 ? "FAIL" : warnings.length > 0 ? "WARN" : "PASS",
+    blockers,
+    warnings,
     db: identity,
     timestamps,
-    ageHours: Object.fromEntries(Object.entries(timestamps).map(([key, value]) => [key, ageHours(value)])),
-    unsafeSourceRanks: Number(unsafeSourceRanks?.unsafe_ranked_rows ?? 0),
+    ageHours: ages,
+    unsafeSourceRanks: unsafeRankCount,
+    transcriptProviderMissingFailures,
     grants,
-    readApi: await fetchReadApi(args.readApiBase),
+    readApi,
   };
 }
 

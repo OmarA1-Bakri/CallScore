@@ -34,6 +34,16 @@ interface TranscriptResult {
   readonly detail?: string;
 }
 
+interface TranscriptFailure {
+  readonly reason: "provider_credentials_missing" | "providers_returned_no_transcript";
+  readonly status: "failed";
+  readonly provider: "none" | "serpapi+yt-dlp" | "serpapi" | "yt-dlp";
+}
+
+type TranscriptFetch =
+  | { readonly ok: true; readonly transcript: TranscriptResult }
+  | { readonly ok: false; readonly failure: TranscriptFailure };
+
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
   if (index < 0 || !argv[index + 1]) return null;
@@ -134,9 +144,18 @@ export function extractRequestedSubtitleUrl(text: string): string | null {
   return match?.[1].replace(/\\u0026/g, "&") ?? null;
 }
 
+export function ytDlpAuthArgs(env: Record<string, string | undefined> = process.env): string[] {
+  const cookies = env.YTDLP_COOKIES_PATH ?? env.YTDLP_COOKIES ?? null;
+  if (cookies) return ["--cookies", cookies];
+  const browser = env.YTDLP_COOKIES_FROM_BROWSER ?? null;
+  if (browser) return ["--cookies-from-browser", browser];
+  return [];
+}
+
 async function fetchViaYtDlp(videoId: string): Promise<TranscriptResult | null> {
   try {
-    const { stdout } = await execFileAsync("yt-dlp", [
+    const { stdout } = await execFileAsync(process.env.YTDLP_BIN ?? "yt-dlp", [
+      ...ytDlpAuthArgs(),
       "--skip-download",
       "--no-warnings",
       "--quiet",
@@ -162,11 +181,41 @@ async function fetchViaYtDlp(videoId: string): Promise<TranscriptResult | null> 
   }
 }
 
-async function fetchTranscript(videoId: string, fallbackYtDlp: boolean): Promise<TranscriptResult | null> {
-  const serp = await fetchViaSerpApi(videoId);
-  if (serp) return serp;
-  if (!fallbackYtDlp) return null;
-  return fetchViaYtDlp(videoId);
+async function fetchTranscript(videoId: string, fallbackYtDlp: boolean): Promise<TranscriptFetch> {
+  const hasSerp = Boolean(serpApiKey());
+  if (hasSerp) {
+    const serp = await fetchViaSerpApi(videoId);
+    if (serp) return { ok: true, transcript: serp };
+  }
+  if (fallbackYtDlp) {
+    const ytDlp = await fetchViaYtDlp(videoId);
+    if (ytDlp) return { ok: true, transcript: ytDlp };
+  }
+  if (!hasSerp && !fallbackYtDlp) {
+    return { ok: false, failure: { reason: "provider_credentials_missing", status: "failed", provider: "none" } };
+  }
+  return {
+    ok: false,
+    failure: {
+      reason: "providers_returned_no_transcript",
+      status: "failed",
+      provider: hasSerp && fallbackYtDlp ? "serpapi+yt-dlp" : hasSerp ? "serpapi" : "yt-dlp",
+    },
+  };
+}
+
+async function markTranscriptFailure(videoId: number, failure: TranscriptFailure, write: boolean): Promise<void> {
+  if (!write) return;
+  await query(
+    `UPDATE videos
+     SET transcript_status = $2,
+         transcript_provider = $3,
+         transcript_error = $4,
+         transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
+         transcript_last_attempt_at = NOW()
+     WHERE id = $1 AND (transcript IS NULL OR length(transcript) = 0)`,
+    [videoId, failure.status, failure.provider, failure.reason],
+  );
 }
 
 async function loadMissingTranscriptVideos(args: BackfillTranscriptsArgs): Promise<MissingTranscriptVideo[]> {
@@ -210,20 +259,22 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     })));
 
     for (const { video, transcript } of results) {
-      if (!transcript) {
+      if (!transcript.ok) {
         failed++;
+        await markTranscriptFailure(video.id, transcript.failure, args.write);
         audit(args, {
           record_type: "transcript_backfill",
           ts: timestamp(),
           mode: args.write ? "WRITE" : "DRY",
-          status: "terminal_no_transcript",
-          reason: "providers_returned_no_transcript",
+          status: transcript.failure.status,
+          reason: transcript.failure.reason,
+          provider: transcript.failure.provider,
           video_id: video.id,
           creator_id: video.creator_id,
           youtube_video_id: video.youtube_video_id,
           creator: video.youtube_handle,
         });
-        console.log(`[${timestamp()}] terminal-no-transcript ${video.youtube_video_id} ${video.creator_name}`);
+        console.log(`[${timestamp()}] ${transcript.failure.status} ${video.youtube_video_id} ${video.creator_name} reason=${transcript.failure.reason}`);
         continue;
       }
 
@@ -231,10 +282,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         await query(
           `UPDATE videos
            SET transcript = $1, transcript_quality = $2, calls_extracted = false,
-               transcript_status = 'available', transcript_provider = $4, transcript_attempts = transcript_attempts + 1,
+               transcript_status = 'available', transcript_provider = $4, transcript_error = NULL,
+               transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
                transcript_last_attempt_at = NOW()
            WHERE id = $3 AND (transcript IS NULL OR length(transcript) = 0)`,
-          [transcript.text, transcript.quality, video.id, transcript.source],
+          [transcript.transcript.text, transcript.transcript.quality, video.id, transcript.transcript.source],
         );
       }
       written++;
@@ -247,12 +299,12 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         creator_id: video.creator_id,
         youtube_video_id: video.youtube_video_id,
         creator: video.youtube_handle,
-        transcript_chars: transcript.text.length,
-        transcript_quality: transcript.quality,
-        source: transcript.source,
-        detail: transcript.detail,
+        transcript_chars: transcript.transcript.text.length,
+        transcript_quality: transcript.transcript.quality,
+        source: transcript.transcript.source,
+        detail: transcript.transcript.detail,
       });
-      console.log(`[${timestamp()}] ${args.write ? "updated" : "would-update"} ${video.youtube_video_id} source=${transcript.source} chars=${transcript.text.length}`);
+      console.log(`[${timestamp()}] ${args.write ? "updated" : "would-update"} ${video.youtube_video_id} source=${transcript.transcript.source} chars=${transcript.transcript.text.length}`);
     }
 
     if (args.gapMs > 0 && index + args.concurrency < videos.length) await sleep(args.gapMs);
