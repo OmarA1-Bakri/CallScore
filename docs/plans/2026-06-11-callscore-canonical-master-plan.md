@@ -278,6 +278,36 @@ Readiness:
 - Autonomous revenue status: `NO` until commerce/growth loops are certified.
 
 ---
+### 0.4 2026-06-11 YT-DLP Cookie Activation Attempt
+
+```text
+YT-DLP COOKIE PATH STATUS: INSTALLED BUT INVALID / BOT-VERIFICATION BLOCKED
+HOST COOKIE ENV: YTDLP_COOKIES_PATH configured in .env.hermes (redacted)
+HOST COOKIE FILE: /opt/callscore/secrets/youtube-cookies.txt, mode 600, owner root:root
+DOCKER WORKER PATH: /run/secrets/youtube-cookies.txt via read-only bind mount
+TRANSCRIPT CANARY: FAIL — one-video slow YT-DLP canary classified bot_verification_required
+BOUNDED CATCH-UP: BLOCKED — not run after canary failed, to avoid YouTube retry hammering
+SOURCE-SAFE RANKS: STILL CERTIFIED; no recompute required from transcript failure
+```
+
+Evidence:
+
+- Existing candidate cookie source found at `/srv/whop-auto/workspace/crypto-tuber-ranked/cookies.txt`; contents were never printed.
+- Candidate was installed to `/opt/callscore/secrets/youtube-cookies.txt` with restrictive runtime-only permissions and wired through `.env.hermes`.
+- `docker-compose.yml` now mounts that host file read-only into the Hermes worker at `/run/secrets/youtube-cookies.txt` and sets `YTDLP_COOKIES_PATH` for the worker container.
+- One-video CallScore canary command ran with `--limit 1 --concurrency 1 --gap-ms 20000 --write` and stopped safely on `bot_verification_required` for video `mhJJSppeUi4`.
+- Because the cookie path was loaded but YouTube still rejected access, the remaining blocker is now a fresh/valid YouTube cookie, not missing code/timer/API methodology.
+
+Exact remaining operator action:
+
+1. Replace `/opt/callscore/secrets/youtube-cookies.txt` with a fresh valid Netscape-format YouTube cookie file, then keep mode `600` and owner `root:root`; or
+2. Provide `YTDLP_COOKIES_FROM_BROWSER=<yt-dlp supported browser spec available to the worker>`; or
+3. Provide `YTDLP_COOKIES=<redacted Netscape cookie content via secure runtime env>`.
+
+After replacement, run the one-video transcript canary first. Only if it succeeds, run the bounded 25-video current-window catch-up and then source-safe recompute/API/homepage certification.
+
+---
+
 ## 1. Source Of Truth
 
 This master plan incorporates:
@@ -2409,11 +2439,11 @@ Explicit approval is required before:
 | HH PostgreSQL / pgsql | CERTIFIED — local HH PostgreSQL `callscore` via `callscore_app` on `::1:5432` |
 | Neon canonical | NO |
 | DB writer privileges | RECOVERED/CERTIFIED — minimum grants applied to `callscore_app` for pipeline application paths |
-| Transcript provider path | BLOCKED BY COOKIE/BOT VERIFICATION — slow YT-DLP is canonical and code-supported; canary without a working cookie path records `bot_verification_required` |
+| Transcript provider path | BLOCKED BY INVALID COOKIE/BOT VERIFICATION — slow YT-DLP is canonical and code-supported; runtime cookie path is installed, but one-video canary still records `bot_verification_required` |
 | Scheduler/job cadence | INSTALLED / ACTIVE / CERTIFIED — `callscore-daily-pipeline.timer` runs bounded RSS discovery, slow transcripts, extraction, matching, scoring, and freshness check daily; Netlify wrapper cadence remains separate provider verification |
 | Worker active processing | CERTIFIED — real `match_prices_batch` and `compute_scores` jobs completed on 2026-06-11; Docker worker rebuilt from current code |
 | Video discovery freshness | RECOVERED — RSS catch-up wrote 1,232 eligible rows; latest video inserted 2026-06-11; 148 creators fresh within 30d |
-| Transcript freshness | BLOCKED BY COOKIE — attempts run today through slow YT-DLP and classify `bot_verification_required`; transcript success remains stale until a working cookie path is supplied |
+| Transcript freshness | BLOCKED BY INVALID COOKIE — attempts run today through slow YT-DLP with installed cookie path and classify `bot_verification_required`; transcript success remains stale until a fresh valid cookie is supplied |
 | Call extraction freshness | PARTIAL RECOVERED — daily canary inserted two calls through app path; full transcript-driven catch-up depends on working YT-DLP cookies |
 | Price matching/scoring freshness | PARTIAL RECOVERED — canary matched mature calls; source-safe recompute ran 2026-06-11 |
 | `creator_stats` source safety | CERTIFIED — recompute produced 0 Altcoin Daily official ranks, 0 low-N official ranks, 0 zero-call official ranks, 30d official rows 0 |
@@ -2423,13 +2453,13 @@ Explicit approval is required before:
 | Altcoin Daily exclusion | CERTIFIED in read/API/UI and source `creator_stats` after recompute |
 | Low-N ranking block | CERTIFIED in read/API/UI and source `creator_stats` after recompute |
 | 30d safety | CERTIFIED as `PENDING_MATURITY`; methodology redesign remains APPROVAL-GATED |
-| Official creator count | 17 after latest canary/recompute — unchanged because no new transcript success; accepted as current strict-source output pending slow-YT-DLP cookie recovery |
-| Website count correctness | PARTIAL — public API counts safe; final current-coverage count certification requires transcript catch-up |
-| Freshness self-check | PR #50 MERGED / WARN — command reports grants, jobs, daily timer status, transcript backlog/status, timestamps, source unsafe ranks, native buckets, and exact YT-DLP bot/cookie warnings |
+| Official creator count | 12m/default 42, all_time 36, 90d 53, 30d 0 after eligibility recalibration and recompute; transcript catch-up may change future counts only after valid cookie recovery |
+| Website count correctness | CERTIFIED for current HH API/source semantics; final transcript-current coverage still depends on valid cookie catch-up |
+| Freshness self-check | WARN — command reports grants, jobs, daily timer status, transcript backlog/status, timestamps, source unsafe ranks, native buckets, and exact invalid-cookie/bot warnings |
 | Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
 | Whop-auto | PARTIAL; LIVE PROVIDER PROOF REQUIRED after data freshness blocker is removed |
 | Art of War loop | NO / NOT CERTIFIED |
-| Data freshness certification | PARTIAL — DB writer/video discovery/worker/source ranks/daily cadence recovered; slow-YT-DLP transcript success remains blocked by cookie/bot verification |
+| Data freshness certification | PARTIAL — DB writer/video discovery/worker/source ranks/daily cadence recovered; slow-YT-DLP transcript success remains blocked by invalid/stale cookie bot verification |
 | Autonomous revenue | NO |
 
 ---
