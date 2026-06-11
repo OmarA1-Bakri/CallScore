@@ -203,6 +203,81 @@ After this is supplied, rerun the same daily command with --transcript-limit 25,
 Transcript backlog as of this update is visible in the freshness self-check. Current largest classes are pending/no transcript, legacy YouTube rate/captcha failures, transcript-disabled videos, and the new explicit `bot_verification_required` canary failures. The backlog is not to be cleared by a single large run; it must drain through the daily bounded slow-YT-DLP cadence.
 
 ---
+
+
+### 0.3 2026-06-11 Creator Eligibility Recalibration Update
+
+```text
+CREATOR ELIGIBILITY STRATEGY: CERTIFIED / IMPLEMENTED LOCALLY
+DEFAULT PUBLIC LEADERBOARD: 12m
+OFFICIAL CREATOR POLICY: RECALIBRATED FOR SERIOUS LOWER-FREQUENCY CREATORS
+SAMPLE-ADJUSTED RANKING: IMPLEMENTED IN SOURCE STATS WRITER
+SOURCE CREATOR_STATS RECOMPUTE: COMPLETED 2026-06-11 12:04:43+01
+TRANSCRIPT COMPLETION: EXTERNAL CREDENTIAL REQUIRED
+```
+
+Simulation verdict on live HH PostgreSQL data:
+
+- Current strict strategy was too restrictive for the intended product because it required high volume before any official treatment.
+- The chosen strategy is `D_official_certified_sample_adjusted`:
+  - `all_time`: 24+ mature qualifying calls for official; 50+ certified.
+  - `12m`: 12+ mature qualifying calls for official; 25+ certified.
+  - `90d`: 3+ mature qualifying calls for recent-form official; 10+ certified.
+  - `30d`: disabled / `PENDING_MATURITY`.
+- This accepts the product rule that one serious mature qualifying call per month is enough for 12m official inclusion, while certified labels remain reserved for larger samples.
+- Ranking is no longer raw-average-first for official source ranks. The source stats writer assigns `accuracy_rank` by sample-adjusted Creator Rank Score:
+
+```text
+sample_adjusted_score = (creator_raw_score * N + global_baseline_score * prior_N) / (N + prior_N)
+```
+
+- Priors: `all_time=24`, `12m=25`, `90d=10`; fallback baseline constant remains `50` when no DB-derived baseline exists.
+- No schema migration was required; the adjusted score is computed during rank assignment, with `alpha_score` retaining its legacy storage meaning of average 0-100 Call Score.
+
+Live simulation counts before recompute:
+
+| Strategy | Period | Official | Certified | Provisional | Watchlist | Stale | Excluded | Pending | Unsafe official |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| A current strict | all_time | 19 | 19 | 26 | 129 | 19 | 4 | 0 | 0 |
+| A current strict | 12m | 32 | 32 | 11 | 131 | 19 | 4 | 0 | 0 |
+| A current strict | 90d | 16 | 16 | 30 | 128 | 19 | 4 | 0 | 0 |
+| B one-call/month | all_time | 36 | 19 | 16 | 122 | 19 | 4 | 0 | 0 |
+| B one-call/month | 12m | 42 | 32 | 9 | 123 | 19 | 4 | 0 | 0 |
+| B one-call/month | 90d | 53 | 32 | 13 | 108 | 19 | 4 | 0 | 0 |
+| C balanced | all_time | 23 | 19 | 29 | 122 | 19 | 4 | 0 | 0 |
+| C balanced | 12m | 42 | 32 | 9 | 123 | 19 | 4 | 0 | 0 |
+| C balanced | 90d | 42 | 32 | 24 | 108 | 19 | 4 | 0 | 0 |
+| D chosen | all_time | 36 | 19 | 16 | 122 | 19 | 4 | 0 | 0 |
+| D chosen | 12m | 42 | 32 | 9 | 123 | 19 | 4 | 0 | 0 |
+| D chosen | 90d | 53 | 32 | 13 | 108 | 19 | 4 | 0 | 0 |
+| D chosen | 30d | 0 | 0 | 0 | 0 | 0 | 4 | 193 | 0 |
+
+Post-recompute source `creator_stats` proof:
+
+- `12m`: rows 197; official/ranked 42; low-N official violations 0; zero-call official ranks 0; updated 2026-06-11 12:04:42+01.
+- `all_time`: rows 197; official/ranked 36; low-N official violations 0; zero-call official ranks 0; updated 2026-06-11 12:04:38+01.
+- `90d`: rows 197; official/ranked 53; low-N official violations 0; zero-call official ranks 0; updated 2026-06-11 12:04:43+01.
+- `30d`: rows 197; official/ranked 0; `PENDING_MATURITY`; updated 2026-06-11 12:04:43+01.
+- Source unsafe named ranks remain 0 for Altcoin Daily, Alex Becker, MoneyZG, and Crypto Inspector.
+
+Final status after this recalibration:
+
+- The previous 17-official count was too restrictive under product policy.
+- It was also temporarily affected by source thresholds and policy exclusions rather than only transcript freshness.
+- Correct post-recompute source official counts are `12m=42`, `all_time=36`, `90d=53`, `30d=0`.
+- Data/worker/freshness remediation remains `PARTIAL / EXTERNAL CREDENTIAL REQUIRED` only because no working YT-DLP cookie path is present in runtime.
+- Exact remaining action remains one of:
+  - `YTDLP_COOKIES_PATH=/absolute/path/to/youtube-cookies.txt`;
+  - `YTDLP_COOKIES_FROM_BROWSER=<yt-dlp supported browser spec available to the worker>`;
+  - `YTDLP_COOKIES=<redacted Netscape cookie file content via secure runtime env>`.
+
+Readiness:
+
+- Whop-auto readiness: `READY NEXT` for commerce certification after public read API restart/deploy certification.
+- Art of War readiness: `READY NEXT` after commerce certification, with transcript gate tracked as an operational warning rather than methodology blocker.
+- Autonomous revenue status: `NO` until commerce/growth loops are certified.
+
+---
 ## 1. Source Of Truth
 
 This master plan incorporates:

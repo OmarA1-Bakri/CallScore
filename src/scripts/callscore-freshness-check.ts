@@ -1,6 +1,11 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { query } from "../lib/db";
+import {
+  CREATOR_STATS_CERTIFIED_THRESHOLDS,
+  CREATOR_STATS_OFFICIAL_THRESHOLDS,
+  CREATOR_STATS_PROVISIONAL_THRESHOLDS,
+} from "../lib/creator-stats-eligibility";
 import { loadEnv } from "./script-helpers";
 
 const execFileAsync = promisify(execFile);
@@ -42,23 +47,50 @@ function ageHours(value: string | null): number | null {
 async function fetchReadApi(base: string | null): Promise<Record<string, unknown> | null> {
   if (!base) return null;
   const root = base.replace(/\/$/, "");
-  const response = await fetch(`${root}/home?period=all_time`, { signal: AbortSignal.timeout(10_000) });
-  if (!response.ok) {
-    return { ok: false, status: response.status };
-  }
-  const json = await response.json() as Record<string, unknown>;
-  const official = Array.isArray(json.officialRankedRows) ? json.officialRankedRows : [];
-  const legacyRows = (json.leaderboard as { rows?: unknown[] } | undefined)?.rows ?? [];
-  return {
-    ok: json.ok === true,
-    nativeBuckets: Array.isArray(json.officialRankedRows)
+  const periods = ["12m", "all_time", "90d", "30d"] as const;
+  const byPeriod: Record<string, unknown> = {};
+  let nativeBuckets = true;
+  let leaderboardRowsEqualOfficial = true;
+  let ok = true;
+
+  for (const period of periods) {
+    const response = await fetch(`${root}/home?period=${period}`, { signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) {
+      byPeriod[period] = { ok: false, status: response.status };
+      ok = false;
+      continue;
+    }
+    const json = await response.json() as Record<string, unknown>;
+    const official = Array.isArray(json.officialRankedRows) ? json.officialRankedRows : [];
+    const legacyRows = (json.leaderboard as { rows?: unknown[] } | undefined)?.rows ?? [];
+    const periodNative = Array.isArray(json.officialRankedRows)
       && Array.isArray(json.provisionalRows)
       && Array.isArray(json.watchlistRows)
       && Array.isArray(json.staleRows)
       && Array.isArray(json.excludedRows)
-      && Array.isArray(json.pendingMaturityRows),
-    officialCount: official.length,
-    leaderboardRowsEqualOfficial: JSON.stringify(legacyRows) === JSON.stringify(official),
+      && Array.isArray(json.pendingMaturityRows);
+    const rowsEqual = JSON.stringify(legacyRows) === JSON.stringify(official);
+    nativeBuckets = nativeBuckets && periodNative;
+    leaderboardRowsEqualOfficial = leaderboardRowsEqualOfficial && rowsEqual;
+    byPeriod[period] = {
+      ok: json.ok === true,
+      emptyReason: json.emptyReason ?? null,
+      nativeBuckets: periodNative,
+      officialCount: official.length,
+      provisionalCount: Array.isArray(json.provisionalRows) ? json.provisionalRows.length : null,
+      watchlistCount: Array.isArray(json.watchlistRows) ? json.watchlistRows.length : null,
+      staleCount: Array.isArray(json.staleRows) ? json.staleRows.length : null,
+      excludedCount: Array.isArray(json.excludedRows) ? json.excludedRows.length : null,
+      pendingCount: Array.isArray(json.pendingMaturityRows) ? json.pendingMaturityRows.length : null,
+      leaderboardRowsEqualOfficial: rowsEqual,
+    };
+  }
+
+  return {
+    ok,
+    nativeBuckets,
+    leaderboardRowsEqualOfficial,
+    byPeriod,
   };
 }
 
@@ -93,9 +125,12 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
      JOIN creators c ON c.id = cs.creator_id
      WHERE cs.accuracy_rank IS NOT NULL
        AND (
-         cs.total_calls < 25
-         OR lower(coalesce(c.name, '')) LIKE '%altcoin daily%'
-         OR lower(replace(coalesce(c.youtube_handle, ''), '@', '')) = 'altcoindaily'
+         cs.period = '30d'
+         OR (cs.period = 'all_time' AND cs.total_calls < 24)
+         OR (cs.period = '12m' AND cs.total_calls < 12)
+         OR (cs.period = '90d' AND cs.total_calls < 3)
+         OR lower(regexp_replace(coalesce(c.name, ''), '[^a-zA-Z0-9]+', '', 'g')) IN ('altcoindaily','alexbeckerschannel','moneyzg','cryptoinspector')
+         OR lower(regexp_replace(coalesce(c.youtube_handle, ''), '[^a-zA-Z0-9]+', '', 'g')) IN ('altcoindaily','alexbeckerschannel','moneyzg','cryptoinspector')
        )`,
   );
   const grants = await query<{ table_name: string; privilege_type: string }>(
@@ -134,7 +169,34 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
      GROUP BY status, error
      ORDER BY COUNT(*) DESC`,
   );
+  const sourceBuckets = await query<{ period: string; rows: string; official: string; certified: string; provisional: string }>(
+    `SELECT
+       period,
+       COUNT(*)::text AS rows,
+       COUNT(*) FILTER (WHERE accuracy_rank IS NOT NULL)::text AS official,
+       COUNT(*) FILTER (
+         WHERE (period = 'all_time' AND total_calls >= 50)
+            OR (period = '12m' AND total_calls >= 25)
+            OR (period = '90d' AND total_calls >= 10)
+       )::text AS certified,
+       COUNT(*) FILTER (
+         WHERE accuracy_rank IS NULL
+           AND (
+             (period = 'all_time' AND total_calls >= 6 AND total_calls < 24)
+             OR (period = '12m' AND total_calls >= 6 AND total_calls < 12)
+             OR (period = '90d' AND total_calls >= 1 AND total_calls < 3)
+           )
+       )::text AS provisional
+     FROM creator_stats
+     GROUP BY period
+     ORDER BY period`,
+  );
   const dailyTimer = await systemdTimerStatus();
+  const ytdlpCookieState = {
+    YTDLP_COOKIES_PATH: Boolean(process.env.YTDLP_COOKIES_PATH),
+    YTDLP_COOKIES: Boolean(process.env.YTDLP_COOKIES),
+    YTDLP_COOKIES_FROM_BROWSER: Boolean(process.env.YTDLP_COOKIES_FROM_BROWSER),
+  };
 
   const timestamps = {
     latestJobCreated: freshness?.latest_job_created ?? null,
@@ -200,6 +262,19 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     blockers,
     warnings,
     db: identity,
+    thresholds: {
+      official: CREATOR_STATS_OFFICIAL_THRESHOLDS,
+      certified: CREATOR_STATS_CERTIFIED_THRESHOLDS,
+      provisional: CREATOR_STATS_PROVISIONAL_THRESHOLDS,
+    },
+    sourceBuckets: sourceBuckets.map((row) => ({
+      period: row.period,
+      rows: Number(row.rows),
+      official: Number(row.official),
+      certified: Number(row.certified),
+      provisional: Number(row.provisional),
+    })),
+    ytdlpCookieState,
     timestamps,
     ageHours: ages,
     unsafeSourceRanks: unsafeRankCount,

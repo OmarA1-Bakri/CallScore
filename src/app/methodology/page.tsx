@@ -245,7 +245,8 @@ export default function MethodologyPage(): ReactElement {
               Call Score scores one matured prediction. Creator Rank Score ranks a creator
               only after official eligibility gates pass. The current writer stores average
               Call Score in <code className="font-mono text-[13px]">{CURRENT_CREATOR_RANKING_METHOD.scoreField}</code>,
-              then orders by score, win rate, sample size, and creator id. The legacy column
+              then assigns rank with a sample-adjusted Creator Rank Score before raw score,
+              win rate, sample size, and creator id tie-breakers. The legacy column
               name is misleading: it is not raw average alpha.
             </p>
             <ul className="font-mono text-[12px] text-ink-600 leading-relaxed space-y-1">
@@ -265,7 +266,7 @@ export default function MethodologyPage(): ReactElement {
                     <td className="py-2 text-ink-900">{rule.label}</td>
                     <td className="py-2 text-ink-700">
                       {rule.officialEnabled
-                        ? `${rule.officialMinCalls}+ official calls`
+                        ? `${rule.officialMinCalls}+ official · ${rule.certifiedMinCalls}+ certified`
                         : `disabled: ${rule.emptyReason}`}
                     </td>
                   </tr>
@@ -273,9 +274,7 @@ export default function MethodologyPage(): ReactElement {
               </tbody>
             </table>
             <p className="font-serif text-[15px] text-ink-700 leading-relaxed mt-4">
-              The 30d official leaderboard stays disabled until the maturity methodology is
-              redesigned. Current safe behavior is <code className="font-mono text-[13px]">PENDING_MATURITY</code>,
-              not a fake zero-call ranking.
+              A serious creator making roughly one mature qualifying call per month can enter the 12m official leaderboard at 12 calls. Certified labels require larger samples. The 30d official leaderboard stays disabled as <code className="font-mono text-[13px]">PENDING_MATURITY</code>, not a fake zero-call ranking.
             </p>
           </div>
         </div>
@@ -369,17 +368,15 @@ export default function MethodologyPage(): ReactElement {
         </table>
       </EditorialSection>
 
-      {/* 08 — methodology v2 */}
+      {/* 08 — rank adjustment */}
       <EditorialSection
         index="08"
-        title={<>Methodology <em className="italic text-accent">v2</em>.</>}
-        meta={<>approval-gated</>}
+        title={<>Sample <em className="italic text-accent">adjustment</em>.</>}
+        meta={<>implemented in source ranks</>}
       >
         <div className="font-serif text-[16px] text-ink-700 leading-relaxed max-w-[760px] space-y-4">
           <p>
-            Current official rankings are intentionally conservative. The next formula should
-            use a sample-adjusted Creator Rank Score rather than a noisy raw average, but that
-            change requires explicit methodology approval and an approved stats recompute.
+            Official rankings use a sample-adjusted Creator Rank Score rather than a noisy raw average. This lets serious lower-frequency creators qualify while pulling 12-call samples toward the global baseline so variance alone cannot dominate proven larger samples.
           </p>
           <p className="font-mono text-[13px] text-ink-600 not-italic">
             {RECOMMENDED_CREATOR_RANK_SCORE_V2.sampleAdjustedFormula}

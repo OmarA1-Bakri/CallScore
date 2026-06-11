@@ -39,8 +39,8 @@ function send(res, status, body) {
 }
 
 function parsePeriod(url) {
-  const period = url.searchParams.get("period") || "all_time";
-  return ["all_time", "12m", "90d", "30d"].includes(period) ? period : "all_time";
+  const period = url.searchParams.get("period") || "12m";
+  return ["all_time", "12m", "90d", "30d"].includes(period) ? period : "12m";
 }
 
 function parseLimit(url, fallback, max) {

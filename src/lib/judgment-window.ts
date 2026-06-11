@@ -12,7 +12,8 @@ export function getJudgmentWindowSql(alias: string): string {
 }
 
 export function getPeriodFilterSql(alias: string, period: Period): string {
-  if (period === "all_time") return `AND ${getJudgmentWindowSql(alias)}`;
+  if (period === "all_time") return "";
+  if (period === "12m") return `AND ${getJudgmentWindowSql(alias)}`;
   if (period === "90d") return `AND ${alias}.call_date >= NOW() - INTERVAL '90 days'`;
   return `AND ${alias}.call_date >= NOW() - INTERVAL '30 days'`;
 }

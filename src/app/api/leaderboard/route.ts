@@ -29,7 +29,7 @@ import type {
   Tier,
 } from "@/lib/types";
 
-const VALID_PERIODS: readonly Period[] = ["all_time", "90d", "30d"] as const;
+const VALID_PERIODS: readonly Period[] = ["12m", "all_time", "90d", "30d"] as const;
 
 interface PrevScoreRow {
   readonly creator_id: number;
@@ -141,7 +141,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   let periodForMonitoring: string | null = null;
   try {
     const { searchParams } = request.nextUrl;
-    const periodParam = searchParams.get("period") ?? "all_time";
+    const periodParam = searchParams.get("period") ?? "12m";
     periodForMonitoring = periodParam;
 
     if (!isValidPeriod(periodParam)) {
@@ -157,7 +157,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const sampleThreshold = getLeaderboardSampleThreshold(period);
     const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
     const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
-    if (period !== "all_time") {
+    if (period === "90d" || period === "30d") {
       const auth = getRequestAuthContext(request);
       const userTier = auth.session?.tier ?? (await getUserTier(auth.accessToken, auth.session?.userId));
       if (!hasAccess(userTier, "pro")) {
@@ -217,7 +217,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const windowRange = getWindowRange(period);
 
     // Fetch previous period scores for trend calculation
-    const prevPeriod: Period = period === "30d" ? "90d" : "all_time";
+    const prevPeriod: Period = period === "30d" ? "90d" : period === "90d" ? "12m" : "all_time";
     const prevScores =
       period !== "all_time"
         ? await query<PrevScoreRow>(

@@ -15,7 +15,7 @@ const optionalNullableTimestamp = z.preprocess(nullWhenMissing, dbTimestampSchem
 const numberFromDb = z.coerce.number();
 
 export const tierSchema = z.enum(["free", "pro", "alpha"]) satisfies z.ZodType<Tier>;
-export const periodSchema = z.enum(["all_time", "90d", "30d"]) satisfies z.ZodType<Period>;
+export const periodSchema = z.enum(["all_time", "12m", "90d", "30d"]) satisfies z.ZodType<Period>;
 export const directionSchema = z.enum(["bullish", "bearish", "neutral"]) satisfies z.ZodType<Direction>;
 const optionalNullableDirection = z.preprocess(nullWhenMissing, directionSchema.nullable());
 

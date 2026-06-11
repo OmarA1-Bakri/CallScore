@@ -7,7 +7,8 @@ export type StrategyType =
   | "fundamental"
   | "narrative"
   | "contrarian";
-export type Period = "all_time" | "90d" | "30d";
+export type Period = "all_time" | "12m" | "90d" | "30d";
+export type CreatorConfidenceTier = "certified" | "official" | "provisional" | "watchlist" | "pending_maturity";
 
 export interface Creator {
   readonly id: number;
@@ -152,4 +153,5 @@ export interface LeaderboardRow {
   readonly selfCorrectionScore?: number;
   readonly revisionCount?: number;
   readonly selfCorrectionTier?: "honest" | "some" | "rarely";
+  readonly confidenceTier?: CreatorConfidenceTier;
 }

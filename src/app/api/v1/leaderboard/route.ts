@@ -53,8 +53,8 @@ function getWindowRange(period: Period): { readonly window_start: string; readon
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const auth = await requireAlphaApiAccess(request);
   if (auth instanceof NextResponse) return auth;
-  const periodParam = request.nextUrl.searchParams.get("period") ?? "all_time";
-  if (!["all_time", "90d", "30d"].includes(periodParam)) {
+  const periodParam = request.nextUrl.searchParams.get("period") ?? "12m";
+  if (!["12m", "all_time", "90d", "30d"].includes(periodParam)) {
     return NextResponse.json({ error: "invalid_period" }, { status: 400, headers: noStoreHeaders() });
   }
   const period = periodParam as Period;
