@@ -13,8 +13,14 @@ import {
   getLeaderboardSampleThreshold,
 } from "@/lib/leaderboard-eligibility";
 import { getLegacyCreatorExclusionSql } from "@/lib/legacy-creator-overrides";
+import {
+  getLeaderboardEmptyMessage,
+  getOfficialRankedReadApiRows,
+  type ReadApiLeaderboardContract,
+} from "@/lib/home-read-api-contract";
 import { CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL, CREATOR_JUDGMENT_WINDOW_LABEL, RECENT_PUBLIC_SCORING_MATURITY_NOTE } from "@/lib/judgment-window";
 import { getCreatorTier } from "@/lib/creator-tier";
+import { toReadApiLeaderboardContract } from "@/lib/leaderboard-safety.mjs";
 import { hasAccess } from "@/lib/whop";
 import { computeTrend } from "@/lib/scoring";
 import { computeAllSelfCorrectionAggregates } from "@/lib/self-correction";
@@ -85,12 +91,38 @@ interface LeaderboardQueryRow {
   readonly worst_call_score: number | null;
   readonly worst_call_date: string | null;
   readonly worst_call_direction: string | null;
+  readonly latest_video_date: string | null;
 }
 
 interface StatsRow {
   readonly total_calls: string;
   readonly avg_accuracy: string;
   readonly creator_count: string;
+}
+
+interface HomeReadApiCounts {
+  readonly trackedCreators?: number;
+  readonly rankedCreators?: number;
+  readonly trackedCalls?: number;
+  readonly scoredCalls?: number;
+  readonly beatBtcCreators?: number;
+  readonly llmValidatedCalls?: number;
+  readonly confidencePassCalls?: number;
+  readonly publicScoredCalls?: number;
+  readonly pendingPublicScoringCalls?: number;
+  readonly liveOpenCalls?: number;
+  readonly pendingHorizonCalls?: number;
+  readonly pending30dCalls?: number;
+  readonly pendingTarget90dCalls?: number;
+  readonly missingPriceCalls?: number;
+  readonly missing30dCalls?: number;
+  readonly missingTargetCalls?: number;
+  readonly targetPendingCalls?: number;
+  readonly excludedLowConfidenceCalls?: number;
+}
+
+interface HomeReadApiResponse extends ReadApiLeaderboardContract<LeaderboardQueryRow> {
+  readonly publicCounts?: HomeReadApiCounts;
 }
 
 function buildCreator(row: LeaderboardQueryRow): Creator {
@@ -141,6 +173,94 @@ function buildStats(row: LeaderboardQueryRow): CreatorStats {
   };
 }
 
+function normalizeReadApiBase(raw: string): string {
+  return raw.trim().replace(/\/+$/, "");
+}
+
+async function fetchHomeReadApi(period: Period): Promise<HomeReadApiResponse | null> {
+  const base = process.env.HH_READ_API_BASE;
+  if (!base?.trim()) return null;
+
+  const response = await fetch(`${normalizeReadApiBase(base)}/home?period=${encodeURIComponent(period)}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) return null;
+  return (await response.json()) as HomeReadApiResponse;
+}
+
+function mergeReadApiCounts(
+  fallback: Awaited<ReturnType<typeof getPublicCounts>>,
+  readApiCounts: HomeReadApiCounts | undefined,
+): Awaited<ReturnType<typeof getPublicCounts>> {
+  if (!readApiCounts) return fallback;
+
+  return {
+    trackedCreators: readApiCounts.trackedCreators ?? fallback.trackedCreators,
+    rankedCreators: readApiCounts.rankedCreators ?? fallback.rankedCreators,
+    trackedCalls: readApiCounts.trackedCalls ?? fallback.trackedCalls,
+    scoredCalls: readApiCounts.scoredCalls ?? fallback.scoredCalls,
+    beatBtcCreators: readApiCounts.beatBtcCreators ?? fallback.beatBtcCreators,
+    llmValidatedCalls: readApiCounts.llmValidatedCalls ?? fallback.llmValidatedCalls,
+    confidencePassCalls: readApiCounts.confidencePassCalls ?? fallback.confidencePassCalls,
+    publicScoredCalls: readApiCounts.publicScoredCalls ?? fallback.publicScoredCalls,
+    pendingPublicScoringCalls:
+      readApiCounts.pendingPublicScoringCalls ?? fallback.pendingPublicScoringCalls,
+    liveOpenCalls: readApiCounts.liveOpenCalls ?? fallback.liveOpenCalls,
+    pendingHorizonCalls: readApiCounts.pendingHorizonCalls ?? fallback.pendingHorizonCalls,
+    pending30dCalls: readApiCounts.pending30dCalls ?? fallback.pending30dCalls,
+    pendingTarget90dCalls: readApiCounts.pendingTarget90dCalls ?? fallback.pendingTarget90dCalls,
+    missingPriceCalls: readApiCounts.missingPriceCalls ?? fallback.missingPriceCalls,
+    missing30dCalls: readApiCounts.missing30dCalls ?? fallback.missing30dCalls,
+    missingTargetCalls: readApiCounts.missingTargetCalls ?? fallback.missingTargetCalls,
+    targetPendingCalls: readApiCounts.targetPendingCalls ?? fallback.targetPendingCalls,
+    excludedLowConfidenceCalls:
+      readApiCounts.excludedLowConfidenceCalls ?? fallback.excludedLowConfidenceCalls,
+  };
+}
+
+function buildLeaderboardRows(
+  rows: readonly LeaderboardQueryRow[],
+  prevScoreMap: ReadonlyMap<number, number>,
+  selfCorrectionMap: ReadonlyMap<number, { readonly score: number; readonly revisionCount: number; readonly tier: "honest" | "some" | "rarely" }>,
+): LeaderboardRow[] {
+  return rows.map((row, index) => {
+    const rank = index + 1;
+    const prev = prevScoreMap.get(row.creator_id);
+    const trend = prev !== undefined ? computeTrend(row.alpha_score, prev) : ("stable" as const);
+    const selfCorrection = selfCorrectionMap.get(row.creator_id);
+
+    return {
+      rank,
+      creator: buildCreator(row),
+      stats: buildStats(row),
+      best_call: row.best_call_symbol
+        ? ({
+            symbol: row.best_call_symbol,
+            return_30d: row.best_call_return,
+            score: row.best_call_score ?? 0,
+            call_date: row.best_call_date ?? "",
+            direction: (row.best_call_direction as Call["direction"]) ?? "neutral",
+          } as Call)
+        : null,
+      worst_call: row.worst_call_symbol
+        ? ({
+            symbol: row.worst_call_symbol,
+            return_30d: row.worst_call_return,
+            score: row.worst_call_score ?? 0,
+            call_date: row.worst_call_date ?? "",
+            direction: (row.worst_call_direction as Call["direction"]) ?? "neutral",
+          } as Call)
+        : null,
+      tier_required: getCreatorTier(rank),
+      trend,
+      selfCorrectionScore: selfCorrection?.score ?? 0,
+      revisionCount: selfCorrection?.revisionCount ?? 0,
+      selfCorrectionTier: selfCorrection?.tier ?? "rarely",
+    };
+  });
+}
+
 interface PageProps {
   readonly searchParams: Promise<{ period?: string }>;
 }
@@ -161,9 +281,45 @@ export default async function HomePage({
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
   const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
 
-  // Fetch leaderboard from DB
+  const fallbackPublicCounts: Awaited<ReturnType<typeof getPublicCounts>> = {
+    trackedCreators: 20,
+    rankedCreators: 0,
+    trackedCalls: 0,
+    scoredCalls: 0,
+    beatBtcCreators: 0,
+    llmValidatedCalls: 0,
+    confidencePassCalls: 0,
+    publicScoredCalls: 0,
+    pendingPublicScoringCalls: 0,
+    liveOpenCalls: 0,
+    pendingHorizonCalls: 0,
+    pending30dCalls: 0,
+    pendingTarget90dCalls: 0,
+    missingPriceCalls: 0,
+    missing30dCalls: 0,
+    missingTargetCalls: 0,
+    targetPendingCalls: 0,
+    excludedLowConfidenceCalls: 0,
+  };
+
+  const readApiHome = await fetchHomeReadApi(period).catch(() => null);
+  let publicCounts: Awaited<ReturnType<typeof getPublicCounts>> | null = readApiHome
+    ? mergeReadApiCounts(fallbackPublicCounts, readApiHome.publicCounts)
+    : null;
+
+  let leaderboardEmptyContract: Pick<ReadApiLeaderboardContract<unknown>, "emptyReason"> | null =
+    readApiHome ? { emptyReason: readApiHome.emptyReason ?? null } : null;
+
+  // Fetch leaderboard from HH read API first. The official homepage rows must
+  // come from officialRankedRows, never from compatibility leaderboard.rows or
+  // from audit buckets such as excludedRows/staleRows/provisionalRows.
   let leaderboard: LeaderboardRow[] = [];
-  try {
+  const readApiOfficialRows = getOfficialRankedReadApiRows(readApiHome);
+
+  if (readApiHome) {
+    leaderboard = buildLeaderboardRows(readApiOfficialRows, new Map(), new Map());
+  } else {
+    try {
     const rows = await query<LeaderboardQueryRow>(
       `SELECT
         cs.*,
@@ -180,6 +336,7 @@ export default async function HomePage({
         c.accuracy_rank AS creator_accuracy_rank,
         c.last_scraped_at AS creator_last_scraped_at,
         c.created_at AS creator_created_at,
+        latest.latest_video_date,
         bc.symbol AS best_call_symbol,
         bc.return_30d AS best_call_return,
         bc.score AS best_call_score,
@@ -192,6 +349,11 @@ export default async function HomePage({
         wc.direction AS worst_call_direction
       FROM creator_stats cs
       JOIN creators c ON c.id = cs.creator_id
+      LEFT JOIN LATERAL (
+        SELECT MAX(v.published_at) AS latest_video_date
+        FROM videos v
+        WHERE v.creator_id = c.id
+      ) latest ON TRUE
       LEFT JOIN calls bc ON bc.id = cs.best_call_id
       LEFT JOIN calls wc ON wc.id = cs.worst_call_id
       WHERE cs.period = $1
@@ -200,6 +362,10 @@ export default async function HomePage({
       ORDER BY cs.accuracy_rank ASC NULLS LAST`,
       [period],
     );
+
+    const safeContract = toReadApiLeaderboardContract(period, rows, { period });
+    const officialRows = getOfficialRankedReadApiRows(safeContract);
+    leaderboardEmptyContract = { emptyReason: safeContract.emptyReason };
 
     const prevPeriod: Period = period === "30d" ? "90d" : "all_time";
     const prevScores =
@@ -220,46 +386,13 @@ export default async function HomePage({
       () => new Map<number, never>(),
     );
 
-    leaderboard = rows.map((row, index) => {
-      const rank = index + 1;
-      const prev = prevScoreMap.get(row.creator_id);
-      const trend = prev !== undefined ? computeTrend(row.alpha_score, prev) : ("stable" as const);
-      const selfCorrection = selfCorrectionMap.get(row.creator_id);
-
-      return {
-        rank,
-        creator: buildCreator(row),
-        stats: buildStats(row),
-        best_call: row.best_call_symbol
-          ? ({
-              symbol: row.best_call_symbol,
-              return_30d: row.best_call_return,
-              score: row.best_call_score ?? 0,
-              call_date: row.best_call_date ?? "",
-              direction: (row.best_call_direction as Call["direction"]) ?? "neutral",
-            } as Call)
-          : null,
-        worst_call: row.worst_call_symbol
-          ? ({
-              symbol: row.worst_call_symbol,
-              return_30d: row.worst_call_return,
-              score: row.worst_call_score ?? 0,
-              call_date: row.worst_call_date ?? "",
-              direction: (row.worst_call_direction as Call["direction"]) ?? "neutral",
-            } as Call)
-          : null,
-        tier_required: getCreatorTier(rank),
-        trend,
-        selfCorrectionScore: selfCorrection?.score ?? 0,
-        revisionCount: selfCorrection?.revisionCount ?? 0,
-        selfCorrectionTier: selfCorrection?.tier ?? "rarely",
-      };
-    });
+    leaderboard = buildLeaderboardRows(officialRows, prevScoreMap, selfCorrectionMap);
   } catch (err) {
     // Re-throw in development to surface errors
     if (process.env.NODE_ENV === "development") {
       throw err;
     }
+  }
   }
 
   // Fetch consensus signals only for Alpha users.
@@ -275,29 +408,11 @@ export default async function HomePage({
     }
   }
 
-  let publicCounts: Awaited<ReturnType<typeof getPublicCounts>> | null = await getPublicCounts().catch(() => null);
+  publicCounts = publicCounts ?? await getPublicCounts().catch(() => null);
   if (!publicCounts) {
-    publicCounts = {
-      trackedCreators: 20,
-      rankedCreators: 0,
-      trackedCalls: 0,
-      scoredCalls: 0,
-      beatBtcCreators: 0,
-      llmValidatedCalls: 0,
-      confidencePassCalls: 0,
-      publicScoredCalls: 0,
-      pendingPublicScoringCalls: 0,
-      liveOpenCalls: 0,
-      pendingHorizonCalls: 0,
-      pending30dCalls: 0,
-      pendingTarget90dCalls: 0,
-      missingPriceCalls: 0,
-      missing30dCalls: 0,
-      missingTargetCalls: 0,
-      targetPendingCalls: 0,
-      excludedLowConfidenceCalls: 0,
-    };
+    publicCounts = fallbackPublicCounts;
   }
+  const officialRankedCreatorCount = leaderboard.length;
 
   // Aggregate stats
   let totalCalls = String(publicCounts.scoredCalls);
@@ -390,7 +505,7 @@ export default async function HomePage({
             totalCalls={totalCalls}
             creatorCount={publicCounts.trackedCreators}
             beatBtcCreators={publicCounts.beatBtcCreators}
-            rankedCreators={publicCounts.rankedCreators}
+            rankedCreators={officialRankedCreatorCount}
             liveOpenCalls={publicCounts.liveOpenCalls}
             excludedLowConfidenceCalls={publicCounts.excludedLowConfidenceCalls}
             confidencePassCalls={publicCounts.confidencePassCalls}
@@ -452,7 +567,7 @@ export default async function HomePage({
         }
         meta={
           <>
-            {publicCounts.rankedCreators} ranked creators · {totalCalls} public-scored calls
+            {officialRankedCreatorCount} ranked creators · {totalCalls} public-scored calls
             <br />
             {CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL}
           </>
@@ -474,7 +589,7 @@ export default async function HomePage({
         ) : (
           <div className="border-t border-ink-250 py-12 text-center">
             <p className="font-mono text-[12px] text-ink-500 tracking-wide">
-              No public-scored calls in this rolling 12-month window yet. Newer tracked calls may still be awaiting extraction, confidence review, or outcome windows.
+              {getLeaderboardEmptyMessage(leaderboardEmptyContract)}
             </p>
           </div>
         )}
