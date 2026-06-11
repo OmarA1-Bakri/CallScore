@@ -159,6 +159,26 @@ test("read API response shape keeps leaderboard.rows safe", () => {
   assert.equal(response.leaderboard.rows.some((item) => item.name === "Altcoin Daily"), false);
 });
 
+test("legacy HH rows can be safely bucketed without freshness proof during frontend compatibility", () => {
+  const response = toReadApiLeaderboardContract(
+    "all_time",
+    [
+      row({ name: "Altcoin Daily", total_calls: 429, accuracy_rank: 19, latest_video_date: null }),
+      row({ name: "Alex Becker's Channel", total_calls: 24, accuracy_rank: 1, latest_video_date: null }),
+      row({ name: "MoneyZG", total_calls: 12, accuracy_rank: 2, latest_video_date: null }),
+      row({ name: "Valid Legacy Creator", total_calls: 75, accuracy_rank: 4, latest_video_date: null }),
+    ],
+    { now: NOW, requireFreshnessProof: false },
+  );
+
+  assert.deepEqual(response.officialRankedRows.map((item) => item.name), ["Valid Legacy Creator"]);
+  assert.equal(response.excludedRows.some((item) => item.name === "Altcoin Daily"), true);
+  assert.equal(response.officialRankedRows.some((item) => item.name === "Altcoin Daily"), false);
+  assert.equal(response.officialRankedRows.some((item) => item.name === "Alex Becker's Channel"), false);
+  assert.equal(response.officialRankedRows.some((item) => item.name === "MoneyZG"), false);
+  assert.deepEqual(response.leaderboard.rows, response.officialRankedRows);
+});
+
 test("publicEligibleCallsWhereSql uses scored-call public predicate", () => {
   assert.equal(
     publicEligibleCallsWhereSql("calls"),

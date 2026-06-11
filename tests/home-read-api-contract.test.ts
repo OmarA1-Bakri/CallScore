@@ -13,7 +13,14 @@ test("homepage source code reads officialRankedRows explicitly for official rank
   assert.match(pageSrc, /getOfficialRankedReadApiRows\(readApiHome\)/);
   assert.match(pageSrc, /const readApiOfficialRows = getOfficialRankedReadApiRows/);
   assert.match(pageSrc, /buildLeaderboardRows\(readApiOfficialRows/);
-  assert.doesNotMatch(pageSrc, /readApiHome\.leaderboard\.rows/);
+  assert.doesNotMatch(pageSrc, /buildLeaderboardRows\(readApiHome\.leaderboard\.rows/);
+});
+
+test("homepage safely buckets legacy HH leaderboard rows before compatibility rendering", () => {
+  assert.match(pageSrc, /Array\.isArray\(readApiHome\.leaderboard\?\.rows\)/);
+  assert.match(pageSrc, /toReadApiLeaderboardContract\(period, readApiHome\.leaderboard\.rows/);
+  assert.match(pageSrc, /requireFreshnessProof:\s*false/);
+  assert.match(pageSrc, /getOfficialRankedReadApiRows\(legacySafeContract\)/);
 });
 
 test("homepage buckets direct DB fallback before rendering official rows", () => {
