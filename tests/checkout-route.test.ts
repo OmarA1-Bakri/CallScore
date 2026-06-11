@@ -71,6 +71,25 @@ test("checkout route supports alpha annual checkout URLs", async () => {
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
+
+test("checkout route supports tier-interval path aliases", async () => {
+  const cases = [
+    ["WHOP_CHECKOUT_URL_PRO_MONTHLY", "/api/checkout/pro-monthly", "pro-monthly", "https://whop.example/checkout/pro-monthly"],
+    ["WHOP_CHECKOUT_URL_PRO_ANNUAL", "/api/checkout/pro-annual", "pro-annual", "https://whop.example/checkout/pro-annual"],
+    ["WHOP_CHECKOUT_URL_ALPHA_MONTHLY", "/api/checkout/alpha-monthly", "alpha-monthly", "https://whop.example/checkout/alpha-monthly"],
+    ["WHOP_CHECKOUT_URL_ALPHA_ANNUAL", "/api/checkout/alpha-annual", "alpha-annual", "https://whop.example/checkout/alpha-annual"],
+  ] as const;
+
+  for (const [envKey, path, tier, url] of cases) {
+    process.env[envKey] = url;
+    const response = await GET(request(path), params(tier));
+
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.get("location"), url);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  }
+});
+
 test("checkout route supports the full Whop revenue plan inventory", async () => {
   const cases = [
     {
