@@ -2697,3 +2697,122 @@ Deliver:
 - rollback plan;
 - certification matrix delta.
 ```
+
+---
+
+## 26. 2026-06-11 Final Goals 1-3 Execution Attempt — Fresh Evidence
+
+Status: **PARTIAL / EXTERNAL ACCESS REQUIRED**.
+
+This run attempted the three operator-requested closeout goals:
+
+1. **Fresh YouTube cookie canary**
+2. **Bounded transcript catch-up**
+3. **Whop provider-proof certification**
+
+### Goal 1 — Fresh YouTube cookie canary
+
+Result: **BLOCKED — FRESH COOKIE NOT AVAILABLE IN RUNTIME**.
+
+Fresh evidence:
+
+- Canonical cookie path remains installed: `/opt/callscore/secrets/youtube-cookies.txt`.
+- File metadata verified without printing contents: `600`, `root:root`, non-empty.
+- Hermes worker/container can read the mounted cookie path.
+- Runtime search for supplied fresh cookie files found only the existing stale cookie and its same-sized workspace copy:
+  - `/opt/callscore/secrets/youtube-cookies.txt`
+  - `/srv/whop-auto/workspace/crypto-tuber-ranked/cookies.txt`
+- Browser-profile metadata check did not find an authenticated Whop session and did not yield a fresh YouTube cookie source.
+- No one-video canary was rerun with the known-stale cookie because prior canary evidence already classified it as `bot_verification_required`, and rerunning stale credentials would increase YouTube bot/rate-limit pressure without new information.
+
+Exact required operator action:
+
+```bash
+sudo install -m 600 /path/to/fresh-youtube-cookies.txt /opt/callscore/secrets/youtube-cookies.txt
+sudo chown root:root /opt/callscore/secrets/youtube-cookies.txt
+cd /opt/crypto-tuber-ranked
+docker compose up -d hermes-worker
+```
+
+Then run exactly one slow YT-DLP transcript canary before any 25-video catch-up.
+
+### Goal 2 — Bounded transcript catch-up
+
+Result: **BLOCKED ON GOAL 1 CANARY**.
+
+Reason:
+
+- The bounded 25-video current-window transcript catch-up remains correctly gated behind a passing one-video canary.
+- Freshness check remains `WARN`, not `FAIL`, with no blockers and exact warnings:
+  - `transcript provider credential missing failures=2`
+  - `yt-dlp bot verification failures=3`
+- Daily pipeline timer remains active and certified.
+- HH read API native bucket contract remains safe.
+
+### Goal 3 — Whop provider-proof certification
+
+Result: **PARTIAL CERTIFIED / PROVIDER AUTH REQUIRED**.
+
+Certified in this run:
+
+- Public checkout alias routes are deployed and return `303` to Whop with `cache-control: no-store`:
+  - `/api/checkout/pro-monthly` -> `plan_NAa2zmHBIx6Qo`
+  - `/api/checkout/pro-annual` -> `plan_iHti858gVSzcY`
+  - `/api/checkout/alpha-monthly` -> `plan_AdlVrE9OqVNAv`
+  - `/api/checkout/alpha-annual` -> `plan_ryBHTb0Ui27PE`
+- Public auth/session route returns `200` with `cache-control: no-store`.
+- Provider plan/product reads succeeded via approved provider-read context:
+  - Pro product: `prod_T0dRPNJkFcf5a`, plans visible, monthly and annual renewal periods verified.
+  - Alpha product: `prod_mFro2vmFaE9Ks`, plans visible, monthly and annual renewal periods verified.
+- Product/plan purchase hosts are Whop-hosted.
+
+Blocked provider actions:
+
+- Public Whop app `app_cDfDRY1cj8yQJZ` is still live but still points to stale Netlify dashboard values:
+  - `https://call-score.netlify.app`
+  - `https://call-score.netlify.app/api/auth/whop/callback`
+- Allowed app URL/callback PATCH to canonical CallScore values was attempted and returned `401`:
+  - `Request must be made from an authenticated actor (user or app or company)`
+- Official Whop API documentation requires developer app update permissions (`developer:update_app` and `developer:manage_api_key`) for this correction.
+- Provider webhook inventory read returned `401`.
+- Provider membership/entitlement read returned `401`.
+- No authenticated Whop browser session metadata was found locally.
+
+Exact required provider action:
+
+- Use a Whop dashboard/API actor with `developer:update_app` and provider read scopes to update public app `app_cDfDRY1cj8yQJZ` to:
+  - App/base URL: `https://call-score.com`
+  - OAuth callback: `https://call-score.com/api/auth/whop/callback`
+  - Return/success/cancel URLs: canonical `https://call-score.com` URLs only
+  - Webhook URL, if configured: `https://call-score.com/api/whop/webhook`
+- Provide dashboard/API access or a safe test account that can prove entitlement states:
+  - free/no entitlement denied
+  - pro entitlement allowed
+  - alpha entitlement allowed
+  - revoked/expired denied
+
+### Fresh verification evidence
+
+- Repo branch at start of this section: `master`.
+- HEAD before this plan update: `45473c4c9843b7265342d75ca163fbf2c16be71c`.
+- `git diff --check`: PASS.
+- `npm run freshness:check -- --read-api-base https://ops-bridge.call-score.com/api/read`: WARN with no blockers.
+- Daily timer: `callscore-daily-pipeline.timer` active/waiting.
+- Docker worker: `crypto-tuber-ranked-hermes-worker-1` running and can read `YTDLP_COOKIES_PATH`.
+- Checkout alias public probes: PASS after PR #57 deployment.
+
+### Certification delta
+
+| Area | Status |
+| --- | --- |
+| Goal 1 fresh cookie canary | BLOCKED — fresh valid YouTube cookie not present |
+| Goal 2 bounded transcript catch-up | BLOCKED — correctly gated on one-video canary |
+| Goal 3 Whop provider proof | PARTIAL — checkout/product/plan/code proof certified; app URL/webhook/entitlement proof blocked by provider auth |
+| Daily cadence | ACTIVE / CERTIFIED |
+| HH read API/homepage safety | CERTIFIED |
+| Whop checkout routes | CERTIFIED |
+| Whop public app URL/callback | BLOCKED — provider update returned 401 |
+| Whop webhook inventory | BLOCKED — provider read returned 401 |
+| Whop entitlement/revocation | BLOCKED — provider membership/test-account access required |
+| Art of War | PLANNING ONLY until Whop provider proof is closed |
+| Autonomous revenue | NO until cookie freshness plus Whop provider proof are closed |
