@@ -1,3 +1,17 @@
+import {
+  getExclusionReason,
+  isExcludedCreator,
+  isTargetCreatorClass,
+  normalizeCreatorIdentity,
+} from "./creator-eligibility-policy.mjs";
+
+export {
+  getExclusionReason,
+  isExcludedCreator,
+  isTargetCreatorClass,
+  normalizeCreatorIdentity,
+} from "./creator-eligibility-policy.mjs";
+
 const ABSOLUTE_OFFICIAL_CALL_FLOOR = 25;
 const OFFICIAL_THRESHOLDS = Object.freeze({
   all_time: 50,
@@ -12,21 +26,8 @@ const PROVISIONAL_THRESHOLDS = Object.freeze({
   "30d": Number.POSITIVE_INFINITY,
 });
 const STALE_AFTER_DAYS = 180;
-const ALTCOIN_DAILY_CHANNEL_IDS = new Set(["ucblhgkvy-bjpcawebgtnfbw"]);
-const EXCLUDED_MEDIA_NEWS_CHANNEL = "EXCLUDED_MEDIA_NEWS_CHANNEL";
 const PENDING_MATURITY = "PENDING_MATURITY";
 const SAFE_SQL_IDENTIFIER = /^[a-z_][a-z0-9_]*$/i;
-
-function normalizeText(value) {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
-}
-
-function compactText(value) {
-  return normalizeText(value).replace(/^@+/, "").replace(/\s+/g, "");
-}
 
 function numberValue(value) {
   const parsed = Number(value ?? 0);
@@ -55,48 +56,6 @@ function assertSafeSqlIdentifier(alias) {
   if (!SAFE_SQL_IDENTIFIER.test(alias)) {
     throw new Error(`Unsafe SQL alias for public eligible calls: ${alias}`);
   }
-}
-
-export function normalizeCreatorIdentity(row = {}) {
-  const name = normalizeText(row.name ?? row.creator_name);
-  const handle = compactText(row.youtube_handle ?? row.handle ?? row.creator_youtube_handle);
-  const channelId = normalizeText(
-    row.youtube_channel_id ?? row.channel_id ?? row.creator_youtube_channel_id,
-  );
-
-  return {
-    name,
-    compactName: compactText(name),
-    handle,
-    channelId,
-  };
-}
-
-export function isExcludedCreator(row = {}) {
-  const identity = normalizeCreatorIdentity(row);
-  if (identity.compactName === "altcoindaily") return true;
-  if (identity.handle === "altcoindaily") return true;
-  if (ALTCOIN_DAILY_CHANNEL_IDS.has(identity.channelId)) return true;
-
-  const creatorType = normalizeText(row.creator_type ?? row.creatorType);
-  const exclusionReason = normalizeText(row.exclusion_reason ?? row.exclusionReason);
-  const combined = `${creatorType} ${exclusionReason}`;
-
-  return /\b(news|media|aggregation|aggregator|non[-_\s]?target|contaminated)\b/.test(combined);
-}
-
-export function getExclusionReason(row = {}) {
-  const identity = normalizeCreatorIdentity(row);
-  if (
-    identity.compactName === "altcoindaily" ||
-    identity.handle === "altcoindaily" ||
-    ALTCOIN_DAILY_CHANNEL_IDS.has(identity.channelId)
-  ) {
-    return EXCLUDED_MEDIA_NEWS_CHANNEL;
-  }
-
-  const reason = row.exclusion_reason ?? row.exclusionReason;
-  return reason ? String(reason) : "EXCLUDED_NON_TARGET_CREATOR";
 }
 
 export function getOfficialThreshold(period = "all_time") {
@@ -154,7 +113,8 @@ export function classifyLeaderboardRow(row = {}, options = {}) {
     !isNullishRank(rank) &&
     totalCalls > 0 &&
     totalCalls >= officialThreshold &&
-    hasFreshnessProof(row)
+    hasFreshnessProof(row) &&
+    isTargetCreatorClass(row)
   ) {
     return {
       bucket: "officialRankedRows",
@@ -165,7 +125,8 @@ export function classifyLeaderboardRow(row = {}, options = {}) {
   if (
     totalCalls > 0 &&
     totalCalls >= getProvisionalThreshold(period) &&
-    hasFreshnessProof(row)
+    hasFreshnessProof(row) &&
+    isTargetCreatorClass(row)
   ) {
     return {
       bucket: "provisionalRows",

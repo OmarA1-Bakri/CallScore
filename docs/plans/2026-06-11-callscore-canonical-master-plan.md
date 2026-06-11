@@ -530,7 +530,7 @@ Updated order and current status:
 | P0D | Restart read API only after explicit approval | Not approved / not done |
 | P0E | Patch frontend to respect buckets | Local frontend display contract patch complete; unmerged, undeployed, and not production-certified |
 | P0F | Deploy only after explicit approval | Not approved / not done |
-| P1 | Canonical exclusion policy shared utility | Pending; API-level Altcoin Daily hard exclusion exists locally, shared policy extraction still pending |
+| P1 | Canonical exclusion policy shared utility | LOCAL PATCH IN PROGRESS on `callscore/revenue-ops-baseline-plan-policy`; shared policy utility extracted; PR/merge pending |
 | P2 | `creator_stats` period semantics and ranking writer correction | Pending |
 | P3 | Stats recompute only after explicit approval | Pending |
 | P4 | 30d redesign / disable official 30d | API-level disable complete locally; methodology redesign pending |
@@ -1220,11 +1220,11 @@ Certification target:
 | CERTIFY RAW POSTGRES EXPOSED | NO |
 | CERTIFY GLOBAL CALL VOLUME EXISTS | YES |
 | CERTIFY CREATOR_STATS SEMANTICS SAFE | NO |
-| CERTIFY LOW-N RANKING BLOCKED | LOCAL READ API PATCH YES; PRODUCTION NOT CERTIFIED |
-| CERTIFY ALTCOIN DAILY EXCLUDED FROM RANKINGS | LOCAL READ API PATCH YES; PRODUCTION NOT CERTIFIED |
-| CERTIFY 30D PERIOD SAFE | LOCAL READ API DISABLE YES; PRODUCTION NOT CERTIFIED |
-| CERTIFY READ API SAFE BUCKET CONTRACT | LOCAL PATCH YES; UNMERGED / UNDEPLOYED / PRODUCTION NOT CERTIFIED |
-| CERTIFY FRONTEND SAFE BUCKET DISPLAY | LOCAL PATCH YES; HOMEPAGE USES `officialRankedRows`; UNMERGED / UNDEPLOYED / PRODUCTION NOT CERTIFIED |
+| CERTIFY LOW-N RANKING BLOCKED | MERGED READ/API + HOMEPAGE PATCH YES via PR #40; PRODUCTION NOT CERTIFIED |
+| CERTIFY ALTCOIN DAILY EXCLUDED FROM RANKINGS | MERGED READ/API + HOMEPAGE PATCH YES via PR #40; STATS-WRITER/PRODUCTION NOT CERTIFIED |
+| CERTIFY 30D PERIOD SAFE | MERGED READ/API DISABLE YES via PR #40; PRODUCTION NOT CERTIFIED; METHODOLOGY REDESIGN PENDING |
+| CERTIFY READ API SAFE BUCKET CONTRACT | MERGED YES via PR #40 (`b18cc9e`); DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
+| CERTIFY FRONTEND SAFE BUCKET DISPLAY | MERGED YES via PR #40 (`b18cc9e`); HOMEPAGE USES `officialRankedRows`; DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
 | CERTIFY WHOP MANIFEST CLEAN | YES |
 | CERTIFY WHOP COMMERCE ENV READY | YES |
 | CERTIFY WHOP COMMERCE LIVE | PARTIAL |
@@ -1457,6 +1457,60 @@ Altcoin Daily is categorically excluded because it is a news/media channel, not 
 
 
 ---
+
+## 17A. Post-PR40 Merge Update — 2026-06-11
+
+PR #40, **Add leaderboard read API safety and frontend bucket contract**, has been merged to `master`.
+
+- Merge commit: `b18cc9e05187da3c85a3768ece7a26cb51338633`
+- Branch commit: `a3f9ddb94016fc8f3e4818e1faaf827131431fb1`
+- Status: MERGED YES
+- Canonical host deploy status: REQUIRES VERIFICATION
+- Production HH read API runtime status: REQUIRES VERIFICATION
+- Production public leaderboard certification: NO — not certified until live `/api/read/home` and homepage checks pass.
+
+Validation before merge:
+
+- `git diff --cached --check` — pass
+- `node --test tests/leaderboard-safety.test.mjs` — pass
+- `node --import tsx --test tests/home-read-api-contract.test.ts tests/page-home-shape.test.ts tests/leaderboard-shape.test.ts` — pass
+- `npm test` — pass
+- `npm run lint` — pass
+- `npm run typecheck` — pass after installing already-declared dependencies locally
+- `npm run build` — pass
+- `node --check src/scripts/callscore-read-api-server.mjs` — pass
+- `node --check src/lib/leaderboard-safety.mjs` — pass
+
+Provider status observed before merge:
+
+- Netlify deploy preview for PR #40: success (`https://deploy-preview-40--call-score.netlify.app`)
+- Vercel status: failing because account is blocked; Vercel remains deprecated and non-canonical.
+
+Important certification boundary:
+
+PR #40 productionizes the code path in git, but does **not** by itself certify runtime production behavior. Certification still requires provider/runtime proof that the production frontend and HH read API are running the merged code and that live responses satisfy the bucket contract.
+
+
+## 17B. Shared Creator Eligibility Policy Patch Update — 2026-06-11
+
+After PR #40 merged, the next implementation branch is `callscore/revenue-ops-baseline-plan-policy`.
+
+Current local patch scope:
+
+- Add `src/lib/creator-eligibility-policy.mjs` as the canonical shared product policy utility.
+- Add `src/lib/creator-eligibility-policy.d.ts` for TypeScript consumers.
+- Move Altcoin Daily and non-target/news/media/aggregation/contaminated/duplicate/ambiguous creator exclusion logic out of leaderboard-specific code.
+- Keep `src/lib/leaderboard-safety.mjs` as the read/API classifier while importing and re-exporting shared policy functions for compatibility.
+- Add `tests/creator-eligibility-policy.test.mjs`.
+
+Status boundary:
+
+- Local patch: IN PROGRESS / validated locally
+- PR: not opened yet
+- Merge: not yet
+- Production certification: not applicable until merged/deployed and runtime validated
+- Stats-writer enforcement: not yet; future patch must consume this policy in rank assignment before approved recompute.
+
 
 ## 18. Next UltraGoal — Revenue-Operations Certification Bridge
 
@@ -1761,7 +1815,7 @@ npm test
 npm run lint
 ```
 
-**Certification criteria:** `ALTCOIN DAILY EXCLUDED FROM RANKINGS: LOCAL SHARED POLICY YES; PRODUCTION TBD`.
+**Certification criteria:** `ALTCOIN DAILY EXCLUDED FROM RANKINGS: LOCAL SHARED POLICY YES; PR/MERGE PENDING; PRODUCTION TBD`.
 
 ### Phase 5 — Whop Commerce Certification Pack
 
@@ -1903,13 +1957,13 @@ Explicit approval is required before:
 | `HH_READ_API_BASE` | REPORTED YES — requires Thread 2 provider verification for final cert |
 | HH PostgreSQL / pgsql | YES as canonical DB; read-only recheck required before final bridge cert |
 | Neon canonical | NO |
-| Read API safety contract | LOCAL PATCH YES; UNMERGED / UNDEPLOYED / PRODUCTION NOT CERTIFIED |
-| Homepage leaderboard correctness | LOCAL PATCH YES; PRODUCTION NOT CERTIFIED |
-| Frontend bucket display | LOCAL PATCH YES; PRODUCTION NOT CERTIFIED |
+| Read API safety contract | MERGED YES via PR #40 (`b18cc9e`); DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
+| Homepage leaderboard correctness | MERGED SAFETY CONTRACT YES via PR #40; LIVE PRODUCTION NOT CERTIFIED |
+| Frontend bucket display | MERGED YES via PR #40; DEPLOYED REQUIRES VERIFICATION; PRODUCTION NOT CERTIFIED |
 | `creator_stats` semantics | NO — repair plan required |
-| Altcoin Daily exclusion | LOCAL READ/API POLICY YES; PRODUCTION/STATS-WRITER NOT CERTIFIED |
-| Low-N ranking block | LOCAL READ/API POLICY YES; STATS-WRITER/PRODUCTION NOT CERTIFIED |
-| 30d safety | LOCAL API DISABLE YES; METHODOLOGY REDESIGN PENDING |
+| Altcoin Daily exclusion | MERGED READ/API/UI POLICY YES via PR #40; PRODUCTION/STATS-WRITER NOT CERTIFIED |
+| Low-N ranking block | MERGED READ/API/UI POLICY YES via PR #40; STATS-WRITER/PRODUCTION NOT CERTIFIED |
+| 30d safety | MERGED API/UI DISABLE YES via PR #40; METHODOLOGY REDESIGN PENDING; PRODUCTION NOT CERTIFIED |
 | Whop commerce | PARTIAL |
 | Whop-auto | NO / NOT CERTIFIED |
 | Hermes worker | LOCAL LOOP PROOF YES; scheduled production proof still required |
