@@ -28,6 +28,8 @@ test("/methodology preserves SCORE_WEIGHTS-driven content", () => {
   assert.match(src, /SCORE_WEIGHTS/);
 });
 
-test("/methodology preserves TRACKED_CREATOR_COUNT reference", () => {
+test("/methodology labels TRACKED_CREATOR_COUNT as seed-list scope", () => {
   assert.match(src, /TRACKED_CREATOR_COUNT|TRACKED_COINS/);
+  assert.match(src, /creator seed list/);
+  assert.doesNotMatch(src, /creators tracked", v: TRACKED_CREATOR_COUNT/);
 });

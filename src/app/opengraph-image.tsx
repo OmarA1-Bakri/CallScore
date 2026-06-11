@@ -82,8 +82,8 @@ export default function Image() {
           }}
         >
           {[
-            ["Creators tracked", "123"],
-            ["Scored calls", "46"],
+            ["Creator seed list", "123"],
+            ["Call Score", "0–100"],
             ["Methodology", "Public"],
             ["Sponsorships", "None"],
           ].map(([label, value]) => (
