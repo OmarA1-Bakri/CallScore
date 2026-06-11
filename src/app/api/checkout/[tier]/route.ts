@@ -24,6 +24,26 @@ function envKey(tier: Tier, interval: Interval): string {
   return `WHOP_CHECKOUT_URL_${tier.toUpperCase()}_${interval.toUpperCase()}`;
 }
 
+function parseTierAndInterval(
+  rawTier: string,
+  request: NextRequest,
+): { tier: Tier; interval: Interval } | { error: "invalid_tier" | "invalid_interval" } {
+  const normalized = rawTier.toLowerCase();
+  const [tierPart, intervalPart, extraPart] = normalized.split("-");
+  const tier = tierPart;
+  const intervalFromPath = intervalPart && !extraPart ? intervalPart : null;
+
+  if (!isTier(tier)) return { error: "invalid_tier" };
+
+  const rawInterval = (
+    intervalFromPath ?? request.nextUrl.searchParams.get("interval") ?? "monthly"
+  ).toLowerCase();
+
+  if (!isInterval(rawInterval)) return { error: "invalid_interval" };
+
+  return { tier, interval: rawInterval };
+}
+
 /**
  * Whop checkout session URLs are transient; forwarding a stale `session` query
  * can produce dead checkout pages. Absolute checkout URLs are normalized after
@@ -49,27 +69,24 @@ export async function GET(
   { params }: { params: Promise<{ tier: string }> },
 ): Promise<NextResponse> {
   const { tier: rawTier } = await params;
-  const tier = rawTier.toLowerCase();
+  const parsed = parseTierAndInterval(rawTier, request);
 
-  if (!isTier(tier)) {
-    return NextResponse.json(
-      { error: "invalid_tier", valid: VALID_TIERS },
-      { status: 400, headers: noStoreHeaders() },
-    );
-  }
+  if ("error" in parsed) {
+    if (parsed.error === "invalid_tier") {
+      return NextResponse.json(
+        { error: "invalid_tier", valid: VALID_TIERS },
+        { status: 400, headers: noStoreHeaders() },
+      );
+    }
 
-  const rawInterval = (
-    request.nextUrl.searchParams.get("interval") ?? "monthly"
-  ).toLowerCase();
-
-  if (!isInterval(rawInterval)) {
     return NextResponse.json(
       { error: "invalid_interval", valid: VALID_INTERVALS },
       { status: 400, headers: noStoreHeaders() },
     );
   }
 
-  const key = envKey(tier, rawInterval);
+  const { tier, interval } = parsed;
+  const key = envKey(tier, interval);
   const url = process.env[key];
 
   if (url && url.trim().length > 0) {
@@ -82,12 +99,12 @@ export async function GET(
     "[checkout] missing env var %s for tier=%s interval=%s",
     key,
     tier,
-    rawInterval,
+    interval,
   );
 
   const fallback = new URL(request.url);
   fallback.pathname = "/feedback";
-  fallback.search = `?missing=checkout-url-${tier}-${rawInterval}`;
+  fallback.search = `?missing=checkout-url-${tier}-${interval}`;
 
   const redirect = NextResponse.redirect(fallback.toString(), 303);
   redirect.headers.set("cache-control", "no-store");

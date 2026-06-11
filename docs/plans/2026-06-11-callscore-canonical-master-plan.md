@@ -447,6 +447,53 @@ Canonical remaining order after this run:
 3. **Whop provider-proof closure** — fix/verify provider dashboard URL drift for the live app, obtain product/plan/webhook/entitlement provider read proof, and certify commerce without mutating pricing/payment/live plans unless separately approved.
 4. **Art of War** — move from planning to autonomous growth-loop execution only after Whop provider proof closes or the operator explicitly accepts the provider gate as blocked and bounded.
 
+
+### 0.8 2026-06-11 Final Cookie + Whop Closure Run — Current Result
+
+```text
+CURRENT MASTER AT START: a1aa0b4c0c82d3bbee7649b052123cd26f7eb97d
+TRANSCRIPT COOKIE: ACTIVE BUT INVALID / NO FRESH VALID SOURCE AVAILABLE
+WHOP PUBLIC APP URL CORRECTION: ATTEMPTED, BLOCKED BY PROVIDER 401 WRITE SCOPE
+WHOP PLAN INVENTORY: CERTIFIED BY DIRECT PROVIDER PLAN/PRODUCT READS
+CHECKOUT ROUTE ALIASES: PATCHED LOCALLY TO SUPPORT /api/checkout/{tier}-{interval}
+ART OF WAR: PLANNING ONLY UNTIL COOKIE + WHOP WRITE/ENTITLEMENT GATES CLOSE
+```
+
+Fresh execution evidence from this run:
+
+1. YouTube cookie refresh gate:
+   - Existing runtime cookie remains present at `/opt/callscore/secrets/youtube-cookies.txt`, mode `600`, owner `root:root`, non-empty.
+   - Hermes worker still reads the mounted `YTDLP_COOKIES_PATH`.
+   - Redacted file sweep found no fresh supplied cookie under `/tmp`, `/opt/callscore`, `/srv`, `/home`, or `/root`; only the previously known stale runtime cookie and same-sized workspace copy were present.
+   - Local browser cookie stores were discovered, but a bounded `yt-dlp --cookies-from-browser` export reported zero browser cookies and only produced request-generated cookies; it was not installed as a valid authenticated YouTube cookie.
+   - No project one-video canary or 25-video catch-up was run because no fresh valid cookie source became active.
+
+2. Whop provider dashboard correction:
+   - Live public Whop app `app_cDfDRY1cj8yQJZ` was re-read and still showed `base_url=https://call-score.netlify.app` and callback `https://call-score.netlify.app/api/auth/whop/callback`.
+   - Allowed provider URL correction was attempted with canonical `https://call-score.com` base URL and `https://call-score.com/api/auth/whop/callback`.
+   - Whop returned `401 unauthorized` for the PATCH, so provider write scope/dashboard access is insufficient from the available key.
+   - No pricing, payment, product, plan, webhook, billing, or secret mutation occurred.
+
+3. Whop provider inventory proof improved:
+   - Direct provider reads of the four route plan IDs succeeded.
+   - Pro monthly `plan_NAa2zmHBIx6Qo`: visible renewal plan, 30-day billing, Whop purchase URL observed.
+   - Pro annual `plan_iHti858gVSzcY`: visible renewal plan, 365-day billing, Whop purchase URL observed.
+   - Alpha monthly `plan_AdlVrE9OqVNAv`: visible renewal plan, 30-day billing, Whop purchase URL observed.
+   - Alpha annual `plan_ryBHTb0Ui27PE`: visible renewal plan, 365-day billing, Whop purchase URL observed.
+   - Product reads for the Pro and Alpha product IDs succeeded; both products are provider-visible but currently hidden.
+   - Webhook list read still returns `401`, so provider webhook dashboard certification remains blocked on read scope.
+
+4. Checkout route behavior:
+   - Existing canonical routes remain certified: `/api/checkout/pro?interval=monthly`, `/api/checkout/pro?interval=annual`, `/api/checkout/alpha?interval=monthly`, `/api/checkout/alpha?interval=annual` return `303` to Whop and `cache-control: no-store`.
+   - The checklist alias routes `/api/checkout/pro-monthly`, `/api/checkout/pro-annual`, `/api/checkout/alpha-monthly`, and `/api/checkout/alpha-annual` initially returned `400`; route code was patched to map these aliases to the same existing environment-backed Whop checkout URLs.
+
+Remaining exact gates after this run:
+
+1. **Fresh authenticated YouTube cookie** — provide a valid Netscape YouTube cookie file and install it with:
+   `sudo install -m 600 /path/to/fresh-youtube-cookies.txt /opt/callscore/secrets/youtube-cookies.txt && sudo chown root:root /opt/callscore/secrets/youtube-cookies.txt && cd /opt/crypto-tuber-ranked && docker compose up -d hermes-worker`
+2. **Whop provider write access/dashboard action** — update live public app `app_cDfDRY1cj8yQJZ` from `call-score.netlify.app` to `call-score.com`, or provide an API key/session with permission to PATCH app URL/callback settings.
+3. **Whop webhook/entitlement proof** — provide provider read scope or dashboard/test-account proof for webhook configuration and live entitlement/revocation behavior. Code-level entitlement and webhook signature tests pass, but live provider proof remains access-gated.
+
 ## 1. Source Of Truth
 
 This master plan incorporates:
@@ -921,7 +968,7 @@ Updated order and current status:
 | P6 | Identity normalization | Pending |
 | P7 | Remaining public read API rollout beyond homepage | Pending |
 | P8 | Controlled scheduled candles enqueue proof | Pending |
-| P9 | Whop live commerce proof | BLOCKED ON PROVIDER ACTION — public route/auth/code proof pass; live provider app dashboard URL drift found (`call-score.netlify.app` / `automation.call-score.com` vs `call-score.com`), and product/plan/webhook/entitlement reads return 401 with available key |
+| P9 | Whop live commerce proof | PARTIAL — public route/auth/code proof pass; provider plan/product inventory now certified by direct reads; live app URL correction attempted but blocked by provider 401 write scope; webhook/entitlement provider proof still access-gated |
 | P10 | Art of War autonomous growth loop certification | READY PLANNING NEXT / BLOCKED ON WHOP PROVIDER PROOF; no public external actions until Whop provider dashboard/inventory/entitlement proof closes |
 
 ---
@@ -2596,8 +2643,8 @@ Explicit approval is required before:
 | Official creator count | 12m/default 42, all_time 36, 90d 53, 30d 0 after eligibility recalibration and recompute; transcript catch-up may change future counts only after valid cookie recovery |
 | Website count correctness | CERTIFIED for current HH API/source semantics; final transcript-current coverage still depends on valid cookie catch-up |
 | Freshness self-check | WARN — command reports grants, jobs, daily timer status, transcript backlog/status, timestamps, source unsafe ranks, native buckets, and exact invalid-cookie/bot warnings |
-| Whop commerce | PARTIAL / ROUTE+CODE PROOF PASS; provider app reads succeeded but found dashboard URL drift (`call-score.netlify.app` on live app and `automation.call-score.com` on manifest app); product/plan/webhook/entitlement inventory reads return 401 with available key; PROVIDER ACTION REQUIRED |
-| Whop-auto | BLOCKED ON PROVIDER ACTION / READ SCOPE; public checkout/OAuth/code proof passes; update live Whop app URLs and provide inventory/entitlement read proof; no provider mutation or live purchase performed |
+| Whop commerce | PARTIAL / ROUTE+CODE+PLAN INVENTORY PROOF PASS; direct reads certify four visible route plan IDs and Pro/Alpha products; public app URL correction attempted but blocked by 401 write scope; webhook and live entitlement proof remain PROVIDER ACTION REQUIRED |
+| Whop-auto | BLOCKED ON PROVIDER WRITE/ENTITLEMENT/WEBHOOK ACCESS; checkout/OAuth/code and plan inventory proof pass; update live app URL/callback and provide webhook/entitlement proof; no pricing/payment/product/plan mutation or live purchase performed |
 | Art of War loop | READY PLANNING NEXT / NOT CERTIFIED; external autonomous growth execution blocked until Whop provider dashboard/inventory/entitlement proof closes |
 | Data freshness certification | PARTIAL — DB writer/video discovery/worker/source ranks/daily cadence recovered; slow-YT-DLP transcript success remains blocked by invalid/stale cookie bot verification |
 | Autonomous revenue | NO |
