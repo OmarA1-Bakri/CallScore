@@ -138,7 +138,7 @@ After provider access is supplied, rerun transcript catch-up, extraction catch-u
 
 ```text
 CANONICAL TRANSCRIPT PATH: SLOW YT-DLP
-SLOW YT-DLP CODE SAFETY: PR #50 PATCH YES
+SLOW YT-DLP CODE SAFETY: PR #50 MERGED
 DAILY PIPELINE TIMER: INSTALLED / ACTIVE / CERTIFIED
 TRANSCRIPT ACQUISITION: BLOCKED BY YOUTUBE BOT VERIFICATION UNTIL COOKIE PATH IS PROVIDED
 DATA/WORKER/FRESHNESS REMEDIATION: PARTIAL — EXACT COOKIE GATE REMAINS
@@ -146,7 +146,7 @@ DATA/WORKER/FRESHNESS REMEDIATION: PARTIAL — EXACT COOKIE GATE REMAINS
 
 Runtime evidence captured on 2026-06-11 after the PR #49 recovery baseline:
 
-- Repo/runtime path: `/opt/crypto-tuber-ranked`; base master `c459fc5448b27195231e2292a3be1706156b6b81`; slow-YT-DLP cadence patch is PR #50.
+- Repo/runtime path: `/opt/crypto-tuber-ranked`; base master `c459fc5448b27195231e2292a3be1706156b6b81`; slow-YT-DLP cadence patch merged via PR #50 (`091da45`).
 - Slow transcript runner defaults are now intentionally conservative:
   - canonical provider path: `yt-dlp` subtitle/caption retrieval only; no video download; no playlist expansion;
   - default transcript batch limit: 25;
@@ -224,7 +224,7 @@ This master plan incorporates:
 - 2026-06-11 merged PR #44 homepage legacy HH compatibility restore (`ad942fdf`).
 - 2026-06-11 merged PR #45 methodology/rubric certification audit and public-copy patch (`93e87d9`).
 - 2026-06-11 merged PR #47 public count/copy clarification (`010eafef`).
-- 2026-06-11 runtime certification: native HH read API buckets certified after `callscore-read-api.service` restart; PR #49 recovered DB writer privileges, RSS discovery, scoring, source-safe stats, and native buckets; PR #50 activates slow-YT-DLP daily cadence and remains blocked only by a working YouTube cookie/credential path.
+- 2026-06-11 runtime certification: native HH read API buckets certified after `callscore-read-api.service` restart; PR #49 recovered DB writer privileges, RSS discovery, scoring, source-safe stats, and native buckets; PR #50 merged slow-YT-DLP daily cadence and remains blocked only by a working YouTube cookie/credential path.
 
 Thread boundaries:
 
@@ -2350,7 +2350,7 @@ Explicit approval is required before:
 | 30d safety | CERTIFIED as `PENDING_MATURITY`; methodology redesign remains APPROVAL-GATED |
 | Official creator count | 17 after latest canary/recompute — unchanged because no new transcript success; accepted as current strict-source output pending slow-YT-DLP cookie recovery |
 | Website count correctness | PARTIAL — public API counts safe; final current-coverage count certification requires transcript catch-up |
-| Freshness self-check | PR #50 PATCH YES / WARN — command reports grants, jobs, daily timer status, transcript backlog/status, timestamps, source unsafe ranks, native buckets, and exact YT-DLP bot/cookie warnings |
+| Freshness self-check | PR #50 MERGED / WARN — command reports grants, jobs, daily timer status, transcript backlog/status, timestamps, source unsafe ranks, native buckets, and exact YT-DLP bot/cookie warnings |
 | Whop commerce | PARTIAL; WHOP-AUTO CERTIFICATION PACK MERGED YES via PR #42; PROVIDER PROOF REQUIRED |
 | Whop-auto | PARTIAL; LIVE PROVIDER PROOF REQUIRED after data freshness blocker is removed |
 | Art of War loop | NO / NOT CERTIFIED |
