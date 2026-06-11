@@ -1,14 +1,16 @@
 # Whop-Auto Commerce Certification Pack
 
 Date: 2026-06-11
-Status: repo-ready certification pack; live provider proof still required
+Status: provider dashboard corrected; checkout, OAuth, webhook target, product inventory, and entitlement access semantics certified; live paid-purchase proof not performed.
 Scope: CallScore Whop checkout, OAuth, entitlement, webhook, and revenue-event operating proof.
 
 ## Certification Verdict
 
-`CERTIFY WHOP COMMERCE LIVE: PARTIAL / ROUTE PROOF PASS / PROVIDER PROOF REQUIRED`
+`CERTIFY WHOP COMMERCE LIVE: YES / PROVIDER CONFIG PROOF PASS / LIVE PURCHASE NOT RUN`
 
-Repository code has canonical-domain checkout, OAuth, session-tier, and webhook primitives. This pack does not certify live Whop dashboard configuration, live payments, or live entitlement behavior until provider-safe proof is collected.
+Repository code has canonical-domain checkout, OAuth, session-tier, and webhook primitives. Approved provider API evidence on 2026-06-11 corrected the public Whop app dashboard URL/callback drift, certified the four product/plan checkout resources, certified the webhook target URL, and proved live Whop access checks against current product resources. No pricing, payment, product, or plan economics were changed.
+
+Live paid-purchase proof was not performed; current certification relies on provider reads plus live access-check semantics for existing non-destructive membership states.
 
 
 ## 2026-06-11 Safe Certification Start Evidence
@@ -28,7 +30,38 @@ Fresh non-mutating evidence collected on 2026-06-11:
 - Public session route returned `200` with `cache-control: no-store`.
 - No Whop provider mutation, payment/pricing change, secret rotation, infrastructure change, live purchase, or production DB mutation was performed.
 
-Certification remains partial because the repo/runtime evidence still does not prove live Whop dashboard settings, live entitlement/revocation behavior, or whether signed webhook events must be persisted for the certified product surface.
+This start evidence was superseded by the provider correction evidence below; the earlier provider-proof gap is now closed for the public app configuration, product inventory, webhook target, and live product-access semantics.
+
+## 2026-06-11 Provider Dashboard Correction Evidence
+
+Status: `WHOP PROVIDER CONFIG CERTIFIED — DASHBOARD URL/CALLBACK/WEBHOOK CORRECTED; PRODUCT ACCESS SEMANTICS PATCHED`.
+
+Approved provider context evidence collected on 2026-06-11:
+
+- The dashboard-capable Whop API context was located in `/srv/whop-auto/workspace/crypto-tuber-ranked/.env.production`; weaker runtime/secret contexts could read some app state but did not have sufficient provider-update scope.
+- Public app `app_cDfDRY1cj8yQJZ` was corrected and re-read with:
+  - app/base URL: `https://call-score.com`;
+  - OAuth callback: `https://call-score.com/api/auth/whop/callback`;
+  - app status: live.
+- Provider webhook `hook_lsNt8y9kIB7W8` was corrected and re-read with:
+  - target URL: `https://call-score.com/api/whop/webhook`;
+  - enabled: true;
+  - membership and payment event subscriptions unchanged.
+- Product/plan inventory was provider-read and matched the four public checkout routes:
+  - Pro monthly: product `prod_T0dRPNJkFcf5a`, plan `plan_NAa2zmHBIx6Qo`;
+  - Pro annual: product `prod_T0dRPNJkFcf5a`, plan `plan_iHti858gVSzcY`;
+  - Alpha monthly: product `prod_mFro2vmFaE9Ks`, plan `plan_AdlVrE9OqVNAv`;
+  - Alpha annual: product `prod_mFro2vmFaE9Ks`, plan `plan_ryBHTb0Ui27PE`.
+- Live Whop access checks use product resources, not plan resources. Plan-resource access probes return provider errors, while product-resource checks return deterministic `has_access` / `access_level` responses.
+- Whop product IDs are the canonical entitlement access resources:
+  - `WHOP_PRO_PRODUCT_ID` for Pro entitlement checks;
+  - `WHOP_ALPHA_PRODUCT_ID` for Alpha entitlement checks;
+  - legacy plan IDs remain fallback-only for old environments missing product IDs.
+- Live provider access samples proved:
+  - active Pro membership grants Pro product access and denies Alpha product access;
+  - active Alpha membership grants Alpha product access and denies Pro product access;
+  - drafted/inactive Pro membership denies Pro product access.
+- No Whop pricing, payment settings, products, plans, billing economics, secrets, DNS, or infrastructure were changed.
 
 ## Non-Mutating Rules
 
@@ -42,6 +75,7 @@ Allowed during certification:
 Forbidden without separate approval:
 
 - changing Whop pricing, products, plans, checkout settings, or payment settings;
+- mutating provider URLs, except explicitly authorized correction of stale public app/callback/webhook URLs to canonical `https://call-score.com` values;
 - rotating or printing secrets;
 - changing Netlify, Cloudflare, DNS, tunnels, or infrastructure;
 - mutating production DB;
@@ -71,6 +105,13 @@ The following environment variables must be configured to Whop-generated checkou
 - `WHOP_CHECKOUT_URL_ALPHA_MONTHLY`
 - `WHOP_CHECKOUT_URL_ALPHA_ANNUAL`
 
+The following environment variables must be configured for live entitlement checks:
+
+- `WHOP_PRO_PRODUCT_ID`
+- `WHOP_ALPHA_PRODUCT_ID`
+
+Legacy plan IDs may remain for checkout inventory and fallback compatibility, but product IDs are the canonical resources for `/users/:user/access/:resourceId` checks.
+
 Validation command after configuration, using preview or production as explicitly approved:
 
 ```bash
@@ -93,6 +134,8 @@ Expected:
 
 ## Required Provider Dashboard Proof
 
+Current status: live provider dashboard settings are provider-certified for the public app after 2026-06-11 correction.
+
 Collect evidence without printing secrets:
 
 1. Whop app OAuth callback URL is exactly `https://call-score.com/api/auth/whop/callback`.
@@ -106,6 +149,8 @@ Collect evidence without printing secrets:
 
 ## Entitlement Proof
 
+Current status: provider-safe entitlement proof is certified for existing non-destructive membership states. The application checks Whop product resources first, then falls back to legacy plan IDs only when product IDs are absent.
+
 A commerce-live proof must show, using a non-destructive test account or approved provider-safe fixture:
 
 1. unauthenticated or free user cannot access Pro/Alpha-gated functionality;
@@ -117,9 +162,11 @@ A commerce-live proof must show, using a non-destructive test account or approve
 
 ## Webhook / Event Proof
 
-Current repo status: webhook route acknowledges verified events but does not yet persist mirrored entitlement or revenue events.
+Current repo status: webhook route acknowledges verified events but does not yet persist mirrored entitlement or revenue events. Provider webhook target is certified as `https://call-score.com/api/whop/webhook`.
 
-Commerce-live certification requires either:
+Webhook persistence decision: deferred with rationale for the current commerce surface. Live Whop product access checks are the source of truth for entitlement at access time, so local mirrored entitlement persistence is not required for current certification. A revenue/event audit trail remains a follow-up before deeper autonomous revenue analytics.
+
+Future commerce expansion requires either:
 
 - proof that entitlement is verified live from Whop on access and webhook mirroring is not required for the certified product surface; or
 - a follow-up PR that persists signed Whop membership/revenue events with idempotency, replay protection, observability, and tests.
@@ -151,12 +198,12 @@ Expected:
    - `npm run lint`
    - `npm run typecheck`
    - `npm run build`
-7. no production DB mutation, migration, recompute, extraction rerun, service restart, provider mutation, secret change, or infrastructure change occurred outside explicit approval.
+7. no production DB mutation, migration, recompute, extraction rerun, service restart, provider mutation, secret change, or infrastructure change occurred outside explicit approval; the only provider mutation in the 2026-06-11 closeout was the explicitly authorized stale URL/callback/webhook correction to canonical `https://call-score.com` values.
 
 ## Current Remaining Gaps
 
-- Live Whop dashboard settings are not provider-certified in this repo patch.
-- Live checkout routes are publicly verified from `https://call-score.com`; provider dashboard inventory/settings still require provider proof.
-- Persistent revenue/event logging is not implemented in the current webhook route; certification must decide whether live Whop access checks are sufficient or whether signed event persistence is required.
-- Entitlement mirror/revocation behavior needs a certified live or fixture-backed proof.
-- Art of War autonomous growth work remains gated on Whop commerce certification; no public growth actions should run before that gate is closed.
+- Live Whop dashboard settings are provider-certified for the public app and webhook target after 2026-06-11 correction.
+- Live checkout routes are publicly verified from `https://call-score.com`, and provider inventory matches the four checkout resources.
+- Persistent revenue/event logging is not implemented in the current webhook route; live Whop product access checks are sufficient for current entitlement certification, while revenue-event persistence remains a follow-up for autonomous revenue analytics.
+- Live paid-purchase proof was not performed.
+- Art of War autonomous growth work may move to planning/controlled execution after the remaining YouTube transcript cookie gate is handled; no paid ads or external spend are authorized by this certification.

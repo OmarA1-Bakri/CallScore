@@ -21,6 +21,8 @@ test("Whop certification pack anchors all commerce-live proof points", () => {
     "WHOP_CHECKOUT_URL_PRO_ANNUAL",
     "WHOP_CHECKOUT_URL_ALPHA_MONTHLY",
     "WHOP_CHECKOUT_URL_ALPHA_ANNUAL",
+    "WHOP_PRO_PRODUCT_ID",
+    "WHOP_ALPHA_PRODUCT_ID",
     "tests/whop-webhook-route.test.ts",
     "CERTIFY WHOP COMMERCE LIVE: YES",
   ]) {
@@ -29,5 +31,6 @@ test("Whop certification pack anchors all commerce-live proof points", () => {
 
   assert.match(doc, /Forbidden without separate approval:/);
   assert.match(doc, /changing Whop pricing, products, plans, checkout settings, or payment settings/);
-  assert.match(doc, /Live Whop dashboard settings are not provider-certified/);
+  assert.match(doc, /Live Whop dashboard settings are provider-certified/);
+  assert.match(doc, /Whop product IDs are the canonical entitlement access resources/);
 });
