@@ -60,7 +60,8 @@
     "transcript:ingest": "node --import tsx src/scripts/ingest-transcript-result.ts",
     "transcript:media-fallback": "node --import tsx src/scripts/transcribe-media-fallback.ts",
     "benchmark:extractors": "node --import tsx src/scripts/benchmark-local-extractors.ts",
-    "ml:idle-improve": "node --import tsx src/scripts/ml-idle-improve.ts"
+    "ml:idle-improve": "node --import tsx src/scripts/ml-idle-improve.ts",
+    "workplane:status": "node --import tsx src/scripts/workplane-status.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

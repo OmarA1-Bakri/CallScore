@@ -5,7 +5,9 @@ import {
   enqueueComputeScoresJob,
   enqueueMatchPricesBatchJob,
   enqueueNightlyMlVerifierJob,
+  enqueueWorkplaneJob,
 } from "../lib/pipeline";
+import { isWorkplaneJobType, WORKPLANE_JOB_TYPES, type WorkplaneJobType } from "../lib/workplane-jobs";
 
 const HOST = process.env.HH_ENQUEUE_HOST || "127.0.0.1";
 const PORT = Number(process.env.HH_ENQUEUE_PORT || "8788");
@@ -23,6 +25,7 @@ const SUPPORTED_TYPES = new Set([
   "match_prices_batch",
   "compute_scores",
   "ml_verifier_batch",
+  ...WORKPLANE_JOB_TYPES,
 ]);
 
 type Body = {
@@ -106,8 +109,31 @@ function sourceValue(raw: unknown): string {
   return typeof raw === "string" && raw.trim() ? raw.trim().slice(0, 80) : "unknown";
 }
 
+function validateWorkplanePayload(type: WorkplaneJobType, payload: Record<string, unknown>): void {
+  if (type === "transcript_collect_laptop") {
+    const limit = positiveInt(payload.limit, 5, 25, "payload.limit");
+    if (limit > 5 && payload.allow_large_batch !== true) {
+      throw new Error("transcript_collect_laptop limit >5 requires payload.allow_large_batch=true");
+    }
+    return;
+  }
+  if (type === "gemma_shadow_extract") {
+    positiveInt(payload.limit, 10, 10, "payload.limit");
+    if (payload.write === true) throw new Error("gemma_shadow_extract cannot write production calls");
+    return;
+  }
+  if (type === "ml_extraction_eval" || type === "ml_idle_improve") {
+    positiveInt(payload.limit, 100, 100, "payload.limit");
+    if (payload.write === true) throw new Error(`${type} cannot write production calls`);
+    return;
+  }
+  if (type === "extraction_promotion_review" && payload.write === true) {
+    throw new Error("extraction_promotion_review is report-only");
+  }
+}
+
 function validate(body: Body): {
-  type: "candle_refresh" | "match_prices_batch" | "compute_scores" | "ml_verifier_batch";
+  type: "candle_refresh" | "match_prices_batch" | "compute_scores" | "ml_verifier_batch" | WorkplaneJobType;
   source: string;
   payload: Record<string, unknown>;
 } {
@@ -115,11 +141,12 @@ function validate(body: Body): {
     throw new Error("unsupported job type");
   }
   const payload = body.payload && typeof body.payload === "object" && !Array.isArray(body.payload) ? body.payload : {};
-  if (payload.write !== undefined && payload.write !== true) {
+  if (isWorkplaneJobType(body.type)) validateWorkplanePayload(body.type, payload);
+  if (!isWorkplaneJobType(body.type) && payload.write !== undefined && payload.write !== true) {
     throw new Error("payload.write must be true when provided");
   }
   return {
-    type: body.type as "candle_refresh" | "match_prices_batch" | "compute_scores" | "ml_verifier_batch",
+    type: body.type as "candle_refresh" | "match_prices_batch" | "compute_scores" | "ml_verifier_batch" | WorkplaneJobType,
     source: sourceValue(body.source),
     payload,
   };
@@ -146,6 +173,12 @@ async function enqueue(validated: ReturnType<typeof validate>) {
   }
   if (validated.type === "compute_scores") {
     return enqueueComputeScoresJob();
+  }
+  if (isWorkplaneJobType(validated.type)) {
+    return enqueueWorkplaneJob({
+      type: validated.type,
+      payload: validated.payload,
+    });
   }
   return enqueueNightlyMlVerifierJob({
     batchSize: positiveInt(validated.payload.batch_size, 250, MAX_ML_BATCH_SIZE, "payload.batch_size"),

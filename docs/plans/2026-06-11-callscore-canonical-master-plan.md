@@ -3958,3 +3958,113 @@ Make Gemma useful on real transcripts before any write canary:
 3. add a strict adapter from the benchmark schema to the production normalized call schema;
 4. add latency budget gates and skip/queue slow rows instead of blocking the batch;
 5. rerun 10-transcript and then 25-transcript shadow samples before considering write-canary promotion.
+
+---
+
+## 36. 2026-06-12 Hermes/workplane automation readiness for collector + Gemma ML loop
+
+Status: **HERMES JOB SURFACES IMPLEMENTED / WORKPLANE STATUS ACTIVE / AUTOMATION READINESS PARTIAL / PRODUCTION DEFAULT UNCHANGED**.
+
+Purpose: convert the rate-limit-safe laptop collector, Gemma shadow extraction, and ML improvement loop from manual operator commands into bounded Hermes/workplane job surfaces with machine-readable state so agents can decide the next safe autonomous action.
+
+### Hermes/workplane job model
+
+Result: **IMPLEMENTED**.
+
+Added canonical job definitions in `src/lib/workplane-jobs.ts` and registered them with the existing pipeline/Hermes/enqueue surfaces rather than creating a separate orchestration path.
+
+| Job | Location | Max batch | Concurrency | Writes allowed | Ranking impact | Status |
+| --- | --- | ---: | ---: | --- | --- | --- |
+| `transcript_collect_laptop` | Omar laptop | 5 default / 25 gated | 1 | transcript-result ingest only | No | REPRESENTED / laptop runner required |
+| `transcript_ingest_result` | HH | 1 | 1 | transcript rows only through ingest script | No | CALLABLE |
+| `gemma_shadow_extract` | HH | 10 | 1 | shadow artifacts only | No | CALLABLE |
+| `ml_extraction_eval` | HH | 100 records | 1 | eval artifacts only | No | CALLABLE |
+| `ml_idle_improve` | HH | 100 records | 1 | recommendation artifacts only | No | CALLABLE |
+| `extraction_promotion_review` | HH | 1 report | 1 | review report only | No | CALLABLE / no auto-promotion |
+
+Safety defaults encoded in the job model:
+
+- laptop cookies remain laptop-local;
+- laptop collection defaults to `Limit 5`, one-at-a-time, `45-90s` randomized gap;
+- `Limit > 5` requires explicit large-batch intent;
+- HTTP 429/bot verification/impersonation-warning threshold stop collection and persist cooldown;
+- Gemma shadow extraction uses `callscore-gemma4-extractor:latest` and writes artifacts only;
+- ML eval/improve jobs cannot write production calls or mutate `creator_stats`;
+- promotion review produces evidence only and keeps `production_default_changed=false`.
+
+### Pipeline/Hermes integration
+
+Result: **REGISTERED**.
+
+Existing files updated:
+
+- `src/lib/pipeline.ts`: added deterministic `workplaneRunKey()` and `enqueueWorkplaneJob()` with safe idempotency and payload flags.
+- `src/scripts/hermes-worker.ts`: advertises and dispatches all workplane job types through the normal Hermes worker job execution path.
+- `src/scripts/callscore-enqueue-server.ts`: accepts workplane job types and enforces batch/write safety validation before enqueueing.
+- `package.json`: added `npm run workplane:status`.
+
+This keeps agentic execution on the existing `pipeline_runs` / `pipeline_jobs` infrastructure and avoids a parallel scheduler.
+
+### Machine-readable workplane status
+
+Result: **ACTIVE**.
+
+Command:
+
+```bash
+npm run workplane:status -- --read-api-base https://ops-bridge.call-score.com/api/read
+```
+
+Latest HH run returned JSON with:
+
+- `status: OK`;
+- `automation_readiness: PARTIAL`;
+- daily pipeline timer active;
+- transcript backlog by failure class;
+- latest transcript attempt: `2026-06-12 08:00:34.96607+01`;
+- latest transcript success: `2026-06-12 07:59:17.127762+01`;
+- latest laptop collector failure: `no_captions` on provider `laptop_collector_firefox`;
+- latest Gemma shadow run: `gemma-shadow-fast-20260612T105750Z`, 10 rows, 0 accepted calls, 1 invalid JSON, 9 timeouts;
+- latest ML eval: `eligible_for_write_canary=false`;
+- `unsafe_source_ranks: 0`;
+- public API `unsafeOfficial.count: 0`;
+- `production_default_changed: false`;
+- next recommended autonomous action: `improve_gemma_prompt_and_chunking` via `ml_idle_improve`.
+
+### Automation readiness
+
+Status: **PARTIAL**.
+
+Ready now:
+
+- HH can represent, enqueue, and execute HH-side workplane jobs;
+- HH can expose JSON state for agent decision-making;
+- Gemma shadow extraction and ML evaluation remain artifact-only;
+- public safety checks are included in the status surface;
+- production extractor default remains unchanged.
+
+Remaining gap before full READY:
+
+- laptop-side runner still needs to poll/claim `transcript_collect_laptop` jobs over Tailscale and publish its cooldown state path/report back to HH. This is intentionally separate because YouTube cookies must stay on Omar's laptop.
+
+### Certification matrix update
+
+| Surface | Status |
+| --- | --- |
+| Hermes job model | IMPLEMENTED |
+| Workplane status JSON | ACTIVE |
+| Transcript collector job | REPRESENTED / laptop runner required |
+| Transcript ingest job | CALLABLE / transcript rows only |
+| Gemma shadow job | CALLABLE / artifact-only |
+| ML eval/improve jobs | CALLABLE / no auto-promotion |
+| Extraction promotion review | REPORT-ONLY |
+| Production Gemma default | NO / UNCHANGED |
+| Production call writes | BLOCKED for Gemma/shadow/ML jobs |
+| Public rankings | SAFE / UNCHANGED |
+| Unsafe source ranks | 0 |
+| API unsafeOfficial | 0 |
+| Automation readiness | PARTIAL |
+
+### Next hard target
+
+Implement the laptop-side workplane runner over Tailscale so Omar's laptop can claim `transcript_collect_laptop` jobs, run only bounded 5-video collections while cooldown is clear, push transcript results through HH ingest, and publish cooldown state back to HH. In parallel, run the next `ml_idle_improve` cycle to shrink Gemma prompt/chunking failures before any write-canary proposal.

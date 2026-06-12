@@ -26,6 +26,7 @@ import {
   CREATOR_CANDIDATE_ADMISSION_JOB_TYPE,
   runCandidateAdmissionJob,
 } from "../lib/candidate-admission";
+import { runWorkplaneJob, WORKPLANE_JOB_TYPES } from "../lib/workplane-jobs";
 import { query } from "../lib/db";
 import { createLogger } from "../lib/logger";
 import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
@@ -39,6 +40,7 @@ export const SUPPORTED_JOB_TYPES = [
   "compute_scores",
   PROMOTE_ML_VERIFIED_JOB_TYPE,
   CREATOR_CANDIDATE_ADMISSION_JOB_TYPE,
+  ...WORKPLANE_JOB_TYPES,
 ] as const;
 const DEFAULT_POLL_MS = 15_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -119,6 +121,7 @@ async function executeJob(job: PipelineJob): Promise<Record<string, unknown>> {
       if (job.type === "compute_scores") return runComputeScoresJob();
       if (job.type === PROMOTE_ML_VERIFIED_JOB_TYPE) return runMlPromotionJob(job);
       if (job.type === CREATOR_CANDIDATE_ADMISSION_JOB_TYPE) return runCandidateAdmissionJob(job);
+      if ((WORKPLANE_JOB_TYPES as readonly string[]).includes(job.type)) return runWorkplaneJob(job);
       throw new Error(`Unsupported pipeline job type: ${job.type}`);
     },
     {
