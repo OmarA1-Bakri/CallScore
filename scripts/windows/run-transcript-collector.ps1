@@ -8,12 +8,17 @@ param(
   [string]$HhHost = "hermes-agent-box",
   [string]$HhRepo = "/opt/crypto-tuber-ranked",
   [string]$StatePath = "",
+  [string]$JobId = "",
+  [string]$OutputJson = "",
+  [int]$CooldownHours = 0,
   [int]$CooldownMinHours = 12,
   [int]$CooldownMaxHours = 24,
   [int]$WarningThreshold = 3,
   [string]$Impersonate = "chrome",
   [switch]$AllowLargeBatch,
   [switch]$NoImpersonate,
+  [switch]$Workplane,
+  [switch]$StatusOnly,
   [switch]$DryRun,
   [switch]$Write
 )
@@ -23,6 +28,7 @@ if ($Limit -lt 1 -or $Limit -gt 25) { throw "Limit must be 1..25" }
 if ($Limit -gt 5 -and -not $AllowLargeBatch) { throw "Limit >5 requires -AllowLargeBatch; 25-video batches are gated until clean stability is proven" }
 if ($Write -and $DryRun) { throw "Use either -Write or -DryRun" }
 if ($GapSeconds -gt 0) { $MinGapSeconds = $GapSeconds; $MaxGapSeconds = $GapSeconds }
+if ($CooldownHours -gt 0) { $CooldownMinHours = $CooldownHours; $CooldownMaxHours = $CooldownHours }
 if ($MinGapSeconds -lt 1 -or $MaxGapSeconds -lt $MinGapSeconds) { throw "Gap bounds must satisfy 1 <= MinGapSeconds <= MaxGapSeconds" }
 if ($CooldownMinHours -lt 1 -or $CooldownMaxHours -lt $CooldownMinHours) { throw "Cooldown bounds must satisfy 1 <= CooldownMinHours <= CooldownMaxHours" }
 
@@ -36,6 +42,31 @@ function Get-DefaultStatePath {
 $StatePath = Get-DefaultStatePath
 $stateDir = Split-Path -Parent $StatePath
 if ($stateDir) { New-Item -ItemType Directory -Path $stateDir -Force | Out-Null }
+$LockPath = "$StatePath.lock"
+
+function Acquire-CollectorLock {
+  if (Test-Path -LiteralPath $LockPath) {
+    try {
+      $existing = Get-Content -LiteralPath $LockPath -Raw | ConvertFrom-Json
+      if ($existing.pid -and (Get-Process -Id ([int]$existing.pid) -ErrorAction SilentlyContinue)) {
+        throw "collector_overlap lock=$LockPath pid=$($existing.pid)"
+      }
+    } catch {
+      if ($_.Exception.Message -match "collector_overlap") { throw }
+    }
+  }
+  [pscustomobject]@{ pid = $PID; started_at_utc = [DateTimeOffset]::UtcNow.ToString("o"); job_id = $JobId } |
+    ConvertTo-Json -Compress | Set-Content -LiteralPath $LockPath -Encoding UTF8
+}
+
+function Release-CollectorLock {
+  Remove-Item -LiteralPath $LockPath -Force -ErrorAction SilentlyContinue
+}
+
+trap {
+  Release-CollectorLock
+  throw $_
+}
 
 function Read-State {
   if (-not (Test-Path -LiteralPath $StatePath)) {
@@ -45,8 +76,12 @@ function Read-State {
   catch { return [pscustomobject]@{ cooldown_until_utc = $null; video_failures = @{}; last_run_utc = $null } }
 }
 
+function Set-StateProperty($state, [string]$name, $value) {
+  $state | Add-Member -Force -NotePropertyName $name -NotePropertyValue $value
+}
+
 function Write-State($state) {
-  $state.last_run_utc = [DateTimeOffset]::UtcNow.ToString("o")
+  Set-StateProperty $state "last_run_utc" ([DateTimeOffset]::UtcNow.ToString("o"))
   $state | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $StatePath -Encoding UTF8
 }
 
@@ -74,10 +109,55 @@ function Should-SkipVideo($state, [string]$youtubeVideoId) {
   } catch { return $true }
 }
 
+function Publish-StateToHH($state) {
+  Set-StateProperty $state "last_job_id" $JobId
+  Set-StateProperty $state "last_mode" $(if ($Workplane) { "workplane" } elseif ($Write) { "write" } else { "dry_run" })
+  Set-StateProperty $state "last_limit" $Limit
+  Set-StateProperty $state "last_gap_min_seconds" $MinGapSeconds
+  Set-StateProperty $state "last_gap_max_seconds" $MaxGapSeconds
+  Set-StateProperty $state "last_attempted_count" $attempted
+  Set-StateProperty $state "last_success_count" $succeeded
+  Set-StateProperty $state "last_failure_count" $failed
+  Set-StateProperty $state "last_terminal_failure" $terminalFailure
+  Write-State $state
+  if ($OutputJson) {
+    $state | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $OutputJson -Encoding UTF8
+  }
+  if ($HhHost -and $HhRepo) {
+    Get-Content -LiteralPath $StatePath -Raw | ssh $HhHost "cd $HhRepo && mkdir -p .tmp/laptop-collector && cat > .tmp/laptop-collector/latest-state.json"
+  }
+}
+
+function Complete-WorkplaneJob([string]$status) {
+  if (-not $JobId) { return }
+  ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane:laptop-job -- complete --job-id $JobId --status $status --state-path .tmp/laptop-collector/latest-state.json" | Out-Host
+}
+
+function Claim-WorkplaneJob {
+  if (-not $Workplane -or $JobId) { return }
+  $runner = "laptop-$($env:COMPUTERNAME)-$PID"
+  $claimRaw = ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane:laptop-job -- claim --worker-id $runner"
+  $claim = ($claimRaw | Out-String | ConvertFrom-Json)
+  if (-not $claim.claimed) {
+    Write-Host "collector_workplane_claim=false"
+    Release-CollectorLock
+    exit 0
+  }
+  $script:JobId = [string]$claim.job.id
+  $payload = $claim.job.payload
+  if ($payload.limit) { $script:Limit = [Math]::Min([int]$payload.limit, 5) }
+  if ($payload.allow_large_batch -eq $true -and $payload.limit) { $script:Limit = [Math]::Min([int]$payload.limit, 25); $script:AllowLargeBatch = $true }
+  if ($payload.browser) { $script:Browser = [string]$payload.browser }
+  if ($payload.since_days) { $script:SinceDays = [int]$payload.since_days }
+  if ($payload.min_gap_seconds) { $script:MinGapSeconds = [int]$payload.min_gap_seconds }
+  if ($payload.max_gap_seconds) { $script:MaxGapSeconds = [int]$payload.max_gap_seconds }
+  Write-Host "collector_workplane_claim=true job_id=$JobId limit=$Limit"
+}
+
 function Start-Cooldown($state, [string]$reason) {
   $hours = Get-Random -Minimum $CooldownMinHours -Maximum ($CooldownMaxHours + 1)
-  $state.cooldown_until_utc = [DateTimeOffset]::UtcNow.AddHours($hours).ToString("o")
-  $state.cooldown_reason = $reason
+  Set-StateProperty $state "cooldown_until_utc" ([DateTimeOffset]::UtcNow.AddHours($hours).ToString("o"))
+  Set-StateProperty $state "cooldown_reason" $reason
   Write-State $state
   Write-Host "collector_cooldown=true reason=$reason hours=$hours until=$($state.cooldown_until_utc)"
 }
@@ -100,12 +180,13 @@ function Test-ImpersonationSupport([string]$target) {
 }
 
 function Send-Failure($item, [string]$reason, [string]$detail) {
+  $cleanDetail = $detail -replace "\r?\n", " "
   $payload = [pscustomobject]@{
     video_id = [int]$item.id
     youtube_video_id = [string]$item.youtube_video_id
     status = "failed"
     error = $reason
-    detail = ($detail -replace "\r?\n", " ").Substring(0, [Math]::Min(500, ($detail -replace "\r?\n", " ").Length))
+    detail = $cleanDetail.Substring(0, [Math]::Min(500, $cleanDetail.Length))
     provider = "laptop_collector_$Browser"
   } | ConvertTo-Json -Depth 5 -Compress
   if ($Write) {
@@ -115,16 +196,32 @@ function Send-Failure($item, [string]$reason, [string]$detail) {
   }
 }
 
+Acquire-CollectorLock
+$attempted = 0
+$succeeded = 0
+$failed = 0
+$terminalFailure = $null
 $state = Read-State
+
+if ($StatusOnly) {
+  Publish-StateToHH $state
+  Release-CollectorLock
+  exit 0
+}
+
 if ($state.cooldown_until_utc) {
   try {
     $until = [DateTimeOffset]::Parse($state.cooldown_until_utc)
     if ($until.UtcDateTime -gt [DateTimeOffset]::UtcNow.UtcDateTime) {
       Write-Host "collector_skip=true reason=cooldown until=$($state.cooldown_until_utc) state=$StatePath"
+      Publish-StateToHH $state
+      Release-CollectorLock
       exit 0
     }
   } catch { }
 }
+
+Claim-WorkplaneJob
 
 $impersonationArgs = @()
 if (Test-ImpersonationSupport $Impersonate) {
@@ -141,6 +238,7 @@ $items = @($worklist.items)
 Write-Host "collector_worklist=$($items.Count) browser=$Browser mode=$(if ($Write) { 'WRITE' } else { 'DRY' }) limit=$Limit gap=${MinGapSeconds}-${MaxGapSeconds}s state=$StatePath"
 
 foreach ($item in $items) {
+  $attempted += 1
   if (Should-SkipVideo $state ([string]$item.youtube_video_id)) {
     Write-Host "collector_skip_video=true youtube_video_id=$($item.youtube_video_id) reason=recent_terminal_failure"
     continue
@@ -187,14 +285,17 @@ foreach ($item in $items) {
     } else {
       Write-Host "would_ingest video_id=$($item.id) youtube_video_id=$($item.youtube_video_id) chars=$($text.Trim().Length)"
     }
+    $succeeded += 1
   } catch {
     $detail = $_.Exception.Message
     $reason = Classify-Failure $detail
+    $failed += 1
     Set-VideoFailure $state ([string]$item.youtube_video_id) $reason
     Write-State $state
     Send-Failure $item $reason $detail
     if ($reason -in @("rate_limited", "bot_verification_required", "impersonation_warning_threshold")) {
       Start-Cooldown $state $reason
+      $terminalFailure = $reason
       $stopBatch = $true
     }
   } finally {
@@ -207,4 +308,6 @@ foreach ($item in $items) {
   Start-Sleep -Seconds $sleepSeconds
 }
 
-Write-State $state
+Publish-StateToHH $state
+Complete-WorkplaneJob $(if ($terminalFailure) { "failed" } else { "succeeded" })
+Release-CollectorLock

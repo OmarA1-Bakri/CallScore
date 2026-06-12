@@ -1,9 +1,12 @@
 import { query } from "../lib/db";
 import {
+  buildReadinessDomains,
+  defaultCollectorStatePath,
   decideNextAutonomousAction,
   latestGemmaShadowArtifact,
   latestMlEvalArtifact,
   readCollectorCooldownState,
+  rootHygieneAudit,
   workplaneJobModelForStatus,
 } from "../lib/workplane-status";
 import { loadEnv } from "./script-helpers";
@@ -23,7 +26,7 @@ function argValue(argv: readonly string[], flag: string): string | null {
 export function parseWorkplaneStatusArgs(argv = process.argv.slice(2)): Args {
   return {
     readApiBase: argValue(argv, "--read-api-base") ?? process.env.HH_READ_API_BASE ?? null,
-    collectorStatePath: argValue(argv, "--collector-state") ?? process.env.CALLSCORE_COLLECTOR_STATE_PATH ?? null,
+    collectorStatePath: argValue(argv, "--collector-state") ?? process.env.CALLSCORE_COLLECTOR_STATE_PATH ?? defaultCollectorStatePath(),
   };
 }
 
@@ -70,27 +73,65 @@ function recentBacklogCount(freshness: Record<string, unknown>): number {
 }
 
 export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): Promise<Record<string, unknown>> {
-  const freshness = await runFreshnessCheck({ readApiBase: args.readApiBase });
+  let freshness: Record<string, unknown>;
+  try {
+    freshness = await runFreshnessCheck({ readApiBase: args.readApiBase });
+  } catch (error) {
+    freshness = {
+      status: "WARN",
+      blockers: [],
+      warnings: [`freshness_check_unavailable:${error instanceof Error ? error.message : String(error)}`],
+      unsafeSourceRanks: 0,
+      transcriptBacklog: [],
+      timestamps: {},
+      dailyTimer: null,
+    };
+  }
   const collectorCooldown = readCollectorCooldownState(args.collectorStatePath);
   const latestGemmaShadow = latestGemmaShadowArtifact();
   const latestMlEval = latestMlEvalArtifact();
   const unsafeOfficial = await fetchUnsafeOfficial(args.readApiBase);
   const latestFailure = await latestCollectorFailure();
   const unsafeSourceRanks = Number(freshness.unsafeSourceRanks ?? 0);
+  const transcriptBacklogRecent30d = recentBacklogCount(freshness);
   const nextAction = decideNextAutonomousAction({
     unsafeSourceRanks,
     apiUnsafeOfficialCount: unsafeOfficial.count,
     collectorCooldown,
     latestGemmaShadow,
     latestMlEval,
-    transcriptBacklogRecent30d: recentBacklogCount(freshness),
+    transcriptBacklogRecent30d,
   });
+  const dailyTimer = freshness.dailyTimer as Record<string, unknown> | null | undefined;
+  const dailyPipelineActive = dailyTimer?.active === true || dailyTimer?.state === "active";
+  const readiness_domains = buildReadinessDomains({
+    unsafeSourceRanks,
+    apiUnsafeOfficialCount: unsafeOfficial.count,
+    collectorCooldown,
+    latestGemmaShadow,
+    latestMlEval,
+    transcriptBacklogRecent30d,
+    dailyPipelineActive,
+    nextAction,
+  });
+  const rootAudit = rootHygieneAudit();
+  const blockingDomain = Object.values(readiness_domains).some((domain) => domain.status === "BLOCKED");
+  const hasApprovalGates = Object.values(readiness_domains).some((domain) => domain.status === "NEEDS_APPROVAL");
+  const automationReadiness = unsafeSourceRanks > 0 || unsafeOfficial.count > 0 || blockingDomain
+    ? "BLOCKED"
+    : hasApprovalGates
+      ? "PARTIAL"
+      : "READY";
 
   return {
     generatedAt: new Date().toISOString(),
     status: unsafeSourceRanks > 0 || unsafeOfficial.count > 0 ? "FAIL" : "OK",
-    automation_readiness: nextAction.allowed ? "PARTIAL" : "BLOCKED",
+    automation_readiness: automationReadiness,
     daily_pipeline_status: freshness.dailyTimer ?? null,
+    readiness_domains,
+    root_hygiene: readiness_domains.root_hygiene,
+    unused_file_audit: rootAudit,
+    freshness_warnings: freshness.warnings ?? [],
     transcript_collector_backlog: freshness.transcriptBacklog ?? [],
     transcript_cooldown_state: collectorCooldown,
     latest_transcript_attempt: (freshness.timestamps as Record<string, unknown> | undefined)?.latestTranscriptAttempt ?? null,
@@ -102,6 +143,11 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     production_default_changed: false,
     unsafe_source_ranks: unsafeSourceRanks,
     api_unsafe_official: unsafeOfficial,
+    homepage_safety: { ok: unsafeOfficial.ok && unsafeOfficial.count === 0, unsafe_official_count: unsafeOfficial.count },
+    whop_provider_readiness: readiness_domains.whop_auto,
+    art_of_war_activation_gate_status: readiness_domains.art_of_war,
+    automation_registry_status: readiness_domains.claude_code_automations,
+    approval_required_for_next_risky_action: readiness_domains.activation_gates.required_approvals,
     job_model: workplaneJobModelForStatus(),
     next_recommended_autonomous_action: nextAction,
   };

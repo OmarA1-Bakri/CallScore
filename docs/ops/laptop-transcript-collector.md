@@ -99,3 +99,29 @@ The ingest path validates video ids, stores transcript text, marks `transcript_s
 - Laptop collector has produced and ingested real transcripts without moving cookies to HH.
 - Latest larger run eventually hit HTTP 429; therefore daily operation is limited to small batches with cooldown and terminal-failure skip logic.
 - Production calls/rankings are unaffected by collector state until normal extraction/scoring paths run under separate gates.
+
+## Workplane runner mode
+
+Status: **INSTALL_READY**.
+
+The same canonical collector script now supports Hermes/workplane operation; no parallel runner is required.
+
+```powershell
+.\scripts\windows\run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -SinceDays 45 -HhHost hermes-agent-box -Write
+```
+
+Workplane behavior:
+
+- claims a pending `transcript_collect_laptop` job from HH with `npm run workplane:laptop-job -- claim`;
+- applies the job payload but clamps default work to limit 5 unless `allow_large_batch=true` is present;
+- uses a local lock file beside `%LOCALAPPDATA%\CallScore\transcript-collector-state.json` to prevent overlapping runs;
+- pushes transcript/failure results to HH ingest;
+- mirrors collector state to HH at `.tmp/laptop-collector/latest-state.json`;
+- completes or fails the claimed job with `npm run workplane:laptop-job -- complete`;
+- never sends cookies to HH.
+
+HH-side status reads the mirrored state by default through:
+
+```bash
+npm run workplane:status -- --read-api-base https://ops-bridge.call-score.com/api/read
+```

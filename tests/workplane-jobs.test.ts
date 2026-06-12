@@ -13,14 +13,33 @@ import {
 } from "../src/lib/workplane-status";
 
 test("workplane job specs cover required Hermes surfaces with safe defaults", () => {
-  assert.deepEqual([...WORKPLANE_JOB_TYPES], [
+  for (const required of [
     "transcript_collect_laptop",
     "transcript_ingest_result",
     "gemma_shadow_extract",
     "ml_extraction_eval",
     "ml_idle_improve",
     "extraction_promotion_review",
-  ]);
+    "whop_provider_health",
+    "whop_plan_inventory_check",
+    "whop_entitlement_sync_dry_run",
+    "whop_webhook_replay_safe",
+    "whop_customer_status_check",
+    "whop_activation_review",
+    "artofwar_strategy_brief",
+    "artofwar_content_queue_dry_run",
+    "artofwar_campaign_plan_generate",
+    "artofwar_audience_research_dry_run",
+    "artofwar_outreach_queue_prepare",
+    "artofwar_publish_approval_review",
+    "artofwar_spend_approval_review",
+    "automation_registry_refresh",
+    "automation_dry_run",
+    "automation_health_check",
+    "automation_activation_review",
+  ]) {
+    assert.equal((WORKPLANE_JOB_TYPES as readonly string[]).includes(required), true, required);
+  }
 
   const collector = getWorkplaneJobSpec("transcript_collect_laptop");
   assert.equal(collector.execution_location, "Omar laptop");
@@ -30,6 +49,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   assert.equal(collector.production_call_writes_allowed, false);
   assert.equal(collector.public_ranking_impact_allowed, false);
   assert.match(collector.cooldown_policy, /12-24h/);
+  assert.match(collector.default_safe_command, /-Workplane/);
 
   const gemma = getWorkplaneJobSpec("gemma_shadow_extract");
   assert.equal(gemma.execution_location, "HH");
@@ -41,6 +61,15 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   const ingest = getWorkplaneJobSpec("transcript_ingest_result");
   assert.equal(ingest.production_db_writes_allowed, true);
   assert.equal(ingest.production_call_writes_allowed, false);
+
+  const whop = getWorkplaneJobSpec("whop_plan_inventory_check");
+  assert.equal(whop.production_db_writes_allowed, false);
+  assert.equal(whop.production_call_writes_allowed, false);
+  assert.match(whop.default_safe_command, /workplane:status/);
+
+  const art = getWorkplaneJobSpec("artofwar_publish_approval_review");
+  assert.equal(art.public_ranking_impact_allowed, false);
+  assert.match(art.cooldown_policy, /not applicable/);
 });
 
 test("workplane status exposes all job specs as JSON-friendly records", () => {
@@ -104,4 +133,26 @@ test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe w
   assert.equal(decideNextAutonomousAction({ ...base, collectorCooldown: { ...base.collectorCooldown, status: "active", cooldown_until_utc: "later" } }).action, "wait_for_collector_cooldown");
   assert.equal(decideNextAutonomousAction({ ...base, latestMlEval: { path: "r", exists: true, modified_at: "now", malformed: false, summary: { promotion_gate: { eligible_for_write_canary: false } } } }).action, "improve_gemma_prompt_and_chunking");
   assert.equal(decideNextAutonomousAction(base).job_type, "gemma_shadow_extract");
+});
+
+test("readiness domains cover all activation surfaces with mutation gates", async () => {
+  const { buildReadinessDomains } = await import("../src/lib/workplane-status");
+  const domains = buildReadinessDomains({
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: { state_path: null, status: "unknown", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, checked_at: "now" },
+    latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 3,
+    dailyPipelineActive: true,
+    nextAction: { action: "run_laptop_collector_limit_5_if_laptop_cooldown_clear", reason: "test", job_type: "transcript_collect_laptop", allowed: true },
+    now: new Date("2026-06-12T12:00:00.000Z"),
+  });
+  for (const key of ["callscore_pipeline", "transcript_collector", "gemma_shadow_extraction", "ml_improvement_loop", "whop_auto", "art_of_war", "claude_code_automations", "hermes_worker", "provider_integrations", "activation_gates", "root_hygiene"]) {
+    assert.ok(domains[key], key);
+    assert.equal(domains[key].production_mutation_allowed, false, key);
+  }
+  assert.equal(domains.activation_gates.status, "NEEDS_APPROVAL");
+  assert.ok(domains.whop_auto.risky_actions_blocked.some((item) => item.includes("pricing")));
+  assert.ok(domains.art_of_war.risky_actions_blocked.some((item) => item.includes("publishing")));
 });

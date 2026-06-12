@@ -26,11 +26,13 @@ import {
   CREATOR_CANDIDATE_ADMISSION_JOB_TYPE,
   runCandidateAdmissionJob,
 } from "../lib/candidate-admission";
-import { runWorkplaneJob, WORKPLANE_JOB_TYPES } from "../lib/workplane-jobs";
+import { getWorkplaneJobSpec, runWorkplaneJob, WORKPLANE_JOB_TYPES } from "../lib/workplane-jobs";
 import { query } from "../lib/db";
 import { createLogger } from "../lib/logger";
 import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
 import { loadEnv, sleep, timestamp } from "./script-helpers";
+
+const HERMES_WORKPLANE_JOB_TYPES = WORKPLANE_JOB_TYPES.filter((type) => getWorkplaneJobSpec(type).execution_location !== "Omar laptop");
 
 export const SUPPORTED_JOB_TYPES = [
   "ml_verifier_batch",
@@ -40,7 +42,7 @@ export const SUPPORTED_JOB_TYPES = [
   "compute_scores",
   PROMOTE_ML_VERIFIED_JOB_TYPE,
   CREATOR_CANDIDATE_ADMISSION_JOB_TYPE,
-  ...WORKPLANE_JOB_TYPES,
+  ...HERMES_WORKPLANE_JOB_TYPES,
 ] as const;
 const DEFAULT_POLL_MS = 15_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;

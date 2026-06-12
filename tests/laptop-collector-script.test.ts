@@ -37,3 +37,13 @@ test("laptop collector has impersonation dependency guardrails", () => {
   assert.match(script, /--impersonate/);
   assert.match(script, /impersonation_warning_threshold/);
 });
+
+
+test("laptop collector exposes workplane claim, lock, and HH state publication", () => {
+  assert.match(script, /\[switch\]\$Workplane/);
+  assert.match(script, /\[string\]\$JobId/);
+  assert.match(script, /Acquire-CollectorLock/);
+  assert.match(script, /workplane:laptop-job -- claim/);
+  assert.match(script, /workplane:laptop-job -- complete/);
+  assert.match(script, /\.tmp\/laptop-collector\/latest-state\.json/);
+});
