@@ -4285,3 +4285,52 @@ Growth Intelligence / Art of War:
 Next canonical target:
 
 Run private Growth Intelligence execution loops only: draft and evaluate internal campaign assets against data-safety, Trust/Publish, Whop, and transcript freshness gates while continuing small laptop collector batches and Gemma schema repair in shadow mode.
+
+---
+
+## 2026-06-12 Controlled Autonomous Runtime Activation Update
+
+Status labels: `CONTROLLED_AUTONOMOUS_RUNTIME_PARTIAL`, `TRANSCRIPT_CADENCE_PARTIAL`, `DATA_SURFACE_SAFE`, `GEMMA_SHADOW_HOLD`, `GEMMA_NOT_PRODUCTION_DEFAULT`, `ML_LOOP_ACTIVE`, `WHOP_AUTO_PARTIAL`, `ART_OF_WAR_PRIVATE_ACTIVE`, `ART_OF_WAR_PUBLIC_NEEDS_APPROVAL`, `PUBLIC_ACTIONS_APPROVAL_GATED`, `AUTONOMOUS_REVENUE_NO`, `NEXT_PHASE_PRIVATE_RUNTIME_EXECUTION`.
+
+### Runtime state
+- Workplane status remains machine-readable and reports `automation_readiness: PARTIAL`.
+- Data/API safety remains green: unsafe source ranks `0`; API unsafe official `0`; homepage HTTP `200`.
+- Unified status now exposes latest laptop collector run, success rate, recent failure reasons, blocked public actions, next approval-gated action, autonomous revenue status, and runtime loop capabilities.
+- Current next autonomous action is to repair transcript targeting/failure classification, not blindly rerun collection.
+
+### Transcript collector
+- HH→Windows laptop workplane path is operational.
+- Latest bounded workplane job: `1830`.
+- Attempted: `5`; successes: `0`; failures: `5`; cooldown: clear; no 429; no bot verification.
+- Recent collector state shows `transcript_failed: 10` across latest bounded attempts.
+- Script hardening added detail previews in laptop state, broader failure classes (`live_or_upcoming`, `private_or_deleted`, `transcript_too_short`, `transient_network`), and 24h skip for any recently failed video.
+- Verdict: `TRANSCRIPT_CADENCE_PARTIAL` until a limit-5 run yields useful transcript successes.
+
+### Gemma / ML
+- `ops/ollama/Modelfile.callscore-gemma4-extractor` now uses the production shadow extraction schema.
+- Local model `callscore-gemma4-extractor:latest` was rebuilt.
+- 1-real shadow run at 350 chars / 350 tokens / 45s timed out.
+- Warm 1-real shadow run at 240 chars / 160 tokens / 90s avoided timeout but failed parser with `Model response did not contain a JSON array`.
+- ML idle report: `json_valid_rate=0`, `schema_pass_rate=0`, `parser_error_count=1`, `eligible_for_write_canary=false`.
+- Verdict: `GEMMA_SHADOW_HOLD`; no production default change.
+
+### Whop-auto
+- `WHOP_AUTO_PARTIAL`: provider/commercial proof remains certified enough for planning through `docs/ops/whop-auto-certification.md` and workplane read-only/dry-run job specs.
+- `/srv/whop-auto` is workspace/history heavy and has no single root package command; live mutations remain approval-gated.
+
+### Art of War
+- `python3 scripts/art_of_war.py validate-docs` passed.
+- Dry-run report generated: `/tmp/callscore-art-of-war-report-20260612-next.md`.
+- Output mode: dry-run/local/null only; 0 public posts; 0 outreach; 0 spend; 0 provider mutation.
+- Verdict: `ART_OF_WAR_PRIVATE_ACTIVE`; public activation requires approval.
+
+### Promotion reviews
+- Unified review created: `docs/plans/2026-06-12-controlled-autonomous-runtime-review.md`.
+- Transcript cadence: hold/partial.
+- Gemma: shadow hold, not canary eligible.
+- Whop: read-only/dry-run partial, live mutation requires approval.
+- Art of War: private active, public needs approval.
+- Runtime: controlled autonomous runtime partial; autonomous revenue no.
+
+### Next hard target
+Repair transcript targeting/failure classification using the new detail previews, then run one more bounded laptop limit-5 batch. Continue private Art of War dry-run cadence; do not run public/revenue/provider mutation until promotion reviews pass and approval is recorded.

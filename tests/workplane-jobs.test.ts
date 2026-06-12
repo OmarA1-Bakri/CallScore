@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec } from "../src/lib/workplane-jobs";
@@ -91,6 +91,7 @@ test("collector cooldown state handles missing, active, clear, and malformed fil
   assert.equal(activeState.status, "active");
   assert.equal(activeState.cooldown_reason, "rate_limited");
   assert.equal(activeState.latest_failure_reason, "rate_limited");
+  assert.deepEqual(activeState.recent_failure_reasons, { rate_limited: 1 });
 
   const clear = join(dir, "clear.json");
   writeFileSync(clear, JSON.stringify({ cooldown_until_utc: "2026-06-12T01:00:00.000Z" }));
@@ -124,13 +125,16 @@ test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe w
   const base = {
     unsafeSourceRanks: 0,
     apiUnsafeOfficialCount: 0,
-    collectorCooldown: { state_path: null, status: "unknown" as const, cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, checked_at: "now" },
+    collectorCooldown: { state_path: null, status: "unknown" as const, cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, latest_job_id: null, last_run_utc: null, last_attempted_count: null, last_success_count: null, last_failure_count: null, last_success_rate: null, recent_failure_reasons: {}, checked_at: "now" },
     latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
     latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
     transcriptBacklogRecent30d: 10,
+    collectorLastAttemptedCount: null,
+    collectorLastSuccessCount: null,
   };
   assert.equal(decideNextAutonomousAction({ ...base, unsafeSourceRanks: 1 }).allowed, false);
   assert.equal(decideNextAutonomousAction({ ...base, collectorCooldown: { ...base.collectorCooldown, status: "active", cooldown_until_utc: "later" } }).action, "wait_for_collector_cooldown");
+  assert.equal(decideNextAutonomousAction({ ...base, collectorLastAttemptedCount: 5, collectorLastSuccessCount: 0 }).action, "repair_transcript_targeting_or_failure_classification");
   assert.equal(decideNextAutonomousAction({ ...base, latestMlEval: { path: "r", exists: true, modified_at: "now", malformed: false, summary: { promotion_gate: { eligible_for_write_canary: false } } } }).action, "start_artofwar_internal_growth_intelligence");
   assert.equal(decideNextAutonomousAction(base).job_type, "gemma_shadow_extract");
 });
@@ -140,7 +144,7 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
   const domains = buildReadinessDomains({
     unsafeSourceRanks: 0,
     apiUnsafeOfficialCount: 0,
-    collectorCooldown: { state_path: null, status: "unknown", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, checked_at: "now" },
+    collectorCooldown: { state_path: null, status: "unknown", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, latest_job_id: null, last_run_utc: null, last_attempted_count: null, last_success_count: null, last_failure_count: null, last_success_rate: null, recent_failure_reasons: {}, checked_at: "now" },
     latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
     latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
     transcriptBacklogRecent30d: 3,
@@ -155,4 +159,13 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
   assert.equal(domains.activation_gates.status, "NEEDS_APPROVAL");
   assert.ok(domains.whop_auto.risky_actions_blocked.some((item) => item.includes("pricing")));
   assert.ok(domains.art_of_war.risky_actions_blocked.some((item) => item.includes("publishing")));
+});
+
+test("Gemma Ollama Modelfile is aligned to production shadow extraction schema", () => {
+  const modelfile = readFileSync("ops/ollama/Modelfile.callscore-gemma4-extractor", "utf8");
+  assert.match(modelfile, /\"symbol\":\"BTCUSDT\"/);
+  assert.match(modelfile, /\"raw_quote\":\"exact quote\"/);
+  assert.match(modelfile, /"extraction_confidence":0\.0-1\.0/);
+  assert.doesNotMatch(modelfile, /asset_symbol/);
+  assert.doesNotMatch(modelfile, /rejected_news_or_aggregation/);
 });
