@@ -62,7 +62,9 @@
     "benchmark:extractors": "node --import tsx src/scripts/benchmark-local-extractors.ts",
     "ml:idle-improve": "node --import tsx src/scripts/ml-idle-improve.ts",
     "workplane:status": "node --import tsx src/scripts/workplane-status.ts",
-    "workplane:laptop-job": "node --import tsx src/scripts/workplane-laptop-job.ts"
+    "workplane:laptop-job": "node --import tsx src/scripts/workplane-laptop-job.ts",
+    "workplane": "node --import tsx src/scripts/workplane.ts",
+    "hygiene": "npm run hygiene:secrets"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

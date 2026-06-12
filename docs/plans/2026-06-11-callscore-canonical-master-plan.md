@@ -4122,3 +4122,31 @@ Next activation sequence:
 6. Require explicit approval before any provider mutation, production extractor default change, public publish/outreach, or spend.
 
 Autonomous revenue status: NO until transcript cadence is stable, Gemma/write path is approved or rule path remains canonical, and Art of War public activation approvals are complete.
+
+### 2026-06-12 — Laptop workplane activation command-surface correction
+
+Status labels:
+
+- LAPTOP_RUNNER_JSON_BOUNDARY_HARDENED
+- WORKPLANE_DISPATCHER_ADDED
+- STATUSONLY_SAFE
+- LAPTOP_LIVE_RUN_BLOCKED_ON_SSH_ACCESS
+
+Findings:
+
+- HH repo was on `master` at `739cbbe11bee0c68c0776038a572411d78ffb698`.
+- The laptop command that failed used a malformed PowerShell switch: `-StatusOnly-HhHost` instead of `-StatusOnly -HhHost`.
+- The old failure mode was consistent with stale/wrong collector code or non-silent npm output being piped to `ConvertFrom-Json`.
+- HH now exposes one `npm run --silent workplane -- ...` dispatcher:
+  - status/default routes to machine-readable workplane status;
+  - `--status --json` is tolerated for operator convenience;
+  - `claim` and `complete` route to the laptop job bridge.
+- The collector now parses HH JSON through `ConvertFrom-StrictJson`, uses `npm run --silent` for claim and worklist, and exits before claim/worklist in `-StatusOnly` mode.
+- Tailscale saw Omar laptop nodes, but SSH from HH returned permission denied, so the live laptop-side run could not be executed from HH in this pass.
+
+Next activation action:
+
+1. On Omar laptop, pull `master` in `C:\Users\albak\xdev\crypto-tuber-ranked`.
+2. Run `.\scripts\windows\run-transcript-collector.ps1 -StatusOnly -HhHost hh`.
+3. If status succeeds, queue or wait for a `transcript_collect_laptop` job and run `.\scripts\windows\run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -HhHost hh -Write`.
+4. Do not run 25-video batch until repeated 5-video runs are clean.

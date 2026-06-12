@@ -43,7 +43,28 @@ test("laptop collector exposes workplane claim, lock, and HH state publication",
   assert.match(script, /\[switch\]\$Workplane/);
   assert.match(script, /\[string\]\$JobId/);
   assert.match(script, /Acquire-CollectorLock/);
-  assert.match(script, /workplane:laptop-job -- claim/);
-  assert.match(script, /workplane:laptop-job -- complete/);
+  assert.match(script, /workplane -- claim/);
+  assert.match(script, /workplane -- complete/);
   assert.match(script, /\.tmp\/laptop-collector\/latest-state\.json/);
+});
+
+test("laptop collector keeps strict JSON command boundaries", () => {
+  assert.match(script, /ConvertFrom-StrictJson/);
+  assert.match(script, /non_json_output/);
+  assert.match(script, /npm run --silent workplane -- claim/);
+  assert.match(script, /npm run --silent transcript:worklist/);
+  assert.doesNotMatch(script, /workplane -- --status/);
+});
+
+test("status-only publishes state and exits before claim or transcript worklist", () => {
+  const statusOnlyIndex = script.indexOf("if ($StatusOnly)");
+  const claimIndex = script.indexOf("\nClaim-WorkplaneJob\n");
+  const worklistIndex = script.indexOf("$worklistCmd");
+  assert.ok(statusOnlyIndex > 0, "missing StatusOnly branch");
+  assert.ok(claimIndex > statusOnlyIndex, "StatusOnly must run before workplane claim");
+  assert.ok(worklistIndex > statusOnlyIndex, "StatusOnly must run before transcript worklist");
+  const statusOnlyBlock = script.slice(statusOnlyIndex, claimIndex);
+  assert.match(statusOnlyBlock, /Publish-StateToHH \$state/);
+  assert.match(statusOnlyBlock, /exit 0/);
+  assert.doesNotMatch(statusOnlyBlock, /transcript:worklist/);
 });
