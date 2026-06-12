@@ -14,7 +14,13 @@ const DEFAULT_VIDEO_AGENTS = 1;
 const MAX_VIDEO_AGENTS = 3;
 const DEFAULT_SHADOW_MODEL = "callscore-gemma4-extractor:latest";
 const DEFAULT_LOCAL_OLLAMA_HOST = "http://127.0.0.1:11434";
-const SHADOW_PROMPT_VERSION = "callscore-gemma4-shadow-v1";
+const DEFAULT_SHADOW_PROMPT_PROFILE = "shadow-compact";
+const DEFAULT_SHADOW_CHUNK_CHARS = 350;
+const DEFAULT_SHADOW_CHUNK_OVERLAP = 50;
+const DEFAULT_SHADOW_MAX_CHUNKS = 1;
+const DEFAULT_SHADOW_NUM_PREDICT = 350;
+const DEFAULT_SHADOW_REQUEST_TIMEOUT_MS = 45_000;
+const SHADOW_PROMPT_VERSION = "callscore-gemma4-shadow-v2-compact";
 
 export interface ShadowExtractArgs extends OpenRouterArgs {
   readonly execute: boolean;
@@ -37,6 +43,12 @@ function withShadowProviderDefaults(argv: readonly string[]): string[] {
   if (!argv.includes("--provider")) withDefaults.push("--provider", "ollama");
   if (!argv.includes("--model")) withDefaults.push("--model", DEFAULT_SHADOW_MODEL);
   if (!argv.includes("--ollama-host")) withDefaults.push("--ollama-host", DEFAULT_LOCAL_OLLAMA_HOST);
+  if (!argv.includes("--prompt-profile")) withDefaults.push("--prompt-profile", DEFAULT_SHADOW_PROMPT_PROFILE);
+  if (!argv.includes("--chunk-chars")) withDefaults.push("--chunk-chars", String(DEFAULT_SHADOW_CHUNK_CHARS));
+  if (!argv.includes("--chunk-overlap")) withDefaults.push("--chunk-overlap", String(DEFAULT_SHADOW_CHUNK_OVERLAP));
+  if (!argv.includes("--max-chunks")) withDefaults.push("--max-chunks", String(DEFAULT_SHADOW_MAX_CHUNKS));
+  if (!argv.includes("--num-predict")) withDefaults.push("--num-predict", String(DEFAULT_SHADOW_NUM_PREDICT));
+  if (!argv.includes("--request-timeout-ms")) withDefaults.push("--request-timeout-ms", String(DEFAULT_SHADOW_REQUEST_TIMEOUT_MS));
   return withDefaults;
 }
 
@@ -133,6 +145,12 @@ function runMetadata(args: ShadowExtractArgs): ShadowExtractionRunMetadata {
       chunk_agents: args.chunkAgents,
       video_agents: args.videoAgents,
       low_confidence_ready: args.lowConfidenceReady,
+      chunk_chars: args.chunkChars,
+      chunk_overlap: args.chunkOverlap,
+      max_chunks: args.maxChunks,
+      request_timeout_ms: args.requestTimeoutMs,
+      num_predict: args.numPredict,
+      prompt_profile: args.promptProfile,
     },
   };
 }
@@ -310,7 +328,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const videos = await loadShadowVideos(args);
   console.log(
-    `[${timestamp()}] shadow extract ${args.execute ? "EXECUTE" : "DRY-RUN"}: run=${args.runId}, videos=${videos.length}, provider=${args.provider}, model=${args.model}, videoAgents=${args.videoAgents}, chunkAgents=${args.chunkAgents}, modelAttempts=${args.modelAttempts}, out=${args.shadowOut}`,
+    `[${timestamp()}] shadow extract ${args.execute ? "EXECUTE" : "DRY-RUN"}: run=${args.runId}, videos=${videos.length}, provider=${args.provider}, model=${args.model}, promptProfile=${args.promptProfile}, chunkChars=${args.chunkChars}, maxChunks=${args.maxChunks}, numPredict=${args.numPredict}, requestTimeoutMs=${args.requestTimeoutMs}, videoAgents=${args.videoAgents}, chunkAgents=${args.chunkAgents}, modelAttempts=${args.modelAttempts}, out=${args.shadowOut}`,
   );
 
   const { processed, failed, accepted: totalAccepted } = await processShadowVideos(

@@ -31,7 +31,12 @@ test("shadow extraction defaults to all transcript recheck selection without pro
   assert.equal(args.provider, "ollama");
   assert.equal(args.model, "callscore-gemma4-extractor:latest");
   assert.equal(args.ollamaHost, "http://127.0.0.1:11434");
-  assert.equal(args.requestTimeoutMs, 180_000);
+  assert.equal(args.requestTimeoutMs, 45_000);
+  assert.equal(args.promptProfile, "shadow-compact");
+  assert.equal(args.chunkChars, 350);
+  assert.equal(args.chunkOverlap, 50);
+  assert.equal(args.maxChunks, 1);
+  assert.equal(args.numPredict, 350);
   assert.equal(args.includeExtracted, true);
   assert.equal(args.pendingOnly, false);
   assert.equal(args.lowConfidenceReady, false);

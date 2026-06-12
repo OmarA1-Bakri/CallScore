@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildOllamaChatRequestBody,
+  compactShadowPrompt,
   buildOllamaHeaders,
   EXTRACTION_SYSTEM_PROMPT,
   extractJsonArrayText,
@@ -171,6 +172,39 @@ test("Ollama chat body disables thinking for JSON extraction", () => {
   assert.equal(messages[0]?.content, EXTRACTION_SYSTEM_PROMPT);
 });
 
+test("compact shadow prompt keeps bounded real-transcript extraction JSON-focused", () => {
+  const fullPrompt = openRouterPrompt(
+    "Bitcoin holds support and could push higher.",
+    "BTC update",
+  );
+  const compactPrompt = compactShadowPrompt(
+    "Bitcoin holds support and could push higher.",
+    "BTC update",
+  );
+
+  assert.match(compactPrompt, /Return ONLY a JSON array/);
+  assert.match(compactPrompt, /If there is no clear tracked-coin call, return \[\]/);
+  assert.match(compactPrompt, /UNTRUSTED_TRANSCRIPT_BEGIN/);
+  assert.ok(compactPrompt.length < fullPrompt.length);
+});
+
+test("Ollama chat body can use compact shadow prompt profile", () => {
+  const body = buildOllamaChatRequestBody(
+    "callscore-gemma4-extractor:latest",
+    "Bitcoin holds support and could push higher.",
+    "BTC update",
+    undefined,
+    undefined,
+    350,
+    "shadow-compact",
+  );
+
+  assert.deepEqual(body.options, { temperature: 0, num_predict: 350 });
+  const messages = body.messages as Array<{ role: string; content: string }>;
+  assert.match(messages[1]?.content ?? "", /Task: extract creator-owned/);
+  assert.doesNotMatch(messages[1]?.content ?? "", /POSITIVE EXAMPLES/);
+});
+
 test("unknown extraction provider is rejected instead of silently falling back", () => {
   assert.throws(
     () => parseOpenRouterExtractionArgs(["--provider", "olama"]),
@@ -308,4 +342,12 @@ test("extractJsonArrayText extracts first JSON array from explanatory model outp
     extractJsonArrayText('Here are the calls:\n[{"symbol":"SOLUSDT"}]\nDone.'),
     '[{"symbol":"SOLUSDT"}]',
   );
+});
+
+test("extractJsonArrayText unwraps common Ollama JSON object array keys", () => {
+  assert.equal(
+    extractJsonArrayText('{"calls":[{"symbol":"BTCUSDT"}]}'),
+    '[{"symbol":"BTCUSDT"}]',
+  );
+  assert.equal(extractJsonArrayText('{"results":[]}'), "[]");
 });

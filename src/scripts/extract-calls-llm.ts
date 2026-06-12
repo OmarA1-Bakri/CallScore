@@ -28,6 +28,7 @@ const MAX_MODEL_ATTEMPTS = 3;
 const DEFAULT_NUM_PREDICT = 2_000;
 const MAX_NUM_PREDICT = 2_000;
 const MAX_CANDIDATE_TEXT_CHARS = 1_000;
+export type ExtractionPromptProfile = "full" | "shadow-compact";
 const PROMPT_INJECTION_ECHO =
   /\b(ignore (?:all )?(?:previous|above) instructions|system prompt|developer message|return only|untrusted_transcript_(?:begin|end))\b/i;
 const UNTRUSTED_TRANSCRIPT_BEGIN = "UNTRUSTED_TRANSCRIPT_BEGIN";
@@ -58,6 +59,7 @@ export interface OpenRouterArgs {
   readonly modelAttempts: number;
   readonly requestTimeoutMs: number;
   readonly numPredict: number;
+  readonly promptProfile: ExtractionPromptProfile;
 }
 
 export interface ChunkSettings {
@@ -123,6 +125,12 @@ function readProvider(value: string | null): ExtractionProvider {
   throw new Error(`Unsupported extraction provider: ${value}. Expected ollama.`);
 }
 
+function readPromptProfile(value: string | null): ExtractionPromptProfile {
+  if (value == null || value === "" || value === "full") return "full";
+  if (value === "shadow-compact") return "shadow-compact";
+  throw new Error(`Unsupported extraction prompt profile: ${value}. Expected full or shadow-compact.`);
+}
+
 export function getOllamaApiKey(env = process.env): string | undefined {
   return env.OLLAMA_API_KEY || env.OLLAMA_TOKEN;
 }
@@ -177,6 +185,7 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
     dryRun: !write || argv.includes("--dry-run"),
     auditOut: argValue(argv, "--audit-out"),
     requestTimeoutMs: positiveInt(argValue(argv, "--request-timeout-ms"), defaultRequestTimeoutMs),
+    promptProfile: readPromptProfile(argValue(argv, "--prompt-profile")),
     numPredict: boundedPositiveInt(
       argValue(argv, "--num-predict"),
       DEFAULT_NUM_PREDICT,
@@ -199,6 +208,17 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
 export function extractJsonArrayText(text: string): string {
   const trimmed = text.trim().replace(/^```json?\s*/i, "").replace(/\s*```$/i, "").trim();
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) return trimmed;
+
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      for (const key of ["calls", "items", "results", "extractions", "output"]) {
+        if (Array.isArray(parsed[key])) return JSON.stringify(parsed[key]);
+      }
+    } catch {
+      // Fall through to bracket extraction / structured error below.
+    }
+  }
 
   const start = trimmed.indexOf("[");
   const end = trimmed.lastIndexOf("]");
@@ -372,6 +392,52 @@ ${chunkContext}
 ${formatUntrustedTranscriptBlock(transcript)}`;
 }
 
+export function compactShadowPrompt(
+  transcript: string,
+  title?: string | null,
+  chunk?: TranscriptChunk,
+  fullTranscriptForHints = transcript,
+): string {
+  const symbols = TRACKED_SYMBOLS.join(", ");
+  const primarySymbol = inferPrimarySymbol(title, fullTranscriptForHints);
+  const symbolHint = primarySymbol ? `Primary symbol hint: ${primarySymbol}\n` : "";
+  const chunkContext = chunk
+    ? `Chunk ${chunk.index + 1}/${chunk.total}; offsets ${chunk.start}-${chunk.end}\n`
+    : `Chunk 1/1; offsets 0-${transcript.length}\n`;
+
+  return `Return ONLY a JSON array. No markdown. No prose.
+Task: extract creator-owned, forward-looking, actionable crypto market calls from this transcript chunk.
+If there is no clear tracked-coin call, return [].
+
+Allowed symbols: ${symbols}
+${symbolHint}Title: ${title ?? "unknown"}
+${chunkContext}
+
+Schema for each item:
+{"symbol":"BTCUSDT","direction":"bullish|bearish|neutral","call_type":"buy|sell|hold|watch|avoid","entry_price":number|null,"target_price":number|null,"stop_loss":number|null,"timeframe":string|null,"confidence":"high|medium|low","strategy_type":"technical_analysis|fundamental|narrative|contrarian","raw_quote":"exact quote","extraction_confidence":0.0-1.0}
+
+Rules:
+- Extract only the creator's own active view/trade idea/level/target/risk warning.
+- Reject news, education, aggregation, guest calls, quoted third-party calls, vague hype, promos, jokes, and retrospective-only claims.
+- Do not invent prices, symbols, or quotes. Use null when a numeric field is absent.
+- If unsure, return [].
+
+${formatUntrustedTranscriptBlock(transcript)}`;
+}
+
+function extractionPrompt(
+  profile: ExtractionPromptProfile,
+  transcript: string,
+  title?: string | null,
+  chunk?: TranscriptChunk,
+  fullTranscriptForHints = transcript,
+): string {
+  if (profile === "shadow-compact") {
+    return compactShadowPrompt(transcript, title, chunk, fullTranscriptForHints);
+  }
+  return openRouterPrompt(transcript, title, chunk, fullTranscriptForHints);
+}
+
 async function callOpenRouter(_args: OpenRouterArgs, _model: string, _transcript: string, _title?: string | null, _chunk?: TranscriptChunk, _fullTranscript?: string): Promise<string> {
   throw new Error("OpenRouter provider has been removed. Use Ollama Cloud (--provider ollama).");
 }
@@ -391,7 +457,7 @@ async function callOllama(args: OpenRouterArgs, model: string, transcript: strin
       method: "POST",
       signal: controller.signal,
       headers,
-      body: JSON.stringify(buildOllamaChatRequestBody(model, transcript, title, chunk, fullTranscript, args.numPredict)),
+      body: JSON.stringify(buildOllamaChatRequestBody(model, transcript, title, chunk, fullTranscript, args.numPredict, args.promptProfile)),
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -420,12 +486,13 @@ export function buildOllamaChatRequestBody(
   chunk?: TranscriptChunk,
   fullTranscript?: string,
   numPredict = DEFAULT_NUM_PREDICT,
+  promptProfile: ExtractionPromptProfile = "full",
 ): Record<string, unknown> {
   return {
     model,
     messages: [
       { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
-      { role: "user", content: openRouterPrompt(transcript, title, chunk, fullTranscript ?? transcript) },
+      { role: "user", content: extractionPrompt(promptProfile, transcript, title, chunk, fullTranscript ?? transcript) },
     ],
     stream: false,
     format: "json",

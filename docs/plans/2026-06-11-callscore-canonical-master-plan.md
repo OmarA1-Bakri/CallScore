@@ -4150,3 +4150,72 @@ Next activation action:
 2. Run `.\scripts\windows\run-transcript-collector.ps1 -StatusOnly -HhHost hh`.
 3. If status succeeds, queue or wait for a `transcript_collect_laptop` job and run `.\scripts\windows\run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -HhHost hh -Write`.
 4. Do not run 25-video batch until repeated 5-video runs are clean.
+
+---
+
+## 2026-06-12 — Transcript/Gemma remediation boundary and Art of War internal activation start
+
+Status labels:
+
+- TRANSCRIPT_COLLECTOR_READY
+- TRANSCRIPT_COLLECTOR_LAPTOP_RUN_REQUIRED
+- TRANSCRIPT_CADENCE_PARTIAL
+- DATA_SURFACE_SAFE
+- GEMMA_SHADOW_IMPROVED
+- GEMMA_SHADOW_HOLD
+- GEMMA_NOT_PRODUCTION_DEFAULT
+- ML_LOOP_UPDATED
+- ART_OF_WAR_INTERNAL_READY
+- ART_OF_WAR_DRY_RUN_STARTED
+- PUBLIC_ACTIONS_APPROVAL_GATED
+- AUTONOMOUS_REVENUE_NO
+- NEXT_PHASE_STARTED
+
+Repo/runtime evidence:
+
+- HH branch: `master` before work branch.
+- Baseline HEAD: `84303dcb57afb015eb1cadfc871945945bd63f8c`.
+- Workplane status: OK / PARTIAL.
+- Freshness check: WARN only; blockers empty.
+- Unsafe source ranks: 0.
+- API unsafeOfficial: 0.
+- Homepage: HTTP 200.
+- 30d bucket: PENDING_MATURITY.
+
+Transcript collector:
+
+- HH workplane job state had no pending `transcript_collect_laptop` jobs.
+- `npm run --silent workplane -- claim --worker-id laptop-smoke-test` returned `{"claimed":false}`.
+- Tailscale saw Omar laptop nodes, but HH SSH probes returned permission denied, so the laptop collector live run could not be initiated from HH.
+- Exact blocker: laptop shell/SSH unavailable from HH; operator or laptop-side scheduler must run `scripts/windows/run-transcript-collector.ps1 -StatusOnly -HhHost hh` and then `-Workplane -Limit 5 -Browser firefox -HhHost hh -Write` when cooldown is clear.
+- No 25-video batch was run.
+- No new transcript catch-up was fabricated.
+
+Data pipeline:
+
+- No new laptop transcript batch landed during this pass, so extraction/scoring/recompute were not rerun.
+- Existing data surface remains safe and natively bucketed.
+
+Gemma shadow / ML loop:
+
+- Added compact shadow prompt profile for real-transcript shadow runs.
+- Updated `gemma_shadow_extract` workplane defaults to bounded HH-safe controls: prompt profile `shadow-compact`, chunk chars 350, overlap 50, max chunks 1, num_predict 350, timeout 45s, concurrency 1.
+- Added JSON parser hardening for common Ollama object wrappers containing arrays (`calls`, `items`, `results`, `extractions`, `output`).
+- Fixture benchmark control: `callscore-gemma4-extractor:latest@modelfile-user` on 10 fixtures produced 9/10 valid/schema, 0 false positives, average latency ~27.6s, verdict not_ready due one 60s timeout.
+- Bounded 1-real-transcript compact shadow run produced 0 timeouts but failed fast with `Model response did not contain a JSON array`; no 5-real run was attempted because the 1-real gate did not pass.
+- ML idle report updated with exact recommendation: align Gemma shadow prompt/Modelfile with the production extractor schema or add reviewed array-wrapper repair fixtures.
+- Gemma remains shadow-only, not production default, and not write-canary eligible.
+
+Art of War internal activation:
+
+- `/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py validate-docs` passed.
+- Generated a local-only fixture War Room report with `python3 scripts/art_of_war.py report --date 2026-06-12 --dry-run --output /tmp/callscore-art-of-war-report-20260612.md`.
+- Dry-run report produced 10 fixture candidates and 10 local/null publish records; external mutation performed was false.
+- Internal-only growth intelligence is now the next canonical development phase.
+- Public publishing, outreach, email/DM sends, spend, provider mutation, Whop live mutation, and production extractor changes remain approval-gated.
+
+Autonomous revenue status: NO until transcript cadence is stable and/or accepted transcript-lag policy is approved, Gemma/write path is approved or rule extractor remains canonical, and Art of War public activation receives explicit approval.
+
+Next canonical target:
+
+Implement the private CallScore Growth Intelligence Pack: a read-only internal report combining workplane status, freshness/API safety, Whop readiness, Art of War dry-run gate counts, transcript cadence state, and private content/funnel recommendations. No public action.

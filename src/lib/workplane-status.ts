@@ -173,7 +173,12 @@ export function decideNextAutonomousAction(input: WorkplaneDecisionInput): Workp
   }
   const mlGate = (input.latestMlEval.summary.promotion_gate ?? {}) as Record<string, unknown>;
   if (input.latestMlEval.exists && mlGate.eligible_for_write_canary !== true) {
-    return { action: "improve_gemma_prompt_and_chunking", reason: "latest ML eval blocks write canary", job_type: "ml_idle_improve", allowed: true };
+    return {
+      action: "start_artofwar_internal_growth_intelligence",
+      reason: "latest ML eval keeps Gemma in HOLD; data surface is safe, so internal-only growth intelligence can proceed",
+      job_type: "artofwar_strategy_brief",
+      allowed: true,
+    };
   }
   if (!input.latestGemmaShadow.exists) {
     return { action: "run_gemma_shadow_extract_limit_10", reason: "no Gemma shadow artifact found", job_type: "gemma_shadow_extract", allowed: true };
