@@ -55,7 +55,10 @@
     "audit:symbol-funnel": "node --import tsx src/scripts/audit-symbol-funnel.ts",
     "audit:blockers": "node --import tsx src/scripts/audit-call-blockers.ts",
     "freshness:check": "node --import tsx src/scripts/callscore-freshness-check.ts",
-    "pipeline:daily": "node --import tsx src/scripts/run-daily-pipeline.ts"
+    "pipeline:daily": "node --import tsx src/scripts/run-daily-pipeline.ts",
+    "transcript:worklist": "node --import tsx src/scripts/transcript-worklist.ts",
+    "transcript:ingest": "node --import tsx src/scripts/ingest-transcript-result.ts",
+    "transcript:media-fallback": "node --import tsx src/scripts/transcribe-media-fallback.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

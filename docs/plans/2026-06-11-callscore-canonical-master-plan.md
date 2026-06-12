@@ -3370,3 +3370,132 @@ No further automated YT-DLP transcript runs should be attempted until one of the
 | Whop commerce proof | CERTIFIED from prior provider-proof section; unchanged |
 | Art of War | READY FOR INTERNAL GROWTH INTELLIGENCE PACK — no public/external execution yet |
 | Autonomous revenue | NO until transcript gate or accepted alternative provider strategy is closed, and revenue-event observability follow-up is complete or explicitly deferred |
+
+---
+
+## 31. 2026-06-12 Transcript Acquisition Final Architecture Test — Laptop Collector vs HH Media Fallback
+
+Status: **BOTH PATHS IMPLEMENTED AS SAFE SCAFFOLDS / NO SUCCESSFUL TRANSCRIPT CANARY YET**.
+
+This pass stopped retrying the exhausted HH cookie/bgutil/WPC transcript-only route and tested two new architecture paths.
+
+### Path A — Omar laptop transcript collector over Tailscale
+
+Result: **IMPLEMENTED / CONNECTIVITY PARTIAL / CANARY BLOCKED ON LAPTOP SSH OR LOCAL OPERATOR RUN**.
+
+Implemented:
+
+- `src/scripts/transcript-worklist.ts` outputs bounded current-window transcript worklists from HH.
+- `src/scripts/ingest-transcript-result.ts` ingests transcript result JSON through the application path.
+- `scripts/windows/run-transcript-collector.ps1` runs transcript-only `yt-dlp` on Omar's laptop with browser cookies staying local.
+- `docs/ops/laptop-transcript-collector.md` documents dry/write canary, 5-video test, and 25-video catch-up gates.
+
+Safety contract:
+
+- cookies stay on laptop;
+- HH receives only transcript text + metadata;
+- transcript-only first;
+- no raw video/audio by default;
+- limit 1, then 5, then 25 only after prior stage passes;
+- 20s gap default;
+- Tailscale/SSH only.
+
+Evidence:
+
+- `omarslaptop-1` reachable over Tailscale at `100.118.20.40` with 0% packet loss.
+- HH non-interactive SSH to laptop currently blocked: `Permission denied (publickey,password)`.
+- HH worklist canary returned one current-window pending item: Bitbull video `eDxJN0vxrGk`.
+- HH ingest dry-run fixture passed validation and did not write.
+
+Canary status: **NOT RUN ON LAPTOP** because HH cannot execute laptop-side commands until Omar either runs the PowerShell script locally or authorizes HH SSH access.
+
+### Path B — HH autonomous media fallback
+
+Result: **SAFE SCAFFOLD IMPLEMENTED / BLOCKED ON LOCAL ASR TOOLING**.
+
+Implemented:
+
+- `src/scripts/transcribe-media-fallback.ts` with:
+  - one-video default limit;
+  - audio-only yt-dlp path;
+  - temp directory under `/tmp/callscore-media-work`;
+  - disk guard;
+  - max filesize guard;
+  - duration guard;
+  - cleanup in `finally`;
+  - no write unless `--write`;
+  - transcript ingestion through the same application SQL builder.
+- `docs/ops/hh-media-fallback.md` documents requirements and gates.
+
+Evidence:
+
+- HH has `ffmpeg` and `yt-dlp`.
+- HH does not have local ASR tooling: `whisper`, `faster_whisper`, `whisper_timestamped`, and `torch` missing.
+- Dry canary stopped before any media download with `asr_unavailable`.
+
+Canary status: **BLOCKED BEFORE DOWNLOAD**. This is correct: HH must not download raw media if it cannot transcribe and clean it up in the same bounded run.
+
+### Comparison
+
+| Criterion | Laptop collector | HH media fallback |
+| --- | --- | --- |
+| Success evidence | Not tested; laptop reachable but SSH denied | Dry canary blocked before download |
+| Main blocker | Laptop-side execution/SSH authorization | ASR runtime/model missing |
+| Secret exposure | Best: cookies remain on laptop | No cookies added, but media processing required |
+| Autonomy | Lower until laptop task/SSH configured | Higher after ASR installed and canaries pass |
+| Rate-limit risk | Lower if residential/browser-authenticated | Unknown; HH IP may still be challenged for media |
+| Disk/storage risk | Very low; transcript-only | Medium; must enforce audio temp cleanup |
+| Maintenance burden | Windows task + SSH/Tailscale | ASR stack/model/GPU/CPU maintenance |
+| Daily cadence readiness | Script/docs ready; scheduler not installed | Script/docs ready; timer integration blocked on ASR canary |
+
+### Decision
+
+Near-term canonical candidate: **Omar laptop transcript collector**.
+
+Reason: it preserves cookies on the browser-authenticated residential machine, avoids raw media, and has lower disk/ASR operational risk. It is not yet certified because laptop-side execution is unavailable from HH in this run.
+
+HH autonomous media fallback remains the preferred future autonomy track only after ASR tooling is installed and one-video + 5-video canaries pass. It must not become daily canonical until cleanup, disk guard, and transcript quality are proven.
+
+### Gates not passed
+
+- Laptop one-video canary: **blocked on laptop local run or SSH authorization**.
+- HH media one-video canary: **blocked on ASR unavailable**.
+- 5-video tests: **not run**.
+- 25-video catch-up: **not run**.
+- Extraction/matching/scoring/recompute after new transcripts: **not run** because no new transcript was acquired.
+
+### Current certification delta
+
+| Area | Status |
+| --- | --- |
+| Transcript worklist | IMPLEMENTED / TESTED |
+| Transcript ingest | IMPLEMENTED / DRY-RUN TESTED |
+| Laptop collector | IMPLEMENTED / BLOCKED ON LAPTOP EXECUTION |
+| HH media fallback | IMPLEMENTED / BLOCKED ON ASR TOOLING |
+| Canonical transcript path | LAPTOP COLLECTOR CANDIDATE; NOT CERTIFIED |
+| Daily transcript cadence | EXISTING HH TIMER ACTIVE; new collector scheduler not installed |
+| Freshness | WARN; transcript gate still open |
+| HH read API/homepage | CERTIFIED unchanged |
+| Whop commerce | CERTIFIED unchanged |
+| Art of War | INTERNAL PLANNING CAN CONTINUE; external growth still gated |
+| Autonomous revenue | NO until transcript acquisition or accepted transcript-lagged strategy is closed |
+
+### Exact next actions
+
+1. Run laptop canary locally on Omar's laptop:
+
+   ```powershell
+   .\scripts\windows\run-transcript-collector.ps1 -Limit 1 -Browser firefox -GapSeconds 20 -SinceDays 45 -HhHost hermes-agent-box -Write
+   ```
+
+   or authorize HH SSH key to `omarslaptop-1` and rerun from HH.
+
+2. If laptop canary passes, run `-Limit 5`, then `-Limit 25`, then HH extraction/matching/scoring/recompute/freshness/API certification.
+
+3. If full HH autonomy remains preferred, install ASR runtime/model on HH, then run:
+
+   ```bash
+   npm run transcript:media-fallback -- --limit 1 --since-days 45 --write
+   ```
+
+   Proceed to 5 and 25 only after prior pass.

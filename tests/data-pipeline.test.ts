@@ -1067,3 +1067,56 @@ test("scoring helpers return safe values for NaN and Infinity inputs", () => {
   assert.equal(didHitTarget("bullish", 110, 95, 120, null), false);
   assert.equal(didHitTarget("bearish", 90, 105, null, 80), false);
 });
+
+import {
+  buildTranscriptWorklistSql,
+  parseTranscriptWorklistArgs,
+} from "../src/scripts/transcript-worklist";
+import {
+  buildTranscriptIngestSql,
+  normalizeTranscriptIngestRecord,
+  parseTranscriptIngestArgs,
+} from "../src/scripts/ingest-transcript-result";
+import {
+  parseMediaFallbackArgs,
+  detectAsr,
+} from "../src/scripts/transcribe-media-fallback";
+
+test("laptop transcript worklist is bounded and current-window first", () => {
+  const args = parseTranscriptWorklistArgs(["--limit", "500", "--since-days", "45", "--creator", "@CryptoFace"]);
+  assert.equal(args.limit, 25);
+  assert.equal(args.sinceDays, 45);
+  assert.equal(args.creator, "@CryptoFace");
+  const statement = buildTranscriptWorklistSql(args);
+  assert.match(statement.sql, /v\.published_at >= NOW\(\) - \(\$1::int \* INTERVAL '1 day'\)/);
+  assert.match(statement.sql, /transcript IS NULL OR length\(v\.transcript\) = 0/);
+  assert.match(statement.sql, /LIMIT \$3/);
+});
+
+test("transcript ingest validates records and avoids overwriting by default", () => {
+  const args = parseTranscriptIngestArgs(["--input", "result.json", "--write"]);
+  assert.deepEqual(args, { input: "result.json", write: true, overwrite: false });
+  const transcript = Array.from({ length: 80 }, (_, index) => `word${index}`).join(" ");
+  const record = normalizeTranscriptIngestRecord({
+    video_id: 123,
+    youtube_video_id: "abcDEF_1234",
+    status: "available",
+    transcript,
+    provider: "laptop_collector_firefox",
+  });
+  const statement = buildTranscriptIngestSql(record);
+  assert.match(statement.sql, /calls_extracted = false/);
+  assert.match(statement.sql, /\$6::boolean OR transcript IS NULL OR length\(transcript\) = 0/);
+  assert.equal(statement.params[5], false);
+});
+
+test("HH media fallback defaults to safe one-video dry run and requires ASR", async () => {
+  const args = parseMediaFallbackArgs([]);
+  assert.equal(args.limit, 1);
+  assert.equal(args.write, false);
+  assert.equal(args.gapMs, 20_000);
+  assert.equal(args.workRoot, "/tmp/callscore-media-work");
+  assert.equal(args.maxFilesize, "200M");
+  const asr = await detectAsr();
+  assert.match(asr, /^(whisper|none)$/);
+});
