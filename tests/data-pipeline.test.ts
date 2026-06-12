@@ -56,6 +56,7 @@ import {
   stripCaptionText,
   ytDlpAuthArgs,
   ytDlpExtraArgs,
+  ytDlpPoTokenProviderArgs,
 } from "../src/scripts/backfill-transcripts";
 import {
   COVERAGE_AUDIT_SECTION_NAMES,
@@ -510,12 +511,19 @@ test("transcript backfill supports redacted yt-dlp auth env hooks", () => {
 test("transcript backfill exposes safe yt-dlp recovery options without logging secrets", () => {
   const env = {
     YTDLP_COOKIES_PATH: "/run/secrets/youtube.cookies",
+    YTDLP_PO_TOKEN_PROVIDER: "bgutil-http",
+    YTDLP_PO_TOKEN_PROVIDER_BASE_URL: "http://127.0.0.1:4416",
+    YTDLP_PLAYER_CLIENT: "mweb",
     YTDLP_EXTRACTOR_ARGS: "youtube:player_client=mweb\nyoutube:player_skip=configs",
     YTDLP_JS_RUNTIMES: "node",
     YTDLP_REMOTE_COMPONENTS: "1",
     YTDLP_USER_AGENT: "Mozilla/5.0 Test Agent",
   };
   assert.deepEqual(ytDlpExtraArgs(env), [
+    "--extractor-args",
+    "youtube:player_client=mweb",
+    "--extractor-args",
+    "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416",
     "--extractor-args",
     "youtube:player_client=mweb",
     "--extractor-args",
@@ -530,12 +538,37 @@ test("transcript backfill exposes safe yt-dlp recovery options without logging s
 
   assert.deepEqual(redactedYtDlpOptionSummary(env), {
     auth: "cookies_path",
+    playerClient: true,
+    poTokenProvider: "bgutil-http",
+    poTokenProviderBaseUrl: true,
+    poTokenProviderHome: false,
     extractorArgs: 2,
     jsRuntimes: true,
     remoteComponents: true,
     userAgent: true,
   });
-  assert.doesNotMatch(JSON.stringify(redactedYtDlpOptionSummary(env)), /youtube\\.cookies|Mozilla|mweb/);
+  assert.doesNotMatch(JSON.stringify(redactedYtDlpOptionSummary(env)), /youtube\\.cookies|Mozilla|127\\.0\\.0\\.1|mweb/);
+});
+
+test("yt-dlp PO-token provider config emits provider args without raw token exposure", () => {
+  assert.deepEqual(
+    ytDlpPoTokenProviderArgs({
+      YTDLP_PO_TOKEN_PROVIDER: "bgutil-http",
+      YTDLP_PO_TOKEN_PROVIDER_BASE_URL: "http://127.0.0.1:4416",
+    }),
+    ["--extractor-args", "youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416"],
+  );
+  assert.deepEqual(
+    ytDlpPoTokenProviderArgs({
+      YTDLP_PO_TOKEN_PROVIDER: "bgutil-script",
+      YTDLP_PO_TOKEN_PROVIDER_HOME: "/opt/callscore/bgutil-ytdlp-pot-provider",
+    }),
+    ["--extractor-args", "youtubepot-bgutilscript:server_home=/opt/callscore/bgutil-ytdlp-pot-provider"],
+  );
+  assert.throws(
+    () => ytDlpPoTokenProviderArgs({ YTDLP_PO_TOKEN_PROVIDER: "bgutil-script" }),
+    /YTDLP_PO_TOKEN_PROVIDER_HOME/,
+  );
 });
 
 test("yt-dlp transcript args remain transcript-only and include extractor backoff", () => {
