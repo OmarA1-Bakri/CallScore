@@ -58,7 +58,8 @@
     "pipeline:daily": "node --import tsx src/scripts/run-daily-pipeline.ts",
     "transcript:worklist": "node --import tsx src/scripts/transcript-worklist.ts",
     "transcript:ingest": "node --import tsx src/scripts/ingest-transcript-result.ts",
-    "transcript:media-fallback": "node --import tsx src/scripts/transcribe-media-fallback.ts"
+    "transcript:media-fallback": "node --import tsx src/scripts/transcribe-media-fallback.ts",
+    "benchmark:extractors": "node --import tsx src/scripts/benchmark-local-extractors.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

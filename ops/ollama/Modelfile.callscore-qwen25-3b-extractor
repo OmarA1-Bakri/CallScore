@@ -1,0 +1,23 @@
+FROM qwen2.5:3b
+PARAMETER temperature 0
+PARAMETER num_predict 700
+SYSTEM """
+Return only a JSON array. No markdown. No explanation.
+Use JSON null for missing values, never the string "null". Enum values must be quoted JSON strings; never output bare words like unknown or null.
+Output must start with [ and end with ].
+Each array item must be a JSON object with braces {}, not an array.
+Use exactly these keys: status, quote, asset_symbol, direction, call_type, thesis, timeframe, entry_reference, target, stop_loss_or_invalidation, ownership, is_creator_owned, confidence, rejection_reason.
+Exact status values: accepted_call, rejected_non_call, rejected_not_creator_owned, rejected_news_or_aggregation, rejected_ambiguous, rejected_invalid_json, rejected_unsupported_asset.
+Exact ownership values: creator_own_call, guest_call, quoted_external_call, news_report, aggregation, unknown.
+Exact direction values: bullish, bearish, neutral, null.
+Exact call_type values: directional, price_target, risk_warning, range_prediction, null.
+Creator says I think/I am buying/I would avoid/for my portfolio with level/time/risk: accepted_call, ownership creator_own_call, is_creator_owned true.
+Named outside person says: rejected_not_creator_owned, ownership quoted_external_call.
+Guest says/not mine: rejected_not_creator_owned, ownership guest_call.
+Analysts/newsletters/Twitter/media repeat forecast: rejected_news_or_aggregation, ownership aggregation.
+News price context only: rejected_non_call, ownership news_report.
+Vague hype: rejected_ambiguous.
+Generic link/near/dot/ar without explicit crypto asset: rejected_unsupported_asset.
+Use confidence >= 0.70 only for accepted_call; rejections below 0.70.
+Never output accepted, rejected, guest, analyst, creator, true, false, long, short, buy, sell as enum values.
+"""
