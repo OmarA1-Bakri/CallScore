@@ -12,7 +12,10 @@ services:
       ML_VERIFIER_PROVIDER: ollama
       OLLAMA_HOST: http://127.0.0.1:11434
       ML_VERIFIER_MODEL: qwen2.5:3b
+      YTDLP_BIN: yt-dlp
       YTDLP_COOKIES_PATH: /run/secrets/youtube-cookies.txt
+      YTDLP_JS_RUNTIMES: node
+      YTDLP_REMOTE_COMPONENTS: "1"
     volumes:
       - /opt/callscore/secrets/youtube-cookies.txt:/run/secrets/youtube-cookies.txt:ro
     command: ["npm", "run", "pipeline:worker", "--", "--poll-ms", "15000"]
@@ -29,6 +32,9 @@ services:
       ML_VERIFIER_PROVIDER: ollama
       OLLAMA_HOST: http://127.0.0.1:11434
       ML_VERIFIER_MODEL: qwen2.5:3b
+      YTDLP_BIN: yt-dlp
+      YTDLP_JS_RUNTIMES: node
+      YTDLP_REMOTE_COMPONENTS: "1"
     entrypoint: ["npm", "run", "pipeline:worker:once", "--"]
     command: ["--dry-run"]
 
@@ -40,6 +46,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env.hermes
+    environment:
+      YTDLP_BIN: yt-dlp
+      YTDLP_JS_RUNTIMES: node
+      YTDLP_REMOTE_COMPONENTS: "1"
     command:
       - npm
       - run
@@ -68,6 +78,10 @@ services:
     profiles: ["debug"]
     env_file:
       - .env.hermes
+    environment:
+      YTDLP_BIN: yt-dlp
+      YTDLP_JS_RUNTIMES: node
+      YTDLP_REMOTE_COMPONENTS: "1"
     entrypoint:
       - npm
       - run

@@ -48,10 +48,14 @@ import {
 } from "../src/lib/pipeline-blockers";
 import { parseBackfillPublicationDatesArgs } from "../src/scripts/backfill-publication-dates";
 import {
+  buildYtDlpTranscriptArgs,
+  classifyYtDlpFailure,
   extractRequestedSubtitleUrl,
   parseBackfillTranscriptsArgs,
+  redactedYtDlpOptionSummary,
   stripCaptionText,
   ytDlpAuthArgs,
+  ytDlpExtraArgs,
 } from "../src/scripts/backfill-transcripts";
 import {
   COVERAGE_AUDIT_SECTION_NAMES,
@@ -479,7 +483,7 @@ test("transcript backfill is dry-run and bounded by default", () => {
   ]);
   assert.equal(args.creator, "@A");
   assert.equal(args.limit, 7);
-  assert.equal(args.concurrency, 3);
+  assert.equal(args.concurrency, 1);
   assert.equal(args.fallbackYtDlp, true);
   assert.equal(args.ytDlpSleepSeconds, 20);
   assert.equal(args.ytDlpMaxSleepSeconds, 60);
@@ -501,6 +505,66 @@ test("transcript backfill supports redacted yt-dlp auth env hooks", () => {
     "--cookies-from-browser",
     "chromium:Default",
   ]);
+});
+
+test("transcript backfill exposes safe yt-dlp recovery options without logging secrets", () => {
+  const env = {
+    YTDLP_COOKIES_PATH: "/run/secrets/youtube.cookies",
+    YTDLP_EXTRACTOR_ARGS: "youtube:player_client=mweb\nyoutube:player_skip=configs",
+    YTDLP_JS_RUNTIMES: "node",
+    YTDLP_REMOTE_COMPONENTS: "1",
+    YTDLP_USER_AGENT: "Mozilla/5.0 Test Agent",
+  };
+  assert.deepEqual(ytDlpExtraArgs(env), [
+    "--extractor-args",
+    "youtube:player_client=mweb",
+    "--extractor-args",
+    "youtube:player_skip=configs",
+    "--js-runtimes",
+    "node",
+    "--remote-components",
+    "ejs:github",
+    "--user-agent",
+    "Mozilla/5.0 Test Agent",
+  ]);
+
+  assert.deepEqual(redactedYtDlpOptionSummary(env), {
+    auth: "cookies_path",
+    extractorArgs: 2,
+    jsRuntimes: true,
+    remoteComponents: true,
+    userAgent: true,
+  });
+  assert.doesNotMatch(JSON.stringify(redactedYtDlpOptionSummary(env)), /youtube\\.cookies|Mozilla|mweb/);
+});
+
+test("yt-dlp transcript args remain transcript-only and include extractor backoff", () => {
+  const args = parseBackfillTranscriptsArgs(["--limit", "1", "--concurrency", "1"]);
+  const ytdlpArgs = buildYtDlpTranscriptArgs("video123", args, {
+    YTDLP_EXTRACTOR_ARGS: "youtube:player_client=mweb",
+    YTDLP_JS_RUNTIMES: "node",
+    YTDLP_RETRY_SLEEP: "extractor:exp=20:120:2",
+  }, ["--cookies", "/run/secrets/youtube.cookies"]);
+
+  assert.ok(ytdlpArgs.includes("--skip-download"));
+  assert.ok(ytdlpArgs.includes("--no-playlist"));
+  assert.ok(ytdlpArgs.includes("--write-auto-subs"));
+  assert.ok(ytdlpArgs.includes("--write-subs"));
+  assert.ok(ytdlpArgs.includes("--extractor-retries"));
+  assert.ok(ytdlpArgs.includes("--retry-sleep"));
+  assert.ok(ytdlpArgs.includes("extractor:exp=20:120:2"));
+  assert.ok(ytdlpArgs.includes("https://www.youtube.com/watch?v=video123"));
+  assert.equal(ytdlpArgs.includes("--yes-playlist"), false);
+  assert.equal(ytdlpArgs.includes("-f"), false);
+});
+
+test("yt-dlp failure classifier distinguishes cookie, PO token, JS runtime, bot, and rate gates", () => {
+  assert.equal(classifyYtDlpFailure("ERROR: This request requires a PO Token / Proof of Origin"), "po_token_required");
+  assert.equal(classifyYtDlpFailure("ERROR: JavaScript runtime unavailable for EJS challenge"), "js_challenge_runtime_missing");
+  assert.equal(classifyYtDlpFailure("ERROR: cookies are expired or rotated"), "cookie_invalid_or_rotated");
+  assert.equal(classifyYtDlpFailure("ERROR: Sign in to confirm you’re not a bot"), "bot_verification_required");
+  assert.equal(classifyYtDlpFailure("ERROR: HTTP Error 429: Too Many Requests"), "rate_limited");
+  assert.equal(classifyYtDlpFailure("WARNING: no automatic captions"), "no_captions");
 });
 
 test("yt-dlp requested_subtitles output is dereferenced instead of stored as transcript text", () => {

@@ -11,11 +11,14 @@ const execFileAsync = promisify(execFile);
 
 const DEFAULT_TRANSCRIPT_BATCH_LIMIT = 25;
 const DEFAULT_TRANSCRIPT_CONCURRENCY = 1;
+const MAX_TRANSCRIPT_CONCURRENCY = 1;
 const DEFAULT_YTDLP_SLEEP_SECONDS = 20;
 const DEFAULT_YTDLP_MAX_SLEEP_SECONDS = 60;
 const DEFAULT_RETRY_COOLDOWN_HOURS = 24;
 const DEFAULT_STALE_RETRY_DAYS = 7;
 const DEFAULT_LOCK_FILE = "/tmp/callscore-slow-ytdlp-transcripts.lock";
+const DEFAULT_YTDLP_EXTRACTOR_RETRIES = 2;
+const DEFAULT_YTDLP_RETRY_SLEEP = "extractor:exp=20:120:2";
 
 export interface BackfillTranscriptsArgs {
   readonly creator: string | null;
@@ -52,11 +55,14 @@ interface TranscriptResult {
   readonly detail?: string;
 }
 
-type TranscriptFailureReason =
+export type TranscriptFailureReason =
   | "provider_credentials_missing"
   | "providers_returned_no_transcript"
   | "no_captions"
   | "bot_verification_required"
+  | "cookie_invalid_or_rotated"
+  | "po_token_required"
+  | "js_challenge_runtime_missing"
   | "rate_limited"
   | "failed_retryable"
   | "failed_terminal";
@@ -98,7 +104,7 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
     creator: argValue(argv, "--creator"),
     limit: positiveInt(argValue(argv, "--limit") ?? process.env.TRANSCRIPT_BATCH_LIMIT ?? null, DEFAULT_TRANSCRIPT_BATCH_LIMIT),
     offset: nonNegativeInt(argValue(argv, "--offset"), 0),
-    concurrency: Math.min(3, requestedConcurrency),
+    concurrency: Math.min(MAX_TRANSCRIPT_CONCURRENCY, requestedConcurrency),
     gapMs: nonNegativeInt(argValue(argv, "--gap-ms"), sleepSeconds * 1000),
     fallbackYtDlp: !argv.includes("--no-yt-dlp"),
     useSerpApi: argv.includes("--serpapi"),
@@ -212,6 +218,92 @@ export function ytDlpAuthArgs(env: Record<string, string | undefined> = process.
   return [];
 }
 
+function splitMultilineEnv(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(/\r?\n/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function truthyEnv(value: string | undefined): boolean {
+  return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
+}
+
+export function ytDlpExtraArgs(env: Record<string, string | undefined> = process.env): string[] {
+  const args: string[] = [];
+  for (const extractorArg of splitMultilineEnv(env.YTDLP_EXTRACTOR_ARGS)) {
+    args.push("--extractor-args", extractorArg);
+  }
+
+  const jsRuntimes = env.YTDLP_JS_RUNTIMES?.trim();
+  if (jsRuntimes) args.push("--js-runtimes", jsRuntimes);
+
+  const remoteComponents = env.YTDLP_REMOTE_COMPONENTS?.trim();
+  if (remoteComponents) {
+    args.push("--remote-components", truthyEnv(remoteComponents) ? "ejs:github" : remoteComponents);
+  }
+
+  const userAgent = env.YTDLP_USER_AGENT?.trim();
+  if (userAgent) args.push("--user-agent", userAgent);
+
+  return args;
+}
+
+export function redactedYtDlpOptionSummary(env: Record<string, string | undefined> = process.env): Record<string, unknown> {
+  return {
+    auth: env.YTDLP_COOKIES_PATH
+      ? "cookies_path"
+      : env.YTDLP_COOKIES
+        ? "inline_cookies"
+        : env.YTDLP_COOKIES_FROM_BROWSER
+          ? "browser"
+          : "none",
+    extractorArgs: splitMultilineEnv(env.YTDLP_EXTRACTOR_ARGS).length,
+    jsRuntimes: Boolean(env.YTDLP_JS_RUNTIMES?.trim()),
+    remoteComponents: Boolean(env.YTDLP_REMOTE_COMPONENTS?.trim()),
+    userAgent: Boolean(env.YTDLP_USER_AGENT?.trim()),
+  };
+}
+
+export function buildYtDlpTranscriptArgs(
+  videoId: string,
+  args: BackfillTranscriptsArgs,
+  env: Record<string, string | undefined> = process.env,
+  authArgs: readonly string[] = ytDlpAuthArgs(env),
+): string[] {
+  return [
+    ...authArgs,
+    ...ytDlpExtraArgs(env),
+    "--skip-download",
+    "--no-playlist",
+    "--no-warnings",
+    "--quiet",
+    "--write-auto-subs",
+    "--write-subs",
+    "--sub-langs",
+    "en.*,en",
+    "--sub-format",
+    "vtt",
+    "--sleep-requests",
+    String(args.ytDlpSleepSeconds),
+    "--sleep-interval",
+    String(args.ytDlpSleepSeconds),
+    "--max-sleep-interval",
+    String(args.ytDlpMaxSleepSeconds),
+    "--retries",
+    "2",
+    "--fragment-retries",
+    "2",
+    "--extractor-retries",
+    String(DEFAULT_YTDLP_EXTRACTOR_RETRIES),
+    "--retry-sleep",
+    env.YTDLP_RETRY_SLEEP?.trim() || DEFAULT_YTDLP_RETRY_SLEEP,
+    "--print",
+    "requested_subtitles",
+    `https://www.youtube.com/watch?v=${videoId}`,
+  ];
+}
+
 function createInlineCookiesFile(env: Record<string, string | undefined> = process.env): { readonly args: readonly string[]; readonly cleanup: () => void } {
   const cookies = env.YTDLP_COOKIES;
   if (!cookies || !cookies.includes("\n")) return { args: [], cleanup: () => undefined };
@@ -224,8 +316,32 @@ function createInlineCookiesFile(env: Record<string, string | undefined> = proce
   };
 }
 
-function classifyYtDlpFailure(text: string): TranscriptFailureReason {
+export function classifyYtDlpFailure(text: string): TranscriptFailureReason {
   const lower = text.toLowerCase();
+  if (
+    lower.includes("po token")
+    || lower.includes("potoken")
+    || lower.includes("proof of origin")
+    || lower.includes("gvs po")
+    || lower.includes("visitor data")
+  ) return "po_token_required";
+  if (
+    lower.includes("javascript challenge")
+    || lower.includes("js runtime")
+    || lower.includes("javascript runtime")
+    || lower.includes("ejs")
+    || lower.includes("remote component")
+  ) return "js_challenge_runtime_missing";
+  if (
+    (lower.includes("cookie") || lower.includes("cookies"))
+    && (
+      lower.includes("expired")
+      || lower.includes("rotated")
+      || lower.includes("invalid")
+      || lower.includes("not authorized")
+      || lower.includes("unable to load")
+    )
+  ) return "cookie_invalid_or_rotated";
   if (lower.includes("sign in to confirm") || lower.includes("not a bot") || lower.includes("bot")) return "bot_verification_required";
   if (lower.includes("too many requests") || lower.includes("rate limit") || lower.includes("http error 429")) return "rate_limited";
   if (lower.includes("subtitles") || lower.includes("no captions") || lower.includes("no automatic captions")) return "no_captions";
@@ -237,32 +353,11 @@ async function fetchViaYtDlp(videoId: string, args: BackfillTranscriptsArgs): Pr
   const inlineCookies = createInlineCookiesFile();
   try {
     const authArgs = inlineCookies.args.length > 0 ? inlineCookies.args : ytDlpAuthArgs();
-    const { stdout } = await execFileAsync(process.env.YTDLP_BIN ?? "yt-dlp", [
-      ...authArgs,
-      "--skip-download",
-      "--no-playlist",
-      "--no-warnings",
-      "--quiet",
-      "--write-auto-subs",
-      "--write-subs",
-      "--sub-langs",
-      "en.*,en",
-      "--sub-format",
-      "vtt",
-      "--sleep-requests",
-      String(args.ytDlpSleepSeconds),
-      "--sleep-interval",
-      String(args.ytDlpSleepSeconds),
-      "--max-sleep-interval",
-      String(args.ytDlpMaxSleepSeconds),
-      "--retries",
-      "2",
-      "--fragment-retries",
-      "2",
-      "--print",
-      "requested_subtitles",
-      `https://www.youtube.com/watch?v=${videoId}`,
-    ], { timeout: 180_000, maxBuffer: 10 * 1024 * 1024 });
+    const { stdout } = await execFileAsync(
+      process.env.YTDLP_BIN ?? "yt-dlp",
+      buildYtDlpTranscriptArgs(videoId, args, process.env, authArgs),
+      { timeout: 180_000, maxBuffer: 10 * 1024 * 1024 },
+    );
     const subtitleUrl = extractRequestedSubtitleUrl(stdout);
     const captionText = subtitleUrl
       ? await fetch(subtitleUrl, { signal: AbortSignal.timeout(30_000) }).then((response) => response.ok ? response.text() : "")
@@ -323,6 +418,8 @@ async function loadMissingTranscriptVideos(args: BackfillTranscriptsArgs): Promi
     `(v.transcript_last_attempt_at IS NULL
       OR v.transcript_last_attempt_at < NOW() - ($1::int * INTERVAL '1 hour')
       OR (v.transcript_error IN ('provider_credentials_missing','bot_verification_required','rate_limited')
+          AND v.transcript_last_attempt_at < NOW() - ($2::int * INTERVAL '1 day'))
+      OR (v.transcript_error IN ('cookie_invalid_or_rotated','po_token_required','js_challenge_runtime_missing')
           AND v.transcript_last_attempt_at < NOW() - ($2::int * INTERVAL '1 day')))`,
   ];
   params.push(args.retryCooldownHours, args.staleRetryDays);
@@ -359,7 +456,12 @@ function acquireLock(lockFile: string): () => void {
 }
 
 function isProviderBlock(reason: TranscriptFailureReason): boolean {
-  return reason === "provider_credentials_missing" || reason === "bot_verification_required" || reason === "rate_limited";
+  return reason === "provider_credentials_missing"
+    || reason === "bot_verification_required"
+    || reason === "cookie_invalid_or_rotated"
+    || reason === "po_token_required"
+    || reason === "js_challenge_runtime_missing"
+    || reason === "rate_limited";
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -376,7 +478,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   try {
     const videos = await loadMissingTranscriptVideos(args);
-    console.log(`[${timestamp()}] slow yt-dlp transcript backfill ${args.write ? "WRITE" : "DRY-RUN"}: videos=${videos.length}, limit=${args.limit}, offset=${args.offset}, concurrency=${args.concurrency}, gapMs=${args.gapMs}, lock=${args.lockFile}`);
+    console.log(`[${timestamp()}] slow yt-dlp transcript backfill ${args.write ? "WRITE" : "DRY-RUN"}: videos=${videos.length}, limit=${args.limit}, offset=${args.offset}, concurrency=${args.concurrency}, gapMs=${args.gapMs}, lock=${args.lockFile}, ytdlp=${JSON.stringify(redactedYtDlpOptionSummary())}`);
 
     let written = 0;
     let failed = 0;

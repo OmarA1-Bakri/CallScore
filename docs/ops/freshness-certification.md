@@ -100,7 +100,22 @@ DATABASE_PROVIDER=postgres npm run backfill:transcripts -- \
   --audit-out .tmp/callscore-slow-ytdlp-canary/transcripts.jsonl
 ```
 
-If the canary reports `bot_verification_required`, stop transcript catch-up and provide a working cookie path. Do not run a full backfill.
+If the canary reports `bot_verification_required`, `po_token_required`,
+`cookie_invalid_or_rotated`, `js_challenge_runtime_missing`, or `rate_limited`,
+stop transcript catch-up and do not run a full backfill.
+
+Current YT-DLP recovery controls are intentionally opt-in and redacted:
+
+- `YTDLP_BIN` may point the host daily pipeline at an isolated current `yt-dlp` venv.
+- `YTDLP_JS_RUNTIMES=node` enables the official JavaScript runtime path.
+- `YTDLP_REMOTE_COMPONENTS=1` allows official EJS remote components when needed.
+- `YTDLP_EXTRACTOR_ARGS` may be used for reviewed official YouTube extractor args
+  such as `youtube:player_client=mweb`; never store static PO tokens casually.
+
+If a fresh cookie is installed and the one-video canary still reports
+`bot_verification_required`, treat the remaining gate as an authenticated
+YouTube session/IP acceptance or reviewed PO-token provider issue. Do not escalate
+to proxies, high concurrency, or large transcript jobs.
 
 ## Backlog drain policy
 
