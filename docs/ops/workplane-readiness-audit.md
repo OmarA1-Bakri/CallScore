@@ -59,7 +59,7 @@ Canonical runner: `scripts/windows/run-transcript-collector.ps1`
 Added workplane mode:
 
 ```powershell
-.\scripts\windows\run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -HhHost hermes-agent-box -Write
+.\scripts\windows\run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519 -Write
 ```
 
 Behavior:

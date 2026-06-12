@@ -6,6 +6,8 @@ param(
   [int]$GapSeconds = 0,
   [int]$SinceDays = 45,
   [string]$HhHost = "hermes-agent-box",
+  [int]$HhPort = 22,
+  [string]$HhIdentityFile = "",
   [string]$HhRepo = "/opt/crypto-tuber-ranked",
   [string]$StatePath = "",
   [string]$JobId = "",
@@ -31,6 +33,91 @@ if ($GapSeconds -gt 0) { $MinGapSeconds = $GapSeconds; $MaxGapSeconds = $GapSeco
 if ($CooldownHours -gt 0) { $CooldownMinHours = $CooldownHours; $CooldownMaxHours = $CooldownHours }
 if ($MinGapSeconds -lt 1 -or $MaxGapSeconds -lt $MinGapSeconds) { throw "Gap bounds must satisfy 1 <= MinGapSeconds <= MaxGapSeconds" }
 if ($CooldownMinHours -lt 1 -or $CooldownMaxHours -lt $CooldownMinHours) { throw "Cooldown bounds must satisfy 1 <= CooldownMinHours <= CooldownMaxHours" }
+if ($HhPort -lt 1 -or $HhPort -gt 65535) { throw "HhPort must be 1..65535" }
+
+function Get-HhSshArgs([string]$RemoteCommand) {
+  $sshArgs = @("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new")
+  if ($HhIdentityFile) { $sshArgs += @("-i", $HhIdentityFile) }
+  if ($HhPort -ne 22) { $sshArgs += @("-p", [string]$HhPort) }
+  $sshArgs += @($HhHost, $RemoteCommand)
+  return $sshArgs
+}
+
+function Get-HhScpArgs([string]$LocalPath, [string]$RemotePath) {
+  $scpArgs = @("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new")
+  if ($HhIdentityFile) { $scpArgs += @("-i", $HhIdentityFile) }
+  if ($HhPort -ne 22) { $scpArgs += @("-P", [string]$HhPort) }
+  $scpArgs += @($LocalPath, "${HhHost}:$RemotePath")
+  return $scpArgs
+}
+
+function Get-HhScpFromArgs([string]$RemotePath, [string]$LocalPath) {
+  $scpArgs = @("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new")
+  if ($HhIdentityFile) { $scpArgs += @("-i", $HhIdentityFile) }
+  if ($HhPort -ne 22) { $scpArgs += @("-P", [string]$HhPort) }
+  $scpArgs += @("${HhHost}:$RemotePath", $LocalPath)
+  return $scpArgs
+}
+
+function Invoke-HhSsh([string]$RemoteCommand) {
+  $sshArgs = Get-HhSshArgs $RemoteCommand
+  ssh @sshArgs
+  if ($LASTEXITCODE -ne 0) { throw "hh_ssh_failed exit=$LASTEXITCODE host=$HhHost port=$HhPort" }
+}
+
+function Copy-FileToHH([string]$LocalPath, [string]$RemotePath) {
+  $scpArgs = Get-HhScpArgs $LocalPath $RemotePath
+  scp @scpArgs
+  if ($LASTEXITCODE -ne 0) { throw "hh_scp_failed exit=$LASTEXITCODE host=$HhHost port=$HhPort" }
+}
+
+function Copy-FileFromHH([string]$RemotePath, [string]$LocalPath) {
+  $scpArgs = Get-HhScpFromArgs $RemotePath $LocalPath
+  scp @scpArgs
+  if ($LASTEXITCODE -ne 0) { throw "hh_scp_failed exit=$LASTEXITCODE host=$HhHost port=$HhPort" }
+}
+
+function Write-Utf8NoBomFile([string]$Path, [string]$Text) {
+  $dir = Split-Path -Parent $Path
+  if ($dir) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($Path, $Text, $utf8NoBom)
+}
+
+function Copy-StringToHH([string]$Payload, [string]$RemotePath) {
+  $tmpFile = Join-Path $env:TEMP ("callscore-hh-payload-" + [Guid]::NewGuid().ToString("N") + ".json")
+  try {
+    Write-Utf8NoBomFile $tmpFile $Payload
+    Copy-FileToHH $tmpFile $RemotePath
+  } finally {
+    Remove-Item -LiteralPath $tmpFile -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Invoke-HhJsonCommand([string]$RemoteCommand, [string]$Label) {
+  $fileName = "json-" + [Guid]::NewGuid().ToString("N") + ".json"
+  $remoteRel = ".tmp/laptop-collector/$fileName"
+  $remoteAbs = "$HhRepo/$remoteRel"
+  $localFile = Join-Path $env:TEMP ("callscore-hh-json-" + [Guid]::NewGuid().ToString("N") + ".json")
+  try {
+    Invoke-HhSsh "cd $HhRepo && mkdir -p .tmp/laptop-collector && set -a && source .env.hermes && set +a && $RemoteCommand > $remoteRel"
+    Copy-FileFromHH $remoteAbs $localFile
+    return Get-Content -LiteralPath $localFile -Raw
+  } finally {
+    Remove-Item -LiteralPath $localFile -Force -ErrorAction SilentlyContinue
+    try { Invoke-HhSsh "rm -f $remoteAbs" | Out-Null } catch { }
+  }
+}
+
+function Invoke-HhIngestPayload([string]$Payload) {
+  $fileName = "ingest-" + [Guid]::NewGuid().ToString("N") + ".json"
+  $remoteRel = ".tmp/laptop-collector/inbox/$fileName"
+  $remoteAbs = "$HhRepo/$remoteRel"
+  Invoke-HhSsh "cd $HhRepo && mkdir -p .tmp/laptop-collector/inbox"
+  Copy-StringToHH $Payload $remoteAbs
+  $remoteCommand = "cd $HhRepo && set -a && source .env.hermes && set +a && npm run transcript:ingest -- --input $remoteRel --write; status=`$?; rm -f $remoteRel; exit `$status"
+  Invoke-HhSsh $remoteCommand
+}
 
 function Get-DefaultStatePath {
   if ($StatePath) { return $StatePath }
@@ -55,8 +142,9 @@ function Acquire-CollectorLock {
       if ($_.Exception.Message -match "collector_overlap") { throw }
     }
   }
-  [pscustomobject]@{ pid = $PID; started_at_utc = [DateTimeOffset]::UtcNow.ToString("o"); job_id = $JobId } |
-    ConvertTo-Json -Compress | Set-Content -LiteralPath $LockPath -Encoding UTF8
+  $lockJson = [pscustomobject]@{ pid = $PID; started_at_utc = [DateTimeOffset]::UtcNow.ToString("o"); job_id = $JobId } |
+    ConvertTo-Json -Compress
+  Write-Utf8NoBomFile $LockPath $lockJson
 }
 
 function Release-CollectorLock {
@@ -82,7 +170,7 @@ function Set-StateProperty($state, [string]$name, $value) {
 
 function Write-State($state) {
   Set-StateProperty $state "last_run_utc" ([DateTimeOffset]::UtcNow.ToString("o"))
-  $state | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $StatePath -Encoding UTF8
+  Write-Utf8NoBomFile $StatePath ($state | ConvertTo-Json -Depth 10)
 }
 
 function ConvertFrom-StrictJson($raw, [string]$label) {
@@ -135,22 +223,23 @@ function Publish-StateToHH($state) {
   Set-StateProperty $state "last_terminal_failure" $terminalFailure
   Write-State $state
   if ($OutputJson) {
-    $state | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $OutputJson -Encoding UTF8
+    Write-Utf8NoBomFile $OutputJson ($state | ConvertTo-Json -Depth 10)
   }
   if ($HhHost -and $HhRepo) {
-    Get-Content -LiteralPath $StatePath -Raw | ssh $HhHost "cd $HhRepo && mkdir -p .tmp/laptop-collector && cat > .tmp/laptop-collector/latest-state.json"
+    Invoke-HhSsh "cd $HhRepo && mkdir -p .tmp/laptop-collector"
+    Copy-FileToHH $StatePath "$HhRepo/.tmp/laptop-collector/latest-state.json"
   }
 }
 
 function Complete-WorkplaneJob([string]$status) {
   if (-not $JobId) { return }
-  ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane -- complete --job-id $JobId --status $status --state-path .tmp/laptop-collector/latest-state.json" | Out-Host
+  Invoke-HhSsh "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane -- complete --job-id $JobId --status $status --state-path .tmp/laptop-collector/latest-state.json" | Out-Host
 }
 
 function Claim-WorkplaneJob {
   if (-not $Workplane -or $JobId) { return }
   $runner = "laptop-$($env:COMPUTERNAME)-$PID"
-  $claimRaw = ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane -- claim --worker-id $runner"
+  $claimRaw = Invoke-HhJsonCommand "npm run --silent workplane -- claim --worker-id $runner" "workplane claim"
   $claim = ConvertFrom-StrictJson $claimRaw "workplane claim"
   if (-not $claim.claimed) {
     Write-Host "collector_workplane_claim=false"
@@ -204,7 +293,7 @@ function Send-Failure($item, [string]$reason, [string]$detail) {
     provider = "laptop_collector_$Browser"
   } | ConvertTo-Json -Depth 5 -Compress
   if ($Write) {
-    $payload | ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run transcript:ingest -- --input - --write"
+    Invoke-HhIngestPayload $payload
   } else {
     Write-Host "would_mark_failed video_id=$($item.id) reason=$reason"
   }
@@ -245,8 +334,7 @@ if (Test-ImpersonationSupport $Impersonate) {
   Write-Host "collector_impersonation=unavailable target=$Impersonate action='python -m pip install -U ""yt-dlp[default,curl-cffi]""'"
 }
 
-$worklistCmd = "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent transcript:worklist -- --limit $Limit --since-days $SinceDays"
-$worklistRaw = ssh $HhHost $worklistCmd
+$worklistRaw = Invoke-HhJsonCommand "npm run --silent transcript:worklist -- --limit $Limit --since-days $SinceDays" "transcript:worklist"
 $worklist = ConvertFrom-StrictJson $worklistRaw "transcript:worklist"
 $items = @($worklist.items)
 Write-Host "collector_worklist=$($items.Count) browser=$Browser mode=$(if ($Write) { 'WRITE' } else { 'DRY' }) limit=$Limit gap=${MinGapSeconds}-${MaxGapSeconds}s state=$StatePath"
@@ -295,7 +383,7 @@ foreach ($item in $items) {
       source = "yt-dlp_captions"
     } | ConvertTo-Json -Depth 5 -Compress
     if ($Write) {
-      $payload | ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run transcript:ingest -- --input - --write"
+      Invoke-HhIngestPayload $payload
     } else {
       Write-Host "would_ingest video_id=$($item.id) youtube_video_id=$($item.youtube_video_id) chars=$($text.Trim().Length)"
     }

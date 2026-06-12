@@ -42,24 +42,46 @@ test("laptop collector has impersonation dependency guardrails", () => {
 test("laptop collector exposes workplane claim, lock, and HH state publication", () => {
   assert.match(script, /\[switch\]\$Workplane/);
   assert.match(script, /\[string\]\$JobId/);
+  assert.match(script, /\[int\]\$HhPort = 22/);
+  assert.match(script, /\[string\]\$HhIdentityFile = ""/);
+  assert.match(script, /Get-HhSshArgs/);
+  assert.match(script, /Get-HhScpArgs/);
+  assert.match(script, /Get-HhScpFromArgs/);
+  assert.match(script, /Copy-FileToHH/);
+  assert.match(script, /Copy-FileFromHH/);
+  assert.match(script, /Invoke-HhJsonCommand/);
+  assert.match(script, /Invoke-HhIngestPayload/);
+  assert.match(script, /Write-Utf8NoBomFile/);
+  assert.match(script, /New-Item -ItemType Directory -Path \$dir -Force/);
+  assert.match(script, /UTF8Encoding\(\$false\)/);
+  assert.match(script, /BatchMode=yes/);
+  assert.match(script, /StrictHostKeyChecking=accept-new/);
+  assert.match(script, /-i", \$HhIdentityFile/);
+  assert.match(script, /-p", \[string\]\$HhPort/);
+  assert.match(script, /-P", \[string\]\$HhPort/);
   assert.match(script, /Acquire-CollectorLock/);
   assert.match(script, /workplane -- claim/);
   assert.match(script, /workplane -- complete/);
   assert.match(script, /\.tmp\/laptop-collector\/latest-state\.json/);
+  assert.match(script, /npm run --silent transcript:worklist -- --limit \$Limit --since-days \$SinceDays/);
 });
 
 test("laptop collector keeps strict JSON command boundaries", () => {
   assert.match(script, /ConvertFrom-StrictJson/);
   assert.match(script, /non_json_output/);
+  assert.match(script, /Write-Utf8NoBomFile \$StatePath/);
+  assert.match(script, /Write-Utf8NoBomFile \$OutputJson/);
   assert.match(script, /npm run --silent workplane -- claim/);
   assert.match(script, /npm run --silent transcript:worklist/);
   assert.doesNotMatch(script, /workplane -- --status/);
+  assert.doesNotMatch(script, /Set-Content -LiteralPath \$StatePath -Encoding UTF8/);
+  assert.doesNotMatch(script, /Set-Content -LiteralPath \$OutputJson -Encoding UTF8/);
 });
 
 test("status-only publishes state and exits before claim or transcript worklist", () => {
   const statusOnlyIndex = script.indexOf("if ($StatusOnly)");
   const claimIndex = script.indexOf("\nClaim-WorkplaneJob\n");
-  const worklistIndex = script.indexOf("$worklistCmd");
+  const worklistIndex = script.indexOf("$worklistRaw");
   assert.ok(statusOnlyIndex > 0, "missing StatusOnly branch");
   assert.ok(claimIndex > statusOnlyIndex, "StatusOnly must run before workplane claim");
   assert.ok(worklistIndex > statusOnlyIndex, "StatusOnly must run before transcript worklist");

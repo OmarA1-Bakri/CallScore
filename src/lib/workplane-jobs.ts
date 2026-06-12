@@ -105,7 +105,7 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
       "runner_overlap",
     ],
     production_db_writes_allowed: true,
-    default_safe_command: "scripts/windows/run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -SinceDays 45 -HhHost hermes-agent-box -Write",
+    default_safe_command: "scripts/windows/run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -SinceDays 45 -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\\.ssh\\callscore_hh_ed25519 -Write",
   }),
   transcript_ingest_result: safeReportSpec("transcript_ingest_result", {
     input_payload: { result_json: "validated transcript result or failure record", overwrite: false, write: true },

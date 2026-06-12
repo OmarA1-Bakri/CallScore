@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { stdin as input } from "node:process";
-import { query } from "../lib/db";
+import { closeDatabasePoolForTests, query } from "../lib/db";
 import { loadEnv } from "./script-helpers";
 
 export type TranscriptIngestStatus = "available" | "failed";
@@ -140,8 +140,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
+  main()
+    .then(async () => {
+      await closeDatabasePoolForTests();
+      process.exit(0);
+    })
+    .catch(async (error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      await closeDatabasePoolForTests().catch(() => undefined);
+      process.exit(1);
+    });
 }

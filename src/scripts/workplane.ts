@@ -1,6 +1,7 @@
 import { main as laptopJobMain } from "./workplane-laptop-job";
 import { buildWorkplaneStatus, parseWorkplaneStatusArgs } from "./workplane-status";
 import { loadEnv } from "./script-helpers";
+import { closeDatabasePoolForTests } from "../lib/db";
 
 export type WorkplaneCommandRoute =
   | { readonly mode: "status"; readonly args: readonly string[] }
@@ -30,8 +31,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
+  main()
+    .then(async () => {
+      await closeDatabasePoolForTests();
+      process.exit(0);
+    })
+    .catch(async (error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      await closeDatabasePoolForTests().catch(() => undefined);
+      process.exit(1);
+    });
 }
