@@ -25,6 +25,8 @@ const DEFAULT_CHUNK_AGENTS = 1;
 const MAX_CHUNK_AGENTS = 3;
 const DEFAULT_MODEL_ATTEMPTS = 2;
 const MAX_MODEL_ATTEMPTS = 3;
+const DEFAULT_NUM_PREDICT = 2_000;
+const MAX_NUM_PREDICT = 2_000;
 const MAX_CANDIDATE_TEXT_CHARS = 1_000;
 const PROMPT_INJECTION_ECHO =
   /\b(ignore (?:all )?(?:previous|above) instructions|system prompt|developer message|return only|untrusted_transcript_(?:begin|end))\b/i;
@@ -55,6 +57,7 @@ export interface OpenRouterArgs {
   readonly chunkAgents: number;
   readonly modelAttempts: number;
   readonly requestTimeoutMs: number;
+  readonly numPredict: number;
 }
 
 export interface ChunkSettings {
@@ -174,6 +177,11 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
     dryRun: !write || argv.includes("--dry-run"),
     auditOut: argValue(argv, "--audit-out"),
     requestTimeoutMs: positiveInt(argValue(argv, "--request-timeout-ms"), defaultRequestTimeoutMs),
+    numPredict: boundedPositiveInt(
+      argValue(argv, "--num-predict"),
+      DEFAULT_NUM_PREDICT,
+      MAX_NUM_PREDICT,
+    ),
     chunkAgents: boundedPositiveInt(
       argValue(argv, "--chunk-agents"),
       DEFAULT_CHUNK_AGENTS,
@@ -383,7 +391,7 @@ async function callOllama(args: OpenRouterArgs, model: string, transcript: strin
       method: "POST",
       signal: controller.signal,
       headers,
-      body: JSON.stringify(buildOllamaChatRequestBody(model, transcript, title, chunk, fullTranscript)),
+      body: JSON.stringify(buildOllamaChatRequestBody(model, transcript, title, chunk, fullTranscript, args.numPredict)),
     });
   } catch (error: unknown) {
     if (error instanceof Error && error.name === "AbortError") {
@@ -411,6 +419,7 @@ export function buildOllamaChatRequestBody(
   title?: string | null,
   chunk?: TranscriptChunk,
   fullTranscript?: string,
+  numPredict = DEFAULT_NUM_PREDICT,
 ): Record<string, unknown> {
   return {
     model,
@@ -425,7 +434,7 @@ export function buildOllamaChatRequestBody(
     think: false,
     options: {
       temperature: 0,
-      num_predict: 2000,
+      num_predict: numPredict,
     },
   };
 }
