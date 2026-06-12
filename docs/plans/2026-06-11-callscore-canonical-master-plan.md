@@ -3606,3 +3606,112 @@ HH autonomous media fallback remains a future autonomy track only after ASR tool
 | Whop commerce | CERTIFIED unchanged |
 | Art of War | READY NEXT for internal growth intelligence and controlled next-phase planning |
 | Autonomous revenue | PARTIAL — still requires revenue observability and explicit launch posture, but transcript/data freshness gate is no longer blocking near-term internal progress |
+
+---
+
+## 33. 2026-06-12 Local Ollama Gemma 4 vs Qwen Extraction Benchmark
+
+Status: **GEMMA4 INSTALLED / LOCAL EXTRACTION MODEL NOT YET CERTIFIED**.
+
+Purpose: benchmark `gemma4:latest` against the existing local baseline `qwen2.5:3b` for CallScore transcript-to-call extraction. This was a dry-run-only model benchmark. No production calls, scores, rankings, provider settings, or secrets were changed.
+
+### Runtime / model-store evidence
+
+Result: **PASS**.
+
+- Host: `hermes-agent-box`.
+- Ollama binary: `/usr/local/bin/ollama`.
+- Ollama version: `0.23.1`.
+- `OLLAMA_MODELS`: unset.
+- Model store: `/usr/share/ollama/.ollama/models`.
+- Store size before pull: `3.6G`.
+- Store size after pull: `12G`.
+- Disk before pull: `/dev/sda1` `150G`, `104G` used, `41G` available, `72%`.
+- Disk after pull: `/dev/sda1` `150G`, `112G` used, `33G` available, `78%`.
+- Memory after pull: `15Gi` total, `11Gi` available, no swap.
+
+Installed models after pull:
+
+- `gemma4:latest` — `9.6 GB`.
+- `qwen2.5:3b` — `1.9 GB`.
+- `qwen2.5:1.5b` — `986 MB`.
+
+`qwen2.5:3b` remained installed and untouched.
+
+### JSON sanity benchmark
+
+Result: **GEMMA4 JSON SANITY PASS / QWEN BASELINE JSON SANITY FAIL**.
+
+Same prompt for both models: return exactly a JSON array containing one BTC bullish record.
+
+| Model | JSON array | Exact instruction | Markdown/prose leak | Latency |
+| --- | --- | --- | --- | ---: |
+| `gemma4:latest` | PASS | PASS | none | `28448ms` |
+| `qwen2.5:3b` | FAIL — returned object, not array | FAIL | object/prose mismatch | `9393ms` |
+
+Gemma 4 passed the simple strict JSON-array sanity test. Qwen 2.5 3B reproduced the known parser-gate issue by returning a JSON object instead of an array.
+
+### Shared extractor-fixture benchmark
+
+Result: **BOTH MODELS NEED PROMPT/PARSER FIX**.
+
+Both models were tested against the same five dry-run fixtures using the current repo extraction prompt/body and strict parser gate:
+
+1. obvious BTC bullish call;
+2. non-call/news fragment;
+3. quoted third-party ETH call;
+4. ambiguous SOL hype;
+5. specific SOL buy/target/invalidation call.
+
+| Model | Fixtures | Passed | Parsed JSON arrays | Schema-valid rows | Avg latency | Finding |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `gemma4:latest` | 5 | 0 | 0 | 0 | `131976ms` | Extracted richer objects, but not arrays; false-positive risk on news/quoted/hype fixtures. |
+| `qwen2.5:3b` | 5 | 0 | 0 | 0 | `82137ms` | Mostly returned `{}`; failed array parser gate; weak extraction. |
+
+Fixture details:
+
+- Gemma 4 produced plausible objects for BTC and SOL, including SOL entry `150`, target `220`, stop `130`, timeframe `60 days`.
+- Gemma 4 also produced high-confidence objects for non-call/quoted/ambiguous fixtures, so it is not safe for public-quality extraction without stricter ownership/non-call gates.
+- Qwen 2.5 3B mostly returned `{}` and missed the strict array contract.
+- Neither model passed the current strict schema/parser benchmark.
+
+### Repo extractor dry-run benchmark
+
+Result: **FAIL for both models / no production write**.
+
+Command shape used for each model:
+
+```bash
+npm run extract:llm -- \
+  --provider ollama \
+  --ollama-host http://127.0.0.1:11434 \
+  --model <model> \
+  --video-ids 19695 \
+  --include-extracted \
+  --limit 1 \
+  --chunk-chars 3000 \
+  --max-chunks 1 \
+  --chunk-agents 1 \
+  --model-attempts 1 \
+  --gap-ms 0 \
+  --audit-out /tmp/callscore-repo-dryrun-<model>.jsonl \
+  --dry-run
+```
+
+Outcomes:
+
+- `gemma4:latest`: failed by timeout at the current extractor request timeout (`180000ms`) on the real transcript chunk.
+- `qwen2.5:3b`: failed with `Model response did not contain a JSON array`.
+
+### Quality gate verdict
+
+Status: **GEMMA4 NOT PROMOTED / QWEN REMAINS BASELINE ONLY / LOCAL EXTRACTION MODEL NOT YET CERTIFIED**.
+
+Gemma 4 is better than Qwen on the simple JSON-array sanity check and appears more semantically capable on obvious calls, but it does not pass the current extractor quality gate. It is not yet safe to make production default because:
+
+- current repo extraction prompt/body yields JSON objects rather than arrays;
+- non-call, quoted-third-party, and ambiguous-hype fixtures produced unsafe high-confidence objects;
+- real transcript dry-run timed out at the current 180s request limit;
+- public-quality promotion would require stricter schema, ownership, non-call rejection, timeout, and parser gates.
+
+Next extraction-system target: implement a local-model benchmark harness and prompt/parser revision that forces array output, supports object-to-array normalization only under strict safe rules, adds creator-owned/non-call classifier fields, and reruns Gemma 4 vs Qwen before any production-default change.
