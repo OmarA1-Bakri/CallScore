@@ -77,11 +77,23 @@ function Copy-FileFromHH([string]$RemotePath, [string]$LocalPath) {
   if ($LASTEXITCODE -ne 0) { throw "hh_scp_failed exit=$LASTEXITCODE host=$HhHost port=$HhPort" }
 }
 
+function Get-RepoRoot {
+  if ($PSScriptRoot) { return (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) }
+  return (Get-Location).Path
+}
+
+function Resolve-RepoRelativePath([string]$Path) {
+  if (-not $Path) { return $Path }
+  if ([System.IO.Path]::IsPathRooted($Path)) { return $Path }
+  return (Join-Path (Get-RepoRoot) $Path)
+}
+
 function Write-Utf8NoBomFile([string]$Path, [string]$Text) {
-  $dir = Split-Path -Parent $Path
+  $resolvedPath = Resolve-RepoRelativePath $Path
+  $dir = Split-Path -Parent $resolvedPath
   if ($dir) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
   $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-  [System.IO.File]::WriteAllText($Path, $Text, $utf8NoBom)
+  [System.IO.File]::WriteAllText($resolvedPath, $Text, $utf8NoBom)
 }
 
 function Copy-StringToHH([string]$Payload, [string]$RemotePath) {
@@ -168,8 +180,10 @@ function Set-StateProperty($state, [string]$name, $value) {
   $state | Add-Member -Force -NotePropertyName $name -NotePropertyValue $value
 }
 
-function Write-State($state) {
-  Set-StateProperty $state "last_run_utc" ([DateTimeOffset]::UtcNow.ToString("o"))
+function Write-State($state, [switch]$PreserveLastRunUtc) {
+  if (-not $PreserveLastRunUtc) {
+    Set-StateProperty $state "last_run_utc" ([DateTimeOffset]::UtcNow.ToString("o"))
+  }
   Write-Utf8NoBomFile $StatePath ($state | ConvertTo-Json -Depth 10)
 }
 
@@ -194,20 +208,45 @@ function Get-VideoFailures($state) {
   return $state.video_failures
 }
 
+function Summarize-FailureDetail([string]$detail, [int]$maxLength = 240) {
+  $lines = @($detail -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+  $actionable = @($lines | Where-Object {
+    $_ -notmatch '(?i)^Traceback' -and
+    $_ -notmatch '(?i)^File "' -and
+    $_ -notmatch '^\^+' -and
+    $_ -notmatch '(?i)^During handling' -and
+    $_ -notmatch '(?i)^The above exception'
+  })
+  if ($actionable.Count -gt 0) {
+    $start = [Math]::Max(0, $actionable.Count - 4)
+    $text = ($actionable[$start..($actionable.Count - 1)] -join " | ")
+  } else {
+    $text = ($detail -replace '\r?\n', " ").Trim()
+  }
+  if (-not $text) { return "empty_error_detail" }
+  return $text.Substring(0, [Math]::Min($maxLength, $text.Length))
+}
+
 function Set-VideoFailure($state, [string]$youtubeVideoId, [string]$reason, [string]$detail) {
   $failures = Get-VideoFailures $state
-  $cleanDetail = ($detail -replace "\r?\n", " ").Trim()
   $entry = [pscustomobject]@{
     reason = $reason
     failed_at_utc = [DateTimeOffset]::UtcNow.ToString("o")
-    detail_preview = $cleanDetail.Substring(0, [Math]::Min(240, $cleanDetail.Length))
+    detail_preview = Summarize-FailureDetail $detail 240
   }
   $failures | Add-Member -Force -NotePropertyName $youtubeVideoId -NotePropertyValue $entry
 }
 
+function Get-DynamicPropertyValue($object, [string]$name) {
+  if ($null -eq $object) { return $null }
+  $property = $object.PSObject.Properties[$name]
+  if ($null -eq $property) { return $null }
+  return $property.Value
+}
+
 function Should-SkipVideo($state, [string]$youtubeVideoId) {
   $failures = Get-VideoFailures $state
-  $failure = $failures.$youtubeVideoId
+  $failure = Get-DynamicPropertyValue $failures $youtubeVideoId
   if ($null -eq $failure) { return $false }
   try {
     $failedAt = [DateTimeOffset]::Parse($failure.failed_at_utc)
@@ -215,17 +254,21 @@ function Should-SkipVideo($state, [string]$youtubeVideoId) {
   } catch { return $true }
 }
 
-function Publish-StateToHH($state) {
-  Set-StateProperty $state "last_job_id" $JobId
-  Set-StateProperty $state "last_mode" $(if ($Workplane) { "workplane" } elseif ($Write) { "write" } else { "dry_run" })
-  Set-StateProperty $state "last_limit" $Limit
-  Set-StateProperty $state "last_gap_min_seconds" $MinGapSeconds
-  Set-StateProperty $state "last_gap_max_seconds" $MaxGapSeconds
-  Set-StateProperty $state "last_attempted_count" $attempted
-  Set-StateProperty $state "last_success_count" $succeeded
-  Set-StateProperty $state "last_failure_count" $failed
-  Set-StateProperty $state "last_terminal_failure" $terminalFailure
-  Write-State $state
+function Publish-StateToHH($state, [switch]$PreserveRunMetrics) {
+  if ($PreserveRunMetrics) {
+    Set-StateProperty $state "last_statusonly_utc" ([DateTimeOffset]::UtcNow.ToString("o"))
+  } else {
+    Set-StateProperty $state "last_job_id" $JobId
+    Set-StateProperty $state "last_mode" $(if ($Workplane) { "workplane" } elseif ($Write) { "write" } else { "dry_run" })
+    Set-StateProperty $state "last_limit" $Limit
+    Set-StateProperty $state "last_gap_min_seconds" $MinGapSeconds
+    Set-StateProperty $state "last_gap_max_seconds" $MaxGapSeconds
+    Set-StateProperty $state "last_attempted_count" $attempted
+    Set-StateProperty $state "last_success_count" $succeeded
+    Set-StateProperty $state "last_failure_count" $failed
+    Set-StateProperty $state "last_terminal_failure" $terminalFailure
+  }
+  Write-State $state -PreserveLastRunUtc:$PreserveRunMetrics
   if ($OutputJson) {
     Write-Utf8NoBomFile $OutputJson ($state | ConvertTo-Json -Depth 10)
   }
@@ -278,6 +321,7 @@ function Classify-Failure([string]$text) {
   if ($text -match "(?i)(private video|video is unavailable|removed by the uploader|account has been terminated|login required)") { return "private_or_deleted" }
   if ($text -match "(?i)transcript_too_short") { return "transcript_too_short" }
   if ($text -match "(?i)(timed out|timeout|connection.*reset|connection.*closed|Incomplete data received)") { return "transient_network" }
+  if ($text -match "(?i)(^|\n)Traceback|yt[_-]?dlp\.|ExtractorError|AttributeError|KeyError|TypeError") { return "collector_tool_error" }
   return "transcript_failed"
 }
 
@@ -291,13 +335,13 @@ function Test-ImpersonationSupport([string]$target) {
 }
 
 function Send-Failure($item, [string]$reason, [string]$detail) {
-  $cleanDetail = $detail -replace "\r?\n", " "
+  $cleanDetail = Summarize-FailureDetail $detail 500
   $payload = [pscustomobject]@{
     video_id = [int]$item.id
     youtube_video_id = [string]$item.youtube_video_id
     status = "failed"
     error = $reason
-    detail = $cleanDetail.Substring(0, [Math]::Min(500, $cleanDetail.Length))
+    detail = $cleanDetail
     provider = "laptop_collector_$Browser"
   } | ConvertTo-Json -Depth 5 -Compress
   if ($Write) {
@@ -315,7 +359,7 @@ $terminalFailure = $null
 $state = Read-State
 
 if ($StatusOnly) {
-  Publish-StateToHH $state
+  Publish-StateToHH $state -PreserveRunMetrics
   Release-CollectorLock
   exit 0
 }

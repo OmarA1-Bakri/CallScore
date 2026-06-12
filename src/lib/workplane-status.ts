@@ -187,6 +187,47 @@ export function latestMlEvalArtifact(root: string | readonly string[] = ["/tmp/c
   }
 }
 
+
+export function latestArtOfWarCampaignReceipt(root: string | readonly string[] = ["/tmp", ".tmp/workplane-jobs"]): ArtifactSummary {
+  const path = latestFile(root, (name) => name.endsWith(".json") && name.includes("callscore-art-of-war") && (name.includes("campaign") || name.includes("receipts-proof")));
+  if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
+  try {
+    const json = readJsonObject(path);
+    const verifier = json.verifier_result && typeof json.verifier_result === "object"
+      ? json.verifier_result as Record<string, unknown>
+      : {};
+    const persona = json.persona_scorecard && typeof json.persona_scorecard === "object"
+      ? json.persona_scorecard as Record<string, unknown>
+      : {};
+    const gemma = json.gemma_evaluation && typeof json.gemma_evaluation === "object"
+      ? json.gemma_evaluation as Record<string, unknown>
+      : {};
+    return {
+      path,
+      exists: true,
+      modified_at: statSync(path).mtime.toISOString(),
+      malformed: false,
+      summary: {
+        campaign_id: json.campaign_id ?? null,
+        iteration: json.iteration ?? null,
+        decision: json.decision ?? null,
+        failure_class: json.failure_class ?? null,
+        next_safe_action: json.next_safe_action ?? null,
+        approval_required: json.approval_required ?? null,
+        public_action_performed: json.public_action_performed ?? null,
+        external_mutation_performed: json.external_mutation_performed ?? null,
+        whop_mutation_performed: json.whop_mutation_performed ?? null,
+        production_mutation_performed: json.production_mutation_performed ?? null,
+        verifier_passed: verifier.passed ?? null,
+        persona_passed: persona.passed ?? null,
+        gemma_passed: gemma.passed ?? null,
+      },
+    };
+  } catch (error) {
+    return { path, exists: true, modified_at: statSync(path).mtime.toISOString(), malformed: true, summary: { error: error instanceof Error ? error.message : String(error) } };
+  }
+}
+
 export function decideNextAutonomousAction(input: WorkplaneDecisionInput): WorkplaneDecision {
   if (input.unsafeSourceRanks > 0 || input.apiUnsafeOfficialCount > 0) {
     return { action: "hold_investigate_public_safety", reason: "unsafe source/ranking state detected", job_type: null, allowed: false };
@@ -233,6 +274,9 @@ export function workplaneJobModelForStatus(): readonly Record<string, unknown>[]
     retry_policy: spec.retry_policy,
     cooldown_policy: spec.cooldown_policy,
     output_artifact: spec.output_artifact,
+    success_criteria: spec.success_criteria,
+    failure_classification: spec.failure_classification,
+    default_safe_command: spec.default_safe_command,
     production_db_writes_allowed: spec.production_db_writes_allowed,
     production_call_writes_allowed: spec.production_call_writes_allowed,
     public_ranking_impact_allowed: spec.public_ranking_impact_allowed,
@@ -327,13 +371,30 @@ export function externalReadinessSnapshot(repoRoot = process.cwd(), now = new Da
     }, now),
     art_of_war: domain({
       status: artEvidence.length >= 2 ? "PARTIAL" : "NOT_CONNECTED",
-      evidence: artEvidence,
+      evidence: [...artEvidence, "campaign_loop_contract=planned_in_master_plan", "persona/dry-run/Gemma verifier jobs=report_only"],
       blockers: ["public publish/outreach/spend requires approval"],
-      safe_next_action: "run artofwar_strategy_brief or campaign_plan_generate dry-run",
+      safe_next_action: "run governed CampaignLoopContract preflight, persona test, dry-run, Gemma eval, and receipt jobs before any approval packet",
       risky_actions_blocked: ["publishing", "email/DM/outreach send", "ad spend", "aggressive scraping"],
       required_approvals: ["public action", "outreach send", "spend"],
       relevant_commands: ["python scripts/art_of_war.py report --dry-run"],
-      relevant_jobs: ["artofwar_strategy_brief", "artofwar_content_queue_dry_run", "artofwar_campaign_plan_generate", "artofwar_audience_research_dry_run", "artofwar_outreach_queue_prepare", "artofwar_publish_approval_review", "artofwar_spend_approval_review"],
+      relevant_jobs: [
+        "artofwar_strategy_brief",
+        "artofwar_content_queue_dry_run",
+        "artofwar_campaign_plan_generate",
+        "artofwar_audience_research_dry_run",
+        "artofwar_outreach_queue_prepare",
+        "artofwar_publish_approval_review",
+        "artofwar_spend_approval_review",
+        "artofwar_campaign_preflight",
+        "artofwar_campaign_iteration",
+        "artofwar_campaign_verify",
+        "artofwar_campaign_persona_test",
+        "artofwar_campaign_dry_run",
+        "artofwar_campaign_gemma_eval",
+        "artofwar_campaign_receipt",
+        "artofwar_campaign_dossier",
+        "artofwar_campaign_approval_review",
+      ],
       dry_run_available: artEvidence.length >= 2,
       canary_available: artEvidence.length >= 2,
     }, now),

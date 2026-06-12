@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec } from "../src/lib/workplane-jobs";
 import {
   decideNextAutonomousAction,
+  latestArtOfWarCampaignReceipt,
   latestGemmaShadowArtifact,
   latestMlEvalArtifact,
   readCollectorCooldownState,
@@ -33,6 +34,15 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
     "artofwar_outreach_queue_prepare",
     "artofwar_publish_approval_review",
     "artofwar_spend_approval_review",
+    "artofwar_campaign_preflight",
+    "artofwar_campaign_iteration",
+    "artofwar_campaign_verify",
+    "artofwar_campaign_persona_test",
+    "artofwar_campaign_dry_run",
+    "artofwar_campaign_gemma_eval",
+    "artofwar_campaign_receipt",
+    "artofwar_campaign_dossier",
+    "artofwar_campaign_approval_review",
     "automation_registry_refresh",
     "automation_dry_run",
     "automation_health_check",
@@ -50,6 +60,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   assert.equal(collector.public_ranking_impact_allowed, false);
   assert.match(collector.cooldown_policy, /12-24h/);
   assert.match(collector.default_safe_command, /-Workplane/);
+  assert.ok(collector.failure_classification.includes("collector_tool_error"));
 
   const gemma = getWorkplaneJobSpec("gemma_shadow_extract");
   assert.equal(gemma.execution_location, "HH");
@@ -161,6 +172,52 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
   assert.ok(domains.art_of_war.risky_actions_blocked.some((item) => item.includes("publishing")));
 });
 
+test("workplane status exposes executable report-only job commands", () => {
+  const model = workplaneJobModelForStatus();
+  const campaignLoop = model.find((entry) => entry.type === "artofwar_campaign_iteration");
+  assert.ok(campaignLoop, "missing campaign iteration job model");
+  assert.match(String(campaignLoop.default_safe_command), /campaign-loop --dry-run/);
+  assert.equal(campaignLoop.production_db_writes_allowed, false);
+  assert.equal(campaignLoop.public_ranking_impact_allowed, false);
+  assert.ok(Array.isArray(campaignLoop.success_criteria));
+  assert.ok(Array.isArray(campaignLoop.failure_classification));
+});
+
+
+test("Art of War campaign loop jobs are report-only and approval-gated", () => {
+  const campaignJobs = [
+    "artofwar_campaign_preflight",
+    "artofwar_campaign_iteration",
+    "artofwar_campaign_verify",
+    "artofwar_campaign_persona_test",
+    "artofwar_campaign_dry_run",
+    "artofwar_campaign_gemma_eval",
+    "artofwar_campaign_receipt",
+    "artofwar_campaign_dossier",
+    "artofwar_campaign_approval_review",
+  ] as const;
+
+  for (const type of campaignJobs) {
+    const spec = getWorkplaneJobSpec(type);
+    assert.equal(spec.execution_location, "HH", type);
+    assert.equal(spec.production_db_writes_allowed, false, type);
+    assert.equal(spec.production_call_writes_allowed, false, type);
+    assert.equal(spec.public_ranking_impact_allowed, false, type);
+    assert.ok(spec.failure_classification.includes("approval_missing"), type);
+    assert.doesNotMatch(spec.default_safe_command, /publish|send|spend|whop:bootstrap|shadow:promote/i, type);
+  }
+
+  const preflight = getWorkplaneJobSpec("artofwar_campaign_preflight");
+  assert.deepEqual((preflight.input_payload.required_fields as string[]).slice(0, 4), ["campaign_id", "track", "objective", "source_data"]);
+
+  const persona = getWorkplaneJobSpec("artofwar_campaign_persona_test");
+  assert.deepEqual(persona.input_payload.personas, ["creator_operator", "whop_buyer", "skeptical_prospect", "high_intent_buyer", "low_trust_cold_prospect", "technical_evaluator"]);
+  assert.equal(persona.input_payload.threshold, 70);
+
+  const approval = getWorkplaneJobSpec("artofwar_campaign_approval_review");
+  assert.match(approval.success_criteria.join(" "), /approval_missing blocks/);
+});
+
 test("Gemma Ollama Modelfile is aligned to production shadow extraction schema", () => {
   const modelfile = readFileSync("ops/ollama/Modelfile.callscore-gemma4-extractor", "utf8");
   assert.match(modelfile, /\"symbol\":\"BTCUSDT\"/);
@@ -168,4 +225,46 @@ test("Gemma Ollama Modelfile is aligned to production shadow extraction schema",
   assert.match(modelfile, /"extraction_confidence":0\.0-1\.0/);
   assert.doesNotMatch(modelfile, /asset_symbol/);
   assert.doesNotMatch(modelfile, /rejected_news_or_aggregation/);
+});
+
+
+test("existing enqueue script can safely enqueue bounded workplane jobs", () => {
+  const enqueueScript = readFileSync("src/scripts/callscore-enqueue-job.ts", "utf8");
+  assert.match(enqueueScript, /--job <candles\|match\|scores\|ml\|workplane>/);
+  assert.match(enqueueScript, /--workplane-type TYPE/);
+  assert.match(enqueueScript, /isWorkplaneJobType/);
+  assert.match(enqueueScript, /getWorkplaneJobSpec/);
+  assert.match(enqueueScript, /transcript_collect_laptop/);
+  assert.match(enqueueScript, /--limit >5 is not supported by this safe workplane enqueue path/);
+  assert.match(enqueueScript, /allow_large_batch: false/);
+  assert.match(enqueueScript, /production_call_writes_allowed: spec\.production_call_writes_allowed/);
+  assert.match(enqueueScript, /public_ranking_impact_allowed: spec\.public_ranking_impact_allowed/);
+});
+
+
+test("latest Art of War campaign receipt summarizes operational loop safely", () => {
+  const dir = mkdtempSync(join(tmpdir(), "callscore-artofwar-receipt-"));
+  const path = join(dir, "callscore-art-of-war-receipts-proof-operational-001.json");
+  writeFileSync(path, JSON.stringify({
+    campaign_id: "receipts-proof-operational-001",
+    iteration: 1,
+    decision: "revise_or_hold",
+    failure_class: "audience_mismatch",
+    next_safe_action: "revise_private_campaign_or_add_evidence",
+    approval_required: true,
+    public_action_performed: false,
+    external_mutation_performed: false,
+    whop_mutation_performed: false,
+    production_mutation_performed: false,
+    verifier_result: { passed: false },
+    persona_scorecard: { passed: false },
+    gemma_evaluation: { passed: false },
+  }));
+  const artifact = latestArtOfWarCampaignReceipt(dir);
+  assert.equal(artifact.exists, true);
+  assert.equal(artifact.summary.campaign_id, "receipts-proof-operational-001");
+  assert.equal(artifact.summary.decision, "revise_or_hold");
+  assert.equal(artifact.summary.public_action_performed, false);
+  assert.equal(artifact.summary.external_mutation_performed, false);
+  assert.equal(artifact.summary.approval_required, true);
 });

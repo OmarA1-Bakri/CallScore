@@ -4334,3 +4334,564 @@ Status labels: `CONTROLLED_AUTONOMOUS_RUNTIME_PARTIAL`, `TRANSCRIPT_CADENCE_PART
 
 ### Next hard target
 Repair transcript targeting/failure classification using the new detail previews, then run one more bounded laptop limit-5 batch. Continue private Art of War dry-run cadence; do not run public/revenue/provider mutation until promotion reviews pass and approval is recorded.
+
+## 2026-06-12 — MartinLoop-inspired Art of War Campaign Loop architecture
+
+Status labels: `ART_OF_WAR_CAMPAIGN_LOOP_PLANNED`, `CAMPAIGN_CONTRACTS_DEFINED`, `PERSONA_TEST_LAYER_DEFINED`, `DRY_RUN_SIMULATION_LAYER_DEFINED`, `GEMMA_CAMPAIGN_EVAL_DEFINED`, `CAMPAIGN_RECEIPTS_REQUIRED`, `PUBLIC_ACTIONS_APPROVAL_GATED`, `MARTIN_LOOP_DEPENDENCY_REJECTED_FOR_NOW`.
+
+Purpose: move Art of War from one-off private growth reports into a governed, revenue-feedback-driven self-improvement loop. This uses MartinLoop as a design pattern only: bounded contracts, verifier gates, failure classes, receipts, no blind retries, and approval packets. `keesan12/martin-loop` is not a hard dependency yet.
+
+### Existing-system findings
+
+Inspection found these systems to extend, not duplicate:
+
+| Area | Existing system | Finding | Decision |
+|---|---|---|---|
+| CallScore workplane jobs | `src/lib/workplane-jobs.ts` | Canonical job registry with report-only fallback and safe defaults. | Extend with Art of War campaign-loop jobs. |
+| Machine-readable status | `src/lib/workplane-status.ts`, `src/scripts/workplane-status.ts` | Canonical JSON status includes Art of War/Whop/Gemma gates. | Extend with campaign-loop capabilities. |
+| Private growth docs | `docs/plans/2026-06-12-callscore-growth-intelligence-pack.md` | Already defines private tracks and public gates. | Reference and evolve; do not replace. |
+| Controlled runtime review | `docs/plans/2026-06-12-controlled-autonomous-runtime-review.md` | Already has promotion-review shape. | Keep as runtime review surface. |
+| Art of War CLI | `/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py` | Local-only CLI: `scan`, `risk`, `story`, `replay`, `report`, `validate-docs`; explicitly no post/send/publish/spend/provider mutation. | Use as dry-run/verifier evidence layer. |
+| Art of War artifacts | `/srv/agents/repos/Claude_Code_Automations/art-of-war/` | Existing JSONL ledger, projection, fixtures, reports, social-posting dry-run packets. | Treat as existing receipt/report source; do not move secrets or live artifacts into CallScore. |
+| Persona references | `/srv/agents/repos/Claude_Code_Automations/shared_references/persona-routing.md`, `payments-persona-playbook.md` | Existing persona playbook is not CallScore-specific but provides reusable persona-routing pattern. | Extend conceptually for CallScore buyer/persona tests. |
+| Art of War tests | `/srv/agents/repos/Claude_Code_Automations/tests/art_of_war/` | Existing tests enforce dry-run and blocked claims. | Future implementation should add campaign-loop tests there or mirror job-safety tests in CallScore. |
+| Hermes orchestration | `/srv/agents/hermes/hermes-agent` | MCP/subagent/agent runtime exists separately. | Hermes remains lead orchestrator; no new runner here. |
+| Whop-auto | `/srv/whop-auto` | Workspace/history-heavy; CallScore has read-only/dry-run job specs. | Keep live mutations approval-gated. |
+
+Systems to extend instead of duplicate: `src/lib/workplane-jobs.ts`, `src/lib/workplane-status.ts`, `src/scripts/workplane-status.ts`, `/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py`, `/srv/agents/repos/Claude_Code_Automations/art-of-war/events/growth-events.jsonl`, `/srv/agents/repos/Claude_Code_Automations/art-of-war/reports/`, existing plan docs.
+
+### CampaignLoopContract
+
+Every campaign iteration must be governed by a bounded contract. Campaigns must not run as open-ended prompts.
+
+```ts
+type CampaignLoopContract = {
+  campaign_id: string;
+  track: "receipts_proof_of_accuracy" | "leaderboard_methodology_trust" | "creator_scorecard_funnel" | string;
+  objective: string;
+  source_data: Array<{
+    source_type: "callscore_api" | "workplane_status" | "artofwar_fixture" | "whop_readonly" | "manual_review";
+    source_ref: string;
+    freshness_utc: string;
+    evidence_level: "E0" | "E1" | "E2" | "E3" | "E4" | "E5";
+  }>;
+  allowed_claims: string[];
+  forbidden_claims: string[];
+  allowed_outputs: Array<"private_brief" | "draft_asset" | "persona_scorecard" | "dry_run_report" | "gemma_evaluation" | "approval_packet" | "campaign_receipt">;
+  denied_outputs: Array<"publish" | "outreach_send" | "email_send" | "dm_send" | "paid_spend" | "whop_mutation" | "provider_mutation" | "production_mutation">;
+  max_iterations: number;
+  verifier_stack: Array<"validate-docs" | "dry-run report" | "evidence-level check" | "forbidden-claim scan" | "source freshness check" | "Whop dependency check" | "publish/spend/outreach gate check" | "persona-test gate" | "Gemma evaluation gate">;
+  approval_policy: {
+    public_action_allowed: false;
+    approval_required_for: string[];
+    approval_record_ref?: string;
+  };
+  stop_conditions: Array<"verifier_failed" | "persona_threshold_failed" | "dry_run_failed" | "gemma_eval_failed" | "same_failure_3x" | "approval_missing" | "max_iterations_reached">;
+};
+```
+
+Default contract values:
+
+- `max_iterations <= 3`.
+- `denied_outputs` always includes publish, outreach, email/DM send, spend, Whop mutation, provider mutation, production mutation.
+- `public_action_allowed=false` unless verifier, persona, dry-run, Gemma, Whop, and approval gates are all cleared.
+- same failure class 3 times stops the loop and creates an approval/revision packet rather than retrying.
+
+### Campaign failure taxonomy
+
+Every failed campaign iteration must have exactly one primary failure class and optional secondary classes:
+
+- `insufficient_evidence`
+- `forbidden_claim`
+- `unsupported_creator_claim`
+- `stale_data`
+- `trust_gate_required`
+- `publish_gate_required`
+- `audience_mismatch`
+- `cta_mismatch`
+- `whop_dependency_blocked`
+- `no_progress`
+- `safety_gate_blocked`
+- `approval_missing`
+
+Repeated failures must not cause blind retries. Pattern:
+
+```text
+if evidence insufficient -> add evidence / hold
+if forbidden claim -> rewrite safer
+if persona score below threshold -> revise messaging / positioning
+if dry-run fails -> fix funnel or hold
+if Gemma classifies repeated weakness -> generate variant strategy
+if repeated same failure 3x -> stop and escalate
+if draft passes private verifier -> create approval packet
+if approval absent -> do not publish
+```
+
+### Verifier gates
+
+Before a campaign can be promoted from private iteration to public implementation, the private verifier stack must emit:
+
+```ts
+type CampaignVerifierResult = {
+  gate: string;
+  passed: boolean;
+  failure_class: string | null;
+  safe_next_action: string;
+  approval_required: boolean;
+  public_action_allowed: boolean;
+};
+```
+
+Required gates:
+
+1. `validate-docs`
+2. `dry-run report`
+3. `evidence-level check`
+4. `forbidden-claim scan`
+5. `source freshness check`
+6. `Whop dependency check`
+7. `publish/spend/outreach gate check`
+8. `persona-test gate`
+9. `Gemma evaluation gate`
+
+No public action is allowed unless all relevant gates pass and approval is explicitly cleared.
+
+### PersonaTestContract and PersonaScorecard
+
+Required personas:
+
+- Creator/operator persona
+- Whop buyer persona
+- Skeptical prospect persona
+- High-intent buyer persona
+- Low-trust cold prospect persona
+- Technical evaluator persona
+
+```ts
+type PersonaTestContract = {
+  campaign_id: string;
+  draft_artifact: string;
+  personas: string[];
+  threshold: number; // default 4/5 per dimension and >= 24/35 aggregate
+  dimensions: ["clarity", "trust", "relevance", "pain_point_match", "cta_strength", "objection_handling", "likelihood_to_convert"];
+  blocked_if_below_threshold: true;
+};
+
+type PersonaScorecard = {
+  campaign_id: string;
+  persona: string;
+  scores: {
+    clarity: number;
+    trust: number;
+    relevance: number;
+    pain_point_match: number;
+    cta_strength: number;
+    objection_handling: number;
+    likelihood_to_convert: number;
+  };
+  objections: string[];
+  recommended_revision: string;
+  pass: boolean;
+  failure_class: "audience_mismatch" | "cta_mismatch" | "trust_gate_required" | null;
+};
+```
+
+Persona output is campaign evidence. Promotion is blocked when persona scores fail threshold.
+
+### DryRunCampaignReport
+
+Private dry-runs simulate the funnel without public side effects:
+
+```ts
+type DryRunCampaignReport = {
+  campaign_id: string;
+  simulated_surfaces: ["landing_page", "cta", "whop_path", "buyer_objections", "conversion_handoff", "evidence_trust_checks", "failure_points", "approval_requirements"];
+  funnel_steps: Array<{ step: string; expected_signal: string; observed_signal: string; pass: boolean; failure_class?: string }>;
+  whop_dependency_status: "pass" | "blocked" | "manual_fallback";
+  public_action_performed: false;
+  provider_mutation_performed: false;
+  production_mutation_performed: false;
+  pass: boolean;
+  next_safe_action: string;
+};
+```
+
+Dry-run prohibition: no publish, outreach, spend, Whop mutation, provider mutation, or production mutation.
+
+### Gemma 4-led campaign evaluation loop
+
+Gemma 4 is a local evaluator, optimizer, classifier, and recommendation engine only. It cannot publish, spend, outreach, mutate Whop, or touch production.
+
+Loop:
+
+```text
+Campaign data
+  -> draft generation
+  -> persona tests
+  -> verifier gates
+  -> dry-run simulation
+  -> Gemma 4 evaluation
+  -> failure classification
+  -> next-best-action recommendation
+  -> receipt
+  -> revised campaign
+```
+
+Artifacts:
+
+```ts
+type GemmaEvaluationReceipt = {
+  campaign_id: string;
+  iteration: number;
+  model: "callscore-gemma4-extractor:latest" | string;
+  evaluated_artifacts: string[];
+  weak_claims: string[];
+  positioning_notes: string[];
+  cta_recommendation: string;
+  trust_proof_recommendation: string;
+  audience_fit_notes: string[];
+  failure_class: string | null;
+  next_best_action: string;
+  public_action_allowed: false;
+};
+
+type CampaignVariantComparison = {
+  campaign_id: string;
+  variants: Array<{ variant_id: string; hypothesis: string; persona_score: number; verifier_pass: boolean; gemma_score: number; decision: "hold" | "revise" | "approval_packet" }>;
+  selected_variant_id: string | null;
+  selection_reason: string;
+};
+
+type RevenueFeedbackTrainingRecord = {
+  campaign_id: string;
+  iteration: number;
+  source: "whop_readonly" | "callscore_analytics" | "manual_revenue_note" | "dry_run";
+  signal: string;
+  confidence: "low" | "medium" | "high";
+  used_for_training: boolean;
+  privacy_notes: string;
+};
+```
+
+### Campaign receipts
+
+Every iteration must persist a machine-readable receipt under the existing Art of War / CallScore artifact paths. Preferred CallScore mirror path: `docs/plans/artifacts/art-of-war/campaign-receipts/`. Preferred Art of War runtime path: `/srv/agents/repos/Claude_Code_Automations/art-of-war/events/growth-events.jsonl` plus report/projection artifacts.
+
+```ts
+type CampaignReceipt = {
+  campaign_id: string;
+  iteration: number;
+  objective: string;
+  draft_artifact: string;
+  evidence: unknown[];
+  persona_scorecard: PersonaScorecard[];
+  dry_run_report: DryRunCampaignReport;
+  gemma_evaluation: GemmaEvaluationReceipt;
+  verifier_result: CampaignVerifierResult[];
+  failure_class: string | null;
+  decision: "hold" | "revise" | "approval_packet" | "blocked";
+  next_safe_action: string;
+  public_action_performed: false;
+  rationale: {
+    why_generated: string;
+    evidence_support: string;
+    persona_findings: string;
+    gemma_recommendation: string;
+    pass_fail_reason: string;
+    changed_from_previous_iteration: string;
+    approval_required: boolean;
+  };
+};
+```
+
+### Report-only workplane jobs
+
+The canonical CallScore workplane registry now exposes report-only campaign-loop job surfaces. Defaults: no publish, no outreach, no spend, no Whop mutation, no provider mutation, no production mutation.
+
+- `artofwar_campaign_preflight`
+- `artofwar_campaign_iteration`
+- `artofwar_campaign_verify`
+- `artofwar_campaign_persona_test`
+- `artofwar_campaign_dry_run`
+- `artofwar_campaign_gemma_eval`
+- `artofwar_campaign_receipt`
+- `artofwar_campaign_dossier`
+- `artofwar_campaign_approval_review`
+
+These extend the existing registry rather than adding a duplicate runner.
+
+### Hermes / Lead Agent / Head-of-Department model
+
+Hermes is the COO-level lead orchestrator. It inspects workplane status, assigns bounded `CampaignLoopContract`s, watches receipts, stops repeated failures, and escalates approval-only actions.
+
+Head-of-Department subagents:
+
+| HoD | Owns | Produces | Cannot do without approval |
+|---|---|---|---|
+| Art of War Marketing Head | Campaign draft/positioning loop | proposals, drafts, variant comparisons | publish, outreach, spend |
+| CallScore Data Head | Source safety and freshness | data evidence packs, freshness notes | production DB destructive ops |
+| Whop Monetization Head | Whop path and conversion dependency | read-only Whop checks, commercial dependency notes | pricing/product/payment/customer mutation |
+| Trust/Evidence Head | Evidence and forbidden claim gates | evidence-level checks, forbidden-claim scan | approve public claims alone |
+| Publishing/Distribution Head | Channel readiness and approval packet | distribution plan, publish/spend/outreach gate review | post/send/spend |
+| Revenue Analytics Head | Feedback loop | revenue/demand signal summaries, training records | mutate payments or customer state |
+
+No HoD may publish, spend, outreach, mutate Whop pricing, mutate providers, or touch production without explicit approval gate clearance.
+
+### Complete `/srv` architecture diagrams
+
+#### 1. `/srv` system architecture
+
+```mermaid
+flowchart TB
+  HH[HH VM / hermes-agent-box]
+  CS[/opt/crypto-tuber-ranked\nCallScore canonical repo]
+  CCA[/srv/agents/repos/Claude_Code_Automations\nArt of War control-plane]
+  WHOP[/srv/whop-auto\ncommercial automation]
+  HERMES[/srv/agents/hermes/hermes-agent\nHermes lead runtime + MCP]
+  LAPTOP[Omar laptop over Tailscale\nFirefox cookies + transcript collector]
+  SITE[call-score.com + ops read API]
+  OLLAMA[Ollama local models\nGemma shadow evaluator]
+  ART[art-of-war events/reports/projection]
+  JOBS[CallScore workplane job registry]
+  STATUS[workplane JSON status]
+
+  HH --> CS
+  HH --> HERMES
+  HH --> CCA
+  HH --> WHOP
+  HH <--> LAPTOP
+  CS --> JOBS --> STATUS
+  CS --> SITE
+  CS --> OLLAMA
+  CCA --> ART
+  WHOP --> STATUS
+  ART --> STATUS
+  STATUS --> HERMES
+```
+
+#### 2. Hermes lead-agent orchestration
+
+```mermaid
+flowchart LR
+  Hermes[Hermes Lead / COO] --> Status[workplane:status JSON]
+  Status --> Decide{next safe action?}
+  Decide -->|collector clear| LaptopJob[transcript_collect_laptop limit 5]
+  Decide -->|growth private| CampaignPreflight[artofwar_campaign_preflight]
+  Decide -->|Gemma hold| GemmaRepair[gemma shadow / ML loop]
+  Decide -->|Whop check| WhopRead[Whop read-only dry-runs]
+  Decide -->|approval needed| ApprovalReview[approval packet only]
+  ApprovalReview -. blocks .-> PublicActions[Publish / Outreach / Spend / Whop mutation]
+```
+
+#### 3. Head-of-Department subagent model
+
+```mermaid
+flowchart TB
+  Hermes[Hermes Lead] --> Marketing[Art of War Marketing Head]
+  Hermes --> Data[CallScore Data Head]
+  Hermes --> Whop[Whop Monetization Head]
+  Hermes --> Trust[Trust/Evidence Head]
+  Hermes --> Publish[Publishing/Distribution Head]
+  Hermes --> Revenue[Revenue Analytics Head]
+  Marketing --> Drafts[Campaign drafts + variants]
+  Data --> Evidence[Evidence packs + freshness]
+  Whop --> WhopDeps[Whop dependency check]
+  Trust --> Gates[Verifier gates]
+  Publish --> Approval[Publish/spend/outreach approval packet]
+  Revenue --> Feedback[Revenue feedback training records]
+  Drafts --> Receipt[Campaign receipt]
+  Evidence --> Receipt
+  WhopDeps --> Receipt
+  Gates --> Receipt
+  Approval --> Receipt
+  Feedback --> Receipt
+```
+
+#### 4. Art of War campaign loop
+
+```mermaid
+flowchart LR
+  Contract[CampaignLoopContract] --> Draft[Draft generation]
+  Draft --> Persona[Persona tests]
+  Persona --> Verify[Verifier gates]
+  Verify --> DryRun[Dry-run simulation]
+  DryRun --> Gemma[Gemma 4 evaluation]
+  Gemma --> Classify[Failure classification]
+  Classify --> Decision{Decision}
+  Decision -->|revise| Draft
+  Decision -->|hold| Receipt[Campaign receipt]
+  Decision -->|passes private gates| Dossier[Approval dossier]
+  Dossier --> Approval{Explicit approval?}
+  Approval -->|no| Receipt
+  Approval -->|yes only| PublicImpl[Public implementation path]
+```
+
+#### 5. Persona-test and dry-run layer
+
+```mermaid
+flowchart TB
+  Draft[Campaign draft] --> Personas{Required personas}
+  Personas --> Creator[Creator/operator]
+  Personas --> Buyer[Whop buyer]
+  Personas --> Skeptic[Skeptical prospect]
+  Personas --> HighIntent[High-intent buyer]
+  Personas --> LowTrust[Low-trust cold prospect]
+  Personas --> Technical[Technical evaluator]
+  Creator --> Score[PersonaScorecard]
+  Buyer --> Score
+  Skeptic --> Score
+  HighIntent --> Score
+  LowTrust --> Score
+  Technical --> Score
+  Score --> Threshold{threshold passed?}
+  Threshold -->|no| Revise[revise messaging/positioning]
+  Threshold -->|yes| DryRun[simulate landing page + CTA + Whop path + objections + handoff]
+```
+
+#### 6. Gemma 4 evaluation loop
+
+```mermaid
+flowchart LR
+  Inputs[Draft + scorecards + dry-run + evidence] --> Gemma[Gemma 4 local evaluator]
+  Gemma --> WeakClaims[weak/unsupported claims]
+  Gemma --> CTA[CTA strength]
+  Gemma --> Trust[trust proof]
+  Gemma --> Audience[audience fit]
+  Gemma --> Failure[primary failure class]
+  Failure --> NBA[next-best-action]
+  NBA --> EvalReceipt[GemmaEvaluationReceipt]
+  EvalReceipt --> CampaignReceipt[CampaignReceipt]
+```
+
+#### 7. Revenue feedback loop
+
+```mermaid
+flowchart LR
+  PrivateCampaign[Private campaign iteration] --> DryRun[Dry-run funnel]
+  DryRun --> WhopPath[Whop dependency check read-only]
+  WhopPath --> Metrics[Demand/revenue signals]
+  Metrics --> Training[RevenueFeedbackTrainingRecord]
+  Training --> Variants[CampaignVariantComparison]
+  Variants --> Next[Next private iteration]
+  Next --> ApprovalPacket[Approval packet if gates pass]
+```
+
+#### 8. Approval gate flow
+
+```mermaid
+flowchart TB
+  PrivatePass[Private gates pass] --> Packet[Campaign approval packet]
+  Packet --> OpApproval{Operator approval recorded?}
+  OpApproval -->|no| Block[approval_missing -> no public action]
+  OpApproval -->|yes| Type{Action type}
+  Type --> Publish[publish]
+  Type --> Outreach[outreach/send]
+  Type --> Spend[paid spend]
+  Type --> WhopMut[Whop pricing/payment/plan/customer mutation]
+  Type --> Provider[provider mutation]
+  Type --> Prod[production mutation]
+  Publish --> ActionGate[final action-specific gate]
+  Outreach --> ActionGate
+  Spend --> ActionGate
+  WhopMut --> ActionGate
+  Provider --> ActionGate
+  Prod --> ActionGate
+```
+
+### Implementation checklist
+
+1. Extend `src/lib/workplane-jobs.ts` with report-only campaign-loop job specs. ✅
+2. Extend `src/lib/workplane-status.ts` / `src/scripts/workplane-status.ts` with campaign-loop capabilities. ✅
+3. Keep using existing Art of War CLI/events/reports instead of adding a new runner. ✅
+4. Implement concrete persona scorecard, dry-run report, Gemma evaluation receipt, and campaign receipt generation in `Claude_Code_Automations` existing Art of War CLI. ✅ (`python3 scripts/art_of_war.py campaign-loop --dry-run ...`)
+5. Keep machine-readable receipts private/local by default (`/tmp` or `art-of-war/campaign-loop/`) and commit only redacted receipts when explicitly needed. ✅
+6. Add Art of War repo tests for dry-run requirement, persona scorecards, verifier gates, public-action blocking, and mutation guards. ✅
+7. Keep public implementation blocked until verifier/persona/dry-run/Gemma/Whop/approval gates pass. Required.
+
+### Promotion rule
+
+A campaign cannot move from private/dry-run to public implementation unless all are true:
+
+- verifier gates pass;
+- persona tests pass;
+- dry-run report passes;
+- Gemma evaluation passes;
+- evidence is sufficient and fresh;
+- Whop dependency checks pass;
+- approval gate is cleared and recorded.
+
+Public implementation includes publishing, outreach, paid spend, Whop pricing/payment/plan/customer mutation, provider mutation, production mutation, and public marketing release. These remain approval-gated.
+
+### Next hard target
+
+Use the new concrete `campaign-loop` command to iterate the first campaign track (`Receipts / Proof of Accuracy`) until persona trust/audience scores pass, then generate an approval dossier. Public implementation remains blocked until explicit approval.
+
+## 2026-06-12 — Controlled operational runtime canary
+
+Status labels: `CONTROLLED_OPERATIONAL_RUNTIME_PARTIAL`, `TRANSCRIPT_CADENCE_PARTIAL`, `TRANSCRIPT_TARGETING_REPAIR_REQUIRED`, `DATA_SURFACE_SAFE`, `GEMMA_OPERATIONAL_SHADOW_ACTIVE`, `GEMMA_SHADOW_HOLD`, `GEMMA_NOT_PRODUCTION_DEFAULT`, `ML_LOOP_OPERATIONAL`, `WHOP_AUTO_READ_ONLY_OPERATIONAL`, `WHOP_LIVE_MUTATION_APPROVAL_GATED`, `ART_OF_WAR_PRIVATE_OPERATIONAL`, `CAMPAIGN_LOOP_RECEIPTS_ACTIVE`, `APPROVAL_PACKETS_CREATED`, `PUBLIC_ACTIONS_APPROVAL_GATED`, `AUTONOMOUS_REVENUE_NO`.
+
+### Operational canary results
+
+- HH state verified on `master` at `084e30071356ef917e3128562ae967ab05793909` before edits.
+- Workplane status remained `OK` / `PARTIAL`; `unsafe_source_ranks=0`, API unsafe official count `0`, `production_default_changed=false`.
+- Laptop SSH to `albak@100.118.10.128` worked and both laptop repos were reachable.
+- Laptop `StatusOnly` passed with cooldown clear and no transcript worklist claim/fetch.
+- Existing enqueue script was extended rather than duplicated: `src/scripts/callscore-enqueue-job.ts --job workplane --workplane-type transcript_collect_laptop --mode probe --limit 5`.
+- Workplane probe job `1832` was claimed by the laptop runner and completed `succeeded` from the queue perspective.
+- The canary attempted `5`, recorded `0` useful transcript successes and `5` failed transcript updates. No HTTP 429, no bot verification, no cooldown.
+- The canary exposed a runner/tooling blocker: yt-dlp returned Python tracebacks and the previous detail preview hid the actionable error line. The runner now classifies traceback/tool failures as `collector_tool_error` and summarizes actionable detail.
+- The canonical runner was synced to the laptop with backups preserved under the laptop repo `.tmp/laptop-collector/script-backups/`.
+
+Transcript cadence verdict: `TRANSCRIPT_CADENCE_PARTIAL` / `TRANSCRIPT_TARGETING_REPAIR_REQUIRED`. Do not run another blind batch until the next canary can classify the yt-dlp traceback tail and/or target known caption-available videos.
+
+### Gemma / ML operational result
+
+`npm run ml:idle-improve` produced `.tmp/ml-idle-improve/ml-idle-20260612182526-ccd88a16.json` with:
+
+- `json_valid_rate=0`
+- `schema_pass_rate=0`
+- `parser_error_count=1`
+- `accepted_calls=0`
+- `eligible_for_write_canary=false`
+- `production_default_changed=false`
+
+Gemma remains `SHADOW HOLD`, not production default, and not write-canary eligible. Next safe action is parser-cleaning/schema fixtures and another bounded shadow run only.
+
+### Whop operational result
+
+Whop remains `WHOP_AUTO_READ_ONLY_OPERATIONAL` / `WHOP_AUTO_PARTIAL` from the CallScore workplane perspective:
+
+- Read-only/dry-run Whop job specs exist in the canonical workplane registry.
+- `/srv/whop-auto` is workspace/history heavy and contains secret paths; broad inspection avoided secret exposure.
+- Live Whop pricing/product/payment/customer entitlement/webhook/provider mutation remains approval-gated.
+
+### Art of War operational result
+
+`python3 scripts/art_of_war.py validate-docs` passed in `/srv/agents/repos/Claude_Code_Automations`.
+
+Operational private campaign-loop receipt generated:
+
+- artifact: `/tmp/callscore-art-of-war-receipts-proof-operational-001.json`
+- `campaign_id=receipts-proof-operational-001`
+- `decision=revise_or_hold`
+- `failure_class=audience_mismatch`
+- `next_safe_action=revise_private_campaign_or_add_evidence`
+- `approval_required=true`
+- `public_action_performed=false`
+- `external_mutation_performed=false`
+- `whop_mutation_performed=false`
+- `production_mutation_performed=false`
+
+Workplane status now exposes the latest private campaign receipt summary via `latest_artofwar_campaign_loop_run`.
+
+### Approval packets status
+
+- Transcript cadence packet: `PARTIAL`; needs one or more limit-5 batches with useful success > 0 and classified failures.
+- Gemma packet: `SHADOW HOLD`; write-canary false.
+- Whop packet: read-only/dry-run visible; live mutation requires approval.
+- Art of War packet: private operational; public publish/outreach/spend requires approval.
+- Runtime packet: `CONTROLLED_OPERATIONAL_RUNTIME_PARTIAL`; next safe autonomous job is transcript targeting/classification repair or private Art of War revision loop.
+
+### Next hard target
+
+Repair the transcript collector’s yt-dlp traceback root cause and target known caption-available videos for the next single limit-5 canary. In parallel, revise the Receipts / Proof of Accuracy private campaign to improve skeptical and low-trust persona scores; rerun `campaign-loop --dry-run` only, with no public action.

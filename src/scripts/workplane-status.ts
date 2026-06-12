@@ -3,6 +3,7 @@ import {
   buildReadinessDomains,
   defaultCollectorStatePath,
   decideNextAutonomousAction,
+  latestArtOfWarCampaignReceipt,
   latestGemmaShadowArtifact,
   latestMlEvalArtifact,
   readCollectorCooldownState,
@@ -90,6 +91,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
   const collectorCooldown = readCollectorCooldownState(args.collectorStatePath);
   const latestGemmaShadow = latestGemmaShadowArtifact();
   const latestMlEval = latestMlEvalArtifact();
+  const latestArtOfWarCampaignLoop = latestArtOfWarCampaignReceipt();
   const unsafeOfficial = await fetchUnsafeOfficial(args.readApiBase);
   const latestFailure = await latestCollectorFailure();
   const unsafeSourceRanks = Number(freshness.unsafeSourceRanks ?? 0);
@@ -160,6 +162,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     homepage_safety: { ok: unsafeOfficial.ok && unsafeOfficial.count === 0, unsafe_official_count: unsafeOfficial.count },
     whop_provider_readiness: readiness_domains.whop_auto,
     art_of_war_activation_gate_status: readiness_domains.art_of_war,
+    latest_artofwar_campaign_loop_run: latestArtOfWarCampaignLoop,
     automation_registry_status: readiness_domains.claude_code_automations,
     approval_required_for_next_risky_action: readiness_domains.activation_gates.required_approvals,
     next_approval_gated_action: "operator approval required before public marketing/outreach/spend, Whop live mutation, Gemma write-canary, or production extractor default change",
@@ -173,6 +176,11 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
       "run_ml_idle_improve_artifact_only",
       "run_whop_read_only_dry_runs",
       "run_artofwar_private_dry_runs",
+      "run_artofwar_campaign_contract_preflight",
+      "run_artofwar_persona_tests_report_only",
+      "run_artofwar_dry_run_simulations_report_only",
+      "run_artofwar_gemma_evaluation_report_only",
+      "write_artofwar_campaign_receipts_public_action_false",
       "produce_promotion_reviews_without_auto_promotion",
     ],
     job_model: workplaneJobModelForStatus(),
