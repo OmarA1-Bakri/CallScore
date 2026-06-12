@@ -110,6 +110,9 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
       (SELECT MAX(transcript_last_attempt_at)::text FROM videos WHERE transcript_status = 'available' AND NULLIF(BTRIM(transcript), '') IS NOT NULL) AS latest_transcript_success,
       (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'provider_credentials_missing') AS transcript_provider_missing_failures,
       (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'bot_verification_required') AS transcript_bot_verification_failures,
+      (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'cookie_invalid_or_rotated') AS transcript_cookie_invalid_failures,
+      (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'po_token_required') AS transcript_po_token_required_failures,
+      (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'js_challenge_runtime_missing') AS transcript_js_runtime_missing_failures,
       (SELECT COUNT(*)::text FROM videos WHERE transcript_error = 'rate_limited') AS transcript_rate_limited_failures,
       (SELECT MAX(created_at)::text FROM calls) AS latest_call_inserted,
       GREATEST(
@@ -149,6 +152,9 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
            WHEN transcript_error IS NULL OR transcript_error = '' THEN 'none'
            WHEN transcript_error = 'provider_credentials_missing' THEN 'provider_credentials_missing'
            WHEN transcript_error = 'bot_verification_required' THEN 'bot_verification_required'
+           WHEN transcript_error = 'cookie_invalid_or_rotated' THEN 'cookie_invalid_or_rotated'
+           WHEN transcript_error = 'po_token_required' THEN 'po_token_required'
+           WHEN transcript_error = 'js_challenge_runtime_missing' THEN 'js_challenge_runtime_missing'
            WHEN transcript_error = 'rate_limited' THEN 'rate_limited'
            WHEN transcript_error ILIKE '%too many requests%' OR transcript_error ILIKE '%captcha%' THEN 'legacy_youtube_rate_or_captcha'
            WHEN transcript_error ILIKE '%disabled%' THEN 'transcript_disabled'
@@ -216,6 +222,9 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
   const unsafeRankCount = Number(unsafeSourceRanks?.unsafe_ranked_rows ?? 0);
   const transcriptProviderMissingFailures = Number(freshness?.transcript_provider_missing_failures ?? 0);
   const transcriptBotVerificationFailures = Number(freshness?.transcript_bot_verification_failures ?? 0);
+  const transcriptCookieInvalidFailures = Number(freshness?.transcript_cookie_invalid_failures ?? 0);
+  const transcriptPoTokenRequiredFailures = Number(freshness?.transcript_po_token_required_failures ?? 0);
+  const transcriptJsRuntimeMissingFailures = Number(freshness?.transcript_js_runtime_missing_failures ?? 0);
   const transcriptRateLimitedFailures = Number(freshness?.transcript_rate_limited_failures ?? 0);
   const requiredGrants = new Map([
     ["videos", ["SELECT", "INSERT", "UPDATE"]],
@@ -251,6 +260,15 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     ...(transcriptBotVerificationFailures > 0
       ? [`yt-dlp bot verification failures=${transcriptBotVerificationFailures}`]
       : []),
+    ...(transcriptCookieInvalidFailures > 0
+      ? [`yt-dlp cookie invalid/rotated failures=${transcriptCookieInvalidFailures}`]
+      : []),
+    ...(transcriptPoTokenRequiredFailures > 0
+      ? [`yt-dlp PO token required failures=${transcriptPoTokenRequiredFailures}`]
+      : []),
+    ...(transcriptJsRuntimeMissingFailures > 0
+      ? [`yt-dlp JS runtime missing failures=${transcriptJsRuntimeMissingFailures}`]
+      : []),
     ...(transcriptRateLimitedFailures > 0
       ? [`yt-dlp rate limited failures=${transcriptRateLimitedFailures}`]
       : []),
@@ -280,6 +298,9 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     unsafeSourceRanks: unsafeRankCount,
     transcriptProviderMissingFailures,
     transcriptBotVerificationFailures,
+    transcriptCookieInvalidFailures,
+    transcriptPoTokenRequiredFailures,
+    transcriptJsRuntimeMissingFailures,
     transcriptRateLimitedFailures,
     transcriptBacklog: transcriptBacklog.map((row) => ({
       status: row.status,

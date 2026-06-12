@@ -2963,3 +2963,120 @@ Then run exactly one slow YT-DLP transcript canary. Run the 25-video bounded cat
 | Data freshness | WARN — structurally ready; transcript completion cookie-gated |
 | Art of War | READY PLANNING NEXT after Whop certification; external growth execution still must respect cookie/data freshness and no paid-ad/public-action gates |
 | Autonomous revenue | NO until transcript cookie gate and revenue-event observability follow-up are closed |
+
+---
+
+## 28. 2026-06-12 Ralplan Execution — YT-DLP Runtime Recovery Controls Added; Fresh Cookie Still Rejected
+
+Status: **YT-DLP RUNTIME UPDATED / CANARY STILL BLOCKED BY YOUTUBE BOT VERIFICATION**.
+
+This execution ran the approved ralplan handoff for slow YT-DLP transcript bot-verification recovery. It did not run a 25-video catch-up because the one-video canary gate did not pass.
+
+### Code/runtime changes
+
+Result: **IMPLEMENTED / TESTED**.
+
+- Slow transcript backfill now supports opt-in official YT-DLP recovery controls:
+  - `YTDLP_EXTRACTOR_ARGS` for reviewed YouTube extractor args, newline-separated when multiple values are needed;
+  - `YTDLP_JS_RUNTIMES` for official JavaScript runtime selection;
+  - `YTDLP_REMOTE_COMPONENTS` for official EJS remote component allowance;
+  - `YTDLP_USER_AGENT` for explicit reviewed user-agent override;
+  - `YTDLP_RETRY_SLEEP` for extractor retry backoff override.
+- Transcript command construction remains transcript-only:
+  - `--skip-download`;
+  - `--no-playlist`;
+  - subtitles/captions only;
+  - extractor retries and retry sleep/backoff enabled.
+- Transcript concurrency is hard-capped to `1` in the backfill path.
+- Provider-blocking classifier now distinguishes:
+  - `cookie_invalid_or_rotated`;
+  - `po_token_required`;
+  - `js_challenge_runtime_missing`;
+  - existing `bot_verification_required` and `rate_limited`.
+- Freshness self-check now reports the new YT-DLP failure classes explicitly.
+- Hermes Docker runtime is pinned to `yt-dlp[default]==2026.6.9`, verifies `yt_dlp_ejs`, and uses Node 22 inside the worker image for official EJS support.
+- Host daily-pipeline runtime now uses an isolated current YT-DLP venv at `/opt/callscore/yt-dlp-2026.6.9` via `YTDLP_BIN` in the ignored runtime environment.
+- Docker Compose overrides `YTDLP_BIN=yt-dlp` inside containers so host-only venv paths do not leak into Hermes containers.
+
+### Runtime verification evidence
+
+Result: **PASS FOR TOOLING; FAIL FOR YOUTUBE ACCESS**.
+
+- Host isolated YT-DLP runtime:
+  - version: `2026.06.09`;
+  - `yt_dlp_ejs=ok`;
+  - Node runtime: `v22.22.3`.
+- Hermes image build test:
+  - `docker build -f Dockerfile.hermes --target hermes-worker -t callscore-hermes-ytdlp-test .` passed;
+  - container smoke: `yt-dlp 2026.06.09`, `yt_dlp_ejs=ok`, `node v22.22.3`.
+- Docker Compose syntax check passed with `docker compose config --quiet`.
+
+### Fresh cookie/canary evidence
+
+Result: **ACTIVE COOKIE FILE BUT STILL REJECTED BY YOUTUBE**.
+
+Cookie metadata verification, without printing contents:
+
+- `/opt/callscore/secrets/youtube-cookies.txt` exists;
+- mode: `600`;
+- owner: `root:root`;
+- non-empty;
+- mtime: `2026-06-12 05:18:19 +0100`.
+
+Canary attempts, both bounded to exactly one video and stopped before catch-up:
+
+| Candidate | Video | Result |
+| --- | --- | --- |
+| current YT-DLP/EJS + installed cookie | `J992svgDqck` | `bot_verification_required` |
+| current YT-DLP/EJS + installed cookie + `youtube:player_client=mweb` | `lff5eE-LAUo` | `bot_verification_required` |
+
+No 25-video bounded catch-up was run because the canary gate failed. This prevented a YT-DLP stampede and preserved the daily backoff policy.
+
+### Freshness/API evidence before catch-up
+
+Freshness self-check after the tooling update remained **WARN**, with no hard safety blockers:
+
+- blockers: `[]`;
+- warnings: existing transcript provider/bot-verification failures;
+- daily timer: active;
+- source unsafe ranks: `0`;
+- read API native buckets: true;
+- `leaderboard.rows == officialRankedRows`: true;
+- 30d: `PENDING_MATURITY`, official `0`.
+
+Public bucket counts from the self-check:
+
+| Period | Official | Provisional | Watchlist | Stale | Excluded | Pending |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| all_time | 36 | 17 | 100 | 19 | 4 | 0 |
+| 12m | 42 | 10 | 100 | 19 | 4 | 0 |
+| 90d | 54 | 12 | 100 | 19 | 4 | 0 |
+| 30d | 0 | 0 | 0 | 0 | 4 | 100 |
+
+### Current interpretation
+
+The remaining transcript blocker is no longer missing code support, stale YT-DLP, missing EJS, missing cookie file, missing lock/backoff, or missing daily cadence. Those are structurally ready.
+
+The current blocker is **YouTube rejecting the installed authenticated cookie/session from this HH runtime as bot verification**, even with current YT-DLP/EJS and an `mweb` client canary. The next acceptable fixes are constrained to official/safe YT-DLP paths:
+
+1. supply/export a YouTube cookie file from a browser session that YouTube accepts from this runtime/IP; or
+2. if fresh accepted cookies still fail and diagnostics identify PO-token enforcement, adopt a reviewed/approved PO-token provider or short-lived operator-supplied PO-token flow under the existing secret-handling rules.
+
+Do **not** use proxies, high concurrency, unbounded transcript backfills, or unreviewed third-party PO-token plugins.
+
+### Updated certification delta
+
+| Area | Status |
+| --- | --- |
+| YT-DLP option plumbing | IMPLEMENTED / TESTED |
+| YT-DLP host runtime | CURRENT / EJS CERTIFIED — `2026.06.09`, `yt_dlp_ejs=ok` |
+| Hermes Docker runtime | PATCHED / BUILD VERIFIED — current YT-DLP + EJS + Node 22 |
+| Cookie file | ACTIVE FILE / REJECTED BY YOUTUBE — fresh/non-empty `600 root:root`, contents not printed |
+| One-video canary | FAIL — `bot_verification_required` for default and `mweb` candidates |
+| Bounded 25-video catch-up | NOT RUN — correctly gated on failed canary |
+| Extraction/matching/scoring after catch-up | NOT RUN — no new transcript success |
+| Freshness self-check | WARN — no safety blockers, transcript success still gated |
+| HH read API/homepage safety | CERTIFIED from self-check/native bucket validation; unchanged by canary failure |
+| Whop live commerce proof | CERTIFIED from prior provider-proof section; unchanged |
+| Art of War | READY PLANNING NEXT for commerce/growth design; public/external autonomous growth still must respect transcript freshness and approval gates |
+| Autonomous revenue | NO until transcript gate and revenue-event observability are closed |
