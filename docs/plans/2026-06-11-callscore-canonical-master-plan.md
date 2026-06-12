@@ -3715,3 +3715,89 @@ Gemma 4 is better than Qwen on the simple JSON-array sanity check and appears mo
 - public-quality promotion would require stricter schema, ownership, non-call rejection, timeout, and parser gates.
 
 Next extraction-system target: implement a local-model benchmark harness and prompt/parser revision that forces array output, supports object-to-array normalization only under strict safe rules, adds creator-owned/non-call classifier fields, and reruns Gemma 4 vs Qwen before any production-default change.
+
+---
+
+## 34. 2026-06-12 Local extraction benchmark cleanup and model-specific tuning
+
+Status: **UNUSED MODELS PRUNED / EXTRACTION DATASET CREATED / GEMMA CANDIDATE APPROVED / QWEN BASELINE RETAINED / PRODUCTION DEFAULT UNCHANGED**.
+
+Purpose: clean up HH Ollama model state, build a CallScore-specific transcript-to-call eval set, benchmark Gemma and Qwen fairly under shared and model-specific prompts, create prompt-wrapped Ollama variants, and choose a local extraction candidate without writing production calls.
+
+### Model/runtime state
+
+Result: **PASS**.
+
+- Host: `hermes-agent-box`.
+- Ollama binary: `/usr/local/bin/ollama`.
+- Ollama version: `0.23.1`.
+- `OLLAMA_MODELS`: unset.
+- Model store: `/usr/share/ollama/.ollama/models`.
+- Models before pruning: `gemma4:latest`, `qwen2.5:3b`, `qwen2.5:1.5b`, `deepseek-v4-pro:cloud`.
+- Removed: `qwen2.5:1.5b`; unused `deepseek-v4-pro:cloud` pointer.
+- Retained: `gemma4:latest`; `qwen2.5:3b`.
+- Created local variants: `callscore-gemma4-extractor:latest`; `callscore-qwen25-3b-extractor:latest`.
+- Model store after pruning/variants: `11G`.
+- Disk before prune: `/dev/sda1` `150G`, `112G` used, `33G` available, `78%`.
+- Disk after prune: `/dev/sda1` `150G`, `111G` used, `34G` available, `77%`.
+- Approx freed: `~1G`; cloud pointer was not a local disk burden.
+
+Final model list:
+
+- `callscore-gemma4-extractor:latest` — local prompt-wrapped Gemma extractor candidate.
+- `callscore-qwen25-3b-extractor:latest` — local prompt-wrapped Qwen benchmark variant.
+- `gemma4:latest` — retained base model.
+- `qwen2.5:3b` — retained baseline model.
+
+### Eval dataset and harness
+
+Result: **PASS**.
+
+Created:
+
+- `data/eval/call-extraction-fixtures.jsonl` — 10 high-signal dry-run fixtures covering creator-owned calls, specific entry/target/stop/timeframe, news non-calls, quoted third-party calls, guest calls, aggregation, ambiguous hype, subtitle false positives, bearish/risk warning, and multi-asset snippets.
+- `src/scripts/benchmark-local-extractors.ts` — dry-run-only Ollama benchmark harness; imports no DB module and writes no production calls.
+- `tests/local-extractor-benchmark.test.ts` — parser/schema/scorer regression tests.
+- `ops/ollama/Modelfile.callscore-gemma4-extractor` and `ops/ollama/Modelfile.callscore-qwen25-3b-extractor`.
+- `docs/ml/call-extraction-eval.md` and `docs/ml/local-extractor-benchmark.md`.
+
+### Benchmark matrix
+
+Full dry-run artifact: `/tmp/callscore-local-extractor-benchmark-v2.json`.
+Final clean Gemma candidate recheck: `/tmp/callscore-local-extractor-benchmark-v6-gemma-revert.json`.
+
+| Model/config | Fixtures | Passed | JSON arrays | Schema pass | False positives | Recall | Avg latency | Verdict |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `gemma4:latest` + shared baseline | 10 | 4 | 4 | 4 | 0 | 10 | `33200ms` | NOT READY |
+| `qwen2.5:3b` + shared baseline | 10 | 0 | 10 | 9 | 0 | 6 | `17418ms` | NOT READY |
+| `gemma4:latest` + Gemma optimized prompt | 10 | 6 | 10 | 7 | 0 | 10 | `40445ms` | NOT READY |
+| `qwen2.5:3b` + Qwen optimized prompt | 10 | 5 | 10 | 10 | 0 | 7 | `14419ms` | NOT READY |
+| `callscore-gemma4-extractor:latest` | 10 | 10 | 10 | 10 | 0 | 10 | `30438ms` clean recheck | **CANDIDATE PASS** |
+| `callscore-qwen25-3b-extractor:latest` | 10 | 0 | 10 | 2 | 0 | 6 | `16152ms` | NOT READY |
+
+### Failure-mode summary
+
+Gemma:
+
+- Base/shared prompt extracted obvious calls but often returned object-only rejections rather than arrays.
+- Gemma-specific prompt improved JSON arrays but still drifted on exact rejection/ownership schema.
+- Prompt-wrapped `callscore-gemma4-extractor:latest` passed the 10-fixture gate after harness-side literal `"null"` cleanup.
+- Main caveat: CPU latency; cold first call can exceed steady-state rows.
+
+Qwen:
+
+- Base/shared prompt was faster and usually array-shaped, but missed key fields and creator-owned recall.
+- Qwen-specific prompt improved some rejections but regressed creator-owned BTC/DOGE/multi-asset calls.
+- Prompt-wrapped Qwen still emitted base tickers, missing confidence fields, malformed schema, and unsafe accepted/rejected ownership decisions.
+
+### Quality gate verdict
+
+Status: **GEMMA CANDIDATE APPROVED / QWEN NOT PROMOTED / RULE EXTRACTOR REMAINS SAFE FALLBACK / PRODUCTION DEFAULT UNCHANGED**.
+
+`callscore-gemma4-extractor:latest` is the preferred local extraction candidate for the next dry-run/canary integration step. It must not write production calls until a separate promotion decision. `qwen2.5:3b` remains installed only as a baseline/reference.
+
+No production DB writes were performed. No extracted calls were written. No scoring/recompute was run for this benchmark. No Whop/provider settings, cookies, secrets, or public rankings were touched.
+
+### Next hard target
+
+Wire `callscore-gemma4-extractor:latest` behind a local-extractor dry-run/canary flag, run it against real laptop-ingested transcripts with no DB writes, compare against the current rule/extraction path, and only then decide whether to promote a local-model-first extraction loop. If Gemma canary stalls on latency or broader real-transcript quality, build a larger labeled dataset and prepare LoRA/QLoRA fine-tuning on a GPU machine; HH CPU is not suitable for true training.
