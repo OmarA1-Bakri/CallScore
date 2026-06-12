@@ -1,6 +1,7 @@
 import { throwIfCronDeadlineExceeded } from "@/app/api/cron/deadline";
 import { TRACKED_SYMBOLS } from "./constants";
 import { CREATOR_CANDIDATE_ADMISSION_JOB_TYPE } from "./candidate-admission";
+import { getWorkplaneJobSpec, isWorkplaneJobType, type WorkplaneJobType } from "./workplane-jobs";
 import { query } from "./db";
 import { createHash } from "node:crypto";
 
@@ -178,6 +179,10 @@ export function candidateAdmissionRunKey(now = new Date()): string {
   return dailyRunKey("candidate-admission", now);
 }
 
+export function workplaneRunKey(type: WorkplaneJobType, now = new Date()): string {
+  return dailyRunKey(`workplane-${type}`, now);
+}
+
 export async function enqueuePipelineJob(input: EnqueueJobInput): Promise<{
   readonly run: PipelineRun;
   readonly job: PipelineJob;
@@ -317,6 +322,33 @@ export async function enqueueComputeScoresJob(input: {
       queued_by: "netlify-scheduled",
     },
     maxAttempts: 2,
+    signal: input.signal,
+  });
+}
+
+export async function enqueueWorkplaneJob(input: {
+  readonly type: WorkplaneJobType;
+  readonly payload?: Record<string, unknown>;
+  readonly now?: Date;
+  readonly signal?: AbortSignal;
+}): Promise<{ readonly run: PipelineRun; readonly job: PipelineJob }> {
+  if (!isWorkplaneJobType(input.type)) throw new Error(`Unsupported workplane job type: ${input.type}`);
+  const spec = getWorkplaneJobSpec(input.type);
+  const runKey = workplaneRunKey(input.type, input.now);
+  return enqueuePipelineJob({
+    runKey,
+    runType: `workplane-${input.type}`,
+    jobType: input.type,
+    priority: input.type === "transcript_collect_laptop" ? 65 : 55,
+    idempotencyKey: runKey,
+    payload: {
+      ...spec.input_payload,
+      ...(input.payload ?? {}),
+      queued_by: "workplane",
+      production_call_writes_allowed: spec.production_call_writes_allowed,
+      public_ranking_impact_allowed: spec.public_ranking_impact_allowed,
+    },
+    maxAttempts: input.type === "transcript_collect_laptop" ? 1 : 2,
     signal: input.signal,
   });
 }
