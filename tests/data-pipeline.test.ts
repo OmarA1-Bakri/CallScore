@@ -542,6 +542,7 @@ test("transcript backfill exposes safe yt-dlp recovery options without logging s
     poTokenProvider: "bgutil-http",
     poTokenProviderBaseUrl: true,
     poTokenProviderHome: false,
+    poTokenBrowserPath: false,
     extractorArgs: 2,
     jsRuntimes: true,
     remoteComponents: true,
@@ -569,6 +570,14 @@ test("yt-dlp PO-token provider config emits provider args without raw token expo
     () => ytDlpPoTokenProviderArgs({ YTDLP_PO_TOKEN_PROVIDER: "bgutil-script" }),
     /YTDLP_PO_TOKEN_PROVIDER_HOME/,
   );
+  assert.deepEqual(
+    ytDlpPoTokenProviderArgs({
+      YTDLP_PO_TOKEN_PROVIDER: "wpc",
+      YTDLP_PO_TOKEN_BROWSER_PATH: "/usr/bin/chromium",
+    }),
+    ["--extractor-args", "youtubepot-wpc:browser_path=/usr/bin/chromium"],
+  );
+  assert.deepEqual(ytDlpPoTokenProviderArgs({ YTDLP_PO_TOKEN_PROVIDER: "wpc" }), []);
 });
 
 test("yt-dlp transcript args remain transcript-only and include extractor backoff", () => {

@@ -3246,3 +3246,127 @@ Still blocked without further approval or gate closure:
 | Whop commerce proof | CERTIFIED from prior provider-proof section; unchanged |
 | Art of War | INTERNAL PLANNING TRACK STARTED; external execution still gated |
 | Autonomous revenue | NO until transcript gate and revenue-event observability follow-up are closed or explicitly accepted |
+
+---
+
+## 30. 2026-06-12 Browser-Attested WPC PO-Token Final Transcript Gate Attempt
+
+Status: **WPC PATH IMPLEMENTED / ONE-VIDEO CANARY FAILED WITH BOT VERIFICATION / TRANSCRIPT ACQUISITION EXTERNALLY BLOCKED BY YOUTUBE ATTESTATION**.
+
+This pass performed the final approved transcript-gate closure attempt after the cookie-only and bgutil-only PO-token paths both failed. It did not repeat normal cookie export attempts. It did not repeat a bgutil-only canary. It did not run the 25-video bounded catch-up because the one-video WPC canary did not pass.
+
+### Browser-attested PO-token implementation
+
+Result: **IMPLEMENTED / TESTED**.
+
+- Host yt-dlp runtime installed `yt-dlp-getpot-wpc==1.0.0` into `/opt/callscore/yt-dlp-2026.6.9`.
+- Host Chromium path used for the canary: `/snap/bin/chromium`.
+- Hermes Docker image now installs and verifies:
+  - `yt-dlp[default]==2026.6.9`;
+  - `bgutil-ytdlp-pot-provider==1.3.1`;
+  - `yt-dlp-getpot-wpc==1.0.0`;
+  - `yt_dlp_ejs`;
+  - `chromium`.
+- Worker image rebuild completed and the container verified:
+  - `yt-dlp 2026.06.09`;
+  - bgutil provider plugin import OK;
+  - WPC provider plugin import OK;
+  - Chromium available at `/usr/bin/chromium`;
+  - `YTDLP_COOKIES_PATH` present/readable;
+  - WPC env present.
+- `src/scripts/backfill-transcripts.ts` supports the browser-attested provider aliases:
+  - `YTDLP_PO_TOKEN_PROVIDER=wpc`;
+  - `YTDLP_PO_TOKEN_PROVIDER=webpo`;
+  - `YTDLP_PO_TOKEN_PROVIDER=browser-attested`.
+- WPC browser path is configured through secret-safe env only:
+  - `YTDLP_PO_TOKEN_BROWSER_PATH` or `YTDLP_WPC_BROWSER_PATH`.
+- Existing `YTDLP_COOKIES_PATH` support is preserved.
+- Freshness self-check now reports the WPC browser-path state as a boolean only; it does not print secrets, cookies, or tokens.
+
+### One-video WPC canary
+
+Result: **FAIL — `bot_verification_required`**.
+
+Command class:
+
+- `npm run pipeline:daily -- --write ... --transcript-limit 1 --transcript-concurrency 1 --transcript-gap-ms 20000 ...`
+- Audit dir: `/tmp/callscore-daily-wpc-canary-20260612T064434`.
+
+Canary evidence:
+
+- Provider summary printed by app path:
+  - `auth=cookies_path`;
+  - `playerClient=true`;
+  - `poTokenProvider=wpc`;
+  - `poTokenBrowserPath=true`;
+  - `jsRuntimes=true`;
+  - `remoteComponents=true`.
+- Attempted one video: `0asuBrrWNzg`.
+- Result: `failed ... reason=bot_verification_required`.
+- Transcript updates: `0`.
+- The backfill stopped immediately after the provider/rate-limit blocker to avoid a YT-DLP stampede.
+- The 25-video bounded catch-up was **not run**.
+
+### Downstream safety after canary
+
+The canary wrapper completed only already-started safe downstream stages:
+
+- local extraction: `0` videos / `0` calls;
+- price matching: considered `50`, matched `0`, skipped `50`;
+- compute scores completed: `7993` scored calls;
+- latest scoring/creator_stats update moved to `2026-06-12 06:46:08+01`.
+
+Freshness self-check after WPC canary:
+
+- status: **WARN**;
+- blockers: `[]`;
+- warnings: transcript provider missing failures `2`, bot verification failures `9`;
+- `ytdlpPoTokenState.provider=wpc`;
+- `ytdlpPoTokenState.browserPath=true`;
+- latest transcript attempt: `2026-06-12 06:45:29+01`;
+- latest transcript success: `2026-05-25 16:01:08+01`;
+- source unsafe ranks: `0`;
+- read API native buckets: true;
+- `leaderboard.rows == officialRankedRows`: true.
+
+### Final transcript-gate interpretation
+
+The transcript blocker is now formally isolated. It is not:
+
+- missing slow transcript code;
+- missing daily timer;
+- missing lock/backoff;
+- missing cookie file;
+- missing current yt-dlp/EJS runtime;
+- missing bgutil provider;
+- missing browser-attested WPC provider;
+- missing Chromium runtime;
+- missing worker wiring.
+
+The blocker is: **YouTube rejects transcript access from the HH runtime/IP/session even with active cookies, bgutil PO-token support, and browser-attested WPC PO-token support.**
+
+Certification status: **EXTERNALLY BLOCKED / YOUTUBE ATTESTATION**.
+
+No further automated YT-DLP transcript runs should be attempted until one of these is intentionally chosen:
+
+1. operator supplies a YouTube session/cookie/browser attestation that YouTube accepts from the HH runtime/IP;
+2. operator accepts a transcript-lagged launch posture;
+3. operator approves an alternative transcript provider strategy with its own safety, cost, and credential gates.
+
+### Updated readiness matrix
+
+| Area | Status |
+| --- | --- |
+| Cookie path | ACTIVE / READABLE / STILL REJECTED |
+| BgUtil provider | ACTIVE / HEALTHY / STILL REJECTED |
+| Browser-attested WPC provider | IMPLEMENTED / VERIFIED / STILL REJECTED |
+| One-video transcript canary | FAIL — `bot_verification_required` |
+| Bounded 25-video catch-up | NOT RUN — correctly gated on failed canary |
+| Extraction/matching/scoring after catch-up | NOT RUN — no new transcript success |
+| Source-safe creator_stats | SAFE — latest update `2026-06-12 06:46:08+01`, unsafe ranks `0` |
+| Freshness self-check | WARN — no safety blockers; transcript success externally gated |
+| HH read API | CERTIFIED — native buckets and safe official rows |
+| Homepage | CERTIFIED — HTTP 200 and no safety regression |
+| Whop commerce proof | CERTIFIED from prior provider-proof section; unchanged |
+| Art of War | READY FOR INTERNAL GROWTH INTELLIGENCE PACK — no public/external execution yet |
+| Autonomous revenue | NO until transcript gate or accepted alternative provider strategy is closed, and revenue-event observability follow-up is complete or explicitly deferred |

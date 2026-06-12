@@ -27,9 +27,9 @@ services:
       ML_VERIFIER_MODEL: qwen2.5:3b
       YTDLP_BIN: yt-dlp
       YTDLP_COOKIES_PATH: /run/secrets/youtube-cookies.txt
-      YTDLP_PO_TOKEN_PROVIDER: bgutil-http
-      YTDLP_PO_TOKEN_PROVIDER_BASE_URL: http://127.0.0.1:4416
-      YTDLP_PLAYER_CLIENT: mweb
+      YTDLP_PO_TOKEN_PROVIDER: wpc
+      YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
+      YTDLP_PLAYER_CLIENT: web
       YTDLP_JS_RUNTIMES: node
       YTDLP_REMOTE_COMPONENTS: "1"
     volumes:
@@ -51,9 +51,9 @@ services:
       OLLAMA_HOST: http://127.0.0.1:11434
       ML_VERIFIER_MODEL: qwen2.5:3b
       YTDLP_BIN: yt-dlp
-      YTDLP_PO_TOKEN_PROVIDER: bgutil-http
-      YTDLP_PO_TOKEN_PROVIDER_BASE_URL: http://127.0.0.1:4416
-      YTDLP_PLAYER_CLIENT: mweb
+      YTDLP_PO_TOKEN_PROVIDER: wpc
+      YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
+      YTDLP_PLAYER_CLIENT: web
       YTDLP_JS_RUNTIMES: node
       YTDLP_REMOTE_COMPONENTS: "1"
     entrypoint: ["npm", "run", "pipeline:worker:once", "--"]
@@ -71,9 +71,9 @@ services:
       - .env.hermes
     environment:
       YTDLP_BIN: yt-dlp
-      YTDLP_PO_TOKEN_PROVIDER: bgutil-http
-      YTDLP_PO_TOKEN_PROVIDER_BASE_URL: http://127.0.0.1:4416
-      YTDLP_PLAYER_CLIENT: mweb
+      YTDLP_PO_TOKEN_PROVIDER: wpc
+      YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
+      YTDLP_PLAYER_CLIENT: web
       YTDLP_JS_RUNTIMES: node
       YTDLP_REMOTE_COMPONENTS: "1"
     command:
@@ -108,9 +108,9 @@ services:
       - .env.hermes
     environment:
       YTDLP_BIN: yt-dlp
-      YTDLP_PO_TOKEN_PROVIDER: bgutil-http
-      YTDLP_PO_TOKEN_PROVIDER_BASE_URL: http://127.0.0.1:4416
-      YTDLP_PLAYER_CLIENT: mweb
+      YTDLP_PO_TOKEN_PROVIDER: wpc
+      YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
+      YTDLP_PLAYER_CLIENT: web
       YTDLP_JS_RUNTIMES: node
       YTDLP_REMOTE_COMPONENTS: "1"
     entrypoint:
