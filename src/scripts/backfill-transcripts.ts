@@ -19,6 +19,7 @@ const DEFAULT_STALE_RETRY_DAYS = 7;
 const DEFAULT_LOCK_FILE = "/tmp/callscore-slow-ytdlp-transcripts.lock";
 const DEFAULT_YTDLP_EXTRACTOR_RETRIES = 2;
 const DEFAULT_YTDLP_RETRY_SLEEP = "extractor:exp=20:120:2";
+const DEFAULT_YTDLP_PO_TOKEN_PROVIDER_BASE_URL = "http://127.0.0.1:4416";
 
 export interface BackfillTranscriptsArgs {
   readonly creator: string | null;
@@ -218,6 +219,10 @@ export function ytDlpAuthArgs(env: Record<string, string | undefined> = process.
   return [];
 }
 
+function normalizeProviderName(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase().replace(/_/g, "-");
+}
+
 function splitMultilineEnv(value: string | undefined): string[] {
   return (value ?? "")
     .split(/\r?\n/)
@@ -231,6 +236,12 @@ function truthyEnv(value: string | undefined): boolean {
 
 export function ytDlpExtraArgs(env: Record<string, string | undefined> = process.env): string[] {
   const args: string[] = [];
+  const playerClient = env.YTDLP_PLAYER_CLIENT?.trim()
+    || (normalizeProviderName(env.YTDLP_PO_TOKEN_PROVIDER) ? "mweb" : "");
+  if (playerClient) args.push("--extractor-args", `youtube:player_client=${playerClient}`);
+
+  args.push(...ytDlpPoTokenProviderArgs(env));
+
   for (const extractorArg of splitMultilineEnv(env.YTDLP_EXTRACTOR_ARGS)) {
     args.push("--extractor-args", extractorArg);
   }
@@ -249,7 +260,30 @@ export function ytDlpExtraArgs(env: Record<string, string | undefined> = process
   return args;
 }
 
+export function ytDlpPoTokenProviderArgs(env: Record<string, string | undefined> = process.env): string[] {
+  const provider = normalizeProviderName(env.YTDLP_PO_TOKEN_PROVIDER);
+  if (!provider || provider === "none" || provider === "off" || provider === "false") return [];
+
+  if (provider === "bgutil" || provider === "bgutil-http" || provider === "bgutilhttp") {
+    const baseUrl = env.YTDLP_PO_TOKEN_PROVIDER_BASE_URL?.trim()
+      || env.YTDLP_PO_TOKEN_BASE_URL?.trim()
+      || DEFAULT_YTDLP_PO_TOKEN_PROVIDER_BASE_URL;
+    return ["--extractor-args", `youtubepot-bgutilhttp:base_url=${baseUrl}`];
+  }
+
+  if (provider === "bgutil-script" || provider === "bgutilscript") {
+    const serverHome = env.YTDLP_PO_TOKEN_PROVIDER_HOME?.trim();
+    if (!serverHome) {
+      throw new Error("YTDLP_PO_TOKEN_PROVIDER_HOME is required when YTDLP_PO_TOKEN_PROVIDER=bgutil-script");
+    }
+    return ["--extractor-args", `youtubepot-bgutilscript:server_home=${serverHome}`];
+  }
+
+  throw new Error(`Unsupported YTDLP_PO_TOKEN_PROVIDER=${provider}`);
+}
+
 export function redactedYtDlpOptionSummary(env: Record<string, string | undefined> = process.env): Record<string, unknown> {
+  const provider = normalizeProviderName(env.YTDLP_PO_TOKEN_PROVIDER);
   return {
     auth: env.YTDLP_COOKIES_PATH
       ? "cookies_path"
@@ -258,6 +292,10 @@ export function redactedYtDlpOptionSummary(env: Record<string, string | undefine
         : env.YTDLP_COOKIES_FROM_BROWSER
           ? "browser"
           : "none",
+    playerClient: Boolean(env.YTDLP_PLAYER_CLIENT?.trim() || provider),
+    poTokenProvider: provider || "none",
+    poTokenProviderBaseUrl: Boolean(env.YTDLP_PO_TOKEN_PROVIDER_BASE_URL?.trim() || env.YTDLP_PO_TOKEN_BASE_URL?.trim()),
+    poTokenProviderHome: Boolean(env.YTDLP_PO_TOKEN_PROVIDER_HOME?.trim()),
     extractorArgs: splitMultilineEnv(env.YTDLP_EXTRACTOR_ARGS).length,
     jsRuntimes: Boolean(env.YTDLP_JS_RUNTIMES?.trim()),
     remoteComponents: Boolean(env.YTDLP_REMOTE_COMPONENTS?.trim()),

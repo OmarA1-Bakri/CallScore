@@ -3080,3 +3080,169 @@ Do **not** use proxies, high concurrency, unbounded transcript backfills, or unr
 | Whop live commerce proof | CERTIFIED from prior provider-proof section; unchanged |
 | Art of War | READY PLANNING NEXT for commerce/growth design; public/external autonomous growth still must respect transcript freshness and approval gates |
 | Autonomous revenue | NO until transcript gate and revenue-event observability are closed |
+
+---
+
+## 29. 2026-06-12 PO-Token Provider Execution — BgUtil Installed; Canary Still Blocked
+
+Status: **PO-TOKEN PROVIDER PATH IMPLEMENTED / ONE-VIDEO CANARY FAILED WITH BOT VERIFICATION**.
+
+This execution followed the reviewed PO-token path after a fresh Firefox cookie remained readable but still failed on HH with `bot_verification_required`. No additional cookie export attempts were made. No 25-video catch-up was run because the one-video canary did not pass.
+
+### Official/reviewed YT-DLP PO-token direction
+
+Evidence checked:
+
+- yt-dlp PO Token Guide currently recommends using a PO Token Provider plugin rather than manual PO-token extraction because tokens can be video-bound and short-lived.
+- The featured `bgutil-ytdlp-pot-provider` path provides two pieces:
+  - a provider service, default HTTP port `4416`;
+  - a Python yt-dlp provider plugin installed into the same yt-dlp runtime.
+- The provider explicitly warns that PO tokens do not guarantee bypass of all YouTube bot checks.
+
+### Code/runtime changes
+
+Result: **IMPLEMENTED / TESTED**.
+
+- `src/scripts/backfill-transcripts.ts` now supports redacted PO-token provider configuration:
+  - `YTDLP_PO_TOKEN_PROVIDER=bgutil-http`;
+  - `YTDLP_PO_TOKEN_PROVIDER_BASE_URL=http://127.0.0.1:4416`;
+  - `YTDLP_PLAYER_CLIENT=mweb`;
+  - existing `YTDLP_COOKIES_PATH`, `YTDLP_COOKIES`, `YTDLP_COOKIES_FROM_BROWSER`, and `YTDLP_EXTRACTOR_ARGS` support is preserved.
+- YT-DLP command construction remains transcript-only and bounded:
+  - `--skip-download`;
+  - `--no-playlist`;
+  - subtitles/captions only;
+  - concurrency hard-capped to `1`;
+  - retry/backoff preserved.
+- `src/scripts/callscore-freshness-check.ts` now reports redacted PO-token provider state.
+- `Dockerfile.hermes` now installs and verifies:
+  - `yt-dlp[default]==2026.6.9`;
+  - `bgutil-ytdlp-pot-provider==1.3.1`;
+  - `yt_dlp_ejs`;
+  - `yt_dlp_plugins.extractor.getpot_bgutil_http`.
+- `docker-compose.yml` now defines `ytdlp-pot-provider` with image `brainicism/bgutil-ytdlp-pot-provider:1.3.1-node`, `network_mode: host`, and restart enabled.
+- `.env.example` documents the provider env without exposing secrets.
+
+### Runtime verification
+
+Result: **PROVIDER ACTIVE / WORKER WIRED**.
+
+- Host venv installed `bgutil-ytdlp-pot-provider==1.3.1` into `/opt/callscore/yt-dlp-2026.6.9`.
+- Docker image rebuild passed and Hermes worker was recreated.
+- `crypto-tuber-ranked-ytdlp-pot-provider-1` is running.
+- Provider log: `Started POT server (v1.3.1) on address [::]:4416`.
+- Worker verification:
+  - `yt-dlp 2026.06.09`;
+  - bgutil provider plugin import OK;
+  - `YTDLP_COOKIES_PATH` readable;
+  - PO-token env present.
+- Daily timer remains active.
+
+### One-video canary
+
+Result: **FAIL — `bot_verification_required`**.
+
+Command class:
+
+- `npm run pipeline:daily -- --write ... --transcript-limit 1 --transcript-concurrency 1 --transcript-gap-ms 20000 ...`
+- Manual audit dir was set under `/tmp` to avoid the root-owned `.tmp/callscore-daily` directory created by the systemd run.
+
+Canary evidence:
+
+- Provider summary printed by app path:
+  - `auth=cookies_path`;
+  - `playerClient=true`;
+  - `poTokenProvider=bgutil-http`;
+  - `poTokenProviderBaseUrl=true`;
+  - `jsRuntimes=true`;
+  - `remoteComponents=true`.
+- Attempted one video: `oWnVNrMZPSE`.
+- Result: `failed ... reason=bot_verification_required`.
+- Transcript updates: `0`.
+- The backfill stopped immediately after the provider blocker to avoid a YT-DLP stampede.
+- No 25-video bounded catch-up was run.
+
+### Downstream safety after canary
+
+The canary wrapper completed its already-started safe downstream stages:
+
+- local extraction: `0` videos / `0` calls;
+- price matching: considered `50`, matched `0`, skipped `50`;
+- compute scores completed: `7993` scored calls;
+- latest scoring/creator_stats update moved to `2026-06-12 06:28:39+01`.
+
+Freshness self-check after canary:
+
+- status: **WARN**;
+- blockers: `[]`;
+- warnings: transcript provider missing failures `2`, bot verification failures `8`;
+- `ytdlpPoTokenState.provider=bgutil-http`;
+- latest transcript attempt: `2026-06-12 06:28:00+01`;
+- latest transcript success: `2026-05-25 16:01:08+01`;
+- source unsafe ranks: `0`;
+- read API native buckets: true;
+- `leaderboard.rows == officialRankedRows`: true.
+
+Public API/homepage certification after canary:
+
+| Surface | Result |
+| --- | --- |
+| all_time API | official `36`, provisional `17`, watchlist `100`, stale `19`, excluded `4`, pending `0`, unsafeOfficial `[]` |
+| 30d API | official `0`, emptyReason `PENDING_MATURITY`, leaderboard rows equal official |
+| Homepage | HTTP `200`, no safety regression observed |
+
+### Exact remaining transcript dependency
+
+The current blocker is not missing code support, missing cookie path, stale YT-DLP, missing EJS, missing provider process, missing provider plugin, missing slow limits, or missing daily cadence.
+
+The current blocker is: **YouTube still requires bot/browser attestation for HH transcript access even with a readable cookie and bgutil PO-token provider.**
+
+Exact next dependency/action:
+
+1. Provide a YouTube session/cookie that YouTube accepts from the HH runtime/IP **or**
+2. authorize and supply the browser-attested PO-token fallback path:
+   - install `yt-dlp-getpot-wpc` in the same yt-dlp runtime / Hermes image;
+   - provide a runnable Chrome/Chromium browser path for HH, for example `/usr/bin/chromium`;
+   - configure the provider with the WPC browser path per the plugin docs;
+   - run exactly one slow transcript canary again before any catch-up.
+
+If WPC is chosen, it may open/use a browser to mint PO tokens; that is a browser-attestation dependency, not a static cookie-export task.
+
+### Art of War internal planning track
+
+Created: `docs/plans/2026-06-12-art-of-war-internal-planning.md`.
+
+Status: **PLANNING ONLY**.
+
+Allowed while transcript gate remains blocked:
+
+- private growth intelligence report design;
+- private content/funnel backlog;
+- revenue-event observability design;
+- internal agentic workplane guardrails.
+
+Still blocked without further approval or gate closure:
+
+- paid ads;
+- public outreach/posting;
+- provider pricing/payment mutation;
+- external autonomous growth actions.
+
+### Updated certification delta
+
+| Area | Status |
+| --- | --- |
+| PO-token provider code path | IMPLEMENTED / TESTED |
+| BgUtil provider service | ACTIVE — `brainicism/bgutil-ytdlp-pot-provider:1.3.1-node` |
+| Worker PO-token plugin | INSTALLED / VERIFIED |
+| Cookie path | ACTIVE / READABLE / STILL REJECTED |
+| One-video transcript canary | FAIL — `bot_verification_required` |
+| Bounded 25-video catch-up | NOT RUN — correctly gated on failed canary |
+| Extraction/matching/scoring | NO NEW TRANSCRIPTS; safe canary wrapper stages completed |
+| Source-safe creator_stats | SAFE — latest update `2026-06-12 06:28:39+01`, unsafe ranks `0` |
+| Freshness self-check | WARN — no safety blockers; transcript success still external-attestation gated |
+| HH read API | CERTIFIED — native buckets and safe official rows |
+| Homepage | CERTIFIED — HTTP 200 and no safety regression |
+| Whop commerce proof | CERTIFIED from prior provider-proof section; unchanged |
+| Art of War | INTERNAL PLANNING TRACK STARTED; external execution still gated |
+| Autonomous revenue | NO until transcript gate and revenue-event observability follow-up are closed or explicitly accepted |
