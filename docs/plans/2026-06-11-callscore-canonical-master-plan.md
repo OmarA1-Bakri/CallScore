@@ -4068,3 +4068,57 @@ Remaining gap before full READY:
 ### Next hard target
 
 Implement the laptop-side workplane runner over Tailscale so Omar's laptop can claim `transcript_collect_laptop` jobs, run only bounded 5-video collections while cooldown is clear, push transcript results through HH ingest, and publish cooldown state back to HH. In parallel, run the next `ml_idle_improve` cycle to shrink Gemma prompt/chunking failures before any write-canary proposal.
+
+---
+
+## 2026-06-12 — Agentic workplane activation readiness upgrade
+
+Status labels:
+
+- ROOT_AUDIT_COMPLETE
+- TECH_DEBT_NEUTRAL / TECH_DEBT_REDUCED
+- CALLSCORE_AUTONOMY_PARTIAL
+- LAPTOP_RUNNER_INSTALL_READY
+- GEMMA_SHADOW_ONLY
+- GEMMA_CANARY_NOT_ELIGIBLE
+- ML_LOOP_WORKPLANE_READY
+- WHOP_AUTO_PARTIAL
+- ART_OF_WAR_PARTIAL
+- CLAUDE_AUTOMATIONS_PARTIAL
+- AGENTIC_WORKPLANE_PARTIAL
+- ACTIVATION_REQUIRES_APPROVAL
+
+Changes recorded:
+
+- Root audit completed and documented in `docs/ops/workplane-readiness-audit.md`.
+- Pre-existing untracked runtime backups were graded REVIEW_LATER and not deleted.
+- No tracked files were removed.
+- Existing canonical files were extended instead of creating duplicate registries/runners:
+  - `src/lib/workplane-jobs.ts`
+  - `src/lib/workplane-status.ts`
+  - `src/scripts/workplane-status.ts`
+  - `scripts/windows/run-transcript-collector.ps1`
+  - `docs/ops/laptop-transcript-collector.md`
+- New HH claim/complete helper added at `src/scripts/workplane-laptop-job.ts` because the cross-host laptop runner needed a narrow pipeline-job claim/complete contract and no existing script exposed that boundary.
+- Workplane job model now includes CallScore, Whop-auto, Art of War, and claude-code-automations readiness/job surfaces.
+- Hermes worker excludes laptop-only transcript jobs from HH execution; Omar laptop runner claims `transcript_collect_laptop` jobs directly so cookies remain laptop-local.
+- `npm run workplane:status` now emits domain readiness for root hygiene, CallScore pipeline, transcript collector, Gemma shadow, ML loop, Whop-auto, Art of War, claude-code-automations, Hermes worker, provider integrations, and activation gates.
+- Laptop runner status: INSTALL_READY / PARTIAL until scheduled from Omar's laptop and clean cooldown-free job claim is observed.
+- Gemma remains shadow-only; latest real-transcript failures mean write-canary is not eligible.
+- ML loop remains artifact-only and workplane-callable.
+- Whop-auto readiness is PARTIAL/read-only; provider/customer/pricing/payment mutations remain approval-gated.
+- Art of War readiness is PARTIAL/dry-run only; publishing/outreach/spend remain approval-gated.
+- Claude-code-automations readiness is PARTIAL; read-only/dry-run surfaces are visible while provider/public/spend/destructive automations remain gated.
+
+Tech debt delta: NEUTRAL / REDUCED. The upgrade reduced ambiguity by extending the existing registry/status/collector path and adding one narrow HH laptop job bridge. No duplicate scheduler or status command was created.
+
+Next activation sequence:
+
+1. Run `scripts/windows/run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -HhHost hermes-agent-box -Write` from Omar's laptop when cooldown is clear.
+2. Confirm HH receives `.tmp/laptop-collector/latest-state.json` and ingests transcript results.
+3. Run HH `gemma_shadow_extract` only after prompt/chunking improvements; keep `GEMMA_CANARY_NOT_ELIGIBLE` until metrics pass.
+4. Run `ml_idle_improve` and `extraction_promotion_review` as report-only jobs.
+5. Run Whop/Art of War/automation dry-run/read-only readiness jobs.
+6. Require explicit approval before any provider mutation, production extractor default change, public publish/outreach, or spend.
+
+Autonomous revenue status: NO until transcript cadence is stable, Gemma/write path is approved or rule path remains canonical, and Art of War public activation approvals are complete.

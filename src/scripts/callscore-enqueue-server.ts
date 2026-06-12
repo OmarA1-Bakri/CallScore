@@ -7,7 +7,7 @@ import {
   enqueueNightlyMlVerifierJob,
   enqueueWorkplaneJob,
 } from "../lib/pipeline";
-import { isWorkplaneJobType, WORKPLANE_JOB_TYPES, type WorkplaneJobType } from "../lib/workplane-jobs";
+import { getWorkplaneJobSpec, isWorkplaneJobType, WORKPLANE_JOB_TYPES, type WorkplaneJobType } from "../lib/workplane-jobs";
 
 const HOST = process.env.HH_ENQUEUE_HOST || "127.0.0.1";
 const PORT = Number(process.env.HH_ENQUEUE_PORT || "8788");
@@ -110,25 +110,23 @@ function sourceValue(raw: unknown): string {
 }
 
 function validateWorkplanePayload(type: WorkplaneJobType, payload: Record<string, unknown>): void {
-  if (type === "transcript_collect_laptop") {
-    const limit = positiveInt(payload.limit, 5, 25, "payload.limit");
-    if (limit > 5 && payload.allow_large_batch !== true) {
-      throw new Error("transcript_collect_laptop limit >5 requires payload.allow_large_batch=true");
-    }
-    return;
+  const spec = getWorkplaneJobSpec(type);
+  if (payload.write === true && !spec.production_db_writes_allowed) {
+    throw new Error(`${type} is report-only and cannot write production state`);
   }
-  if (type === "gemma_shadow_extract") {
-    positiveInt(payload.limit, 10, 10, "payload.limit");
-    if (payload.write === true) throw new Error("gemma_shadow_extract cannot write production calls");
-    return;
+  if (payload.production_call_write === true || payload.write_production_calls === true) {
+    throw new Error(`${type} cannot write production calls`);
   }
-  if (type === "ml_extraction_eval" || type === "ml_idle_improve") {
-    positiveInt(payload.limit, 100, 100, "payload.limit");
-    if (payload.write === true) throw new Error(`${type} cannot write production calls`);
-    return;
+  if (payload.public_action === true || payload.publish === true || payload.send === true || payload.spend === true) {
+    throw new Error(`${type} requires explicit approval for public/provider/spend action`);
   }
-  if (type === "extraction_promotion_review" && payload.write === true) {
-    throw new Error("extraction_promotion_review is report-only");
+  if (payload.provider_mutation === true || payload.pricing_mutation === true || payload.payment_mutation === true || payload.entitlement_mutation === true) {
+    throw new Error(`${type} requires explicit approval for provider/customer mutation`);
+  }
+
+  const limit = positiveInt(payload.limit, spec.max_batch_size, Math.max(spec.max_batch_size, 1), "payload.limit");
+  if (type === "transcript_collect_laptop" && limit > 5 && payload.allow_large_batch !== true) {
+    throw new Error("transcript_collect_laptop limit >5 requires payload.allow_large_batch=true");
   }
 }
 
