@@ -3499,3 +3499,110 @@ HH autonomous media fallback remains the preferred future autonomy track only af
    ```
 
    Proceed to 5 and 25 only after prior pass.
+
+---
+
+## 32. 2026-06-12 Laptop Collector Post-Ingest Certification
+
+Status: **LAPTOP COLLECTOR CERTIFIED AS CANONICAL NEAR-TERM TRANSCRIPT PATH / HH DATA SURFACE SAFE**.
+
+Omar ran the laptop collector from the residential/browser-authenticated laptop over Tailscale after the 5-video canary passed. HH performed the post-ingest processing and certification.
+
+### Transcript ingest evidence
+
+Result: **PASS**.
+
+- Laptop collector provider: `laptop_collector_firefox`.
+- Laptop transcripts available: `28`.
+- Laptop transcripts extracted: `28`.
+- Laptop pending extraction: `0`.
+- Latest laptop transcript success: `2026-06-12 08:00:34+01`.
+- Latest global transcript success: `2026-06-12 07:59:17+01` in freshness self-check.
+
+The laptop collector path is now certified as the canonical near-term transcript acquisition path because it produced real transcripts without moving cookies to HH and without raw media download.
+
+### HH post-ingest processing
+
+Result: **PASS**.
+
+Commands run after ingest:
+
+- `npm run extract:local -- --limit 50` across repeated drain passes until laptop pending extraction reached `0`.
+- `npm run match -- --limit 500 --batch-size 100`.
+- `npm run score`.
+- `npm run freshness:check -- --read-api-base https://ops-bridge.call-score.com/api/read`.
+
+Evidence:
+
+- Calls total: `16169`.
+- New calls in last 3h: `26`.
+- New calls with entry price in last 3h: `22`.
+- Latest call inserted: `2026-06-12 07:59:50+01`.
+- Latest scoring update: `2026-06-12 08:00:18+01`.
+- Latest creator_stats update: `2026-06-12 08:00:18+01`.
+- Source unsafe ranks: `0`.
+
+### Freshness check
+
+Result: **WARN / ACCEPTABLE**.
+
+- blockers: `[]`.
+- latest transcript attempt: `2026-06-12 08:00:34+01`.
+- latest transcript success: `2026-06-12 07:59:17+01`.
+- remaining warnings are legacy HH yt-dlp credential/bot-verification failures:
+  - provider credential missing failures: `2`;
+  - yt-dlp bot verification failures: `9`.
+
+These warnings no longer block the near-term transcript path because laptop collector acquired and ingested fresh transcripts successfully.
+
+### Public API / homepage certification
+
+Result: **CERTIFIED**.
+
+Public HH read API remains native bucketed and safe:
+
+| Period | Official | Provisional | Watchlist | Stale | Excluded | Pending | Empty reason | Unsafe official |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |
+| all_time | 36 | 17 | 100 | 19 | 4 | 0 | — | 0 |
+| 12m | 42 | 10 | 100 | 19 | 4 | 0 | — | 0 |
+| 90d | 54 | 12 | 100 | 19 | 4 | 0 | — | 0 |
+| 30d | 0 | 0 | 0 | 0 | 4 | 100 | `PENDING_MATURITY` | 0 |
+
+For all checked periods, `leaderboard.rows == officialRankedRows` remained true.
+
+Homepage validation:
+
+- `https://call-score.com/`: HTTP `200`.
+- No public safety regression observed.
+
+### Canonical path decision
+
+Near-term canonical transcript path: **Omar laptop collector over Tailscale**.
+
+Rationale:
+
+- proven real transcript success;
+- cookies remain on Omar's laptop;
+- HH only receives transcript text/metadata;
+- no raw media download;
+- no secret/cookie transfer to HH;
+- bounded 5-video canary and 25-video catch-up path worked operationally.
+
+HH autonomous media fallback remains a future autonomy track only after ASR tooling and one-video/5-video cleanup canaries pass.
+
+### Updated readiness matrix
+
+| Area | Status |
+| --- | --- |
+| Laptop collector | CERTIFIED CANONICAL NEAR-TERM |
+| Laptop 5-video canary | PASS |
+| Laptop bounded catch-up | PASS — `28` total laptop transcripts ingested |
+| HH extraction after ingest | PASS — `28/28` laptop transcripts extracted |
+| Matching/scoring | PASS — matching/scoring rerun after drain |
+| Source-safe creator_stats | PASS — updated `2026-06-12 08:00:18+01`, unsafe ranks `0` |
+| Freshness self-check | WARN ACCEPTABLE — legacy HH yt-dlp warnings only |
+| HH read API | CERTIFIED |
+| Homepage | CERTIFIED |
+| Whop commerce | CERTIFIED unchanged |
+| Art of War | READY NEXT for internal growth intelligence and controlled next-phase planning |
+| Autonomous revenue | PARTIAL — still requires revenue observability and explicit launch posture, but transcript/data freshness gate is no longer blocking near-term internal progress |
