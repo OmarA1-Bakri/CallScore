@@ -85,6 +85,20 @@ function Write-State($state) {
   $state | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $StatePath -Encoding UTF8
 }
 
+function ConvertFrom-StrictJson($raw, [string]$label) {
+  $text = ($raw | Out-String).Trim()
+  if (-not $text) { throw "$label returned empty_output" }
+  if (-not ($text.StartsWith("{") -or $text.StartsWith("["))) {
+    $preview = ($text.Substring(0, [Math]::Min(240, $text.Length)) -replace "\r?\n", " ")
+    throw "$label returned non_json_output preview=$preview"
+  }
+  try { return ($text | ConvertFrom-Json) }
+  catch {
+    $preview = ($text.Substring(0, [Math]::Min(240, $text.Length)) -replace "\r?\n", " ")
+    throw "$label returned invalid_json_output error=$($_.Exception.Message) preview=$preview"
+  }
+}
+
 function Get-VideoFailures($state) {
   if ($null -eq $state.video_failures) {
     $state | Add-Member -Force -NotePropertyName video_failures -NotePropertyValue ([pscustomobject]@{})
@@ -130,14 +144,14 @@ function Publish-StateToHH($state) {
 
 function Complete-WorkplaneJob([string]$status) {
   if (-not $JobId) { return }
-  ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane:laptop-job -- complete --job-id $JobId --status $status --state-path .tmp/laptop-collector/latest-state.json" | Out-Host
+  ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane -- complete --job-id $JobId --status $status --state-path .tmp/laptop-collector/latest-state.json" | Out-Host
 }
 
 function Claim-WorkplaneJob {
   if (-not $Workplane -or $JobId) { return }
   $runner = "laptop-$($env:COMPUTERNAME)-$PID"
-  $claimRaw = ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane:laptop-job -- claim --worker-id $runner"
-  $claim = ($claimRaw | Out-String | ConvertFrom-Json)
+  $claimRaw = ssh $HhHost "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane -- claim --worker-id $runner"
+  $claim = ConvertFrom-StrictJson $claimRaw "workplane claim"
   if (-not $claim.claimed) {
     Write-Host "collector_workplane_claim=false"
     Release-CollectorLock
@@ -231,9 +245,9 @@ if (Test-ImpersonationSupport $Impersonate) {
   Write-Host "collector_impersonation=unavailable target=$Impersonate action='python -m pip install -U ""yt-dlp[default,curl-cffi]""'"
 }
 
-$worklistCmd = "cd $HhRepo && set -a && source .env.hermes && set +a && npm run transcript:worklist -- --limit $Limit --since-days $SinceDays"
+$worklistCmd = "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent transcript:worklist -- --limit $Limit --since-days $SinceDays"
 $worklistRaw = ssh $HhHost $worklistCmd
-$worklist = ($worklistRaw | Out-String | ConvertFrom-Json)
+$worklist = ConvertFrom-StrictJson $worklistRaw "transcript:worklist"
 $items = @($worklist.items)
 Write-Host "collector_worklist=$($items.Count) browser=$Browser mode=$(if ($Write) { 'WRITE' } else { 'DRY' }) limit=$Limit gap=${MinGapSeconds}-${MaxGapSeconds}s state=$StatePath"
 

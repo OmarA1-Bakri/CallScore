@@ -125,3 +125,28 @@ HH-side status reads the mirrored state by default through:
 ```bash
 npm run workplane:status -- --read-api-base https://ops-bridge.call-score.com/api/read
 ```
+
+## Activation troubleshooting notes
+
+Use spaced PowerShell switches. This is valid:
+
+```powershell
+.\scripts\windows\run-transcript-collector.ps1 -StatusOnly -HhHost hh
+```
+
+This is invalid and can route execution unexpectedly:
+
+```powershell
+.\scripts\windows\run-transcript-collector.ps1 -StatusOnly-HhHost hh
+```
+
+HH command surfaces:
+
+```bash
+npm run --silent workplane -- --read-api-base https://ops-bridge.call-score.com/api/read
+npm run --silent workplane -- --status --json --read-api-base https://ops-bridge.call-score.com/api/read
+npm run --silent workplane -- claim --worker-id laptop-smoke-test
+npm run --silent workplane -- complete --job-id <id> --status succeeded --state-path .tmp/laptop-collector/latest-state.json
+```
+
+The collector uses `npm run --silent` for HH commands that are parsed as JSON. If a non-JSON banner or shell output is returned, the collector now fails with `non_json_output` and a short preview instead of a raw `ConvertFrom-Json` parser exception.
