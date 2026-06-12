@@ -4219,3 +4219,69 @@ Autonomous revenue status: NO until transcript cadence is stable and/or accepted
 Next canonical target:
 
 Implement the private CallScore Growth Intelligence Pack: a read-only internal report combining workplane status, freshness/API safety, Whop readiness, Art of War dry-run gate counts, transcript cadence state, and private content/funnel recommendations. No public action.
+
+---
+
+## 2026-06-12 — Laptop workplane proof and private Growth Intelligence Pack
+
+Status labels:
+
+- LAPTOP_SSH_READY
+- LAPTOP_STATUSONLY_PASS
+- LAPTOP_WORKPLANE_5_PASS
+- TRANSCRIPT_CADENCE_PARTIAL
+- DATA_SURFACE_SAFE
+- GEMMA_SHADOW_HOLD
+- GEMMA_NOT_PRODUCTION_DEFAULT
+- GROWTH_INTELLIGENCE_PACK_CREATED
+- ART_OF_WAR_INTERNAL_ACTIVE
+- PUBLIC_ACTIONS_APPROVAL_GATED
+- AUTONOMOUS_REVENUE_NO
+
+Repo/runtime evidence:
+
+- HH branch: `master`.
+- Baseline HEAD: `8205997701e38f076c182ab34b995ffc1d5d4c28`.
+- HH → Windows laptop SSH passed over Tailscale using `albak@100.118.10.128`.
+- Workplane status after collector state repair: OK / PARTIAL.
+- Freshness check: WARN only; blockers empty.
+- Unsafe source ranks: 0.
+- API unsafeOfficial: 0.
+- Homepage: HTTP 200.
+- 30d bucket: PENDING_MATURITY.
+
+Laptop collector:
+
+- Laptop repo was reachable at `C:\Users\albak\xdev\crypto-tuber-ranked`; local branch `master`; local HEAD `6197264c842bdecbc3b13d81d15abe3520a83999`; existing untracked local files were preserved and not overwritten except the canonical collector script was copied after backup.
+- Fixed the collector HH bridge for the canonical laptop → HH path: `omar@100.107.162.80` on SSH port `2222` with `C:\Users\albak\.ssh\callscore_hh_ed25519`.
+- Replaced fragile Windows `ssh.exe` stdout/stdin JSON transport with SCP-backed JSON file transfer for claim/worklist/ingest payloads.
+- Fixed HH CLI wrappers to close DB pools and exit cleanly for laptop `workplane`, `transcript:worklist`, and transcript ingest calls.
+- Fixed collector state/output JSON writes to use UTF-8 without BOM so HH workplane status can parse `.tmp/laptop-collector/latest-state.json`.
+- `-StatusOnly` passed and published state without claiming a job or fetching a worklist.
+- Bounded workplane job `1829` ran with limit 5, Firefox cookies, concurrency 1, and no 25-video batch.
+- Transcript acquisition result for job `1829`: attempted 5, successful transcripts 0, failures 5, failure class `transcript_failed`, no 429/bot verification, cooldown clear.
+- Because no new transcripts landed, extraction/scoring/recompute was not rerun.
+
+Data pipeline:
+
+- Current public data surface remains safe and natively bucketed.
+- Transcript cadence remains PARTIAL because the transport path is proven but the latest bounded batch produced no usable transcripts.
+- Autonomous revenue remains NO until transcript cadence is stable or an explicit transcript-lag policy is accepted.
+
+Gemma shadow / ML loop:
+
+- Gemma remains shadow-only and not production default.
+- Write-canary eligibility remains false.
+- Current next Gemma target remains schema/Modelfile alignment and reviewed repair fixtures; no production calls were written.
+
+Growth Intelligence / Art of War:
+
+- Created `docs/plans/2026-06-12-callscore-growth-intelligence-pack.md` as the first private CallScore Growth Intelligence Pack.
+- `/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py validate-docs` passed.
+- Generated a local-only Art of War dry-run report at `/tmp/callscore-art-of-war-report-20260612-latest.md`; publish outputs were dry-run/local/null only and external mutation was false.
+- First internal campaign tracks: Receipts / Proof of Accuracy, Leaderboard Explainer / Methodology Trust, Creator Scorecard Funnel.
+- Public publishing, outreach, email/DM sends, spend, provider mutation, Whop live mutation, and production extractor changes remain approval-gated.
+
+Next canonical target:
+
+Run private Growth Intelligence execution loops only: draft and evaluate internal campaign assets against data-safety, Trust/Publish, Whop, and transcript freshness gates while continuing small laptop collector batches and Gemma schema repair in shadow mode.

@@ -52,20 +52,20 @@ From Omar's laptop PowerShell:
 
 ```powershell
 cd <repo-checkout-or-copied-scripts-dir>
-.\scripts\windows\run-transcript-collector.ps1 -Limit 1 -Browser firefox -SinceDays 45 -HhHost hermes-agent-box -DryRun
-.\scripts\windows\run-transcript-collector.ps1 -Limit 1 -Browser firefox -SinceDays 45 -HhHost hermes-agent-box -Write
+.\scripts\windows\run-transcript-collector.ps1 -Limit 1 -Browser firefox -SinceDays 45 -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519 -DryRun
+.\scripts\windows\run-transcript-collector.ps1 -Limit 1 -Browser firefox -SinceDays 45 -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519 -Write
 ```
 
 Default small daily batch after a clean canary:
 
 ```powershell
-.\scripts\windows\run-transcript-collector.ps1 -Limit 5 -Browser firefox -SinceDays 45 -HhHost hermes-agent-box -Write
+.\scripts\windows\run-transcript-collector.ps1 -Limit 5 -Browser firefox -SinceDays 45 -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519 -Write
 ```
 
 25-video current-window catch-up is not the default. Use only after clean stability is proven and no cooldown is active:
 
 ```powershell
-.\scripts\windows\run-transcript-collector.ps1 -Limit 25 -AllowLargeBatch -Browser firefox -SinceDays 45 -HhHost hermes-agent-box -Write
+.\scripts\windows\run-transcript-collector.ps1 -Limit 25 -AllowLargeBatch -Browser firefox -SinceDays 45 -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519 -Write
 ```
 
 ## Cooldown state
@@ -107,7 +107,7 @@ Status: **INSTALL_READY**.
 The same canonical collector script now supports Hermes/workplane operation; no parallel runner is required.
 
 ```powershell
-.\scripts\windows\run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -SinceDays 45 -HhHost hermes-agent-box -Write
+.\scripts\windows\run-transcript-collector.ps1 -Workplane -Limit 5 -Browser firefox -SinceDays 45 -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519 -Write
 ```
 
 Workplane behavior:
@@ -131,7 +131,7 @@ npm run workplane:status -- --read-api-base https://ops-bridge.call-score.com/ap
 Use spaced PowerShell switches. This is valid:
 
 ```powershell
-.\scripts\windows\run-transcript-collector.ps1 -StatusOnly -HhHost hh
+.\scripts\windows\run-transcript-collector.ps1 -StatusOnly -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519
 ```
 
 This is invalid and can route execution unexpectedly:
@@ -150,3 +150,5 @@ npm run --silent workplane -- complete --job-id <id> --status succeeded --state-
 ```
 
 The collector uses `npm run --silent` for HH commands that are parsed as JSON. If a non-JSON banner or shell output is returned, the collector now fails with `non_json_output` and a short preview instead of a raw `ConvertFrom-Json` parser exception.
+
+Current HH SSH note: HH listens on Tailscale `100.107.162.80` port `2222`, so laptop runner commands must pass `-HhPort 2222` unless a local SSH config alias maps the host and port.
