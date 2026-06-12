@@ -194,9 +194,14 @@ function Get-VideoFailures($state) {
   return $state.video_failures
 }
 
-function Set-VideoFailure($state, [string]$youtubeVideoId, [string]$reason) {
+function Set-VideoFailure($state, [string]$youtubeVideoId, [string]$reason, [string]$detail) {
   $failures = Get-VideoFailures $state
-  $entry = [pscustomobject]@{ reason = $reason; failed_at_utc = [DateTimeOffset]::UtcNow.ToString("o") }
+  $cleanDetail = ($detail -replace "\r?\n", " ").Trim()
+  $entry = [pscustomobject]@{
+    reason = $reason
+    failed_at_utc = [DateTimeOffset]::UtcNow.ToString("o")
+    detail_preview = $cleanDetail.Substring(0, [Math]::Min(240, $cleanDetail.Length))
+  }
   $failures | Add-Member -Force -NotePropertyName $youtubeVideoId -NotePropertyValue $entry
 }
 
@@ -204,7 +209,6 @@ function Should-SkipVideo($state, [string]$youtubeVideoId) {
   $failures = Get-VideoFailures $state
   $failure = $failures.$youtubeVideoId
   if ($null -eq $failure) { return $false }
-  if ($failure.reason -notin @("rate_limited", "bot_verification_required", "impersonation_warning_threshold")) { return $false }
   try {
     $failedAt = [DateTimeOffset]::Parse($failure.failed_at_utc)
     return $failedAt.UtcDateTime -gt [DateTimeOffset]::UtcNow.AddHours(-24).UtcDateTime
@@ -269,7 +273,11 @@ function Classify-Failure([string]$text) {
   if ($text -match "(?i)(HTTP\s*(Error\s*)?429|429\s*Too\s*Many\s*Requests|Too\s*Many\s*Requests)") { return "rate_limited" }
   if ($text -match "(?i)(bot_verification_required|not a bot|Sign in to confirm|confirm\s+you.?re\s+not\s+a\s+bot)") { return "bot_verification_required" }
   if ($text -match "(?i)(impersonation.*not available|no impersonate target|curl_cffi|requested but no impersonation target)") { return "impersonation_unavailable" }
-  if ($text -match "(?i)no_captions") { return "no_captions" }
+  if ($text -match "(?i)(no_captions|no subtitles|no automatic captions|There are no subtitles)") { return "no_captions" }
+  if ($text -match "(?i)(Premieres|upcoming|live stream|This live event)") { return "live_or_upcoming" }
+  if ($text -match "(?i)(private video|video is unavailable|removed by the uploader|account has been terminated|login required)") { return "private_or_deleted" }
+  if ($text -match "(?i)transcript_too_short") { return "transcript_too_short" }
+  if ($text -match "(?i)(timed out|timeout|connection.*reset|connection.*closed|Incomplete data received)") { return "transient_network" }
   return "transcript_failed"
 }
 
@@ -342,7 +350,7 @@ Write-Host "collector_worklist=$($items.Count) browser=$Browser mode=$(if ($Writ
 foreach ($item in $items) {
   $attempted += 1
   if (Should-SkipVideo $state ([string]$item.youtube_video_id)) {
-    Write-Host "collector_skip_video=true youtube_video_id=$($item.youtube_video_id) reason=recent_terminal_failure"
+    Write-Host "collector_skip_video=true youtube_video_id=$($item.youtube_video_id) reason=recent_failure_24h"
     continue
   }
 
@@ -392,7 +400,7 @@ foreach ($item in $items) {
     $detail = $_.Exception.Message
     $reason = Classify-Failure $detail
     $failed += 1
-    Set-VideoFailure $state ([string]$item.youtube_video_id) $reason
+    Set-VideoFailure $state ([string]$item.youtube_video_id) $reason $detail
     Write-State $state
     Send-Failure $item $reason $detail
     if ($reason -in @("rate_limited", "bot_verification_required", "impersonation_warning_threshold")) {

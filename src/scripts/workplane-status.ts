@@ -101,6 +101,8 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     latestGemmaShadow,
     latestMlEval,
     transcriptBacklogRecent30d,
+    collectorLastAttemptedCount: collectorCooldown.last_attempted_count,
+    collectorLastSuccessCount: collectorCooldown.last_success_count,
   });
   const dailyTimer = freshness.dailyTimer as Record<string, unknown> | null | undefined;
   const dailyPipelineActive = dailyTimer?.active === true || dailyTimer?.state === "active";
@@ -138,6 +140,15 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     latest_transcript_attempt: (freshness.timestamps as Record<string, unknown> | undefined)?.latestTranscriptAttempt ?? null,
     latest_transcript_success: (freshness.timestamps as Record<string, unknown> | undefined)?.latestTranscriptSuccess ?? null,
     latest_collector_failure: latestFailure,
+    latest_collector_run: {
+      job_id: collectorCooldown.latest_job_id,
+      last_run_utc: collectorCooldown.last_run_utc,
+      attempted: collectorCooldown.last_attempted_count,
+      successes: collectorCooldown.last_success_count,
+      failures: collectorCooldown.last_failure_count,
+      success_rate: collectorCooldown.last_success_rate,
+      recent_failure_reasons: collectorCooldown.recent_failure_reasons,
+    },
     latest_gemma_shadow_extraction_run: latestGemmaShadow,
     latest_ml_eval_run: latestMlEval,
     model_currently_recommended: latestMlEval.exists && latestMlGate.eligible_for_write_canary !== true
@@ -151,6 +162,19 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     art_of_war_activation_gate_status: readiness_domains.art_of_war,
     automation_registry_status: readiness_domains.claude_code_automations,
     approval_required_for_next_risky_action: readiness_domains.activation_gates.required_approvals,
+    next_approval_gated_action: "operator approval required before public marketing/outreach/spend, Whop live mutation, Gemma write-canary, or production extractor default change",
+    autonomous_revenue_status: "NO",
+    blocked_public_actions: readiness_domains.activation_gates.risky_actions_blocked,
+    runtime_loop_capabilities: [
+      "inspect_workplane_status",
+      "run_laptop_collector_limit_5_when_cooldown_clear",
+      "ingest_transcript_results",
+      "run_gemma_shadow_extract_artifact_only",
+      "run_ml_idle_improve_artifact_only",
+      "run_whop_read_only_dry_runs",
+      "run_artofwar_private_dry_runs",
+      "produce_promotion_reviews_without_auto_promotion",
+    ],
     job_model: workplaneJobModelForStatus(),
     next_recommended_autonomous_action: nextAction,
   };

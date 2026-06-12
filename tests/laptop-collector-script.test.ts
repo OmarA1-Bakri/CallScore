@@ -24,11 +24,20 @@ test("laptop collector detects 429 and bot verification, persists cooldown, and 
 
 test("laptop collector avoids retry hammering and keeps transcript-only yt-dlp mode", () => {
   assert.match(script, /Should-SkipVideo/);
-  assert.match(script, /recent_terminal_failure/);
+  assert.match(script, /recent_failure_24h/);
+  assert.match(script, /detail_preview/);
   assert.match(script, /--skip-download/);
   assert.match(script, /--no-playlist/);
   assert.match(script, /--write-auto-subs/);
   assert.doesNotMatch(script, /--download-archive\s+.*retry/i);
+});
+
+test("laptop collector classifies non-rate-limit transcript failures", () => {
+  assert.match(script, /live_or_upcoming/);
+  assert.match(script, /private_or_deleted/);
+  assert.match(script, /transcript_too_short/);
+  assert.match(script, /transient_network/);
+  assert.match(script, /no automatic captions/);
 });
 
 test("laptop collector has impersonation dependency guardrails", () => {

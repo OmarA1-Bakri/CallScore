@@ -8,6 +8,13 @@ export interface CollectorCooldownState {
   readonly cooldown_until_utc: string | null;
   readonly cooldown_reason: string | null;
   readonly latest_failure_reason: string | null;
+  readonly latest_job_id: string | null;
+  readonly last_run_utc: string | null;
+  readonly last_attempted_count: number | null;
+  readonly last_success_count: number | null;
+  readonly last_failure_count: number | null;
+  readonly last_success_rate: number | null;
+  readonly recent_failure_reasons: Record<string, number>;
   readonly checked_at: string;
 }
 
@@ -26,6 +33,8 @@ export interface WorkplaneDecisionInput {
   readonly latestGemmaShadow: ArtifactSummary;
   readonly latestMlEval: ArtifactSummary;
   readonly transcriptBacklogRecent30d: number;
+  readonly collectorLastAttemptedCount: number | null;
+  readonly collectorLastSuccessCount: number | null;
 }
 
 export interface WorkplaneDecision {
@@ -46,27 +55,36 @@ function readJsonObject(path: string): Record<string, unknown> {
   return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
 }
 
+function numberOrNull(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function emptyCollectorState(path: string | null, status: CollectorCooldownState["status"], checkedAt: string): CollectorCooldownState {
+  return {
+    state_path: path,
+    status,
+    cooldown_until_utc: null,
+    cooldown_reason: null,
+    latest_failure_reason: null,
+    latest_job_id: null,
+    last_run_utc: null,
+    last_attempted_count: null,
+    last_success_count: null,
+    last_failure_count: null,
+    last_success_rate: null,
+    recent_failure_reasons: {},
+    checked_at: checkedAt,
+  };
+}
+
 export function readCollectorCooldownState(path: string | null, now = new Date()): CollectorCooldownState {
   const checkedAt = now.toISOString();
   if (!path) {
-    return {
-      state_path: null,
-      status: "unknown",
-      cooldown_until_utc: null,
-      cooldown_reason: null,
-      latest_failure_reason: null,
-      checked_at: checkedAt,
-    };
+    return emptyCollectorState(null, "unknown", checkedAt);
   }
   if (!existsSync(path)) {
-    return {
-      state_path: path,
-      status: "unknown",
-      cooldown_until_utc: null,
-      cooldown_reason: null,
-      latest_failure_reason: null,
-      checked_at: checkedAt,
-    };
+    return emptyCollectorState(path, "unknown", checkedAt);
   }
   try {
     const json = readJsonObject(path);
@@ -78,23 +96,31 @@ export function readCollectorCooldownState(path: string | null, now = new Date()
     const latestFailure = failures
       .filter((item) => item && typeof item === "object")
       .sort((a, b) => (parseDate(b.failed_at_utc) ?? 0) - (parseDate(a.failed_at_utc) ?? 0))[0];
+    const recentReasons = failures.reduce<Record<string, number>>((acc, item) => {
+      const reason = typeof item?.reason === "string" && item.reason.trim() ? item.reason : "unknown";
+      acc[reason] = (acc[reason] ?? 0) + 1;
+      return acc;
+    }, {});
+    const attempted = numberOrNull(json.last_attempted_count);
+    const successes = numberOrNull(json.last_success_count);
+    const failuresCount = numberOrNull(json.last_failure_count);
     return {
       state_path: path,
       status: untilMs && untilMs > now.getTime() ? "active" : "clear",
       cooldown_until_utc: until,
       cooldown_reason: typeof json.cooldown_reason === "string" ? json.cooldown_reason : null,
       latest_failure_reason: typeof latestFailure?.reason === "string" ? latestFailure.reason : null,
+      latest_job_id: typeof json.last_job_id === "string" ? json.last_job_id : null,
+      last_run_utc: typeof json.last_run_utc === "string" ? json.last_run_utc : null,
+      last_attempted_count: attempted,
+      last_success_count: successes,
+      last_failure_count: failuresCount,
+      last_success_rate: attempted && attempted > 0 && successes !== null ? successes / attempted : null,
+      recent_failure_reasons: recentReasons,
       checked_at: checkedAt,
     };
   } catch {
-    return {
-      state_path: path,
-      status: "malformed",
-      cooldown_until_utc: null,
-      cooldown_reason: null,
-      latest_failure_reason: null,
-      checked_at: checkedAt,
-    };
+    return emptyCollectorState(path, "malformed", checkedAt);
   }
 }
 
@@ -170,6 +196,14 @@ export function decideNextAutonomousAction(input: WorkplaneDecisionInput): Workp
   }
   if (input.collectorCooldown.status === "malformed") {
     return { action: "repair_or_replace_collector_state", reason: "collector cooldown state is malformed", job_type: "transcript_collect_laptop", allowed: false };
+  }
+  if ((input.collectorLastAttemptedCount ?? 0) >= 5 && (input.collectorLastSuccessCount ?? 0) === 0) {
+    return {
+      action: "repair_transcript_targeting_or_failure_classification",
+      reason: "latest bounded laptop batch had zero transcript successes; avoid blind retry and inspect targeting/failure detail",
+      job_type: "transcript_collect_laptop",
+      allowed: true,
+    };
   }
   const mlGate = (input.latestMlEval.summary.promotion_gate ?? {}) as Record<string, unknown>;
   if (input.latestMlEval.exists && mlGate.eligible_for_write_canary !== true) {
@@ -365,9 +399,27 @@ export function buildReadinessDomains(input: {
     }, now),
     transcript_collector: domain({
       status: input.collectorCooldown.status === "malformed" ? "BLOCKED" : "PARTIAL",
-      evidence: [`cooldown=${input.collectorCooldown.status}`, `state=${input.collectorCooldown.state_path ?? "unknown"}`, `backlog_recent30d=${input.transcriptBacklogRecent30d}`],
-      blockers: input.collectorCooldown.status === "active" ? [`cooldown_until=${input.collectorCooldown.cooldown_until_utc}`] : [],
-      safe_next_action: input.collectorCooldown.status === "active" ? "wait_for_collector_cooldown" : "claim transcript_collect_laptop limit 5 from laptop runner",
+      evidence: [
+        `cooldown=${input.collectorCooldown.status}`,
+        `state=${input.collectorCooldown.state_path ?? "unknown"}`,
+        `backlog_recent30d=${input.transcriptBacklogRecent30d}`,
+        `last_job_id=${input.collectorCooldown.latest_job_id ?? "unknown"}`,
+        `last_attempted=${input.collectorCooldown.last_attempted_count ?? "unknown"}`,
+        `last_success=${input.collectorCooldown.last_success_count ?? "unknown"}`,
+        `last_failure=${input.collectorCooldown.last_failure_count ?? "unknown"}`,
+        `last_success_rate=${input.collectorCooldown.last_success_rate ?? "unknown"}`,
+        `recent_failure_reasons=${JSON.stringify(input.collectorCooldown.recent_failure_reasons)}`,
+      ],
+      blockers: input.collectorCooldown.status === "active"
+        ? [`cooldown_until=${input.collectorCooldown.cooldown_until_utc}`]
+        : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
+          ? ["latest bounded batch had 0 transcript successes; inspect targeting/failure classification before another batch"]
+          : []),
+      safe_next_action: input.collectorCooldown.status === "active"
+        ? "wait_for_collector_cooldown"
+        : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
+          ? "repair transcript targeting/failure classification before next 5-video run"
+          : "claim transcript_collect_laptop limit 5 from laptop runner"),
       risky_actions_blocked: ["25-video batch without explicit gate", "cookie transfer to HH", "retry hammering after 429"],
       required_approvals: ["large transcript batch >5"],
       relevant_commands: ["scripts/windows/run-transcript-collector.ps1 -Workplane -Limit 5 -Write"],

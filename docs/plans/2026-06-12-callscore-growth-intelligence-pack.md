@@ -179,3 +179,22 @@ Blocked actions:
 ## 10. Explicit safety statement
 
 This pack is private and internal-only. It performed no public action, no outreach, no spend, no provider mutation, no Whop mutation, no Gemma production writes, no creator_stats mutation from Gemma, no destructive production DB operation, and no 25-video transcript run.
+
+---
+
+## 2026-06-12 Controlled Runtime Update
+
+Status labels: `CONTROLLED_AUTONOMOUS_RUNTIME_PARTIAL`, `TRANSCRIPT_CADENCE_PARTIAL`, `DATA_SURFACE_SAFE`, `GEMMA_SHADOW_HOLD`, `GEMMA_NOT_PRODUCTION_DEFAULT`, `ML_LOOP_ACTIVE`, `WHOP_AUTO_PARTIAL`, `ART_OF_WAR_PRIVATE_ACTIVE`, `ART_OF_WAR_PUBLIC_NEEDS_APPROVAL`, `PUBLIC_ACTIONS_APPROVAL_GATED`, `AUTONOMOUS_REVENUE_NO`.
+
+Latest collector evidence: laptop workplane job `1830` attempted 5 videos, stored 0 transcripts, recorded 5 `transcript_failed` outcomes, no 429, no bot verification, cooldown clear. The collector script now records detail previews, classifies more non-rate-limit failures, and skips any recently failed video for 24h.
+
+Latest Gemma evidence: `callscore-gemma4-extractor:latest` was rebuilt from a production-schema Modelfile. The 1-real warm run reduced timeout to parser/schema failure, but produced no valid accepted calls. ML idle report keeps write-canary eligibility false.
+
+Art of War evidence: `validate-docs` passed and `/tmp/callscore-art-of-war-report-20260612-next.md` was generated in dry-run/local/null mode. No public action, outreach, provider mutation, or spend occurred.
+
+Private campaign tracks remain:
+1. Receipts / Proof of Accuracy.
+2. Leaderboard Explainer / Methodology Trust.
+3. Creator Scorecard Funnel.
+
+Next safe action: repair transcript targeting/failure classification before another laptop limit-5 run; continue Art of War private dry-run reporting only.
