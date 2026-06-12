@@ -279,6 +279,12 @@ export function ytDlpPoTokenProviderArgs(env: Record<string, string | undefined>
     return ["--extractor-args", `youtubepot-bgutilscript:server_home=${serverHome}`];
   }
 
+  if (provider === "wpc" || provider === "webpo" || provider === "browser-attested") {
+    const browserPath = env.YTDLP_PO_TOKEN_BROWSER_PATH?.trim()
+      || env.YTDLP_WPC_BROWSER_PATH?.trim();
+    return browserPath ? ["--extractor-args", `youtubepot-wpc:browser_path=${browserPath}`] : [];
+  }
+
   throw new Error(`Unsupported YTDLP_PO_TOKEN_PROVIDER=${provider}`);
 }
 
@@ -296,6 +302,7 @@ export function redactedYtDlpOptionSummary(env: Record<string, string | undefine
     poTokenProvider: provider || "none",
     poTokenProviderBaseUrl: Boolean(env.YTDLP_PO_TOKEN_PROVIDER_BASE_URL?.trim() || env.YTDLP_PO_TOKEN_BASE_URL?.trim()),
     poTokenProviderHome: Boolean(env.YTDLP_PO_TOKEN_PROVIDER_HOME?.trim()),
+    poTokenBrowserPath: Boolean(env.YTDLP_PO_TOKEN_BROWSER_PATH?.trim() || env.YTDLP_WPC_BROWSER_PATH?.trim()),
     extractorArgs: splitMultilineEnv(env.YTDLP_EXTRACTOR_ARGS).length,
     jsRuntimes: Boolean(env.YTDLP_JS_RUNTIMES?.trim()),
     remoteComponents: Boolean(env.YTDLP_REMOTE_COMPONENTS?.trim()),

@@ -207,6 +207,7 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     provider: process.env.YTDLP_PO_TOKEN_PROVIDER?.trim() || "none",
     providerBaseUrl: Boolean(process.env.YTDLP_PO_TOKEN_PROVIDER_BASE_URL?.trim() || process.env.YTDLP_PO_TOKEN_BASE_URL?.trim()),
     providerHome: Boolean(process.env.YTDLP_PO_TOKEN_PROVIDER_HOME?.trim()),
+    browserPath: Boolean(process.env.YTDLP_PO_TOKEN_BROWSER_PATH?.trim() || process.env.YTDLP_WPC_BROWSER_PATH?.trim()),
     playerClient: Boolean(process.env.YTDLP_PLAYER_CLIENT?.trim()),
   };
 
