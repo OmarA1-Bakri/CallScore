@@ -51,6 +51,22 @@ export interface ShadowExtractedCallRecord {
   readonly video: ShadowVideoMetadata;
   readonly transcript_sha256: string;
   readonly transcript_length: number;
+  readonly prompt_version?: string;
+  readonly schema_valid?: boolean;
+  readonly confidence_distribution?: {
+    readonly min: number | null;
+    readonly max: number | null;
+    readonly average: number | null;
+    readonly high_confidence_count: number;
+    readonly medium_confidence_count: number;
+    readonly low_confidence_count: number;
+  };
+  readonly parser_errors?: readonly string[];
+  readonly latency_ms?: number | null;
+  readonly comparison_to_rule_extractor?: {
+    readonly status: "pending_shadow_diff";
+    readonly note: string;
+  };
   readonly candidate_count: number;
   readonly accepted_count: number;
   readonly accepted_calls: readonly NormalizedExtractedCall[];

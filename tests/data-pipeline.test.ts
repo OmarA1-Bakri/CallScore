@@ -1090,6 +1090,9 @@ test("laptop transcript worklist is bounded and current-window first", () => {
   const statement = buildTranscriptWorklistSql(args);
   assert.match(statement.sql, /v\.published_at >= NOW\(\) - \(\$1::int \* INTERVAL '1 day'\)/);
   assert.match(statement.sql, /transcript IS NULL OR length\(v\.transcript\) = 0/);
+  assert.match(statement.sql, /LEFT JOIN creator_stats cs90/);
+  assert.match(statement.sql, /transcript_priority/);
+  assert.match(statement.sql, /ORDER BY CASE/);
   assert.match(statement.sql, /LIMIT \$3/);
 });
 

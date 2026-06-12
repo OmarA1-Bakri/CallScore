@@ -19,6 +19,7 @@ export interface TranscriptWorkItem {
   readonly published_at: string | null;
   readonly transcript_status: string | null;
   readonly transcript_error: string | null;
+  readonly transcript_priority: "official" | "provisional" | "watchlist" | "stale_repair" | "excluded_validation";
 }
 
 function argValue(argv: readonly string[], flag: string): string | null {
@@ -31,6 +32,25 @@ function positiveInt(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
+
+const prioritySql = `CASE
+        WHEN lower(c.name) LIKE '%altcoin daily%'
+          OR lower(replace(c.youtube_handle, '@', '')) IN ('alexbeckerschannel', 'moneyzg', 'cryptoinspector', 'altcoindaily')
+          OR lower(COALESCE(c.focus, '')) ~ '(news|media|aggregation|aggregator)'
+          THEN 5
+        WHEN v.published_at < NOW() - INTERVAL '45 days' THEN 4
+        WHEN COALESCE(cs90.total_calls, 0) >= 3 AND cs90.accuracy_rank IS NOT NULL THEN 1
+        WHEN COALESCE(cs90.total_calls, 0) >= 1 THEN 2
+        ELSE 3
+      END`;
+
+const priorityLabelSql = `CASE ${prioritySql}
+        WHEN 1 THEN 'official'
+        WHEN 2 THEN 'provisional'
+        WHEN 3 THEN 'watchlist'
+        WHEN 4 THEN 'stale_repair'
+        ELSE 'excluded_validation'
+      END`;
 
 export function parseTranscriptWorklistArgs(argv = process.argv.slice(2)): TranscriptWorklistArgs {
   return {
@@ -71,11 +91,13 @@ export function buildTranscriptWorklistSql(args: TranscriptWorklistArgs): { read
         c.youtube_handle,
         v.published_at::text AS published_at,
         v.transcript_status,
-        v.transcript_error
+        v.transcript_error,
+        ${priorityLabelSql} AS transcript_priority
       FROM videos v
       JOIN creators c ON c.id = v.creator_id
+      LEFT JOIN creator_stats cs90 ON cs90.creator_id = c.id AND cs90.period = '90d'
       WHERE ${filters.join(" AND ")}
-      ORDER BY v.published_at DESC NULLS LAST, v.id DESC
+      ORDER BY ${prioritySql} ASC, v.published_at DESC NULLS LAST, v.id DESC
       LIMIT $${params.length}`,
     params,
   };

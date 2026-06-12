@@ -12,6 +12,9 @@ type ShadowVideo = Video & { creator_id: number; creator_name: string; youtube_h
 
 const DEFAULT_VIDEO_AGENTS = 1;
 const MAX_VIDEO_AGENTS = 3;
+const DEFAULT_SHADOW_MODEL = "callscore-gemma4-extractor:latest";
+const DEFAULT_LOCAL_OLLAMA_HOST = "http://127.0.0.1:11434";
+const SHADOW_PROMPT_VERSION = "callscore-gemma4-shadow-v1";
 
 export interface ShadowExtractArgs extends OpenRouterArgs {
   readonly execute: boolean;
@@ -30,8 +33,11 @@ function argValue(argv: readonly string[], flag: string): string | null {
 }
 
 function withShadowProviderDefaults(argv: readonly string[]): string[] {
-  if (argv.includes("--provider")) return [...argv];
-  return [...argv, "--provider", "ollama"];
+  const withDefaults = [...argv];
+  if (!argv.includes("--provider")) withDefaults.push("--provider", "ollama");
+  if (!argv.includes("--model")) withDefaults.push("--model", DEFAULT_SHADOW_MODEL);
+  if (!argv.includes("--ollama-host")) withDefaults.push("--ollama-host", DEFAULT_LOCAL_OLLAMA_HOST);
+  return withDefaults;
 }
 
 function positiveInt(value: string | null, fallback: number): number {
@@ -152,6 +158,22 @@ function dryRunRecord(args: ShadowExtractArgs, video: ShadowVideo): ShadowExtrac
     },
     transcript_sha256: hashTranscript(transcript),
     transcript_length: transcript.length,
+    prompt_version: SHADOW_PROMPT_VERSION,
+    schema_valid: false,
+    confidence_distribution: {
+      min: null,
+      max: null,
+      average: null,
+      high_confidence_count: 0,
+      medium_confidence_count: 0,
+      low_confidence_count: 0,
+    },
+    parser_errors: ["dry_run_no_model_call"],
+    latency_ms: null,
+    comparison_to_rule_extractor: {
+      status: "pending_shadow_diff",
+      note: "Run npm run shadow:diff against this artifact for rule-extractor comparison.",
+    },
     candidate_count: 0,
     accepted_count: 0,
     accepted_calls: [],
@@ -161,6 +183,23 @@ function dryRunRecord(args: ShadowExtractArgs, video: ShadowVideo): ShadowExtrac
       reached_transcript_end: false,
     },
     error: "dry_run_no_model_call",
+  };
+}
+
+function confidenceDistribution(calls: readonly { extraction_confidence?: number; confidence?: string | null }[]): NonNullable<ShadowExtractedCallRecord["confidence_distribution"]> {
+  const scores = calls
+    .map((call) => Number(call.extraction_confidence ?? 0))
+    .filter((value) => Number.isFinite(value));
+  const high = calls.filter((call) => call.confidence === "high").length;
+  const medium = calls.filter((call) => call.confidence === "medium").length;
+  const low = calls.filter((call) => call.confidence === "low").length;
+  return {
+    min: scores.length ? Math.min(...scores) : null,
+    max: scores.length ? Math.max(...scores) : null,
+    average: scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : null,
+    high_confidence_count: high,
+    medium_confidence_count: medium,
+    low_confidence_count: low,
   };
 }
 
@@ -185,7 +224,9 @@ async function processShadowVideo(
   }
 
   try {
+    const started = Date.now();
     const result = await extractWithModelFallback(args, transcript, video.title);
+    const latencyMs = Date.now() - started;
     const record: ShadowExtractedCallRecord = {
       record_type: "shadow_extraction",
       ts: timestamp(),
@@ -205,6 +246,15 @@ async function processShadowVideo(
       },
       transcript_sha256: hashTranscript(transcript),
       transcript_length: transcript.length,
+      prompt_version: SHADOW_PROMPT_VERSION,
+      schema_valid: true,
+      confidence_distribution: confidenceDistribution(result.calls),
+      parser_errors: [],
+      latency_ms: latencyMs,
+      comparison_to_rule_extractor: {
+        status: "pending_shadow_diff",
+        note: "Run npm run shadow:diff against this artifact for rule-extractor comparison.",
+      },
       candidate_count: result.candidates.length,
       accepted_count: result.calls.length,
       accepted_calls: result.calls,
@@ -221,7 +271,7 @@ async function processShadowVideo(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const record = dryRunRecord(args, video);
-    writeJsonlRecord(args.shadowOut, { ...record, error: message });
+    writeJsonlRecord(args.shadowOut, { ...record, error: message, parser_errors: [message] });
     console.error(`[${timestamp()}] FAIL shadow video ${video.id} (${video.creator_name}): ${message}`);
     return { processed: 0, failed: 1, accepted: 0 };
   }

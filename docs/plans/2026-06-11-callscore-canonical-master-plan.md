@@ -3801,3 +3801,160 @@ No production DB writes were performed. No extracted calls were written. No scor
 ### Next hard target
 
 Wire `callscore-gemma4-extractor:latest` behind a local-extractor dry-run/canary flag, run it against real laptop-ingested transcripts with no DB writes, compare against the current rule/extraction path, and only then decide whether to promote a local-model-first extraction loop. If Gemma canary stalls on latency or broader real-transcript quality, build a larger labeled dataset and prepare LoRA/QLoRA fine-tuning on a GPU machine; HH CPU is not suitable for true training.
+
+---
+
+## 35. 2026-06-12 Rate-limit-safe laptop collector and Gemma shadow ML loop
+
+Status: **LAPTOP COLLECTOR RATE-LIMIT HARDENED / GEMMA SHADOW MODE ACTIVE / ML IMPROVEMENT LOOP IMPLEMENTED / GEMMA NOT PRODUCTION DEFAULT**.
+
+Purpose: keep the residential laptop transcript path useful without triggering YouTube rate limits, and connect `callscore-gemma4-extractor:latest` to safe artifact-only shadow extraction plus ML improvement reporting without contaminating production calls or public rankings.
+
+### Laptop collector hardening
+
+Result: **RATE-LIMIT HARDENED**.
+
+Updated `scripts/windows/run-transcript-collector.ps1` safety defaults:
+
+- default batch limit is now `5`;
+- `Limit > 5` requires explicit `-AllowLargeBatch`;
+- hard max remains `25`;
+- default gap is randomized `45-90` seconds;
+- concurrency remains one video at a time;
+- transcript-only yt-dlp flags remain `--skip-download`, `--no-playlist`, `--write-auto-subs`, `--write-subs`;
+- HTTP 429 and bot-verification evidence stop the batch immediately;
+- terminal 429/bot/impersonation-warning-threshold failures persist cooldown state;
+- cooldown defaults to randomized `12-24` hours;
+- recent terminal video failures are skipped to avoid retry hammering;
+- impersonation support is checked with `yt-dlp --list-impersonate-targets` before `--impersonate` is used.
+
+Impersonation dependency status: **GUARDED / LAPTOP VERIFY REQUIRED**.
+
+The script now prints the exact laptop-side install command if targets are unavailable:
+
+```powershell
+python -m pip install -U "yt-dlp[default,curl-cffi]"
+yt-dlp --list-impersonate-targets
+```
+
+HH cannot prove the laptop dependency from repo tests alone; the collector now prevents repeated warning spam and stops/cools down if warnings cross the safety threshold.
+
+### Transcript worklist priority
+
+Result: **PRIORITY QUEUE ADDED**.
+
+`npm run transcript:worklist` now orders candidates by:
+
+1. recent official creators;
+2. recent provisional creators;
+3. recent watchlist creators;
+4. stale repair candidates;
+5. excluded identities only for validation.
+
+This keeps small batches focused on current public-value freshness and avoids wasting scarce YouTube allowance on lower-priority rows.
+
+### Gemma shadow extraction
+
+Result: **SHADOW MODE ACTIVE / NOT PRODUCTION DEFAULT / NOT PROMOTED**.
+
+Changes:
+
+- `npm run shadow:extract` now defaults shadow mode to local Ollama `callscore-gemma4-extractor:latest` at `http://127.0.0.1:11434` unless overridden.
+- Shadow records include prompt version, schema validity, parser errors, latency, confidence distribution, and pending rule-extractor comparison metadata.
+- `--num-predict` was added to the LLM extractor as a bounded local-shadow/runtime tuning knob; production default remains unchanged at `2000`.
+- No production calls are written by shadow extraction. `shadow:promote` remains separately guarded and was not run.
+
+Real-transcript artifact-only sample:
+
+- Run id: `gemma-shadow-fast-20260612T105750Z`.
+- Shadow artifact: `/tmp/callscore-shadow-extractions/gemma-shadow-fast-20260612T105750Z.jsonl`.
+- Diff artifact: `/tmp/callscore-shadow-extractions/gemma-shadow-fast-20260612T105750Z.diff.jsonl`.
+- ML report: `/tmp/callscore-shadow-extractions/gemma-shadow-fast-20260612T105750Z.ml-idle-report.json`.
+- Bounds: 10 existing transcripts, local Ollama, `chunk-chars=250`, `max-chunks=1`, `num-predict=300`, `request-timeout-ms=60000`, no DB writes.
+
+Outcome:
+
+| Metric | Result |
+| --- | ---: |
+| Shadow rows | 10 |
+| Accepted calls | 0 |
+| Parser/schema pass | 0/10 |
+| Invalid JSON-array failures | 1 |
+| Timeout failures | 9 |
+| Diff rows | 10 `manual_review` |
+| Production calls written | 0 |
+| Public rankings affected | 0 |
+
+Conclusion: the fixture-approved `callscore-gemma4-extractor:latest` is **not ready for real-transcript write canary** under the current repo extractor prompt/body and HH CPU latency. It remains a shadow candidate only.
+
+### ML idle improvement loop
+
+Result: **IMPLEMENTED / PROMOTION BLOCKED BY EVIDENCE**.
+
+Added `npm run ml:idle-improve`:
+
+- reads shadow artifacts, optional shadow diff artifacts, and eval fixtures;
+- produces metrics, prompt-improvement suggestions, fixture targets, and promotion-gate decisions;
+- never writes production calls;
+- never changes public rankings;
+- keeps `eligible_for_write_canary=false` until JSON/schema, false-positive, ownership, and approval gates are recorded.
+
+Current ML report metrics from the 10-video Gemma shadow sample:
+
+- `json_valid_rate = 0`;
+- `schema_pass_rate = 0`;
+- `parser_error_count = 10`;
+- `accepted_calls = 0`;
+- `diff_status_counts.manual_review = 10`;
+- promotion gate: **false**.
+
+### Validation evidence
+
+Targeted tests passed:
+
+```bash
+node --import tsx --test tests/laptop-collector-script.test.ts tests/ml-idle-improve.test.ts tests/shadow-scripts.test.ts tests/data-pipeline.test.ts
+# 60/60 pass
+```
+
+UltraQA scenario coverage included:
+
+- malformed/unsafe batch flags (`Limit > 5` without `-AllowLargeBatch`);
+- HTTP 429 detection;
+- bot-verification detection;
+- cooldown persistence;
+- no retry hammering after terminal failure;
+- jitter/gap defaults;
+- transcript-only yt-dlp flags;
+- impersonation dependency/warning guard;
+- shadow extraction no-write defaults;
+- ML promotion gate remains false without approval/eval evidence;
+- misleading green prevention: real-transcript Gemma shadow failure blocks promotion despite fixture benchmark pass.
+
+### Certification matrix update
+
+| Surface | Status |
+| --- | --- |
+| Laptop collector | RATE-LIMIT HARDENED |
+| Collector default batch | 5 videos |
+| 25-video batch | GATED by `-AllowLargeBatch` |
+| 429 cooldown | ACTIVE, 12-24h randomized |
+| Impersonation dependency | GUARDED; verify/install on laptop if targets unavailable |
+| Transcript freshness | PARTIAL / RATE-LIMIT CONTROLLED |
+| Gemma extractor | SHADOW MODE ACTIVE |
+| Gemma production default | NO / UNCHANGED |
+| Gemma write canary | BLOCKED by real-transcript parser/timeout evidence |
+| ML improvement loop | IMPLEMENTED |
+| Production calls/rankings | SAFE / UNCHANGED |
+| Whop commerce | CERTIFIED unchanged |
+| Art of War | READY for internal planning/intelligence; external public growth still gated by data/freshness discipline |
+
+### Next hard target
+
+Make Gemma useful on real transcripts before any write canary:
+
+1. split real transcripts into smaller semantic snippets before prompting;
+2. reduce or replace the current extractor prompt for local Gemma shadow mode;
+3. add a strict adapter from the benchmark schema to the production normalized call schema;
+4. add latency budget gates and skip/queue slow rows instead of blocking the batch;
+5. rerun 10-transcript and then 25-transcript shadow samples before considering write-canary promotion.
