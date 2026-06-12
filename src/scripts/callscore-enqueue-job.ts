@@ -1,6 +1,7 @@
 import { enqueuePipelineJob } from "../lib/pipeline";
+import { getWorkplaneJobSpec, isWorkplaneJobType, type WorkplaneJobType } from "../lib/workplane-jobs";
 
-type JobName = "candles" | "match" | "scores" | "ml";
+type JobName = "candles" | "match" | "scores" | "ml" | "workplane";
 type Mode = "schedule" | "probe";
 
 type Args = {
@@ -11,11 +12,15 @@ type Args = {
   matchLimit?: number;
   matchBatchSize?: number;
   mlBatchSize?: number;
+  workplaneType?: WorkplaneJobType;
+  limit?: number;
+  browser?: string;
+  sinceDays?: number;
   queuedBy: string;
 };
 
 function usage(): never {
-  console.error(`Usage: node --import tsx src/scripts/callscore-enqueue-job.ts --job <candles|match|scores|ml> [--mode schedule|probe]
+  console.error(`Usage: node --import tsx src/scripts/callscore-enqueue-job.ts --job <candles|match|scores|ml|workplane> [--mode schedule|probe]
 
 Options:
   --symbols BTCUSDT,ETHUSDT      candles only; default BTCUSDT,ETHUSDT,SOLUSDT
@@ -23,13 +28,17 @@ Options:
   --match-limit N                match only; default 1000 schedule, 10 probe
   --match-batch-size N           match only; default 200 schedule, 10 probe
   --ml-batch-size N              ml only; default 250 schedule, 1 probe
+  --workplane-type TYPE          workplane only; required, e.g. transcript_collect_laptop
+  --limit N                      workplane transcript only; max 5 without explicit gated large-batch path
+  --browser VALUE                workplane transcript only; default firefox
+  --since-days N                 workplane transcript only; default 45
   --queued-by VALUE              metadata only; default local-hh-scheduler
 
 Required environment:
   DATABASE_PROVIDER=postgres
   DATABASE_URL or another supported Postgres URL env var must be set.
 
-This script only enqueues pipeline jobs. It does not execute jobs, deploy, call Whop, or mutate provider/channel state.`);
+This script only enqueues pipeline jobs. It does not execute jobs, deploy, call Whop, publish, spend, or mutate provider/channel state.`);
   process.exit(2);
 }
 
@@ -54,7 +63,7 @@ function parseArgs(argv: string[]): Args {
     switch (arg) {
       case "--job": {
         const job = next();
-        if (!["candles", "match", "scores", "ml"].includes(job)) usage();
+        if (!["candles", "match", "scores", "ml", "workplane"].includes(job)) usage();
         args.job = job as JobName;
         break;
       }
@@ -79,6 +88,21 @@ function parseArgs(argv: string[]): Args {
       case "--ml-batch-size":
         args.mlBatchSize = positiveInt(next(), "--ml-batch-size");
         break;
+      case "--workplane-type": {
+        const type = next();
+        if (!isWorkplaneJobType(type)) usage();
+        args.workplaneType = type;
+        break;
+      }
+      case "--limit":
+        args.limit = positiveInt(next(), "--limit");
+        break;
+      case "--browser":
+        args.browser = next();
+        break;
+      case "--since-days":
+        args.sinceDays = positiveInt(next(), "--since-days");
+        break;
       case "--queued-by":
         args.queuedBy = next();
         break;
@@ -91,6 +115,11 @@ function parseArgs(argv: string[]): Args {
     }
   }
   if (!args.job) usage();
+  if (args.job === "workplane" && !args.workplaneType) usage();
+  if (args.job !== "workplane" && args.workplaneType) usage();
+  if (args.limit && args.limit > 5) {
+    throw new Error("--limit >5 is not supported by this safe workplane enqueue path");
+  }
   return args;
 }
 
@@ -122,7 +151,7 @@ async function main() {
   const jobName = args.job;
   if (!jobName) usage();
   const probe = args.mode === "probe";
-  const prefix = `local-hh-${jobName}`;
+  const prefix = jobName === "workplane" ? `local-hh-workplane-${args.workplaneType}` : `local-hh-${jobName}`;
   const key = probe
     ? uniqueProbeKey(prefix)
     : scheduledKey(prefix, jobName === "candles" ? "quarter-hour" : "daily");
@@ -133,6 +162,9 @@ async function main() {
     matchLimit: args.matchLimit ?? (probe ? 10 : 1000),
     matchBatchSize: args.matchBatchSize ?? (probe ? 10 : 200),
     mlBatchSize: args.mlBatchSize ?? (probe ? 1 : 250),
+    limit: args.limit ?? 5,
+    browser: args.browser ?? "firefox",
+    sinceDays: args.sinceDays ?? 45,
   };
 
   const config = (() => {
@@ -186,6 +218,34 @@ async function main() {
             mode: args.mode,
           },
         };
+      case "workplane": {
+        const workplaneType = args.workplaneType;
+        if (!workplaneType) usage();
+        const spec = getWorkplaneJobSpec(workplaneType);
+        const transcriptPayload = workplaneType === "transcript_collect_laptop"
+          ? {
+              limit: defaults.limit,
+              browser: defaults.browser,
+              since_days: defaults.sinceDays,
+              allow_large_batch: false,
+              write_result_to_hh: true,
+              workplane_claim: true,
+            }
+          : {};
+        return {
+          runType: `workplane-${workplaneType}`,
+          jobType: workplaneType,
+          priority: workplaneType === "transcript_collect_laptop" ? 65 : 55,
+          payload: {
+            ...spec.input_payload,
+            ...transcriptPayload,
+            queued_by: args.queuedBy,
+            mode: args.mode,
+            production_call_writes_allowed: spec.production_call_writes_allowed,
+            public_ranking_impact_allowed: spec.public_ranking_impact_allowed,
+          },
+        };
+      }
       default:
         throw new Error(`Unsupported job: ${args.job}`);
     }

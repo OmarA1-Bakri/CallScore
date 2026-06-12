@@ -24,6 +24,9 @@ test("laptop collector detects 429 and bot verification, persists cooldown, and 
 
 test("laptop collector avoids retry hammering and keeps transcript-only yt-dlp mode", () => {
   assert.match(script, /Should-SkipVideo/);
+  assert.match(script, /Get-DynamicPropertyValue/);
+  assert.match(script, /PSObject\.Properties\[\$name\]/);
+  assert.doesNotMatch(script, /\$failure = \$failures\.\$youtubeVideoId/);
   assert.match(script, /recent_failure_24h/);
   assert.match(script, /detail_preview/);
   assert.match(script, /--skip-download/);
@@ -37,6 +40,9 @@ test("laptop collector classifies non-rate-limit transcript failures", () => {
   assert.match(script, /private_or_deleted/);
   assert.match(script, /transcript_too_short/);
   assert.match(script, /transient_network/);
+  assert.match(script, /collector_tool_error/);
+  assert.match(script, /Traceback/);
+  assert.match(script, /Summarize-FailureDetail/);
   assert.match(script, /no automatic captions/);
 });
 
@@ -95,7 +101,21 @@ test("status-only publishes state and exits before claim or transcript worklist"
   assert.ok(claimIndex > statusOnlyIndex, "StatusOnly must run before workplane claim");
   assert.ok(worklistIndex > statusOnlyIndex, "StatusOnly must run before transcript worklist");
   const statusOnlyBlock = script.slice(statusOnlyIndex, claimIndex);
-  assert.match(statusOnlyBlock, /Publish-StateToHH \$state/);
+  assert.match(statusOnlyBlock, /Publish-StateToHH \$state -PreserveRunMetrics/);
+  assert.match(script, /last_statusonly_utc/);
+  assert.match(script, /if \(\$PreserveRunMetrics\)/);
+  assert.match(script, /PreserveLastRunUtc/);
+  assert.match(script, /Write-State \$state -PreserveLastRunUtc:\$PreserveRunMetrics/);
   assert.match(statusOnlyBlock, /exit 0/);
   assert.doesNotMatch(statusOnlyBlock, /transcript:worklist/);
+});
+
+
+test("laptop collector resolves output JSON repo-relative for SSH execution", () => {
+  assert.match(script, /function Get-RepoRoot/);
+  assert.match(script, /function Resolve-RepoRelativePath/);
+  assert.match(script, /\[System\.IO\.Path\]::IsPathRooted\(\$Path\)/);
+  assert.match(script, /Join-Path \(Get-RepoRoot\) \$Path/);
+  assert.match(script, /\$resolvedPath = Resolve-RepoRelativePath \$Path/);
+  assert.match(script, /WriteAllText\(\$resolvedPath, \$Text, \$utf8NoBom\)/);
 });

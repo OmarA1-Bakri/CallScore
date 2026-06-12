@@ -93,3 +93,23 @@ Next hard target:
 2. Achieve a limit-5 laptop collector batch with transcript success > 0.
 3. Add Gemma parser-cleaning fixtures from real non-array outputs, then rerun 5-real shadow.
 4. Keep Art of War private dry-run cadence while public actions remain approval-gated.
+
+
+## Operational canary update — 2026-06-12 18:25Z
+
+Verdict remains `CONTROLLED_OPERATIONAL_RUNTIME_PARTIAL`.
+
+New evidence:
+- Laptop `StatusOnly` passed over Tailscale with cooldown clear.
+- Workplane probe job `1832` was enqueued through the existing `callscore-enqueue-job.ts` path, claimed by the laptop, and completed.
+- The batch attempted 5 videos, wrote 5 failed transcript result updates, and produced no useful transcripts. No 429, no bot verification, no cooldown.
+- Failure detail showed opaque Python tracebacks; the runner now classifies these as `collector_tool_error` and stores more actionable summaries.
+- `npm run ml:idle-improve` ran artifact-only; Gemma write-canary eligibility remains false and production default did not change.
+- Art of War campaign-loop produced `/tmp/callscore-art-of-war-receipts-proof-operational-001.json`: `decision=revise_or_hold`, `failure_class=audience_mismatch`, `approval_required=true`, `public_action_performed=false`.
+
+Approval packets:
+- Transcript: PARTIAL / targeting and collector-tool-error repair required.
+- Gemma: SHADOW HOLD / no write canary.
+- Whop: read-only/dry-run visible / live mutation approval-gated.
+- Art of War: private operational / public publish-outreach-spend approval-gated.
+- Runtime: PARTIAL / safe next action is transcript repair or private campaign revision.

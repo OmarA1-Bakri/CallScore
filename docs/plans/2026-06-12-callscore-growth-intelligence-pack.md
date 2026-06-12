@@ -198,3 +198,65 @@ Private campaign tracks remain:
 3. Creator Scorecard Funnel.
 
 Next safe action: repair transcript targeting/failure classification before another laptop limit-5 run; continue Art of War private dry-run reporting only.
+
+## 11. Governed campaign-loop addendum — 2026-06-12
+
+Art of War private execution now uses a MartinLoop-inspired design pattern without importing `keesan12/martin-loop` as a dependency. The canonical loop is contract-bound and receipt-backed:
+
+`CampaignLoopContract -> draft -> PersonaScorecard -> verifier gates -> DryRunCampaignReport -> GemmaEvaluationReceipt -> failure_class -> next_safe_action -> CampaignReceipt -> revised draft or approval dossier`.
+
+Report-only workplane jobs now represent the loop:
+
+- `artofwar_campaign_preflight`
+- `artofwar_campaign_iteration`
+- `artofwar_campaign_verify`
+- `artofwar_campaign_persona_test`
+- `artofwar_campaign_dry_run`
+- `artofwar_campaign_gemma_eval`
+- `artofwar_campaign_receipt`
+- `artofwar_campaign_dossier`
+- `artofwar_campaign_approval_review`
+
+Every job defaults to: no public publish, no outreach, no spend, no Whop mutation, no provider mutation, no production mutation.
+
+Required first private loop track: **Receipts / Proof of Accuracy**. Stop if evidence is insufficient, persona trust score fails, forbidden claims appear, dry-run funnel fails, Gemma classifies repeated weakness, or approval is missing.
+
+
+## 12. Concrete campaign-loop implementation status — 2026-06-12
+
+Status labels: `ART_OF_WAR_PRIVATE_ACTIVE`, `CAMPAIGN_LOOP_RECEIPTS_ACTIVE`, `PUBLIC_ACTIONS_APPROVAL_GATED`, `AUTONOMOUS_REVENUE_NO`.
+
+The existing `Claude_Code_Automations` Art of War CLI now has a private report-only command:
+
+```bash
+cd /srv/agents/repos/Claude_Code_Automations
+python3 scripts/art_of_war.py campaign-loop --dry-run --campaign-id receipts-proof-smoke --output /tmp/callscore-art-of-war-campaign-loop-latest.json
+```
+
+The command produces a machine-readable `CampaignReceipt` with a `CampaignLoopContract`, persona scorecards, verifier gate stack, dry-run report, Gemma evaluation receipt, campaign variant comparison, revenue feedback training record, failure class, and next safe action.
+
+Latest private run result: `decision=revise_or_hold`, `failure_class=audience_mismatch`, `public_action_performed=false`, `external_mutation_performed=false`. This is the correct safe behavior: the first Receipts / Proof of Accuracy draft needs persona/trust refinement before any approval packet.
+
+Next safe action: revise the private campaign copy/evidence packet to improve skeptical/low-trust persona scores, then rerun `campaign-loop --dry-run`. No publish, outreach, spend, Whop mutation, provider mutation, or production mutation is allowed.
+
+## 13. Operational campaign-loop evidence — 2026-06-12
+
+Status labels: `ART_OF_WAR_PRIVATE_OPERATIONAL`, `CAMPAIGN_LOOP_RECEIPTS_ACTIVE`, `PUBLIC_ACTIONS_APPROVAL_GATED`, `AUTONOMOUS_REVENUE_NO`.
+
+Private operational receipt:
+
+- path: `/tmp/callscore-art-of-war-receipts-proof-operational-001.json`
+- campaign: `receipts-proof-operational-001`
+- track: `receipts_proof_of_accuracy`
+- decision: `revise_or_hold`
+- failure class: `audience_mismatch`
+- next safe action: `revise_private_campaign_or_add_evidence`
+- approval required: `true`
+- public action performed: `false`
+- external mutation performed: `false`
+- Whop mutation performed: `false`
+- production mutation performed: `false`
+
+Persona findings: creator/operator, Whop buyer, high-intent buyer, and technical evaluator scored above threshold. Skeptical prospect and low-trust cold prospect failed trust/objection handling thresholds. The next private iteration should add clearer evidence context, methodology caveats, and a stronger trust/receipts explainer before any approval dossier.
+
+Operational runtime note: CallScore can now enqueue bounded laptop collector jobs, run private Art of War campaign-loop receipts, run ML idle improvement artifacts, and expose these states in workplane JSON. Public action, outreach, spend, live Whop mutation, Gemma write-canary, and production default changes remain blocked pending explicit approval.
