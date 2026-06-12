@@ -122,6 +122,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     : hasApprovalGates
       ? "PARTIAL"
       : "READY";
+  const latestMlGate = (latestMlEval.summary.promotion_gate ?? {}) as Record<string, unknown>;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -139,7 +140,9 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     latest_collector_failure: latestFailure,
     latest_gemma_shadow_extraction_run: latestGemmaShadow,
     latest_ml_eval_run: latestMlEval,
-    model_currently_recommended: nextAction.action === "improve_gemma_prompt_and_chunking" ? "rule_extractor_safe_fallback" : "callscore-gemma4-extractor:shadow_only",
+    model_currently_recommended: latestMlEval.exists && latestMlGate.eligible_for_write_canary !== true
+      ? "rule_extractor_safe_fallback"
+      : "callscore-gemma4-extractor:shadow_only",
     production_default_changed: false,
     unsafe_source_ranks: unsafeSourceRanks,
     api_unsafe_official: unsafeOfficial,

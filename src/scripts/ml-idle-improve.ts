@@ -90,6 +90,8 @@ export function buildMlIdleImproveReport(args: Args, runId = buildRunId("ml-idle
   const fixtures = readJsonl<Record<string, unknown>>(args.fixtures);
 
   const parserErrorCount = shadow.reduce((sum, row) => sum + (row.parser_errors?.length ?? (row.error ? 1 : 0)), 0);
+  const parserMessages = shadow.flatMap((row) => [...(row.parser_errors ?? []), ...(row.error ? [row.error] : [])]);
+  const arrayShapeErrors = parserMessages.filter((message) => /JSON array|did not contain/i.test(message)).length;
   const validJson = shadow.filter((row) => !row.error && parserErrorCount >= 0).length;
   const schemaPass = shadow.filter((row) => row.schema_valid === true && !row.error).length;
   const acceptedCalls = shadow.reduce((sum, row) => sum + row.accepted_count, 0);
@@ -107,6 +109,7 @@ export function buildMlIdleImproveReport(args: Args, runId = buildRunId("ml-idle
 
   const suggestions: string[] = [];
   if (parserErrorCount > 0) suggestions.push("Add parser-cleaning fixtures from failed Gemma shadow outputs before any write canary.");
+  if (arrayShapeErrors > 0) suggestions.push("Align Gemma shadow prompt/Modelfile with the production extractor schema or add reviewed array-wrapper repair fixtures; current failures include non-array/non-production-schema output.");
   if (riskyDiffs.length > 0) suggestions.push("Prioritize manual review of new/changed shadow calls and convert disagreements into known-good/known-bad fixtures.");
   if (acceptedCalls === 0) suggestions.push("Sample more likely market-call transcripts before judging recall; current shadow artifact contains no accepted calls.");
   suggestions.push("Keep Gemma in shadow mode until promotion gates and approval evidence are recorded.");

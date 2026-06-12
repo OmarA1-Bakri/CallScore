@@ -73,6 +73,40 @@ test("ml idle improve parser accepts explicit artifact paths", () => {
   assert.equal(args.out, "out.json");
 });
 
+test("ml idle improve recommends schema alignment for non-array Gemma outputs", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ml-idle-schema-"));
+  const shadowIn = join(dir, "shadow.jsonl");
+  const fixtures = join(dir, "fixtures.jsonl");
+  writeJsonl(shadowIn, [
+    {
+      record_type: "shadow_extraction",
+      ts: "2026-01-01T00:00:00.000Z",
+      run_id: "shadow-test",
+      provider: "ollama",
+      model: "callscore-gemma4-extractor:latest",
+      fallback_model: null,
+      video,
+      transcript_sha256: "abc",
+      transcript_length: 100,
+      prompt_version: "callscore-gemma4-shadow-v2-compact",
+      schema_valid: false,
+      parser_errors: ["Model response did not contain a JSON array"],
+      latency_ms: null,
+      candidate_count: 0,
+      accepted_count: 0,
+      accepted_calls: [],
+      chunk_summary: { chunk_count: 0, covered_until_offset: 0, reached_transcript_end: false },
+      error: null,
+    },
+  ]);
+  writeJsonl(fixtures, [{ id: "fixture-1" }]);
+
+  const report = buildMlIdleImproveReport({ shadowIn, diffIn: null, fixtures, out: join(dir, "out.json") }, "ml-idle-schema");
+  assert.equal(report.metrics.parser_error_count, 1);
+  assert.equal(report.promotion_gate.eligible_for_write_canary, false);
+  assert.ok(report.suggestions.some((item) => item.includes("production extractor schema")));
+});
+
 test("ml idle improve command writes a report artifact", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ml-idle-main-"));
   const shadowIn = join(dir, "shadow.jsonl");

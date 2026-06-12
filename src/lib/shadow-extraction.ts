@@ -27,6 +27,12 @@ export interface ShadowExtractionRunMetadata {
     readonly chunk_agents?: number;
     readonly video_agents?: number;
     readonly low_confidence_ready?: boolean;
+    readonly chunk_chars?: number;
+    readonly chunk_overlap?: number;
+    readonly max_chunks?: number;
+    readonly request_timeout_ms?: number;
+    readonly num_predict?: number;
+    readonly prompt_profile?: string;
   };
 }
 
