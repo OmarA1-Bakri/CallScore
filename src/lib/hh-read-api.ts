@@ -72,6 +72,37 @@ export async function fetchHhHome(period: Period, limit = 100): Promise<HhHomePa
   return payload?.ok === true ? payload : null;
 }
 
+
+function getReadApiRows(payload: ReadApiLeaderboardContract<unknown> | null | undefined): readonly Record<string, unknown>[] {
+  const buckets = [
+    payload?.officialRankedRows,
+    payload?.provisionalRows,
+    payload?.watchlistRows,
+    payload?.staleRows,
+    payload?.pendingMaturityRows,
+    payload?.leaderboard?.rows,
+  ];
+  return buckets
+    .flatMap((bucket) => (Array.isArray(bucket) ? bucket : []))
+    .filter((row): row is Record<string, unknown> => Boolean(row && typeof row === "object"));
+}
+
+export async function fetchHhCreatorById<
+  TCreator extends Partial<Creator> = Creator,
+  TStats extends Partial<CreatorStats> = CreatorStats,
+  TCall extends Partial<Call> = Call,
+>(
+  creatorId: number,
+  period: Period = "all_time",
+  limit = 50,
+): Promise<HhCreatorPayload<TCreator, TStats, TCall> | null> {
+  const home = await fetchHhHome(period, 250);
+  const row = getReadApiRows(home).find((item) => Number(item.creator_id ?? item.id) === creatorId);
+  const handle = typeof row?.youtube_handle === "string" ? row.youtube_handle : null;
+  if (!handle) return null;
+  return fetchHhCreator<TCreator, TStats, TCall>(handle, period, limit);
+}
+
 export async function fetchHhCreator<
   TCreator extends Partial<Creator> = Creator,
   TStats extends Partial<CreatorStats> = CreatorStats,

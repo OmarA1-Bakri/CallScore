@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { fetchHhCreatorById, getHhReadApiBase } from "@/lib/hh-read-api";
 import { getCreatorTier } from "@/lib/creator-tier";
 import { hasAccess } from "@/lib/whop";
 import { getUserTier } from "@/lib/whop-access";
@@ -18,6 +19,16 @@ const SORT_COLUMN_MAP: Record<SortField, string> = {
   score: "score DESC",
   return: "return_30d DESC NULLS LAST",
 };
+
+function sortCalls(calls: readonly Call[], sort: SortField): Call[] {
+  return [...calls].sort((a, b) => {
+    if (sort === "date") return new Date(b.call_date).getTime() - new Date(a.call_date).getTime();
+    if (sort === "score") return b.score - a.score;
+    const aReturn = a.return_30d ?? Number.NEGATIVE_INFINITY;
+    const bReturn = b.return_30d ?? Number.NEGATIVE_INFINITY;
+    return bReturn - aReturn;
+  });
+}
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 20;
@@ -57,6 +68,85 @@ export async function GET(
       );
     }
 
+    // Parse pagination and sort params before choosing the data source.
+    const { searchParams } = request.nextUrl;
+    const page = parsePositiveInt(
+      searchParams.get("page"),
+      DEFAULT_PAGE,
+    );
+    const limit = parsePositiveInt(
+      searchParams.get("limit"),
+      DEFAULT_LIMIT,
+      MAX_LIMIT,
+    );
+    const sortParam = searchParams.get("sort") ?? "date";
+
+    if (!isValidSort(sortParam)) {
+      return NextResponse.json(
+        {
+          error: `Invalid sort field. Must be one of: ${VALID_SORT_FIELDS.join(", ")}`,
+        },
+        { status: 400 },
+      );
+    }
+
+    const readApiEnabled = Boolean(getHhReadApiBase());
+    const readApiCreator = await fetchHhCreatorById<Creator, CreatorStats, Call>(creatorId, "all_time", 250).catch(() => null);
+    if (readApiCreator) {
+      const creator = parseApiRow(creatorRowSchema, readApiCreator.creator, "creator read API");
+      const stats = readApiCreator.stats
+        ? parseApiRow(creatorStatsRowSchema, readApiCreator.stats, "creator read API stats")
+        : null;
+      const rank = creator.accuracy_rank ?? stats?.accuracy_rank ?? Infinity;
+      const requiredTier: Tier = getCreatorTier(rank);
+      const auth = getRequestAuthContext(request);
+      const userTier = auth.session?.tier ?? await getUserTier(auth.accessToken);
+
+      if (!hasAccess(userTier, requiredTier)) {
+        return NextResponse.json(
+          {
+            error: "Upgrade required",
+            required_tier: requiredTier,
+            current_tier: userTier,
+          },
+          { status: 403 },
+        );
+      }
+
+      const parsedCalls = parseApiRows(callRowSchema, readApiCreator.calls, "creator read API calls");
+      const sortedCalls = sortCalls(parsedCalls, sortParam);
+      const offset = (page - 1) * limit;
+      const serializedCalls = serializeCalls(sortedCalls.slice(offset, offset + limit));
+      const total = sortedCalls.length;
+
+      return NextResponse.json({
+        data: {
+          creator,
+          stats,
+          calls: serializedCalls,
+        },
+        meta: {
+          pagination: {
+            page,
+            limit,
+            total,
+            has_more: offset + limit < total,
+          },
+          counts: {
+            tracked_calls: total,
+            scored_calls: stats?.total_calls ?? 0,
+          },
+        },
+      });
+    }
+
+    if (readApiEnabled) {
+      return NextResponse.json(
+        { error: "Creator not found" },
+        { status: 404 },
+      );
+    }
+
     // Fetch creator
     const rawCreators = await query<Creator>(
       `SELECT * FROM creators WHERE id = $1`,
@@ -88,28 +178,6 @@ export async function GET(
           current_tier: userTier,
         },
         { status: 403 },
-      );
-    }
-
-    // Parse pagination and sort params
-    const { searchParams } = request.nextUrl;
-    const page = parsePositiveInt(
-      searchParams.get("page"),
-      DEFAULT_PAGE,
-    );
-    const limit = parsePositiveInt(
-      searchParams.get("limit"),
-      DEFAULT_LIMIT,
-      MAX_LIMIT,
-    );
-    const sortParam = searchParams.get("sort") ?? "date";
-
-    if (!isValidSort(sortParam)) {
-      return NextResponse.json(
-        {
-          error: `Invalid sort field. Must be one of: ${VALID_SORT_FIELDS.join(", ")}`,
-        },
-        { status: 400 },
       );
     }
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
-import { fetchHhCreator, getHhReadApiBase } from "../src/lib/hh-read-api";
+import { fetchHhCreator, fetchHhCreatorById, getHhReadApiBase } from "../src/lib/hh-read-api";
 
 const originalFetch = globalThis.fetch;
 const originalBase = process.env.HH_READ_API_BASE;
@@ -50,6 +50,39 @@ test("fetchHhCreator normalizes handles and passes period plus limit", async () 
   assert.equal(requestedPeriod, "all_time");
   assert.equal(requestedLimit, "50");
   assert.equal(requestedAuth, "Bearer secret_test");
+});
+
+test("fetchHhCreatorById resolves creator IDs through public home rows", async () => {
+  process.env.HH_READ_API_BASE = "https://ops-bridge.call-score.com/api/read/";
+
+  const requestedPaths: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const requestedUrl = new URL(String(input));
+    requestedPaths.push(`${requestedUrl.pathname}?${requestedUrl.searchParams.toString()}`);
+    if (requestedUrl.pathname.endsWith("/home")) {
+      return new Response(JSON.stringify({
+        ok: true,
+        officialRankedRows: [
+          { creator_id: 93, youtube_handle: "@99Bitcoins" },
+        ],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      creator: { id: 93, name: "99Bitcoins", youtube_handle: "@99Bitcoins" },
+      stats: null,
+      calls: [{ id: 24996, creator_id: 93, coin_symbol: "ETH", target_price: 1700 }],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  const payload = await fetchHhCreatorById(93, "all_time", 100);
+
+  assert.equal(payload?.creator.name, "99Bitcoins");
+  assert.equal(payload?.calls.length, 1);
+  assert.deepEqual(requestedPaths, [
+    "/api/read/home?period=all_time&limit=250",
+    "/api/read/creator/99Bitcoins?period=all_time&limit=100",
+  ]);
 });
 
 test("fetchHhCreator returns null when read API is unavailable", async () => {
