@@ -5675,3 +5675,24 @@ Validation after this follow-on work:
 Safety note: the accidental broad score recompute happened because `compute-scores.ts` historically ignored CLI arguments. It is now guarded so future attempts to use `--limit` fail closed rather than silently recomputing all public stats.
 
 Current verdict remains **PARTIAL** but materially advanced: transcript cadence is proven across two bounded laptop batches, one accepted Gemma call has passed artifact validation/diff and a one-video write canary, and the scoring CLI safety defect is fixed. FULL still requires a dedicated bounded score canary or explicit full-recompute approval path, more transcript/extraction cadence, Composio MCP auth/tool discovery, Art of War audience-fit revision, and audit completeness reduction.
+
+### 2026-06-13 Dedicated bounded scoring canary implemented
+
+The previous safety defect around `npm run score -- --limit 1` is resolved with a real bounded scoring canary path:
+
+- `compute-scores.ts` now supports scoped canaries with `--call-id`, `--call-ids`, or `--video-id`, plus `--limit <= 5`.
+- The established full recompute still exists, but is explicit: no args for the scheduled path or `--confirm-full-recompute` for operator intent.
+- Unsupported flags fail closed.
+- `recomputeScopedCallScores` updates only selected calls and does not delete/recompute `creator_stats`.
+- Canary run: `npm run score -- --video-id 20290 --limit 1`.
+- Result: `considered_calls=1`, `scored_calls=0`, elapsed `52ms`; this is expected for the new watch call because it is not public-score mature/eligible yet.
+- Receipt: `.tmp/workflow-receipts/pipeline_score_canary/score-video20290-20260613T190556Z.json`.
+- Workplane now records the latest score canary receipt alongside transcript cadence and Gemma write-canary receipts.
+
+Validation after bounded score canary:
+
+- `npm run freshness:check`: `WARN`, no blockers; latest transcript/call/scoring timestamps remain fresh.
+- `npm run verify:public -- --source live --base-url https://call-score.com`: pass.
+- Targeted Workplane and compute-score CLI tests pass.
+
+Current activation state remains **PARTIAL** because `audit:pipeline` still reports broader completeness blockers (`missing_publication_dates`, `missing_transcripts_or_terminal_reasons`, `pending_shadow_recheck`) and Composio/Art of War remain gated. The core connected data path is now proven end-to-end at canary scale: laptop transcript ingest → Gemma shadow/diff → one-video write canary → bounded match canary → bounded score canary.

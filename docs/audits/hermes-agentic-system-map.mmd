@@ -212,3 +212,7 @@ flowchart LR
 %% Gemma second-batch shadow: records=4 accepted=1 failed=0; diff=new_calls:1,manual_review:2,no_accepted_calls:1.
 %% Write canary: one reviewed new_calls video 20290 promoted with --write --allow-statuses new_calls --video-ids 20290 --limit 1 --mark-video-extracted; receipt=.tmp/workflow-receipts/gemma_write_canary/gemma-laptop-batch2-20260613T184350Z.json.
 %% Safety fix: compute-scores now rejects unsupported --limit canary flags; use no args or --confirm-full-recompute for the established full recompute path. Dedicated bounded scoring canary remains P1.
+%% 2026-06-13 bounded scoring canary update
+%% compute-scores now supports scoped --call-id/--call-ids/--video-id canaries with --limit<=5 and rejects unsupported misleading flags.
+%% Score canary: npm run score -- --video-id 20290 --limit 1 => considered_calls=1 scored_calls=0, receipt=.tmp/workflow-receipts/pipeline_score_canary/score-video20290-20260613T190556Z.json.
+%% Core data path proven at canary scale: laptop transcript -> Gemma shadow/diff -> one-video write canary -> match canary -> score canary. Remaining PARTIAL blockers are audit completeness, Composio auth/tooling, and Art of War audience/public gate.

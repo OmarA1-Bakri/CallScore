@@ -198,12 +198,14 @@ test("transcript readiness trusts latest successful cadence receipt over stale c
 
 
 
-test("pipeline readiness recognizes latest Gemma write canary receipt", () => {
+test("pipeline readiness recognizes latest Gemma write and score canary receipts", () => {
   const root = mkdtempSync(join(tmpdir(), "callscore-workplane-write-canary-"));
   const transcriptDir = join(root, ".tmp", "workflow-receipts", "transcript_laptop_cadence");
   const writeDir = join(root, ".tmp", "workflow-receipts", "gemma_write_canary");
+  const scoreDir = join(root, ".tmp", "workflow-receipts", "pipeline_score_canary");
   mkdirSync(transcriptDir, { recursive: true });
   mkdirSync(writeDir, { recursive: true });
+  mkdirSync(scoreDir, { recursive: true });
   writeFileSync(join(transcriptDir, "laptop-limit5.json"), JSON.stringify({
     workflow_name: "transcript_laptop_cadence",
     run_id: "laptop-limit5",
@@ -213,6 +215,12 @@ test("pipeline readiness recognizes latest Gemma write canary receipt", () => {
   writeFileSync(join(writeDir, "gemma-write.json"), JSON.stringify({
     workflow_name: "gemma_write_canary",
     run_id: "gemma-write",
+    result: "passed",
+    blockers: [],
+  }));
+  writeFileSync(join(scoreDir, "score-canary.json"), JSON.stringify({
+    workflow_name: "pipeline_score_canary",
+    run_id: "score-canary",
     result: "passed",
     blockers: [],
   }));
@@ -245,10 +253,11 @@ test("pipeline readiness recognizes latest Gemma write canary receipt", () => {
   });
 
   assert.deepEqual(domains.callscore_pipeline.blockers, [
-    "bounded transcript cadence and one-video Gemma write canary passed; dedicated bounded scoring canary remains missing",
+    "bounded transcript cadence, one-video Gemma write canary, and bounded score canary passed; audit pipeline completeness remains partial",
   ]);
-  assert.match(String(domains.callscore_pipeline.safe_next_action), /bounded scoring canary/);
+  assert.match(String(domains.callscore_pipeline.safe_next_action), /audit pipeline completeness/);
   assert.ok(domains.callscore_pipeline.evidence.some((item) => item.includes("latest_gemma_write_canary_receipt=")));
+  assert.ok(domains.callscore_pipeline.evidence.some((item) => item.includes("latest_pipeline_score_canary_receipt=")));
 });
 
 test("readiness domains cover all activation surfaces with mutation gates", async () => {

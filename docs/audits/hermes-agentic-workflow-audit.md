@@ -487,3 +487,12 @@ Readiness impact:
 - Transcript cadence: **READY_WITH_GATES**, now two bounded laptop batches succeeded.
 - Gemma/Qwen: **READY_WITH_GATES+WRITE_CANARY**, one accepted call promoted via explicit one-video canary.
 - Match/score: **PARTIAL**. Match canary ran; bounded score canary is not implemented yet. Full recompute path remains explicit and guarded.
+
+### 2026-06-13 bounded scoring canary update
+
+- Added real bounded score canary support to `compute-scores.ts`: `--call-id`, `--call-ids`, or `--video-id`, with `--limit <= 5`.
+- Added `recomputeScopedCallScores` so canaries update only selected calls and do not delete/rebuild `creator_stats`.
+- Canary executed: `npm run score -- --video-id 20290 --limit 1`.
+- Result: `considered_calls=1`, `scored_calls=0`, which is acceptable for the promoted watch call because it is not public-score mature/eligible yet.
+- Receipt: `.tmp/workflow-receipts/pipeline_score_canary/score-video20290-20260613T190556Z.json`.
+- Workplane now recognizes latest score-canary receipt and reports the pipeline blocker as audit-completeness, not missing scoring canary.

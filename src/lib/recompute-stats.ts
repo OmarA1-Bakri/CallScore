@@ -71,9 +71,8 @@ function toScoreInput(row: ScoreRow): Call {
   };
 }
 
-export async function recomputeCallScores(): Promise<number> {
-  const rows = await query<ScoreRow>(
-    `SELECT
+function scoreSelectSql(whereSql = "", limitSql = ""): string {
+  return `SELECT
       id,
       extraction_confidence,
       call_date::text AS call_date,
@@ -87,9 +86,13 @@ export async function recomputeCallScores(): Promise<number> {
       specificity_score,
       regime_difficulty,
       hit_target
-     FROM calls`,
-  );
+     FROM calls
+     ${whereSql}
+     ORDER BY id ASC
+     ${limitSql}`;
+}
 
+async function applyCallScoreUpdates(rows: readonly ScoreRow[]): Promise<number> {
   const scoredUpdates = rows.map((row) => {
     const eligible = getCallScoreStatus({
       extraction_confidence: row.extraction_confidence,
@@ -120,6 +123,43 @@ export async function recomputeCallScores(): Promise<number> {
   }
 
   return scoredUpdates.filter((row) => row.score > 0).length;
+}
+
+export async function recomputeCallScores(): Promise<number> {
+  const rows = await query<ScoreRow>(scoreSelectSql());
+  return applyCallScoreUpdates(rows);
+}
+
+export interface RecomputeScopedCallScoresMetrics {
+  readonly considered_calls: number;
+  readonly scored_calls: number;
+}
+
+export async function recomputeScopedCallScores(input: {
+  readonly callIds?: readonly number[];
+  readonly videoId?: number;
+  readonly limit: number;
+}): Promise<RecomputeScopedCallScoresMetrics> {
+  if ((!input.callIds || input.callIds.length === 0) && !input.videoId) {
+    throw new Error("bounded score canary requires callIds or videoId");
+  }
+  const params: unknown[] = [];
+  const filters: string[] = [];
+  if (input.callIds && input.callIds.length > 0) {
+    params.push(input.callIds);
+    filters.push(`id = ANY($${params.length}::int[])`);
+  }
+  if (input.videoId) {
+    params.push(input.videoId);
+    filters.push(`video_id = $${params.length}`);
+  }
+  params.push(input.limit);
+  const rows = await query<ScoreRow>(
+    scoreSelectSql(`WHERE ${filters.join(" AND ")}`, `LIMIT $${params.length}`),
+    params,
+  );
+  const scoredCalls = await applyCallScoreUpdates(rows);
+  return { considered_calls: rows.length, scored_calls: scoredCalls };
 }
 
 export async function recomputeCreatorStats(period: Period): Promise<void> {
