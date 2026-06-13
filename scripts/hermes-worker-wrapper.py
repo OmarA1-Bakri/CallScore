@@ -10,7 +10,7 @@ Safe wrapper for the pipeline worker.
 
 import os, sys, subprocess, time
 
-PROJECT_DIR = "/srv/whop-auto/workspace/crypto-tuber-ranked"
+PROJECT_DIR = os.environ.get("CALLSCORE_APP_DIR", "/opt/crypto-tuber-ranked")
 LOG_PATH = os.path.join(PROJECT_DIR, ".tmp", "hermes-worker.log")
 
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
@@ -22,7 +22,9 @@ def log(msg: str):
     print(line, end="")
 
 def load_env():
-    env_path = os.path.join(PROJECT_DIR, ".env.local")
+    env_path = os.environ.get("CALLSCORE_ENV_FILE", os.path.join(PROJECT_DIR, ".env.hermes"))
+    if not os.path.exists(env_path):
+        env_path = os.path.join(PROJECT_DIR, ".env.local")
     if not os.path.exists(env_path):
         log(f"WARNING: .env.local not found at {env_path}")
         return
@@ -55,7 +57,7 @@ def main():
     if not db_url:
         log("ERROR: NEON_DATABASE_URL not set after loading .env.local")
         sys.exit(1)
-    log(f"DB URL present (starts with {db_url[:25]}...)")
+    log("DB URL present (redacted)")
 
     while True:
         log("Starting hermes-worker...")

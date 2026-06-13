@@ -65,7 +65,8 @@
     "workplane:status": "node --import tsx src/scripts/workplane-status.ts",
     "workplane:laptop-job": "node --import tsx src/scripts/workplane-laptop-job.ts",
     "workplane": "node --import tsx src/scripts/workplane.ts",
-    "hygiene": "npm run hygiene:secrets"
+    "hygiene": "npm run hygiene:secrets",
+    "workflow:receipt": "node --import tsx src/scripts/write-workflow-receipt.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -268,3 +268,23 @@ test("latest Art of War campaign receipt summarizes operational loop safely", ()
   assert.equal(artifact.summary.external_mutation_performed, false);
   assert.equal(artifact.summary.approval_required, true);
 });
+
+test("Whop workplane jobs stay read-only or dry-run by default", () => {
+  const whopJobs = [
+    "whop_provider_health",
+    "whop_plan_inventory_check",
+    "whop_entitlement_sync_dry_run",
+    "whop_webhook_replay_safe",
+    "whop_customer_status_check",
+    "whop_activation_review",
+  ] as const;
+
+  for (const type of whopJobs) {
+    const spec = getWorkplaneJobSpec(type);
+    assert.equal(spec.production_db_writes_allowed, false, type);
+    assert.equal(spec.production_call_writes_allowed, false, type);
+    assert.equal(spec.public_ranking_impact_allowed, false, type);
+    assert.doesNotMatch(spec.default_safe_command, /whop:bootstrap|create|update|delete|pricing|payment/i, type);
+    assert.ok(spec.failure_classification.includes("approval_missing") || spec.failure_classification.includes("unsafe_mutation_requested"), type);
+  }
+});

@@ -2,6 +2,7 @@ import type { PipelineJob } from "./pipeline";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { buildRunId } from "./shadow-extraction";
+import { writeWorkflowReceipt } from "./workflow-receipts";
 
 export const WORKPLANE_JOB_TYPES = [
   "transcript_collect_laptop",
@@ -571,6 +572,20 @@ export function workplaneSpecsForStatus(): readonly WorkplaneJobSpec[] {
   return WORKPLANE_JOB_TYPES.map((type) => WORKPLANE_JOB_SPECS[type]);
 }
 
+function writeWorkplaneReceipt(job: PipelineJob, spec: WorkplaneJobSpec, runId: string, result: "passed" | "failed" | "blocked" | "skipped", blockers: readonly string[], nextAction: string): string {
+  return writeWorkflowReceipt({
+    run_id: runId,
+    workflow_name: job.type,
+    started_at: new Date().toISOString(),
+    finished_at: new Date().toISOString(),
+    command: spec.default_safe_command,
+    result,
+    blockers,
+    approval_evidence: typeof job.payload?.approval_evidence === "string" ? job.payload.approval_evidence : null,
+    next_action: nextAction,
+  }).path;
+}
+
 function writeReportOnlyArtifact(job: PipelineJob, spec: WorkplaneJobSpec): Record<string, unknown> {
   const runId = typeof job.payload?.run_id === "string" ? job.payload.run_id : buildRunId(job.type);
   const out = typeof job.payload?.out === "string" ? job.payload.out : `.tmp/workplane-jobs/${job.type}-${runId}.json`;
@@ -590,7 +605,8 @@ function writeReportOnlyArtifact(job: PipelineJob, spec: WorkplaneJobSpec): Reco
     decision: "report_only_no_external_mutation",
   };
   writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
-  return { mode: "report_only", out, ...report };
+  const receiptPath = writeWorkplaneReceipt(job, spec, runId, "passed", [], "review report-only artifact; require approval receipt before unsafe action");
+  return { mode: "report_only", out, receipt_path: receiptPath, ...report };
 }
 
 export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, unknown>> {
@@ -607,6 +623,7 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
       success: false,
       failure_classification: "laptop_runner_required",
       note: "Hermes can represent and enqueue this job, but cookies remain laptop-local and execution must happen on Omar laptop/workplane runner.",
+      receipt_path: writeWorkplaneReceipt(job, spec, typeof payload.run_id === "string" ? payload.run_id : buildRunId("transcript_collect_laptop"), "blocked", ["laptop_runner_required"], "Run the laptop collector command from Omar laptop with limit <=5 and publish result artifact."),
     };
   }
 
@@ -615,7 +632,8 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
     if (!inputPath) throw new Error("transcript_ingest_result requires payload.input_path");
     const { main } = await import("../scripts/ingest-transcript-result");
     await main(["--input", inputPath, ...(payload.write === false ? ["--dry-run"] : ["--write"])]);
-    return { mode: payload.write === false ? "dry_run" : "write", execution_location: spec.execution_location, input_path: inputPath, production_call_writes_allowed: false, public_ranking_impact_allowed: false };
+    const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("transcript_ingest_result");
+    return { mode: payload.write === false ? "dry_run" : "write", execution_location: spec.execution_location, input_path: inputPath, production_call_writes_allowed: false, public_ranking_impact_allowed: false, receipt_path: writeWorkplaneReceipt(job, spec, runId, "passed", [], "review transcript ingest result; no production call writes allowed") };
   }
 
   if (job.type === "gemma_shadow_extract") {
@@ -640,7 +658,7 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
       "--num-predict", String(payload.num_predict ?? 350),
       "--request-timeout-ms", String(payload.request_timeout_ms ?? 45_000),
     ]);
-    return { mode: "shadow_artifact", execution_location: spec.execution_location, run_id: runId, shadow_out: shadowOut, production_call_writes_allowed: false, public_ranking_impact_allowed: false };
+    return { mode: "shadow_artifact", execution_location: spec.execution_location, run_id: runId, shadow_out: shadowOut, production_call_writes_allowed: false, public_ranking_impact_allowed: false, receipt_path: writeWorkplaneReceipt(job, spec, runId, "passed", [], "validate shadow artifact and keep promotion blocked until approval gates pass") };
   }
 
   if (job.type === "ml_extraction_eval" || job.type === "ml_idle_improve") {
@@ -652,7 +670,8 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
       ...(typeof payload.fixtures === "string" ? ["--fixtures", payload.fixtures] : []),
       "--out", out,
     ]);
-    return { mode: "eval_artifact", execution_location: spec.execution_location, out, production_call_writes_allowed: false, public_ranking_impact_allowed: false };
+    const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("ml_idle_improve");
+    return { mode: "eval_artifact", execution_location: spec.execution_location, out, production_call_writes_allowed: false, public_ranking_impact_allowed: false, receipt_path: writeWorkplaneReceipt(job, spec, runId, "passed", [], "review ML eval artifact; promotion still requires approval") };
   }
 
   if (job.type === "extraction_promotion_review") {
@@ -669,7 +688,7 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
       production_call_writes_allowed: false,
       public_ranking_impact_allowed: false,
     }, null, 2)}\n`);
-    return { mode: "promotion_review_report", execution_location: spec.execution_location, out, production_db_writes_allowed: false, production_call_writes_allowed: false, public_ranking_impact_allowed: false, note: "Promotion review creates evidence only; production default remains unchanged." };
+    return { mode: "promotion_review_report", execution_location: spec.execution_location, out, production_db_writes_allowed: false, production_call_writes_allowed: false, public_ranking_impact_allowed: false, note: "Promotion review creates evidence only; production default remains unchanged.", receipt_path: writeWorkplaneReceipt(job, spec, runId, "blocked", ["approval_missing"], "collect explicit promotion approval before write canary") };
   }
 
   return writeReportOnlyArtifact(job, spec);

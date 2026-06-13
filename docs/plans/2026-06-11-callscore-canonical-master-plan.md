@@ -5148,3 +5148,39 @@ Stop condition:
 - All safe local verification and read-only audits complete.
 - Remaining blockers require explicit approval, credentials, provider state, or external state.
 ```
+
+---
+
+## 2026-06-13 Hermes / CallScore operational hardening update
+
+Status: **PARTIAL, safer for operation mode**.
+
+Completed safely:
+
+- Marketing orchestrator prompts under `/srv/agents/hermes/orchestrators/marketing/` were converted to env-only, read-only helper language. Public posting, outbound messaging, paid tooling, and spend are fail-closed behind approval and receipts.
+- Marketing supervisor now requires explicit private-dry-run approval evidence and writes a launch receipt; it no longer embeds credentials or launches yolo/public/spend behavior by default.
+- Gateway state token residue was redacted locally; credential rotation remains an external owner action if the token was active.
+- Canonical CallScore operation paths were repointed to `/opt/crypto-tuber-ranked` in active wrappers/scripts/cron references and selected Hermes skills. Stale mirrors remain inventoried, not deleted.
+- Added generic workflow receipt support in the canonical repo: `npm run workflow:receipt` writes deterministic JSON receipts and fail-closes dangerous public/spend/provider/DB workflows without approval evidence.
+- Workplane report-only/special jobs now return receipt paths; Whop jobs remain read-only/dry-run by default and are test-covered.
+- Bounded canaries ran with receipts:
+  - transcript worklist: pass, limit 5;
+  - transcript media fallback: blocked by local ASR unavailable;
+  - Gemma shadow: artifact written, blocked by Ollama timeout / schema pass 0;
+  - Art of War campaign dry-run: no public action, blocked by audience mismatch.
+- Live monetization check remains healthy: `/api/health` ok and `/api/creator/93?limit=100` leak count 0 for known target-price rows.
+
+Remaining blockers:
+
+- P0: Composio MCP is not functional because local Composio auth/API key is missing; provide it only through the approved local secret store, not chat.
+- P0/P1: external credential rotation review for previously exposed credentials if active.
+- P1: useful transcript cadence is not proven; run laptop collector limit 5 or configure local ASR, then rerun canary.
+- P1: Gemma shadow needs timeout/model/prompt repair until bounded schema pass >0.
+- P1: `verify:public --base-url https://call-score.com` reports live leaderboard/homepage count mismatch versus local publicCounts; inspect source/cache and deploy only with explicit production approval.
+- P2: stale mirrors/logs need approved archive/redaction cleanup; do not delete backups without approval.
+
+Next exact safe action:
+
+```text
+Provide valid Composio API key/auth via the approved local secret store and run read-only Composio tool discovery; in parallel run laptop transcript collector limit 5 or install/configure local ASR, then rerun transcript/Gemma canaries.
+```

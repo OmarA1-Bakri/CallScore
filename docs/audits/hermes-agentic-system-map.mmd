@@ -1,0 +1,192 @@
+%% Diagram A — Full operational system map
+flowchart LR
+  Operator[Operator]
+  subgraph HERMES[Hermes Control Plane]
+    HG[Hermes gateway\nstate redacted; rotation review]
+    HW[Hermes worker\ncanonical /opt repo]
+    HCron[Hermes cron/jobs\ncanonicalized]
+    Sup[Marketing supervisor\nfail-closed private dry-run only]
+  end
+  subgraph WORKPLANE[Workplane]
+    WQ[pipeline_jobs]
+    Specs[Workplane job specs]
+    Receipts[workflow receipt helper\n.tmp/workflow-receipts]
+  end
+  subgraph REPO[CallScore Repo]
+    Repo[/opt/crypto-tuber-ranked\nCANONICAL]
+    Scripts[npm scripts\nworkplane/freshness/audit/verify]
+    Docs[audit + masterplan]
+  end
+  subgraph PROD[CallScore Production]
+    Site[call-score.com]
+    Health[/api/health OK]
+    Creator93[/api/creator/93\ntarget leak fixed]
+    Netlify[Netlify call-score]
+    ReadAPI[HH Read API]
+    DB[(HH PostgreSQL)]
+  end
+  subgraph MARKETING[Marketing Orchestrators]
+    Content[content-agent\nenv-only draft]
+    Dist[distribution-agent\napproval-gated]
+    Growth[growth-agent\nzero-cost private]
+    Sentinel[marketing sentinel\nread-only]
+    AoW[Art of War dry-runs\naudience mismatch]
+  end
+  subgraph PIPE[Transcript + Gemma]
+    Worklist[transcript worklist\nPASS limit 5]
+    Media[media fallback\nBLOCKED: ASR unavailable]
+    Laptop[laptop collector\noperator/cookies required]
+    Gemma[Gemma shadow\nBLOCKED: timeout/schema 0]
+  end
+  subgraph MCP[MCP / Toolbox]
+    Composio[Composio\nNOT FUNCTIONAL: api key missing]
+    HHBridge[HH bridge\nPARTIAL wrapper issue]
+    UseAgents[UseAgents\nneeds verification]
+    Context7[Context7\nneeds verification]
+    PostgREST[PostgREST\nno proof]
+  end
+  subgraph GATES[Approval Gates]
+    DeployGate[Production deploy]
+    DBGate[Production DB mutation]
+    WhopGate[Whop product/customer/payment mutation]
+    PubGate[Public publish/outreach]
+    SpendGate[Paid spend]
+    RotationGate[Credential rotation]
+    InfraGate[Destructive infra]
+    OpenGate[Open-ended scrape/extract/LLM]
+  end
+  subgraph BLOCKERS[Remaining Blockers]
+    B1[Composio auth]
+    B2[Transcript cadence]
+    B3[Gemma timeout/schema]
+    B4[Public count mismatch]
+    B5[External rotation review]
+  end
+
+  Operator -->|manual trigger| HG
+  HG -->|controls/observes| HCron
+  HCron -->|scheduled trigger| HW
+  HW -->|polls| WQ
+  Specs -->|defines safe jobs| WQ
+  WQ -->|writes receipt| Receipts
+  Sup -->|requires approval file| Receipts
+  Repo -->|source| Netlify
+  Netlify -->|serves| Site
+  Site --> Health
+  Site --> Creator93
+  Health -->|read-only| ReadAPI
+  Creator93 -->|read-only| ReadAPI
+  ReadAPI -->|read-only| DB
+  Scripts -->|read-only checks| Site
+  Scripts -->|approved helpers| DB
+  Content -->|private draft only| Receipts
+  Dist -->|requires approval| PubGate
+  Growth -->|zero-cost only| SpendGate
+  Sentinel -->|observes| ReadAPI
+  AoW -->|dry-run receipt| Receipts
+  Worklist -->|receipt pass| Receipts
+  Media -->|blocked by| B2
+  Laptop -->|requires operator-side cookies| B2
+  Gemma -->|blocked by| B3
+  Composio -->|blocked by| B1
+  Scripts -->|verify public failed| B4
+  HG -->|rotation review| B5
+  DeployGate -->|requires approval| Netlify
+  DBGate -->|requires approval| DB
+  WhopGate -->|requires approval| Receipts
+  PubGate -->|requires approval| Receipts
+  SpendGate -->|requires approval| Receipts
+  RotationGate -->|requires approval| B5
+  InfraGate -->|requires approval| HW
+  OpenGate -->|requires approval| Worklist
+
+%% Diagram B — Hermes control-boundary map
+flowchart TD
+  subgraph FULL_HERMES_CONTROL
+    F0[None for production/revenue/public/provider mutations]
+  end
+  subgraph SCHEDULE_CONTROLLED
+    S1[Hermes cron/jobs canonicalized]
+    S2[daily pipeline timer observed]
+  end
+  subgraph SCRIPT_CONTROLLED
+    C1[Hermes worker]
+    C2[Workplane report-only jobs]
+    C3[workflow:receipt]
+    C4[freshness/audit/local verify]
+    C5[Art of War dry-run]
+    C6[Whop dry-run/read specs]
+  end
+  subgraph MANUAL_TRIGGER
+    M1[Netlify deploy]
+    M2[laptop transcript collector]
+    M3[service restart]
+    M4[provider auth repair]
+  end
+  subgraph OBSERVED_ONLY
+    O1[HH PostgreSQL]
+    O2[HH Read API]
+    O3[call-score.com]
+    O4[Whop state]
+    O5[Docker/systemd]
+  end
+  subgraph NO_CONTROL
+    N1[Composio until API key auth]
+    N2[Public social/email channels]
+    N3[Paid marketing tools]
+    N4[Whop mutations]
+  end
+  subgraph APPROVAL_REQUIRED
+    A1[production deploy]
+    A2[DB mutation outside approved path]
+    A3[Whop mutation]
+    A4[public publish/outreach]
+    A5[paid spend]
+    A6[credential rotation]
+    A7[destructive infra]
+    A8[open-ended jobs]
+  end
+  subgraph UNSAFE_BLOCKED
+    U1[public/spend action without receipt]
+    U2[Whop mutation without receipt]
+    U3[DB mutation without receipt]
+  end
+  subgraph UNKNOWN_NEEDS_VERIFICATION
+    X1[UseAgents]
+    X2[Context7]
+    X3[PostGREST]
+  end
+
+%% Diagram C — Approval-gate map
+flowchart LR
+  subgraph SAFE[Safe autonomous lanes]
+    RO[Read-only health checks]
+    PV[Public API leak verification]
+    HY[Secret hygiene scan]
+    DRY[Dry-run marketing drafts]
+    ZC[Zero-cost content preparation]
+    REC[Receipt generation]
+    WP[Workplane status]
+    AUD[Pipeline/freshness audit]
+  end
+  subgraph NEEDS[Requires operator approval]
+    DEP[Production deploy]
+    WH[Whop mutation]
+    DBM[Production DB mutation]
+    PUB[Public marketing publication]
+    OUT[Outbound email/DM/social]
+    PAID[Paid marketing spend]
+    ROT[Credential rotation]
+    INFRA[Destructive infra action]
+    OPEN[Open-ended scraping/extraction/LLM]
+  end
+  SAFE -->|writes receipt| REC
+  DEP -->|approval gate| REC
+  WH -->|approval gate| REC
+  DBM -->|approval gate| REC
+  PUB -->|approval gate| REC
+  OUT -->|approval gate| REC
+  PAID -->|approval gate| REC
+  ROT -->|approval gate| REC
+  INFRA -->|approval gate| REC
+  OPEN -->|approval gate| REC
