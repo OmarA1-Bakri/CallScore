@@ -84,3 +84,60 @@ Do not start true fine-tuning without approval. If needed:
 - export merged/adapter model to GGUF with llama.cpp;
 - import to Ollama and rerun this benchmark plus real-transcript dry-run canaries;
 - promotion gate remains no production writes until benchmark + real canary pass.
+
+## 2026-06-13 schema-contract reconciliation
+
+PR #66's `callscore-gemma4-extractor:latest` 10/10 result remains valid, but it was a benchmark of the **normalized eval schema** (`status`, `asset_symbol`, `ownership`, `is_creator_owned`, etc.). A later production-shadow Modelfile changed `callscore-gemma4-extractor:latest` to the **production extraction schema** (`symbol`, `direction`, `call_type`, `entry_price`, `target_price`, `raw_quote`, etc.). Comparing production-schema output against the old eval-schema validator created a false regression.
+
+The contracts are now split explicitly:
+
+- `ops/ollama/Modelfile.callscore-gemma4-eval-extractor` preserves the PR #66 optimized eval-schema prompt.
+- `ops/ollama/Modelfile.callscore-gemma4-extractor` remains the production-schema shadow extractor.
+- `npm run benchmark:extractors` accepts `--schema eval` or `--schema production`.
+- The benchmark records the schema contract in each row and summary.
+
+Rebuild local models:
+
+```bash
+ollama create callscore-gemma4-eval-extractor -f ops/ollama/Modelfile.callscore-gemma4-eval-extractor
+ollama create callscore-gemma4-extractor -f ops/ollama/Modelfile.callscore-gemma4-extractor
+```
+
+Eval-schema PR #66 recheck:
+
+```bash
+OLLAMA_HOST=http://127.0.0.1:11434 npm run benchmark:extractors -- \
+  --fixtures data/eval/call-extraction-fixtures.jsonl \
+  --configs callscore-gemma4-eval-extractor:latest@modelfile-user \
+  --schema eval \
+  --timeout-ms 120000 \
+  --num-predict 900 \
+  --out .tmp/shadow-extraction/gemma-eval-schema-pr66-recheck.json \
+  --dry-run
+```
+
+Result: `10/10` fixtures passed, `10/10` JSON arrays, `10/10` schema pass, `0` false positives, recall `10/10`, `candidate_pass`.
+
+Production-schema recheck:
+
+```bash
+OLLAMA_HOST=http://127.0.0.1:11434 npm run benchmark:extractors -- \
+  --fixtures data/eval/call-extraction-fixtures.jsonl \
+  --configs callscore-gemma4-extractor:latest@modelfile-user \
+  --schema production \
+  --timeout-ms 120000 \
+  --num-predict 900 \
+  --out .tmp/shadow-extraction/gemma-production-schema-recheck.json \
+  --dry-run
+```
+
+Result: `10/10` fixtures passed, `10/10` JSON arrays, `10/10` production-schema pass, `0` false positives, recall `10/10`, `candidate_pass`.
+
+Bounded real-transcript shadow canary:
+
+- Run id: `gemma-production-shadow-recheck-20260613T140436Z`.
+- Artifact: `.tmp/shadow-extraction/gemma-production-shadow-recheck-20260613T140436Z.jsonl`.
+- Result: `schema_valid=true`, `accepted_count=1`, `candidate_count=1`, `latency_ms=42423`, no parser errors.
+- Scope: local Ollama only, limit `1`, one chunk, artifact-only, no production writes, no promotion.
+
+Promotion remains blocked until separate explicit approval plus larger shadow/diff review. This reconciliation proves benchmark contracts and bounded shadow readiness; it does not authorize production writes.

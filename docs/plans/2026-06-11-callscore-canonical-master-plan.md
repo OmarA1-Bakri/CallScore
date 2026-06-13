@@ -5271,3 +5271,58 @@ npm run shadow:extract -- --execute --provider ollama --ollama-host http://127.0
 ```
 
 In parallel, configure local ASR or run the laptop transcript collector limit 5. Do not deploy, publish, spend, mutate Whop, or mutate production DB without a separate explicit approval receipt.
+
+---
+
+## 2026-06-13 Gemma/Qwen schema-contract reconciliation
+
+Status: **GEMMA SHADOW READINESS IMPROVED TO READY_WITH_GATES / ARTIFACT-ONLY; PRODUCTION WRITES STILL BLOCKED**.
+
+Problem resolved:
+
+- PR #66 commit `7d2f1fc` proved `callscore-gemma4-extractor:latest` could pass `10/10` local fixtures under the normalized eval schema.
+- Commit `084e300` later changed `ops/ollama/Modelfile.callscore-gemma4-extractor` to production-schema output.
+- Current rechecks were mixing contracts: production rows were being compared to the older eval-schema validator.
+
+Implementation:
+
+- Added `ops/ollama/Modelfile.callscore-gemma4-eval-extractor` to preserve the PR #66 eval-schema prompt separately.
+- Kept `ops/ollama/Modelfile.callscore-gemma4-extractor` as the production-schema shadow extractor.
+- Added benchmark `--schema eval` and `--schema production` modes.
+- Added regression tests proving eval/prod schema acceptance and rejection behavior, wrapper safety, and no-call `[]` behavior.
+- Tuned production Modelfile for multi-call extraction, timeframe preservation, and cautious/avoid below-level calls.
+
+Local model commands run:
+
+```bash
+ollama create callscore-gemma4-eval-extractor -f ops/ollama/Modelfile.callscore-gemma4-eval-extractor
+ollama create callscore-gemma4-extractor -f ops/ollama/Modelfile.callscore-gemma4-extractor
+```
+
+Benchmark evidence:
+
+| Contract | Model | Artifact | Result |
+| --- | --- | --- | --- |
+| Eval schema | `callscore-gemma4-eval-extractor:latest` | `.tmp/shadow-extraction/gemma-eval-schema-pr66-recheck.json` | `10/10` fixtures, `10/10` JSON arrays, `10/10` schema, `0` false positives, `candidate_pass` |
+| Production schema | `callscore-gemma4-extractor:latest` | `.tmp/shadow-extraction/gemma-production-schema-recheck.json` | `10/10` fixtures, `10/10` JSON arrays, `10/10` schema, `0` false positives, `candidate_pass` |
+
+Real-transcript shadow canary:
+
+- Run id: `gemma-production-shadow-recheck-20260613T140436Z`.
+- Artifact: `.tmp/shadow-extraction/gemma-production-shadow-recheck-20260613T140436Z.jsonl`.
+- Scope: local Ollama, limit `1`, one video, one chunk, artifact-only.
+- Result: `schema_valid=true`, `accepted_count=1`, `candidate_count=1`, `latency_ms=42423`, no parser errors.
+- No production writes, no promotion, no DB mutation.
+
+Receipts:
+
+- `.tmp/workflow-receipts/gemma_eval_schema_recheck/gemma-eval-schema-pr66-recheck.json`
+- `.tmp/workflow-receipts/gemma_production_schema_recheck/gemma-production-schema-recheck.json`
+- `.tmp/workflow-receipts/gemma_shadow_canary/gemma-production-shadow-recheck-20260613T140436Z.json`
+
+Activation impact:
+
+- Gemma/Qwen schema-readiness blocker is no longer P1 zero-state.
+- Gemma production-schema shadow extraction is ready for bounded artifact-only operation with gates.
+- Production write canary remains blocked until explicit approval plus larger shadow/diff evidence.
+- Transcript acquisition/cadence remains separate from model schema readiness.

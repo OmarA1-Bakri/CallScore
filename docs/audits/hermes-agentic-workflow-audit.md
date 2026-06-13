@@ -255,3 +255,47 @@ Operational posture:
 
 - Safe autonomous lanes: health checks, local/live public verification, hygiene, Workplane status, freshness/audit read-only reports, private Art of War dry-runs, Whop fixture/read-only tests, receipt generation.
 - Still approval-gated: Netlify deploy, production DB mutation, Whop mutation, public publishing/outreach, paid spend, provider env changes, credential rotation, destructive infra, open-ended extraction/model jobs.
+
+---
+
+## 2026-06-13 Gemma/Qwen schema-contract reconciliation update
+
+Verdict update for Gemma shadow readiness: **READY_WITH_GATES for bounded artifact-only shadow**, not approved for promotion or production writes.
+
+What changed:
+
+- PR #66 10/10 benchmark evidence was reconciled with current production-shadow behavior.
+- Root cause of the apparent regression: PR #66 validated the normalized eval schema, while later production-shadow Modelfile changes emit production-schema rows.
+- Eval and production contracts are now separate:
+  - `ops/ollama/Modelfile.callscore-gemma4-eval-extractor` preserves PR #66 eval-schema prompt.
+  - `ops/ollama/Modelfile.callscore-gemma4-extractor` remains production-schema shadow model.
+  - `src/scripts/benchmark-local-extractors.ts` supports `--schema eval` and `--schema production`.
+
+Evidence:
+
+| Workflow | Artifact | Result |
+| --- | --- | --- |
+| `gemma_eval_schema_recheck` | `.tmp/shadow-extraction/gemma-eval-schema-pr66-recheck.json` | 10/10 fixtures, 10/10 JSON arrays, 10/10 schema, 0 false positives, candidate_pass |
+| `gemma_production_schema_recheck` | `.tmp/shadow-extraction/gemma-production-schema-recheck.json` | 10/10 fixtures, 10/10 JSON arrays, 10/10 production schema, 0 false positives, candidate_pass |
+| `gemma_shadow_canary` | `.tmp/shadow-extraction/gemma-production-shadow-recheck-20260613T140436Z.jsonl` | limit 1, one chunk, `schema_valid=true`, `accepted_count=1`, `candidate_count=1`, latency 42423ms |
+
+Receipts:
+
+- `.tmp/workflow-receipts/gemma_eval_schema_recheck/gemma-eval-schema-pr66-recheck.json`
+- `.tmp/workflow-receipts/gemma_production_schema_recheck/gemma-production-schema-recheck.json`
+- `.tmp/workflow-receipts/gemma_shadow_canary/gemma-production-shadow-recheck-20260613T140436Z.json`
+
+Safety:
+
+- Local Ollama only.
+- Artifact-only shadow canary.
+- No production calls written.
+- No shadow promotion.
+- No production DB mutation.
+- No paid LLM/API calls.
+
+Remaining gates:
+
+- Larger real-transcript shadow sample and `shadow:diff` review before any write-canary discussion.
+- Explicit operator approval required before promotion or production writes.
+- Transcript acquisition cadence remains a separate P1 blocker.

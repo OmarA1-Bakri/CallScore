@@ -13,7 +13,14 @@ type Status =
   | "rejected_unsupported_asset";
 
 type Direction = "bullish" | "bearish" | "neutral" | null;
-type Ownership = "creator_own_call" | "guest_call" | "quoted_external_call" | "news_report" | "aggregation" | "unknown";
+type Ownership =
+  | "creator_own_call"
+  | "guest_call"
+  | "quoted_external_call"
+  | "news_report"
+  | "aggregation"
+  | "unknown";
+type BenchmarkSchema = "eval" | "production";
 
 export interface ExpectedCall {
   readonly asset_symbol: string;
@@ -47,7 +54,12 @@ export interface NormalizedExtraction {
   readonly quote: string | null;
   readonly asset_symbol: string | null;
   readonly direction: Direction;
-  readonly call_type: "directional" | "price_target" | "risk_warning" | "range_prediction" | null;
+  readonly call_type:
+    | "directional"
+    | "price_target"
+    | "risk_warning"
+    | "range_prediction"
+    | null;
   readonly thesis: string | null;
   readonly timeframe: string | null;
   readonly entry_reference: string | null;
@@ -64,7 +76,29 @@ export interface BenchmarkConfig {
   readonly promptVariant: PromptVariant;
 }
 
-type PromptVariant = "shared-baseline" | "gemma-optimized" | "qwen-optimized" | "modelfile-user";
+export interface ProductionExtraction {
+  readonly symbol: string;
+  readonly direction: "bullish" | "bearish" | "neutral";
+  readonly call_type: "buy" | "sell" | "hold" | "watch" | "avoid";
+  readonly entry_price: number | null;
+  readonly target_price: number | null;
+  readonly stop_loss: number | null;
+  readonly timeframe: string | null;
+  readonly confidence: "high" | "medium" | "low";
+  readonly strategy_type:
+    | "technical_analysis"
+    | "fundamental"
+    | "narrative"
+    | "contrarian";
+  readonly raw_quote: string;
+  readonly extraction_confidence: number;
+}
+
+type PromptVariant =
+  | "shared-baseline"
+  | "gemma-optimized"
+  | "qwen-optimized"
+  | "modelfile-user";
 
 const STATUSES: readonly Status[] = [
   "accepted_call",
@@ -75,10 +109,51 @@ const STATUSES: readonly Status[] = [
   "rejected_invalid_json",
   "rejected_unsupported_asset",
 ];
-const OWNERSHIPS: readonly Ownership[] = ["creator_own_call", "guest_call", "quoted_external_call", "news_report", "aggregation", "unknown"];
+const OWNERSHIPS: readonly Ownership[] = [
+  "creator_own_call",
+  "guest_call",
+  "quoted_external_call",
+  "news_report",
+  "aggregation",
+  "unknown",
+];
 const DIRECTIONS = ["bullish", "bearish", "neutral", null] as const;
-const CALL_TYPES = ["directional", "price_target", "risk_warning", "range_prediction", null] as const;
-const SUPPORTED_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT", "XRPUSDT", "ADAUSDT", "LINKUSDT", "NEARUSDT", "DOTUSDT", "ARUSDT", "RENDERUSDT"];
+const CALL_TYPES = [
+  "directional",
+  "price_target",
+  "risk_warning",
+  "range_prediction",
+  null,
+] as const;
+const PRODUCTION_CALL_TYPES = [
+  "buy",
+  "sell",
+  "hold",
+  "watch",
+  "avoid",
+] as const;
+const PRODUCTION_CONFIDENCE = ["high", "medium", "low"] as const;
+const PRODUCTION_STRATEGY_TYPES = [
+  "technical_analysis",
+  "fundamental",
+  "narrative",
+  "contrarian",
+] as const;
+const SUPPORTED_SYMBOLS = [
+  "BTCUSDT",
+  "ETHUSDT",
+  "SOLUSDT",
+  "DOGEUSDT",
+  "XRPUSDT",
+  "ADAUSDT",
+  "LINKUSDT",
+  "NEARUSDT",
+  "DOTUSDT",
+  "ARUSDT",
+  "RENDERUSDT",
+  "AVAXUSDT",
+  "SUIUSDT",
+];
 
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -90,6 +165,14 @@ function hasFlag(argv: readonly string[], flag: string): boolean {
   return argv.includes(flag);
 }
 
+export function readBenchmarkSchema(value: string | null): BenchmarkSchema {
+  if (value === null || value === "" || value === "eval") return "eval";
+  if (value === "production") return "production";
+  throw new Error(
+    `Unsupported benchmark schema '${value}'. Expected eval or production.`,
+  );
+}
+
 function positiveInt(value: string | null, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
@@ -97,10 +180,18 @@ function positiveInt(value: string | null, fallback: number): number {
 
 function parseConfig(input: string): BenchmarkConfig {
   const separator = input.lastIndexOf("@");
-  if (separator <= 0) throw new Error(`Invalid config '${input}'. Expected model@prompt-variant`);
+  if (separator <= 0)
+    throw new Error(`Invalid config '${input}'. Expected model@prompt-variant`);
   const model = input.slice(0, separator);
   const promptVariant = input.slice(separator + 1) as PromptVariant;
-  if (!["shared-baseline", "gemma-optimized", "qwen-optimized", "modelfile-user"].includes(promptVariant)) {
+  if (
+    ![
+      "shared-baseline",
+      "gemma-optimized",
+      "qwen-optimized",
+      "modelfile-user",
+    ].includes(promptVariant)
+  ) {
     throw new Error(`Invalid prompt variant '${promptVariant}'`);
   }
   return { model, promptVariant };
@@ -113,7 +204,8 @@ export function loadFixtures(filePath: string): Fixture[] {
     .filter(Boolean)
     .map((line, index) => {
       const parsed = JSON.parse(line) as Fixture;
-      if (!parsed.id || !parsed.transcript_text) throw new Error(`Fixture line ${index + 1} missing id/transcript_text`);
+      if (!parsed.id || !parsed.transcript_text)
+        throw new Error(`Fixture line ${index + 1} missing id/transcript_text`);
       return parsed;
     });
 }
@@ -140,7 +232,10 @@ Use exact enum values only. Enum values must be quoted JSON strings. Use JSON nu
 Each array element must be a JSON object using braces, never an array of key/value strings.`;
 }
 
-export function buildPrompt(variant: PromptVariant, fixture: Fixture): { readonly system?: string; readonly user: string } {
+export function buildPrompt(
+  variant: PromptVariant,
+  fixture: Fixture,
+): { readonly system?: string; readonly user: string } {
   const sharedRules = `${extractionSchemaText()}
 Only extract forward-looking, measurable crypto market calls for supported assets: ${SUPPORTED_SYMBOLS.join(", ")}.
 Only creator-owned calls can use status accepted_call with confidence >= 0.70.
@@ -208,13 +303,18 @@ Transcript: ${fixture.transcript_text}`,
   }
 
   return {
-    system: "You are CallScore's local transcript-to-call extractor. Return JSON array only. No markdown. No prose.",
+    system:
+      "You are CallScore's local transcript-to-call extractor. Return JSON array only. No markdown. No prose.",
     user: sharedRules,
   };
 }
 
 export function extractJsonArrayText(text: string): string {
-  const trimmed = text.trim().replace(/^```json?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const trimmed = text
+    .trim()
+    .replace(/^```json?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
   if (trimmed.startsWith("[") && trimmed.endsWith("]")) return trimmed;
   const start = trimmed.indexOf("[");
   const end = trimmed.lastIndexOf("]");
@@ -235,13 +335,24 @@ function booleanValue(value: unknown): boolean | null {
 }
 
 function confidenceValue(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1) return value;
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= 1
+  )
+    return value;
   return null;
 }
 
-export function validateExtraction(item: unknown): { readonly ok: boolean; readonly errors: readonly string[]; readonly value?: NormalizedExtraction } {
+export function validateExtraction(item: unknown): {
+  readonly ok: boolean;
+  readonly errors: readonly string[];
+  readonly value?: NormalizedExtraction;
+} {
   const errors: string[] = [];
-  if (typeof item !== "object" || item === null || Array.isArray(item)) return { ok: false, errors: ["not_object"] };
+  if (typeof item !== "object" || item === null || Array.isArray(item))
+    return { ok: false, errors: ["not_object"] };
   const record = item as Record<string, unknown>;
   const status = record.status as Status;
   if (!STATUSES.includes(status)) errors.push("invalid_status");
@@ -256,12 +367,15 @@ export function validateExtraction(item: unknown): { readonly ok: boolean; reado
   const confidence = confidenceValue(record.confidence);
   if (confidence === null) errors.push("invalid_confidence");
   const assetSymbol = textOrNull(record.asset_symbol);
-  if (assetSymbol !== null && !SUPPORTED_SYMBOLS.includes(assetSymbol)) errors.push("unsupported_asset_symbol");
+  if (assetSymbol !== null && !SUPPORTED_SYMBOLS.includes(assetSymbol))
+    errors.push("unsupported_asset_symbol");
   if (status === "accepted_call") {
     if (!assetSymbol) errors.push("accepted_missing_asset");
     if (!direction) errors.push("accepted_missing_direction");
-    if (ownership !== "creator_own_call" || isCreatorOwned !== true) errors.push("accepted_not_creator_owned");
-    if (confidence !== null && confidence < 0.7) errors.push("accepted_low_confidence");
+    if (ownership !== "creator_own_call" || isCreatorOwned !== true)
+      errors.push("accepted_not_creator_owned");
+    if (confidence !== null && confidence < 0.7)
+      errors.push("accepted_low_confidence");
   }
   if (errors.length > 0) return { ok: false, errors };
   return {
@@ -286,33 +400,170 @@ export function validateExtraction(item: unknown): { readonly ok: boolean; reado
   };
 }
 
-function contains(haystack: string | null, needle: string | undefined): boolean {
+function numberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : Number.NaN;
+}
+
+function numberToText(value: number | null): string | null {
+  return value === null ? null : String(value);
+}
+
+function productionConfidenceToNumber(
+  value: ProductionExtraction["confidence"],
+): number {
+  if (value === "high") return 0.9;
+  if (value === "medium") return 0.75;
+  return 0.5;
+}
+
+function productionCallTypeToEval(
+  value: ProductionExtraction["call_type"],
+): NormalizedExtraction["call_type"] {
+  if (value === "avoid") return "risk_warning";
+  if (value === "buy" || value === "sell") return "price_target";
+  return "directional";
+}
+
+export function validateProductionExtraction(item: unknown): {
+  readonly ok: boolean;
+  readonly errors: readonly string[];
+  readonly value?: ProductionExtraction;
+  readonly normalized?: NormalizedExtraction;
+} {
+  const errors: string[] = [];
+  if (typeof item !== "object" || item === null || Array.isArray(item))
+    return { ok: false, errors: ["not_object"] };
+  const record = item as Record<string, unknown>;
+  const symbol =
+    typeof record.symbol === "string" ? record.symbol.toUpperCase() : "";
+  if (!SUPPORTED_SYMBOLS.includes(symbol)) errors.push("unsupported_symbol");
+  const direction = record.direction as ProductionExtraction["direction"];
+  if (!DIRECTIONS.filter(Boolean).includes(direction))
+    errors.push("invalid_direction");
+  const callType = record.call_type as ProductionExtraction["call_type"];
+  if (!PRODUCTION_CALL_TYPES.includes(callType))
+    errors.push("invalid_call_type");
+  const entryPrice = numberOrNull(record.entry_price);
+  const targetPrice = numberOrNull(record.target_price);
+  const stopLoss = numberOrNull(record.stop_loss);
+  if (Number.isNaN(entryPrice)) errors.push("invalid_entry_price");
+  if (Number.isNaN(targetPrice)) errors.push("invalid_target_price");
+  if (Number.isNaN(stopLoss)) errors.push("invalid_stop_loss");
+  const timeframe = textOrNull(record.timeframe);
+  const confidence = record.confidence as ProductionExtraction["confidence"];
+  if (!PRODUCTION_CONFIDENCE.includes(confidence))
+    errors.push("invalid_confidence");
+  const strategyType =
+    record.strategy_type as ProductionExtraction["strategy_type"];
+  if (!PRODUCTION_STRATEGY_TYPES.includes(strategyType))
+    errors.push("invalid_strategy_type");
+  const rawQuote = textOrNull(record.raw_quote);
+  if (!rawQuote) errors.push("missing_raw_quote");
+  const extractionConfidence = confidenceValue(record.extraction_confidence);
+  if (extractionConfidence === null)
+    errors.push("invalid_extraction_confidence");
+  if (errors.length > 0) return { ok: false, errors };
+  const value: ProductionExtraction = {
+    symbol,
+    direction,
+    call_type: callType,
+    entry_price: entryPrice,
+    target_price: targetPrice,
+    stop_loss: stopLoss,
+    timeframe,
+    confidence,
+    strategy_type: strategyType,
+    raw_quote: rawQuote as string,
+    extraction_confidence: extractionConfidence as number,
+  };
+  const normalizedEntry =
+    value.call_type === "avoid" ? null : numberToText(value.entry_price);
+  const normalizedInvalidation = numberToText(
+    value.stop_loss ?? (value.call_type === "avoid" ? value.entry_price : null),
+  );
+  return {
+    ok: true,
+    errors: [],
+    value,
+    normalized: {
+      status: "accepted_call",
+      quote: value.raw_quote,
+      asset_symbol: value.symbol,
+      direction: value.direction,
+      call_type: productionCallTypeToEval(value.call_type),
+      thesis: null,
+      timeframe: value.timeframe,
+      entry_reference: normalizedEntry,
+      target: numberToText(value.target_price),
+      stop_loss_or_invalidation: normalizedInvalidation,
+      ownership: "creator_own_call",
+      is_creator_owned: true,
+      confidence: productionConfidenceToNumber(value.confidence),
+      rejection_reason: null,
+    },
+  };
+}
+
+export function validateExtractionForSchema(
+  item: unknown,
+  schema: BenchmarkSchema,
+): {
+  readonly ok: boolean;
+  readonly errors: readonly string[];
+  readonly value?: NormalizedExtraction;
+} {
+  if (schema === "eval") return validateExtraction(item);
+  const result = validateProductionExtraction(item);
+  return { ok: result.ok, errors: result.errors, value: result.normalized };
+}
+function contains(
+  haystack: string | null,
+  needle: string | undefined,
+): boolean {
   if (!needle) return true;
   return (haystack ?? "").toLowerCase().includes(needle.toLowerCase());
 }
 
-function expectedCallMatched(expected: ExpectedCall, calls: readonly NormalizedExtraction[]): boolean {
-  return calls.some((call) =>
-    call.status === "accepted_call" &&
-    call.asset_symbol === expected.asset_symbol &&
-    call.direction === expected.direction &&
-    (!expected.ownership || call.ownership === expected.ownership) &&
-    (expected.is_creator_owned === undefined || call.is_creator_owned === expected.is_creator_owned) &&
-    contains(call.entry_reference, expected.entry_contains) &&
-    contains(call.target, expected.target_contains) &&
-    contains(call.timeframe, expected.timeframe_contains) &&
-    contains(call.stop_loss_or_invalidation, expected.invalidation_contains),
+function expectedCallMatched(
+  expected: ExpectedCall,
+  calls: readonly NormalizedExtraction[],
+): boolean {
+  return calls.some(
+    (call) =>
+      call.status === "accepted_call" &&
+      call.asset_symbol === expected.asset_symbol &&
+      call.direction === expected.direction &&
+      (!expected.ownership || call.ownership === expected.ownership) &&
+      (expected.is_creator_owned === undefined ||
+        call.is_creator_owned === expected.is_creator_owned) &&
+      contains(call.entry_reference, expected.entry_contains) &&
+      contains(call.target, expected.target_contains) &&
+      contains(call.timeframe, expected.timeframe_contains) &&
+      contains(call.stop_loss_or_invalidation, expected.invalidation_contains),
   );
 }
 
-function expectedRejectionMatched(expected: ExpectedRejection, calls: readonly NormalizedExtraction[]): boolean {
+function expectedRejectionMatched(
+  expected: ExpectedRejection,
+  calls: readonly NormalizedExtraction[],
+): boolean {
   if (calls.length === 0) return true;
-  return calls.some((call) =>
-    call.status === expected.status && (!expected.ownership || call.ownership === expected.ownership),
+  return calls.some(
+    (call) =>
+      call.status === expected.status &&
+      (!expected.ownership || call.ownership === expected.ownership),
   );
 }
 
-export function scoreFixture(fixture: Fixture, values: readonly NormalizedExtraction[], parseOk: boolean, schemaOk: boolean): {
+export function scoreFixture(
+  fixture: Fixture,
+  values: readonly NormalizedExtraction[],
+  parseOk: boolean,
+  schemaOk: boolean,
+): {
   readonly pass: boolean;
   readonly falsePositive: boolean;
   readonly ownershipPass: boolean;
@@ -324,19 +575,49 @@ export function scoreFixture(fixture: Fixture, values: readonly NormalizedExtrac
   if (!parseOk) reasons.push("invalid_json_array");
   if (!schemaOk) reasons.push("schema_invalid");
   const accepted = values.filter((value) => value.status === "accepted_call");
-  const highConfidencePublic = accepted.filter((value) => value.confidence >= 0.7 && value.is_creator_owned && value.ownership === "creator_own_call");
-  const falsePositive = fixture.expected_public_eligible === false && highConfidencePublic.length > 0;
+  const highConfidencePublic = accepted.filter(
+    (value) =>
+      value.confidence >= 0.7 &&
+      value.is_creator_owned &&
+      value.ownership === "creator_own_call",
+  );
+  const falsePositive =
+    fixture.expected_public_eligible === false &&
+    highConfidencePublic.length > 0;
   if (falsePositive) reasons.push("high_confidence_false_positive");
-  const missingExpected = fixture.expected_calls.filter((expected) => !expectedCallMatched(expected, values));
-  if (missingExpected.length > 0) reasons.push(`missing_expected_calls:${missingExpected.map((item) => item.asset_symbol).join(",")}`);
-  const missingRejections = fixture.expected_rejections.filter((expected) => !expectedRejectionMatched(expected, values));
-  if (missingRejections.length > 0) reasons.push(`missing_expected_rejections:${missingRejections.map((item) => item.status).join(",")}`);
-  const ownershipPass = values.every((value) => value.status !== "accepted_call" || (value.ownership === "creator_own_call" && value.is_creator_owned));
+  const missingExpected = fixture.expected_calls.filter(
+    (expected) => !expectedCallMatched(expected, values),
+  );
+  if (missingExpected.length > 0)
+    reasons.push(
+      `missing_expected_calls:${missingExpected.map((item) => item.asset_symbol).join(",")}`,
+    );
+  const missingRejections = fixture.expected_rejections.filter(
+    (expected) => !expectedRejectionMatched(expected, values),
+  );
+  if (missingRejections.length > 0)
+    reasons.push(
+      `missing_expected_rejections:${missingRejections.map((item) => item.status).join(",")}`,
+    );
+  const ownershipPass = values.every(
+    (value) =>
+      value.status !== "accepted_call" ||
+      (value.ownership === "creator_own_call" && value.is_creator_owned),
+  );
   if (!ownershipPass) reasons.push("ownership_failed");
-  const obviousRecall = fixture.expected_calls.length === 0 || missingExpected.length === 0;
-  const quotedRejectionPass = !fixture.source_type.includes("quoted") || (accepted.length === 0 && !falsePositive);
+  const obviousRecall =
+    fixture.expected_calls.length === 0 || missingExpected.length === 0;
+  const quotedRejectionPass =
+    !fixture.source_type.includes("quoted") ||
+    (accepted.length === 0 && !falsePositive);
   return {
-    pass: parseOk && schemaOk && !falsePositive && missingExpected.length === 0 && missingRejections.length === 0 && ownershipPass,
+    pass:
+      parseOk &&
+      schemaOk &&
+      !falsePositive &&
+      missingExpected.length === 0 &&
+      missingRejections.length === 0 &&
+      ownershipPass,
     falsePositive,
     ownershipPass,
     obviousRecall,
@@ -356,7 +637,9 @@ async function callOllama(input: {
   const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
   try {
     const messages = [
-      ...(input.prompt.system ? [{ role: "system", content: input.prompt.system }] : []),
+      ...(input.prompt.system
+        ? [{ role: "system", content: input.prompt.system }]
+        : []),
       { role: "user", content: input.prompt.user },
     ];
     const response = await fetch(`${input.host.replace(/\/+$/, "")}/api/chat`, {
@@ -374,10 +657,17 @@ async function callOllama(input: {
       }),
       signal: controller.signal,
     });
-    const body = await response.json() as { message?: { content?: unknown }; error?: unknown };
-    if (!response.ok) throw new Error(`Ollama HTTP ${response.status}: ${String(body.error ?? "unknown")}`);
+    const body = (await response.json()) as {
+      message?: { content?: unknown };
+      error?: unknown;
+    };
+    if (!response.ok)
+      throw new Error(
+        `Ollama HTTP ${response.status}: ${String(body.error ?? "unknown")}`,
+      );
     const content = body.message?.content;
-    if (typeof content !== "string") throw new Error("Ollama response missing message.content");
+    if (typeof content !== "string")
+      throw new Error("Ollama response missing message.content");
     return content;
   } finally {
     clearTimeout(timeout);
@@ -390,6 +680,7 @@ export async function runBenchmark(input: {
   readonly host: string;
   readonly timeoutMs: number;
   readonly numPredict: number;
+  readonly schema: BenchmarkSchema;
 }): Promise<Record<string, unknown>> {
   const rows = [] as Record<string, unknown>[];
   for (const config of input.configs) {
@@ -413,10 +704,14 @@ export async function runBenchmark(input: {
         const parsed = JSON.parse(jsonText) as unknown;
         parseOk = Array.isArray(parsed);
         if (parseOk) {
-          const checks = (parsed as unknown[]).map(validateExtraction);
+          const checks = (parsed as unknown[]).map((item) =>
+            validateExtractionForSchema(item, input.schema),
+          );
           schemaErrors = checks.flatMap((check) => check.errors);
           schemaOk = checks.every((check) => check.ok);
-          validated = checks.flatMap((check) => check.value ? [check.value] : []);
+          validated = checks.flatMap((check) =>
+            check.value ? [check.value] : [],
+          );
         }
       } catch (error) {
         parseError = error instanceof Error ? error.message : String(error);
@@ -425,6 +720,7 @@ export async function runBenchmark(input: {
       rows.push({
         model: config.model,
         prompt_variant: config.promptVariant,
+        schema: input.schema,
         fixture_id: fixture.id,
         source_type: fixture.source_type,
         latency_ms: Math.round(performance.now() - started),
@@ -432,11 +728,17 @@ export async function runBenchmark(input: {
         parsed_json_array: parseOk,
         schema_valid: schemaOk,
         schema_errors: schemaErrors,
-        extracted_call_count: validated.filter((item) => item.status === "accepted_call").length,
-        rejected_count: validated.filter((item) => item.status !== "accepted_call").length,
+        extracted_call_count: validated.filter(
+          (item) => item.status === "accepted_call",
+        ).length,
+        rejected_count: validated.filter(
+          (item) => item.status !== "accepted_call",
+        ).length,
         confidence_distribution: validated.map((item) => item.confidence),
         markdown_leak: /```/.test(rawOutput),
-        prose_leak: rawOutput.trim().startsWith("[") ? false : rawOutput.trim().length > 0,
+        prose_leak: rawOutput.trim().startsWith("[")
+          ? false
+          : rawOutput.trim().length > 0,
         ownership_pass: score.ownershipPass,
         false_positive: score.falsePositive,
         obvious_recall: score.obviousRecall,
@@ -450,21 +752,39 @@ export async function runBenchmark(input: {
     }
   }
   const summaries = input.configs.map((config) => {
-    const configRows = rows.filter((row) => row.model === config.model && row.prompt_variant === config.promptVariant);
+    const configRows = rows.filter(
+      (row) =>
+        row.model === config.model &&
+        row.prompt_variant === config.promptVariant,
+    );
     const fixtureCount = configRows.length || 1;
-    const acceptedCalls = configRows.reduce((sum, row) => sum + Number(row.extracted_call_count ?? 0), 0);
-    const rejectedCalls = configRows.reduce((sum, row) => sum + Number(row.rejected_count ?? 0), 0);
-    const avgLatency = Math.round(configRows.reduce((sum, row) => sum + Number(row.latency_ms ?? 0), 0) / fixtureCount);
+    const acceptedCalls = configRows.reduce(
+      (sum, row) => sum + Number(row.extracted_call_count ?? 0),
+      0,
+    );
+    const rejectedCalls = configRows.reduce(
+      (sum, row) => sum + Number(row.rejected_count ?? 0),
+      0,
+    );
+    const avgLatency = Math.round(
+      configRows.reduce((sum, row) => sum + Number(row.latency_ms ?? 0), 0) /
+        fixtureCount,
+    );
     const validJson = configRows.filter((row) => row.parsed_json_array).length;
     const schemaPass = configRows.filter((row) => row.schema_valid).length;
-    const falsePositives = configRows.filter((row) => row.false_positive).length;
+    const falsePositives = configRows.filter(
+      (row) => row.false_positive,
+    ).length;
     const ownershipPass = configRows.filter((row) => row.ownership_pass).length;
     const obviousRecall = configRows.filter((row) => row.obvious_recall).length;
-    const quotedRejection = configRows.filter((row) => row.quoted_rejection_pass).length;
+    const quotedRejection = configRows.filter(
+      (row) => row.quoted_rejection_pass,
+    ).length;
     const passed = configRows.filter((row) => row.pass).length;
     return {
       model: config.model,
       prompt_variant: config.promptVariant,
+      schema: input.schema,
       fixture_count: configRows.length,
       passed_fixtures: passed,
       valid_json: validJson,
@@ -480,16 +800,27 @@ export async function runBenchmark(input: {
       accepted_calls: acceptedCalls,
       rejected_calls: rejectedCalls,
       average_latency_ms: avgLatency,
-      quality_gate_pass: validJson / fixtureCount >= 0.95 && schemaPass / fixtureCount >= 0.95 && falsePositives === 0 && passed === configRows.length && avgLatency <= 60_000,
-      verdict: validJson / fixtureCount >= 0.95 && schemaPass / fixtureCount >= 0.95 && falsePositives === 0 && passed === configRows.length && avgLatency <= 60_000
-        ? "candidate_pass"
-        : "not_ready",
+      quality_gate_pass:
+        validJson / fixtureCount >= 0.95 &&
+        schemaPass / fixtureCount >= 0.95 &&
+        falsePositives === 0 &&
+        passed === configRows.length &&
+        avgLatency <= 60_000,
+      verdict:
+        validJson / fixtureCount >= 0.95 &&
+        schemaPass / fixtureCount >= 0.95 &&
+        falsePositives === 0 &&
+        passed === configRows.length &&
+        avgLatency <= 60_000
+          ? "candidate_pass"
+          : "not_ready",
     };
   });
   return {
     generated_at: timestamp(),
     dry_run: true,
     host: input.host,
+    schema: input.schema,
     fixture_count: input.fixtures.length,
     configs: input.configs,
     summaries,
@@ -498,40 +829,61 @@ export async function runBenchmark(input: {
 }
 
 function printTable(summaries: readonly Record<string, unknown>[]): void {
-  console.log("\nmodel\tprompt\tfixtures\tvalid_json\tschema\tfalse_pos\townership\trecall\taccepted\trejected\tavg_ms\tverdict");
+  console.log(
+    "\nmodel\tprompt\tfixtures\tvalid_json\tschema\tfalse_pos\townership\trecall\taccepted\trejected\tavg_ms\tverdict",
+  );
   for (const row of summaries) {
-    console.log([
-      row.model,
-      row.prompt_variant,
-      row.fixture_count,
-      row.valid_json,
-      row.schema_pass,
-      row.false_positives,
-      row.creator_ownership_pass,
-      row.obvious_call_recall,
-      row.accepted_calls,
-      row.rejected_calls,
-      row.average_latency_ms,
-      row.verdict,
-    ].join("\t"));
+    console.log(
+      [
+        row.model,
+        row.prompt_variant,
+        row.fixture_count,
+        row.valid_json,
+        row.schema_pass,
+        row.false_positives,
+        row.creator_ownership_pass,
+        row.obvious_call_recall,
+        row.accepted_calls,
+        row.rejected_calls,
+        row.average_latency_ms,
+        row.verdict,
+      ].join("\t"),
+    );
   }
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
-  const fixturesPath = argValue(argv, "--fixtures") ?? "data/eval/call-extraction-fixtures.jsonl";
+  const fixturesPath =
+    argValue(argv, "--fixtures") ?? "data/eval/call-extraction-fixtures.jsonl";
   const configInput = argValue(argv, "--configs") ?? argValue(argv, "--models");
-  if (!configInput) throw new Error("--configs model@prompt,model@prompt is required");
-  const configs = configInput.split(",").map((item) => parseConfig(item.trim()));
-  const host = argValue(argv, "--host") ?? process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434";
+  if (!configInput)
+    throw new Error("--configs model@prompt,model@prompt is required");
+  const configs = configInput
+    .split(",")
+    .map((item) => parseConfig(item.trim()));
+  const host =
+    argValue(argv, "--host") ??
+    process.env.OLLAMA_HOST ??
+    "http://127.0.0.1:11434";
   const timeoutMs = positiveInt(argValue(argv, "--timeout-ms"), 60_000);
   const numPredict = positiveInt(argValue(argv, "--num-predict"), 900);
   const out = argValue(argv, "--out");
+  const schema = readBenchmarkSchema(argValue(argv, "--schema"));
   const fixtures = loadFixtures(fixturesPath);
   if (!hasFlag(argv, "--dry-run")) {
-    console.log("[benchmark-local-extractors] no DB writes are implemented; running dry-run benchmark.");
+    console.log(
+      "[benchmark-local-extractors] no DB writes are implemented; running dry-run benchmark.",
+    );
   }
-  const result = await runBenchmark({ fixtures, configs, host, timeoutMs, numPredict });
+  const result = await runBenchmark({
+    fixtures,
+    configs,
+    host,
+    timeoutMs,
+    numPredict,
+    schema,
+  });
   printTable(result.summaries as Record<string, unknown>[]);
   if (out) {
     mkdirSync(path.dirname(out), { recursive: true });
@@ -542,7 +894,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
 if (process.argv[1]?.endsWith("benchmark-local-extractors.ts")) {
   main().catch((error) => {
-    console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+    console.error(
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
+    );
     process.exit(1);
   });
 }

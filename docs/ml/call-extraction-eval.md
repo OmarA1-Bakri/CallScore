@@ -37,3 +37,25 @@ OLLAMA_HOST=http://127.0.0.1:11434 npm run benchmark:extractors -- \
   --configs gemma4:latest@shared-baseline,qwen2.5:3b@shared-baseline,gemma4:latest@gemma-optimized,qwen2.5:3b@qwen-optimized,callscore-gemma4-extractor@modelfile-user,callscore-qwen25-3b-extractor@modelfile-user \
   --out /tmp/callscore-local-extractor-benchmark.json
 ```
+
+## 2026-06-13 schema modes
+
+The fixture dataset still defines the normalized eval contract. Production-shadow extraction now has a separate benchmark mode because the live shadow extractor returns production-schema rows.
+
+Use:
+
+- `--schema eval` for normalized PR #66-style outputs with `status`, `asset_symbol`, `ownership`, and rejection objects.
+- `--schema production` for production rows with `symbol`, `direction`, `call_type`, numeric price fields, `raw_quote`, and `extraction_confidence`.
+
+Important distinction:
+
+- Eval schema can emit explicit rejection objects.
+- Production schema treats no-call/rejection cases as `[]` in benchmark mode.
+- `[]` remains valid for no-call fixtures in production mode.
+- Production rows are normalized only inside the benchmark harness for fixture scoring; shadow promotion is still separate and approval-gated.
+
+Latest local evidence:
+
+- Eval model `callscore-gemma4-eval-extractor:latest`: `10/10` fixture pass under `--schema eval`.
+- Production model `callscore-gemma4-extractor:latest`: `10/10` fixture pass under `--schema production`.
+- Real-transcript production shadow canary wrote one artifact with `schema_valid=true` and no production writes.

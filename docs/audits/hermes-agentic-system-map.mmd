@@ -36,7 +36,7 @@ flowchart LR
     Worklist[transcript worklist\nPASS limit 5]
     Media[transcript waterfall\nBLOCKED: bot verification / ASR absent]
     Laptop[laptop collector\noperator/cookies required]
-    Gemma[Gemma+Qwen shadow\nQwen schema pass 1/1; promotion blocked]
+    Gemma[Gemma shadow\neval+production schema 10/10; canary accepted 1; promotion blocked]
   end
   subgraph MCP[MCP / Toolbox]
     Composio[Composio\nREAD-ONLY SDK probe pass via local venv]
@@ -58,7 +58,7 @@ flowchart LR
   subgraph BLOCKERS[Remaining Blockers]
     B1[Composio CLI/MCP wiring optional; SDK probe pass]
     B2[Transcript cadence: bot verification / ASR absent]
-    B3[Shadow promotion approval; Gemma timeout remains]
+    B3[Shadow promotion approval; larger diff review required]
     B4[Public count source drift resolved by --source live]
     B5[External rotation review]
   end
@@ -194,4 +194,4 @@ flowchart LR
 
 
 %% 2026-06-13 readiness recheck note
-%% 2026-06-13 latest: Composio read-only SDK probe passed via local venv; public verify --source live passed; Qwen schema pass 1/1; transcript remains degraded by bot verification / ASR absence; no public/spend/Whop/DB mutation.
+%% 2026-06-13 latest: Composio read-only SDK probe passed via local venv; public verify --source live passed; Gemma eval+production schemas pass 10/10; bounded shadow canary accepted 1 artifact-only; transcript remains degraded by bot verification / ASR absence; no public/spend/Whop/DB mutation.
