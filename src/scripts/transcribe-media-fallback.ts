@@ -41,11 +41,17 @@ function positiveInt(value: string | null, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
+function nonNegativeInt(value: string | null, fallback: number): number {
+  if (value === null) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
 export function parseMediaFallbackArgs(argv = process.argv.slice(2)): MediaFallbackArgs {
   return {
     limit: Math.min(25, positiveInt(argValue(argv, "--limit"), 1)),
     sinceDays: positiveInt(argValue(argv, "--since-days"), 45),
-    gapMs: positiveInt(argValue(argv, "--gap-ms"), 20_000),
+    gapMs: nonNegativeInt(argValue(argv, "--gap-ms"), 20_000),
     write: argv.includes("--write") && !argv.includes("--dry-run"),
     workRoot: argValue(argv, "--work-root") ?? DEFAULT_WORK_ROOT,
     minFreeGb: positiveInt(argValue(argv, "--min-free-gb"), 5),

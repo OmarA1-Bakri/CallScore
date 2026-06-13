@@ -42,6 +42,7 @@ test("laptop collector classifies non-rate-limit transcript failures", () => {
   assert.match(script, /transient_network/);
   assert.match(script, /collector_tool_error/);
   assert.match(script, /Traceback/);
+  assert.match(script, /System\\.Management\\.Automation/);
   assert.match(script, /Summarize-FailureDetail/);
   assert.match(script, /no automatic captions/);
 });

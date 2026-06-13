@@ -19,6 +19,7 @@ export interface TranscriptIngestRecord {
   readonly transcript_quality?: number;
   readonly provider?: string;
   readonly error?: string;
+  readonly detail?: string;
   readonly source?: string;
 }
 
@@ -42,6 +43,21 @@ export function transcriptQuality(text: string): number {
   if (words < 200) return 0.35;
   if (words < 500) return 0.65;
   return Math.min(1, 0.75 + Math.min(0.25, words / 4000));
+}
+
+function normalizeFailureText(value: unknown, maxLength: number): string {
+  return String(value ?? "")
+    .replace(/(?:\\r\\n|\\n|\\r|[\r\n\t])+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function buildFailureError(error: unknown, detail: unknown): string {
+  const reason = normalizeFailureText(error ?? "collector_failed", 120) || "collector_failed";
+  const preview = normalizeFailureText(detail, 360);
+  if (!preview || preview === reason || preview.startsWith(`${reason}:`)) return reason;
+  return `${reason}: ${preview}`.slice(0, 500);
 }
 
 export function normalizeTranscriptIngestRecord(value: unknown): TranscriptIngestRecord {
@@ -72,7 +88,8 @@ export function normalizeTranscriptIngestRecord(value: unknown): TranscriptInges
     video_id: videoId,
     youtube_video_id: youtubeVideoId,
     status,
-    error: String(record.error ?? "collector_failed").slice(0, 120),
+    error: buildFailureError(record.error, record.detail),
+    detail: typeof record.detail === "string" ? normalizeFailureText(record.detail, 360) : undefined,
     provider: String(record.provider ?? "laptop_collector").slice(0, 80),
   };
 }

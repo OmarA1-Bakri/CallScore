@@ -1126,6 +1126,20 @@ test("transcript ingest validates records and avoids overwriting by default", ()
   assert.equal(statement.params[5], false);
 });
 
+test("transcript ingest preserves bounded failed-detail preview", () => {
+  const record = normalizeTranscriptIngestRecord({
+    video_id: 123,
+    youtube_video_id: "abcDEF_1234",
+    status: "failed",
+    error: "collector_tool_error",
+    detail: "Traceback (most recent call last):\\n  File yt_dlp/foo.py\\nTypeError: broken extractor",
+    provider: "laptop_collector_firefox",
+  });
+  const statement = buildTranscriptIngestSql(record);
+  assert.equal(statement.params[1], "collector_tool_error: Traceback (most recent call last): File yt_dlp/foo.py TypeError: broken extractor");
+  assert.equal(String(statement.params[1]).includes("\\n"), false);
+});
+
 test("HH media fallback defaults to safe one-video dry run and requires ASR", async () => {
   const args = parseMediaFallbackArgs([]);
   assert.equal(args.limit, 1);
@@ -1135,4 +1149,9 @@ test("HH media fallback defaults to safe one-video dry run and requires ASR", as
   assert.equal(args.maxFilesize, "200M");
   const asr = await detectAsr();
   assert.match(asr, /^(whisper|none)$/);
+});
+
+test("HH media fallback accepts zero gap for bounded canaries", () => {
+  const args = parseMediaFallbackArgs(["--gap-ms", "0"]);
+  assert.equal(args.gapMs, 0);
 });

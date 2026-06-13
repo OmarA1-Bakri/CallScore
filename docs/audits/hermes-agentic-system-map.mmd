@@ -195,3 +195,6 @@ flowchart LR
 
 %% 2026-06-13 readiness recheck note
 %% 2026-06-13 latest: Composio read-only SDK probe passed via local venv; public verify --source live passed; Gemma eval+production schemas pass 10/10; bounded 5-row full-transcript shadow sample rows=5 schema=5/5 accepted=1 diff removed=2 changed=1 no_accepted=2 manual_review=0; transcript remains degraded by bot verification / ASR absence; no public/spend/Whop/DB mutation.
+
+%% 2026-06-13 transcript classification update
+%% HH yt-dlp bounded canary => bot_verification_required. Waterfall dry-run => pending_handoff / external_handoff_required / laptop_ytdlp with previous_failure_reason=bot_verification_required. HH media fallback => asr_unavailable. Composio configured locally but read-only SDK discovery blocked by auth_invalid_or_expired. Whop gates and Art of War private dry-run remain fail-closed. No production DB writes, deploys, Whop mutation, public action, paid provider, cookie print, or spend.

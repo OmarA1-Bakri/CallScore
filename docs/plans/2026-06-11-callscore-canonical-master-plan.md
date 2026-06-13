@@ -146,6 +146,82 @@ Next exact safe action:
 Inspect latest transcript collector job 1832 failures and repair targeting/failure classification; then run only a bounded limit-5 laptop/cookie collector or local ASR-backed canary. Separately review the Gemma shadow diff artifact before requesting explicit shadow:promote/write-canary approval.
 ```
 
+### 0.0.3 2026-06-13 transcript blocker classification after `9a2a46b`
+
+```text
+CANONICAL HEAD BEFORE REMEDIATION: 9a2a46b Record canonical readiness after Gemma shadow sample
+CANONICAL BRANCH: master
+CANONICAL FULL-SYSTEM READINESS: PARTIAL
+SAFE OPERATION MODE: READY — read-only / dry-run / artifact-only / approval-gated lanes
+TARGET-PRICE LEAK: FIXED LIVE
+PUBLIC LIVE VERIFY: PASS, HH-read source aligned
+WORKPLANE: OK, automation_readiness=PARTIAL
+TRANSCRIPT CADENCE: NOT PROVEN; EXACT EXTERNAL/LAPTOP/ASR BLOCKERS CLASSIFIED
+COMPOSIO MCP: CONFIGURED LOCALLY; AUTH INVALID/EXPIRED FOR TOOL DISCOVERY
+GEMMA/QWEN SHADOW: READY_WITH_GATES / ARTIFACT-ONLY
+PUBLIC / SPEND / WHOP / DB MUTATION: APPROVAL-GATED
+```
+
+Fresh transcript evidence:
+
+- Latest Workplane transcript collector state still shows job `1832`, attempted `5`, successes `0`, failures `5`, recent reason `transcript_failed`; cooldown is clear.
+- HH yt-dlp bounded dry-run (`limit=1`, no DB write) classified the provider blocker as `bot_verification_required`.
+- Transcript waterfall bounded dry-run (`limit=3`, methods `hh-yt-dlp-ejs-wpc,laptop-yt-dlp,media-asr-fallback`) produced a safe handoff record instead of retrying broadly:
+  - `status="pending_handoff"`
+  - `reason="external_handoff_required"`
+  - `method="laptop_ytdlp"`
+  - `previous_failure_reason="bot_verification_required"`
+  - video candidate `cryptowendyo` / `NdO9GZMJfj0`
+- HH media fallback dry-run (`limit=1`) remains blocked by `asr_unavailable`; `yt-dlp` and `ffmpeg` are present, but local Whisper/faster-whisper style ASR runtime is absent.
+- No production DB writes, broad transcript retries, paid providers, cookie printing, deploys, Whop mutation, public action, or spend were performed.
+
+Code hardening from this pass:
+
+- Failed transcript ingest now preserves a bounded, normalized failure detail preview in `transcript_error`, preventing future opaque `transcript_failed` rows when laptop/collector output includes a traceback or tool failure.
+- Laptop collector classifier now recognizes Python/tool traceback and PowerShell runtime exceptions as `collector_traceback`.
+- Transcript handoff audit records `previous_failure_reason`, so Workplane/Hermes can show why HH acquisition yielded to laptop collection.
+- Media fallback CLI parsing now accepts `--gap-ms 0` as an intentional zero delay instead of falling back to the default gap.
+
+Composio / MCP evidence:
+
+- Local Composio config paths and API-key variable names exist, and an isolated SDK probe environment was created under `.tmp/` without committing it or printing secrets.
+- Read-only tool-discovery probes fail with `AuthenticationError`; current blocker is `auth_invalid_or_expired`, not missing project context.
+- Exact operator action: refresh/store a valid Composio API key in the approved local secret store or env file, never chat, then rerun the read-only `composio_mcp_probe` workflow.
+
+Whop / marketing safety evidence:
+
+- Targeted Whop/workplane/receipt tests pass and Whop mutation paths remain fail-closed without approval receipts.
+- Art of War private dry-run executed with `public_action_performed=false`, `external_mutation_performed=false`, and `failure_class=audience_mismatch`; no public action or spend.
+
+Validation after transcript-classification patch:
+
+- `git diff --check`: pass.
+- Targeted transcript/laptop tests: `53/53` pass.
+- Targeted Workplane/receipt/Whop tests: `39/39` pass.
+- `npm run typecheck`: pass.
+- `npm run lint`: pass.
+- `npm run build`: pass.
+- `npm run hygiene`: pass, `Secret hygiene: ok`.
+- Full test sweep: `635/635` pass.
+- `npm run workplane:status` with approved local env: `OK`, `automation_readiness=PARTIAL`.
+- `npm run freshness:check` with approved local env: `WARN`, no blockers; transcript provider/bot warnings remain.
+- `npm run audit:pipeline` with approved local env: exit `0`, blockers still `missing_publication_dates`, `missing_transcripts_or_terminal_reasons`, `pending_shadow_recheck`.
+- `npm run verify:public`: pass local direct-DB mode.
+- `npm run verify:public -- --source live --base-url https://call-score.com`: pass live HH-read mode.
+- Live `/api/health`: `ok=true`, `source=hh_read_api`; live creator `93` known target leak count remains `0`, with ETH/SOL/BTC gated target rows returning null target prices and preserved outcomes.
+
+Current blocker ranking:
+
+- P0: none for target-price monetization, live health, public HH-read verification, Whop mutation gates, or marketing spend/public gates.
+- P1: transcript useful cadence not proven until either laptop/cookie collector succeeds in a bounded run or local ASR is installed/configured; Composio MCP tool discovery blocked by invalid/expired local auth; Gemma promotion/write remains approval-gated after artifact-only evidence.
+- P2: stale mirror archive/delete, historical log redaction, Mermaid rendering, and prompt/doc consolidation.
+
+Next exact safe action:
+
+```text
+Run the bounded laptop transcript collector from the operator environment with browser cookies for the handoff candidate, or install/configure local ASR on the VM and rerun `npm run transcript:media-fallback -- --limit 1 --since-days 45 --dry-run --gap-ms 0`; then rerun `transcript_waterfall_canary` and only proceed to artifact-only Gemma/Qwen shadow over any new transcript evidence.
+```
+
 ```text
 CERTIFY AUTONOMOUS REVENUE: NO
 ```

@@ -2,12 +2,67 @@
 
 Date: 2026-06-13  
 Mode: remediation audit. Read/write scope: canonical repo docs/code plus safe Hermes prompt/script hardening. No provider/customer/public/paid/destructive action performed.  
-Verdict: **PARTIAL** — P0 local safety defects were remediated; full activation still depends on external Composio auth, transcript/ASR or laptop collector success, Gemma latency/schema pass, and a production/public-count deploy decision.
+Verdict: **PARTIAL** — safe read-only/dry-run operation is ready; full activation still depends on transcript cadence via laptop/ASR and refreshed Composio auth. Gemma/Qwen shadow is READY_WITH_GATES; public live HH-read verification and target-price safety pass.
+
+
+## 2026-06-13 transcript blocker classification from `9a2a46b`
+
+Strict status: **PARTIAL, safe-operation READY**.
+
+Fresh evidence:
+
+- Baseline before edits: `master` at `9a2a46b`, dirty only after the transcript-classification patch.
+- Workplane status: `OK`, `automation_readiness=PARTIAL`; latest transcript job `1832` still attempted `5`, successes `0`, failures `5`, and opaque `transcript_failed` rows.
+- Live public verification: `npm run verify:public -- --source live --base-url https://call-score.com` passed against HH-read source; live `/api/health` healthy; creator `93` leak count for `1700`, `60`, and `55000` remains `0`.
+- HH yt-dlp bounded canary (`limit=1`, dry-run, no DB write) classified `bot_verification_required`.
+- Transcript waterfall bounded canary (`limit=3`, dry-run, no DB write) returned `pending_handoff` with `reason=external_handoff_required`, `method=laptop_ytdlp`, and `previous_failure_reason=bot_verification_required`.
+- HH media fallback bounded canary (`limit=1`, dry-run) classified `asr_unavailable`; `yt-dlp` and `ffmpeg` exist, but local ASR runtime is absent.
+- Composio config/key variable presence was confirmed without printing values; isolated SDK probe reached auth checks but read-only tool discovery failed with `AuthenticationError`, so blocker is `auth_invalid_or_expired`.
+- Whop/readiness targeted tests passed and mutation paths remain fail-closed; no Whop mutation.
+- Art of War private dry-run produced `decision=revise_or_hold`, `failure_class=audience_mismatch`, `public_action_performed=false`, and `external_mutation_performed=false`.
+
+Fixes in this pass:
+
+- Preserve bounded failed-transcript detail in ingest instead of reducing all failures to opaque `transcript_failed`.
+- Classify Python/yt-dlp/PowerShell tracebacks in laptop collector output as `collector_traceback`.
+- Include `previous_failure_reason` in transcript handoff audit records.
+- Respect explicit `--gap-ms 0` for media fallback canaries.
+
+Receipts:
+
+- `.tmp/workflow-receipts/transcript_waterfall_canary/transcript-waterfall-20260613T165222Z.json` — blocked by `bot_verification_required` / `external_handoff_required` / `laptop_runner_required`.
+- `.tmp/workflow-receipts/composio_mcp_probe/composio-mcp-probe-20260613T165424Z.json` — blocked by `auth_invalid_or_expired`.
+- `.tmp/workflow-receipts/artofwar_campaign_dry_run/artofwar-dry-run-20260613T165507Z.json` — private dry-run held for audience mismatch.
+
+Validation after patch:
+
+- `git diff --check`: pass.
+- Targeted transcript/laptop tests: `53/53` pass.
+- Targeted Workplane/receipt/Whop tests: `39/39` pass.
+- `npm run typecheck`: pass.
+- `npm run lint`: pass.
+- `npm run build`: pass.
+- `npm run hygiene`: pass, `Secret hygiene: ok`.
+- Full test sweep: `635/635` pass.
+- Ops gates with approved local env: `workplane:status` OK/PARTIAL; `freshness:check` WARN/no blockers; `audit:pipeline` exit 0 with transcript/shadow/publication blockers; `verify:public` local pass; `verify:public -- --source live --base-url https://call-score.com` pass.
+- Live health/creator check: `/api/health` ok via HH read API; creator `93` known target leak count `0`, with target outcomes preserved and numeric target prices null for public/free rows.
+
+Updated blockers:
+
+- P0: none for safe read-only/dry-run operation.
+- P1: transcript useful cadence needs bounded laptop collector with cookies or local ASR setup; Composio read-only MCP needs refreshed local auth; Gemma promotion/write stays approval-gated.
+- P2: stale mirror archive/delete and historical log redaction.
+
+Next exact safe action:
+
+```text
+Run bounded laptop_ytdlp collector for the handoff candidate from the operator laptop/browser-cookie environment, or install/configure local ASR and rerun the bounded media fallback canary; then re-run transcript_waterfall_canary and only run artifact-only Gemma/Qwen shadow if new transcript evidence exists.
+```
 
 ## 1. Executive verdict
 
 - Ready for full Hermes control: **PARTIAL**
-- One-line reason: safe read-only/dry-run operation is now gated and receipted, but Composio is unauthenticated, transcript and Gemma canaries are not successful, public/spend/Whop/DB actions remain approval-gated, and live public count verification is out of sync.
+- One-line reason: safe read-only/dry-run operation is gated and receipted, target-price/public HH-read checks pass, and Gemma/Qwen is artifact-ready-with-gates; FULL remains PARTIAL because transcript cadence needs laptop/ASR and Composio tool discovery needs refreshed local auth.
 
 ## 2. Actual agents discovered
 
@@ -23,8 +78,8 @@ Verdict: **PARTIAL** — P0 local safety defects were remediated; full activatio
 | Marketing supervisor | `/srv/agents/hermes/orchestrators/marketing/supervisor.sh` | launch marketing agents | manual | Hermes CLI | script present | prompt files | private dry-run only | approval file required; receipt written | fail-closed | fixed; no inline creds | READY_WITH_GATES | shell audit |
 | Art of War jobs | `WORKPLANE_JOB_TYPES` + `/srv/agents/repos/Claude_Code_Automations` | campaign dry-run/eval | manual/worker | Python/Node artifacts | dry-run executed | docs/artifacts | artifact-only | publish/spend gates | none; dry-run only | low | CANONICAL_WITH_GATES | dry-run receipt |
 | Whop Workplane jobs | `WORKPLANE_JOB_TYPES` | provider/read/dry-run checks | manual/worker | Node/provider reads | specs present | Whop config/state | dry-run/read-only | Whop approval | blocked for mutation | env-dependent | CANONICAL_WITH_GATES | tests |
-| Transcript pipeline | `transcript:*`, Workplane jobs | transcript acquisition/ingest | manual/Workplane | laptop collector, yt-dlp, ffmpeg/ASR | worklist works; ASR missing | videos | bounded ingest only | approved path + receipts | low | cookies/env risk | PARTIAL | canary receipts |
-| Gemma shadow extraction | `shadow:*` scripts | model shadow extraction | manual/worker | Ollama/Gemma | model present; timed out in canary | existing transcripts | artifact-only | promotion approval | low | low | PARTIAL | shadow artifact/receipt |
+| Transcript pipeline | `transcript:*`, Workplane jobs | transcript acquisition/ingest | manual/Workplane | laptop collector, yt-dlp, ffmpeg/ASR | worklist works; HH yt-dlp hits bot verification; ASR missing; laptop handoff ready | videos | bounded ingest only | approved path + receipts | low | cookies/env risk | PARTIAL | canary receipts |
+| Gemma/Qwen shadow extraction | `shadow:*` scripts | model shadow extraction | manual/worker | Ollama/Gemma/Qwen | eval+production schema benchmarks pass; bounded sample/diff artifacts exist | existing transcripts | artifact-only | promotion approval | low | low | READY_WITH_GATES | shadow artifact/receipt |
 | HH Control Bridge | HH MCP/toolbox surface | read-only VM bridge | service/toolbox | MCP | listed but wrapper probe failed | VM/files | read-only first | write gate | low | low | PARTIAL | toolbox probe |
 | Codex/OMX skills | `/home/omar/.codex/skills/*` | prompt/workflow surfaces | prompt-triggered | Codex runtime | installed | repo/session | not production agents | prompt rules | low | low | PROMPT_ROUTER_TOKEN | skill files |
 
@@ -34,7 +89,7 @@ Non-agents: `$task-router`, `$ultraqa`, `$ultrawork`, `$ultragoal`, `$caveman` a
 
 - READY: public health/API read checks; `hygiene`; `workplane:status`; target-price monetization boundary.
 - READY_WITH_GATES: marketing prompts/supervisor after hardening; Whop read/dry-run jobs; Art of War dry-runs; receipt generation; report-only Workplane jobs.
-- PARTIAL: Hermes worker, transcript pipeline, Gemma shadow, Composio/HH toolbox, public count verification.
+- PARTIAL: Hermes worker, transcript pipeline, Composio auth/tool-discovery, HH toolbox formalization. Gemma/Qwen is READY_WITH_GATES; public live HH-read verification passes.
 - UNSAFE: no remaining active marketing inline-credential prompt found in the remediated target set; historical logs/snapshots remain sensitive and must not be printed.
 - STALE: `/srv/whop-auto/workspace/crypto-tuber-ranked`, `/srv/agents/crypto-tuber-ranked`, `/srv/agents/repos/crypto-tuber-ranked` remain inventories only; not deleted.
 - UNKNOWN: direct UseAgents/Context7/PostGREST runtime state.
@@ -92,15 +147,15 @@ Non-agents: `$task-router`, `$ultraqa`, `$ultrawork`, `$ultragoal`, `$caveman` a
 | target-price monetization | LIVE FIXED | deployed app | none known | monitor |
 | `workplane:status` | OK | script-controlled | none | schedule safely |
 | `freshness:check` | WARN/no blockers | script-controlled | provider warnings | monitor/receipt |
-| `audit:pipeline` | blockers present | script-controlled | missing publication dates; missing transcripts/terminal reasons; pending shadow recheck | repair transcript/Gemma |
-| `verify:public --base-url` | FAILED live count checks | script-controlled | live API/homepage counts differ from local publicCounts | inspect/deploy source or cache after approval |
+| `audit:pipeline` | blockers present | script-controlled | missing publication dates; transcript cadence terminal reasons now classified; shadow remains approval-gated | repair transcript cadence |
+| `verify:public -- --source live --base-url https://call-score.com` | PASS | script-controlled | none for HH-read source mode | keep scheduled read-only |
 | transcript worklist | PASS limit 5 | manual/script | none for worklist | run laptop collector or ASR repair |
-| transcript media fallback | BLOCKED | manual/script | ASR unavailable | install/configure ASR or laptop collector |
-| Gemma shadow canary | BLOCKED | script-controlled | Ollama timeout; schema pass 0/1 | tune prompt/model/timeout |
+| transcript media fallback | BLOCKED | manual/script | ASR unavailable; `--gap-ms 0` parsing fixed | install/configure ASR or laptop collector |
+| Gemma/Qwen shadow canary | READY_WITH_GATES | script-controlled | promotion/write approval required | review diff before any write canary |
 
 ## 10. MCP/toolbox audit
 
-- Composio: configured/context dirs present under `/home/omar/.composio` and `/srv/agents/hermes/composio-project-context`, but API key env is absent, CLI binary is absent, SDK import is absent in the active runtime; tool discovery not functional.
+- Composio: configured/context dirs present; API-key variable presence confirmed without printing values; isolated SDK probe under `.tmp/` reached API auth but read-only discovery failed with `AuthenticationError`. Current blocker: `auth_invalid_or_expired`.
 - UseAgents: listed in toolbox metadata; direct Codex app wrapper returned unknown-tool errors; needs operator/toolbox repair.
 - HH bridge: listed; direct app wrapper returned unknown-tool errors, but local VM evidence exists. Treat as partial.
 - PostGREST: no positive proof.
@@ -133,15 +188,15 @@ Secrets printed: **no intentional secret values** in this audit artifact.
 
 ## 14. Activation blockers
 
-- P0: Composio auth/API key/CLI/SDK missing for functional MCP; external credential rotation review for previously exposed credentials if active.
-- P1: transcript useful cadence not proven from this VM because local ASR is unavailable; Gemma and Qwen bounded shadow canaries wrote artifacts but schema pass remains 0; `verify:public --base-url` live count checks fail due local direct-DB counts versus live HH-read counts; audit pipeline blockers remain.
+- P0: none for safe read-only/dry-run operation; external credential rotation review remains owner action if previously exposed credentials are active.
+- P1: transcript useful cadence not proven from this VM because HH yt-dlp hits `bot_verification_required`, local ASR is unavailable, and laptop/cookie collector handoff is required; Composio read-only discovery blocked by `auth_invalid_or_expired`; audit pipeline blockers remain.
 - P2: stale mirror archive/delete; historical log redaction; Mermaid SVG rendering; prompt/doc consolidation.
 
 ## 15. Recommended migration to full Hermes control
 
-- Phase 1: Complete external Composio auth repair and credential rotation review; no public/spend/provider writes.
-- Phase 2: Prove transcript cadence via laptop collector limit 5 or install local ASR, then emit success receipt.
-- Phase 3: Tune Gemma extractor or fallback model until bounded shadow schema pass >0, then keep promotion approval-gated.
+- Phase 1: Complete external Composio auth refresh and credential rotation review; no public/spend/provider writes.
+- Phase 2: Prove transcript cadence via bounded laptop collector with cookies or install/configure local ASR, then emit success receipt.
+- Phase 3: Review Gemma/Qwen shadow diff artifacts and keep promotion/write approval-gated.
 - Phase 4: Resolve live public count mismatch via source/cache/deploy investigation; deploy only with explicit production approval.
 - Phase 5: Schedule only safe read-only/dry-run receipted lanes; leave Whop/DB/public/spend/credential actions approval-required.
 

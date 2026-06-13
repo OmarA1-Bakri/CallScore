@@ -321,7 +321,7 @@ function Classify-Failure([string]$text) {
   if ($text -match "(?i)(private video|video is unavailable|removed by the uploader|account has been terminated|login required)") { return "private_or_deleted" }
   if ($text -match "(?i)transcript_too_short") { return "transcript_too_short" }
   if ($text -match "(?i)(timed out|timeout|connection.*reset|connection.*closed|Incomplete data received)") { return "transient_network" }
-  if ($text -match "(?i)(^|\n)Traceback|yt[_-]?dlp\.|ExtractorError|AttributeError|KeyError|TypeError") { return "collector_tool_error" }
+  if ($text -match "(?is)(traceback\s+\(most recent call last\)|yt[_-]?dlp\.|ExtractorError|AttributeError|KeyError|TypeError|System\.Management\.Automation\.(RuntimeException|MethodInvocationException))") { return "collector_tool_error" }
   return "transcript_failed"
 }
 

@@ -613,6 +613,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
               reason: transcript.handoff.reason,
               provider: transcript.handoff.provider,
               method: transcript.handoff.method,
+              previous_failure_reason: transcript.handoff.previousFailureReason,
               video_id: video.id,
               creator_id: video.creator_id,
               youtube_video_id: video.youtube_video_id,
