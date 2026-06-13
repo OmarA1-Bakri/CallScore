@@ -8,6 +8,92 @@
 ---
 
 ## 0. Strict Verdict
+### 0.0.1 2026-06-13 Activation / Monetization Boundary / Operationalization Update
+
+```text
+TARGET-PRICE MONETIZATION PATCH: COMMITTED
+COMMIT: 2062a72 Protect target prices behind Pro entitlement
+DEPLOY STATUS: LIVE / VERIFIED
+LIVE PUBLIC API LEAK STATUS: FIXED
+OPERATIONALIZATION STATUS: MONETIZATION BOUNDARY DEPLOYED; FULL SYSTEM ACTIVATION REMAINS PARTIAL
+```
+
+Current canonical source state:
+
+- Active source tree: `/opt/crypto-tuber-ranked`.
+- Stale/thin mirrors were observed under `/srv/agents/...` and `/srv/whop-auto/...`; do not treat them as production source of truth unless revalidated.
+- Commit `2062a72159795d215c77536813813f63175b67c7` implements the target-price monetization boundary.
+- Netlify project confirmed: `call-score` / `https://call-score.com`.
+- An earlier authorized production deploy was interrupted. The local Netlify deploy process was killed and deploy id `6a2d0e6b8edfb59624b86d85` remained `state=new`, `published_at=null`.
+- A fresh authorized Netlify production deploy completed successfully: deploy id `6a2d0f971463d69d78b32371`, `state=ready`, `published_at=2026-06-13T08:08:39.809Z`, URL `https://6a2d0f971463d69d78b32371--call-score.netlify.app`.
+- Production alias `https://call-score.com` now serves the target-price monetization boundary from commit `2062a72`.
+
+Monetization boundary now in committed code:
+
+- Creator call-history target prices are `Pro` gated, not `Alpha` gated.
+- Free/public users may see target existence and target outcome only.
+- Free/public serialized calls with a target return:
+  - `target_price: null`
+  - `validated_target_price: null`
+  - `raw_quote: null` as an extra leak guard
+  - `hit_target` preserved
+  - `target_status` preserved
+  - `target_required_tier: "pro"`
+  - `can_view_target_price: false`
+- Pro/Alpha serialized calls with a target return the real numeric `target_price` and `can_view_target_price: true`.
+- UI target-cell rendering:
+  - no target: `—`
+  - free/public gated hit: `Pro ✓`
+  - free/public gated miss: `Pro ✕`
+  - entitled path: formatted numeric target plus `✓` / `✕`
+- Pricing copy now states:
+  - Free: creator profiles and call-history summaries.
+  - Pro: target prices, exports, alerts, and watchlists.
+  - Alpha: backtests, API keys, webhooks, and advanced signal workflows.
+
+Verification evidence before commit:
+
+- `git diff --check`: pass.
+- `npm run typecheck`: pass.
+- `npm run lint`: pass.
+- `npm run build`: pass.
+- Targeted target-boundary/page tests: `31/31` pass.
+- Explicit full test sweep: `615/615` pass.
+- `npm run hygiene`: `Secret hygiene: ok`.
+
+Live verification evidence after deploy:
+
+- `https://call-score.com/api/health`: healthy (`ok=true`, `db=ok`, HH read API source).
+- `https://call-score.com/api/creator/93?limit=100`: no known target-price leak rows for `1700`, `60`, or `55000`.
+- Public/free API target rows now show:
+  - `ETHUSDT` bearish: `target_price=null`, `validated_target_price=null`, `hit_target=true`, `target_required_tier="pro"`, `can_view_target_price=false`.
+  - `SOLUSDT` bullish: `target_price=null`, `validated_target_price=null`, `hit_target=true`, `target_required_tier="pro"`, `can_view_target_price=false`.
+  - `BTCUSDT` bearish: `target_price=null`, `validated_target_price=null`, `hit_target=false`, `target_required_tier="pro"`, `can_view_target_price=false`.
+- Headless Chromium live DOM check on `/creator/99bitcoins`, page 3 of call history: `Pro ✓` appears twice, `Pro ✕` appears once, and `1,700` / `60` / `55,000` target labels are absent.
+
+Immediate P0:
+
+```text
+TARGET-PRICE MONETIZATION BOUNDARY IS LIVE. NEXT P0: CONTINUE FULL ACTIVATION AUDIT WITHOUT WEAKENING REMAINING GATES.
+```
+
+Public monetization safety for target prices is certified for the known 99Bitcoins leak vector. Do not certify full autonomous revenue while transcript cadence, Gemma shadow hold, Whop mutation approval, Art of War public-action approval, and full VM activation gates remain unresolved.
+
+Operationalization sequence from this state:
+
+1. Confirm no orphan Netlify/Next build processes remain.
+2. Confirm working tree clean and `HEAD == 2062a72`.
+3. Confirm Netlify latest deploy `6a2d0e6b8edfb59624b86d85` is not published or has failed/cancelled before starting another deploy.
+4. Run a fresh production deploy only with explicit operator approval.
+5. After deploy, verify:
+   - `/api/health` healthy.
+   - `/api/creator/93?limit=100` does not expose `target_price` values `1700`, `60`, or `55000` to public/free requests.
+   - Target rows preserve outcomes and include `target_required_tier="pro"` / `can_view_target_price=false`.
+   - `/creator/99bitcoins` renders `Pro ✓`, `Pro ✓`, `Pro ✕` and not numeric target labels for free/public users.
+6. If live verification passes, update this master plan with deploy id, published timestamp, and leak-fixed verdict.
+7. Then continue full-system activation gates: transcript cadence, Hermes/workplane, Gemma shadow hold, Whop read-only checks, Art of War private loop, secret hygiene, and ops docs.
+
+
 
 ```text
 CERTIFY AUTONOMOUS REVENUE: NO
@@ -4895,3 +4981,170 @@ Workplane status now exposes the latest private campaign receipt summary via `la
 ### Next hard target
 
 Repair the transcript collector’s yt-dlp traceback root cause and target known caption-available videos for the next single limit-5 canary. In parallel, revise the Receipts / Proof of Accuracy private campaign to improve skeptical and low-trust persona scores; rerun `campaign-loop --dry-run` only, with no public action.
+
+---
+
+## 2026-06-13 Complete Operationalization Prompt
+
+Use this prompt to take the whole system from the current committed-but-not-live state through deployment, verification, cleanup, and activation readiness. It intentionally keeps destructive/provider/data mutations approval-gated.
+
+```text
+$task-router $ultraqa $ultrawork $ultragoal $caveman
+
+Goal: Operationalize CallScore end-to-end from current committed state to activation-ready system.
+
+Repo / source of truth:
+- Active repo: /opt/crypto-tuber-ranked
+- Canonical branch: master
+- Required commit baseline: 2062a72 Protect target prices behind Pro entitlement
+- Production host: Netlify project call-score, https://call-score.com
+- Production DB: HH PostgreSQL via HH read API and approved app paths
+- Stale mirrors under /srv/agents and /srv/whop-auto may exist; inspect only for drift, do not patch unless proven active.
+
+Current critical state:
+- Target-price monetization boundary is committed locally in 2062a72.
+- Live production still leaks the three known 99Bitcoins numeric target prices until a new Netlify production deploy is completed and verified.
+- Previous deploy attempt for 2062a72 was interrupted; Netlify deploy id 6a2d0e6b8edfb59624b86d85 was observed as state=new and unpublished. Re-check this before starting another deploy.
+- Last known live deploy before this fix: 6a2cf2b0801ccf40b3596b27.
+
+Hard safety rules:
+- Do not print secrets, env values, tokens, API keys, connection strings, cookies, or private keys.
+- Do not mutate production DB except through explicitly approved, bounded, repo-approved app paths.
+- No destructive SQL: no DROP, TRUNCATE, broad DELETE/UPDATE, destructive migrations, recomputes, or backfills without explicit scoped approval.
+- Do not change Whop pricing/products/plans/payment/customer state.
+- Do not rotate credentials or edit provider env vars.
+- Do not send email, post publicly, publish marketing, trigger spend, or run open-ended scraping/extraction/LLM jobs.
+- Do not restart/stop services, purge queues, delete Docker volumes/images, or mutate systemd/Docker production runtime without explicit approval.
+- Netlify production deploy of commit 2062a72 is authorized only if the operator explicitly grants it in the current session. If not present, stop and request exact approval.
+- All external production-visible actions must have exact command, reason, risk, rollback/alternative, and post-checks.
+
+Phase 0 — interrupted deploy safety check:
+1. Check for orphan local processes:
+   - netlify deploy
+   - next build
+   - npm run build
+   - @netlify/build
+2. If a prior deploy process is still running from an interrupted turn, stop it before any new deploy.
+3. Read Netlify deploy list/API for project call-score and record latest deploy id/state/published_at without exposing secrets.
+4. If deploy 6a2d0e6b8edfb59624b86d85 is ready/published, skip redeploy and go straight to live verification. If state=new/failed/cancelled/unpublished, proceed only if deploy approval is active.
+
+Phase 1 — repo integrity before deploy:
+1. cd /opt/crypto-tuber-ranked
+2. Confirm HEAD is 2062a72 or explain drift.
+3. Confirm git status clean except intentional masterplan/doc updates. If docs changed after 2062a72, decide whether to deploy app commit 2062a72 exactly or commit docs separately; do not accidentally deploy unreviewed code.
+4. Run:
+   - git diff --check
+   - npm run typecheck
+   - npm run lint
+   - npm run build
+   - node --import tsx --test tests/creator-target-entitlements.test.ts tests/public-integrity.test.ts tests/page-pricing-shape.test.ts tests/page-creator-shape.test.ts tests/components-no-lucide-decoration.test.ts
+   - node --import tsx --test $(find tests -name '*.test.ts' | sort)
+   - npm run hygiene
+5. If any fail, fix surgically, re-run failing gates, then full relevant gates.
+
+Phase 2 — Netlify production deploy:
+1. Use canonical Netlify project call-score.
+2. Preferred safe command if deploying current clean app tree:
+   netlify deploy --prod --build --message "Protect target prices behind Pro entitlement 2062a72"
+3. Capture deploy id, deploy URL, alias URL, state, and published_at.
+4. If deploy fails or is interrupted, do not claim live fixed. Record deploy id and state, then stop or retry only with clear evidence and approval.
+
+Phase 3 — live public monetization verification:
+1. Read-only check:
+   - https://call-score.com/api/health
+   - https://call-score.com/api/creator/93?limit=100
+   - https://call-score.com/creator/99bitcoins
+2. Expected health:
+   - ok true or equivalent healthy response.
+3. Expected public/free creator API result:
+   - No numeric target_price values 1700, 60, 55000 in public/free response.
+   - ETHUSDT bearish row: target_price null, hit_target true, target_required_tier pro, can_view_target_price false.
+   - SOLUSDT bullish row: target_price null, hit_target true, target_required_tier pro, can_view_target_price false.
+   - BTCUSDT bearish row: target_price null, hit_target false, target_required_tier pro, can_view_target_price false.
+   - target_status preserved.
+4. Expected UI result:
+   - Free/public /creator/99bitcoins renders Pro ✓ for ETH target hit.
+   - Free/public /creator/99bitcoins renders Pro ✓ for SOL target hit.
+   - Free/public /creator/99bitcoins renders Pro ✕ for BTC target miss.
+   - Numeric labels 1,700, 60, 55,000 are not visible to free/public users.
+5. If live API still leaks target prices, inspect deploy alias/current deploy. Do not mutate DB. Fix deploy/source mismatch first.
+
+Phase 4 — whole-system read-only activation audit:
+Audit and summarize, redacting secrets:
+- OS/disk/memory/load.
+- Node/npm versions.
+- active repos under /opt, /srv, /home/omar relevant to CallScore.
+- git status/HEAD/remotes without printing credential-bearing URLs.
+- systemd services: callscore read API, enqueue server, relevant workers.
+- Docker containers/images/volumes summary, no deletion.
+- listening ports and process tree summary.
+- Netlify project/deploy state.
+- HH read API status and public API health.
+- workplane status read-only.
+- Hermes worker status read-only.
+- cron/timers/scheduled jobs summary.
+- transcript tools: yt-dlp, ffmpeg, ASR availability, no open-ended fetches.
+- DB connectivity only via approved safe helpers or bounded read-only queries.
+- logs only with secret redaction.
+- hidden stale worktrees/backups/tmp artifacts; classify, do not delete user backups.
+
+Phase 5 — cleanup / TD reduction:
+Before editing or deleting, classify candidates:
+1. safe delete
+2. safe move/archive
+3. code simplification
+4. doc cleanup
+5. needs approval
+Allowed without extra approval:
+- local repo doc updates
+- small test/doc cleanup
+- removing generated temp artifacts under disposable repo temp dirs only when proven agent-created
+- small status/audit script improvements with tests
+Not allowed without explicit approval:
+- deleting backup files
+- deleting Docker volumes/images
+- stopping/restarting services
+- DB writes/recomputes/backfills
+- Whop/Netlify config changes beyond the already-approved deploy
+- git push/merge unless separately authorized
+
+Phase 6 — activation gates:
+Inspect package.json first, then run safe available commands:
+- npm run workplane -- status
+- npm run freshness:check
+- npm run audit:pipeline
+- npm run verify:public
+- npm run hygiene
+If a script is absent or unsafe in the current environment, skip with exact reason. Document known baseline failures as unrelated only with exact failing command/test and rationale.
+
+Phase 7 — known blockers and holds:
+Do not mark FULL activation if any remain:
+- public target-price API leak not fixed live.
+- transcript provider success remains 0/useful transcript cadence not proven.
+- Gemma JSON/schema pass rate remains 0 or write-canary ineligible.
+- Whop revenue/mutation gates lack explicit approval.
+- Art of War public publish/outreach/spend lacks explicit approval.
+- DB safety/audit or Hermes status is unknown.
+
+Final verdict format:
+1. Activation verdict: FULL / PARTIAL / BLOCKED
+2. Commit SHA and deploy id/url/state
+3. Live public API leak fixed: yes/no with evidence
+4. Free UI target labels verified: yes/no with evidence
+5. Pro/Alpha target path implemented/tested: yes/no and limits
+6. VM audit summary
+7. Workplane/Hermes/freshness summary
+8. Cleanup completed
+9. TD removed/reduced
+10. Remaining TD ranked P0/P1/P2
+11. Production blockers
+12. Commands run + pass/fail
+13. Files changed
+14. Untracked files intentionally preserved
+15. Next exact safe command/action
+
+Stop condition:
+- Live target-price leak is fixed or explicitly blocked.
+- All safe local verification and read-only audits complete.
+- Remaining blockers require explicit approval, credentials, provider state, or external state.
+```
