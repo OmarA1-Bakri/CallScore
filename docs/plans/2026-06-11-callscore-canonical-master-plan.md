@@ -93,7 +93,58 @@ Operationalization sequence from this state:
 6. If live verification passes, update this master plan with deploy id, published timestamp, and leak-fixed verdict.
 7. Then continue full-system activation gates: transcript cadence, Hermes/workplane, Gemma shadow hold, Whop read-only checks, Art of War private loop, secret hygiene, and ops docs.
 
+### 0.0.2 2026-06-13 Canonical readiness update after `85f6757`
 
+```text
+CANONICAL HEAD: 85f6757 Extend Gemma shadow evidence with bounded diff sample
+CANONICAL BRANCH: master
+CANONICAL FULL-SYSTEM READINESS: PARTIAL
+SAFE OPERATION MODE: YES — read-only / dry-run / report-only lanes
+CERTIFY AUTONOMOUS REVENUE: NO
+TARGET-PRICE LEAK: FIXED LIVE
+PUBLIC LIVE VERIFY: PASS, HH-read source aligned
+WORKPLANE: OK, automation_readiness=PARTIAL
+GEMMA SHADOW: READY_WITH_GATES / ARTIFACT-ONLY
+TRANSCRIPT CADENCE: PARTIAL / TARGETING REPAIR REQUIRED
+PUBLIC / SPEND / WHOP / DB MUTATION: APPROVAL-GATED
+```
+
+Current canonical source state:
+
+- Active repo remains `/opt/crypto-tuber-ranked`.
+- Current canonical commit is `85f6757 Extend Gemma shadow evidence with bounded diff sample` on `master`.
+- The target-price monetization leak remains fixed live: public creator `93` exposes no numeric `target_price` / `validated_target_price` values for known targets `1700`, `60`, or `55000`; the ETH/SOL/BTC rows preserve `hit_target`, `target_required_tier="pro"`, and `can_view_target_price=false`.
+- `npm run verify:public -- --source live --base-url https://call-score.com` passes against the live HH-read source: health ok, leaderboard metadata equals rows (`36/36`), and homepage funnel counts are non-zero (`raw=16186`, `public=7995`, `ranked=42`).
+- Workplane status is `OK` with `automation_readiness=PARTIAL`; the daily pipeline timer is active; current source safety shows `unsafe_source_ranks=0` and `api_unsafe_official.count=0`.
+- Freshness status is `WARN` with no blockers; warnings are transcript-only (`transcript provider credential missing failures=2`, `yt-dlp bot verification failures=9`).
+
+Gemma / shadow extraction state:
+
+- PR #66 eval-schema benchmark and the current production-schema benchmark have both been reconciled and pass `10/10` under separate explicit schema contracts.
+- Latest real-transcript bounded sample: `.tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.jsonl`.
+- Sample evidence: `rows=5`, `videos=5`, `schema_valid=5/5`, `failed_records=0`, `accepted_calls=1`, full transcript coverage `5/5`.
+- Shadow diff evidence: `removed_calls=2`, `changed_calls=1`, `no_accepted_calls=2`, `manual_review=0`.
+- A durable committed summary exists at `docs/audits/gemma-production-shadow-sample-fullcover-20260613T155241Z.summary.json`.
+- Promotion/write remains blocked until explicit operator approval after diff review. No production writes, deploy, paid LLM/API calls, Whop mutation, public action, or spend were performed.
+
+Transcript / ingestion state:
+
+- Transcript cadence remains the main operational P1.
+- Latest bounded collector evidence: job `1832`, attempted `5`, successes `0`, failures `5`, success rate `0`, recent failure reason `transcript_failed=15`; cooldown is clear.
+- Freshness warnings still show provider-credential and YouTube bot-verification failures.
+- Next safe action is not a broad rerun; first repair transcript targeting/failure classification, then run a bounded laptop/cookie collector or ASR-backed canary.
+
+Current blocker ranking:
+
+- P0: none for known live target-price leak or live public HH-read verification.
+- P1: transcript cadence/failure classification; Gemma promotion/write approval and diff review; audit-pipeline transcript/shadow completeness; Composio MCP/CLI formalization; Whop/public marketing/provider mutations remain approval-gated.
+- P2: stale mirrors, historical log redaction, and credential rotation review require explicit archive/rotation owner action.
+
+Next exact safe action:
+
+```text
+Inspect latest transcript collector job 1832 failures and repair targeting/failure classification; then run only a bounded limit-5 laptop/cookie collector or local ASR-backed canary. Separately review the Gemma shadow diff artifact before requesting explicit shadow:promote/write-canary approval.
+```
 
 ```text
 CERTIFY AUTONOMOUS REVENUE: NO
@@ -119,10 +170,10 @@ Previous P0 blocker from the earlier master plan:
 
 That blocker has been superseded by later provider work.
 
-Current P0 blocker:
+Historical P0 blocker, superseded by later HH-read/live-source verification:
 
 ```text
-PUBLIC LEADERBOARD DATA CONTRACT IS COMMERCIALLY UNSAFE.
+PUBLIC LEADERBOARD DATA CONTRACT WAS COMMERCIALLY UNSAFE; CURRENT LIVE HH-READ VERIFY PASSES WITH UNSAFE SOURCE RANKS AT 0.
 ```
 
 Current meaning:
@@ -5175,8 +5226,8 @@ Remaining blockers:
 - P0: Composio MCP is not functional because local Composio auth/API key is missing; provide it only through the approved local secret store, not chat.
 - P0/P1: external credential rotation review for previously exposed credentials if active.
 - P1: useful transcript cadence is not proven; run laptop collector limit 5 or configure local ASR, then rerun canary.
-- P1: Gemma shadow needs timeout/model/prompt repair until bounded schema pass >0.
-- P1: `verify:public --base-url https://call-score.com` reports live leaderboard/homepage count mismatch versus local publicCounts; inspect source/cache and deploy only with explicit production approval.
+- Superseded P1: Gemma schema/pass repair is complete under explicit eval and production contracts; latest bounded real-transcript sample has `schema_valid=5/5` and `accepted_calls=1`. Promotion/write remains approval-gated pending diff review.
+- Superseded P1: public verification now supports live HH-read source mode and `npm run verify:public -- --source live --base-url https://call-score.com` passes; no deploy or DB mutation required for this verification mismatch.
 - P2: stale mirrors/logs need approved archive/redaction cleanup; do not delete backups without approval.
 
 Next exact safe action:
@@ -5213,8 +5264,8 @@ Do not mark FULL until:
 
 1. Composio MCP has local auth/CLI/SDK and read-only tool discovery receipt.
 2. Transcript canary produces at least one useful transcript or operator laptop/cookie/ASR blocker is resolved.
-3. Shadow extraction has schema pass >0 with artifact receipt; promotion remains separately approval-gated.
-4. Public verification compares against the same production data source or the HH-read/local DB drift is reconciled.
+3. Shadow extraction has positive schema evidence (`5/5`) and artifact receipts; promotion/write remains separately approval-gated after diff review.
+4. Public verification remains source-aligned against the live HH-read source and continues to pass.
 5. Any externally exposed credentials from prior unsafe prompts are rotated by the provider owner if active.
 
 Next exact safe action:
@@ -5257,7 +5308,7 @@ Fresh validation:
 Remaining blockers before FULL:
 
 - P1 transcript: useful cadence not proven from this VM. Bounded canary terminal reason is `bot_verification_required`; local ASR is absent. Safe next action: configure local ASR or run the operator laptop/cookie collector limit 5, then rerun `transcript_waterfall_canary`.
-- P1 shadow: Qwen fallback schema pass is now positive, but Gemma still needs tuning and accepted-call quality remains zero. Promotion remains approval-gated.
+- P1 shadow: Gemma is no longer zero-state. Eval and production fixture benchmarks pass `10/10`; bounded real-transcript sample has `schema_valid=5/5` and `accepted_calls=1`. Promotion remains approval-gated pending diff review/write-canary approval.
 - P1 audit pipeline: missing publication dates, transcript terminal coverage, and shadow recheck coverage remain incomplete.
 - P1 Composio: SDK read-only probe works; MCP/CLI integration should be formalized before broad Composio automation.
 - P2 cleanup: stale mirrors, historical log redaction, and credential rotation review require explicit archive/rotation owner action.
