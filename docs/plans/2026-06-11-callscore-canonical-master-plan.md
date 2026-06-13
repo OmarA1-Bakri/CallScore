@@ -222,6 +222,61 @@ Next exact safe action:
 Run the bounded laptop transcript collector from the operator environment with browser cookies for the handoff candidate, or install/configure local ASR on the VM and rerun `npm run transcript:media-fallback -- --limit 1 --since-days 45 --dry-run --gap-ms 0`; then rerun `transcript_waterfall_canary` and only proceed to artifact-only Gemma/Qwen shadow over any new transcript evidence.
 ```
 
+### 0.0.4 2026-06-13 canonical laptop transcript path reactivated
+
+```text
+CANONICAL TRANSCRIPT PATH: OMAR LAPTOP COLLECTOR OVER TAILSCALE
+TRANSCRIPT CANARY STATUS: PASS — BOUNDED LIMIT 1 WRITE THROUGH APPROVED INGEST
+LATEST TRANSCRIPT SUCCESS: 2026-06-13 18:30:47+01
+SAFE OPERATION MODE: READY / PARTIAL
+FULL ACTIVATION: PARTIAL UNTIL REPEATED LIMIT-5 CADENCE AND DOWNSTREAM EXTRACTION/MATCH/SCORE GATES PASS
+```
+
+Correction to prior transcript blocker classification:
+
+- The canonical near-term transcript acquisition path is not HH direct `yt-dlp` or HH ASR fallback. It is the Omar laptop collector over Tailscale, certified by PR #64 and this master plan section `2026-06-12 Laptop Collector Post-Ingest Certification`.
+- HH direct `yt-dlp` remains diagnostic only and currently classifies `bot_verification_required`.
+- HH media fallback remains a future autonomy lane and is blocked until local ASR is installed/configured.
+
+Fresh access evidence:
+
+- Tailscale peer `omarslaptop-1` / `100.118.20.40` is online and reachable from HH.
+- HH can SSH into laptop WSL using the existing bridge key path, without printing secrets.
+- Windows `ssh hh` from the laptop was blocked at connect time, but WSL `ssh hermes-agent-box` works.
+- User-provided fixed collector exists at `C:\Users\albak\run-transcript-collector-fixed.ps1`.
+- A non-destructive working copy was created at `C:\Users\albak\run-transcript-collector-fixed-wslssh.ps1` so the Windows collector can call HH through explicit WSL SSH: `wsl.exe -d Ubuntu -u omar ssh hermes-agent-box`.
+
+Fresh canary evidence:
+
+- Dry-run limit 1 from laptop Firefox/residential path succeeded for video `KQNpABBLxzs`, transcript length `3035` chars, with no DB write.
+- Write limit 1 from the same path succeeded through approved HH transcript ingest:
+  - `mode=WRITE`
+  - `records=1`
+  - `updated=1`
+- Worklist after ingest moved to the next pending items, proving the ingested video no longer appears in the first pending slot.
+- Workplane status after ingest reports latest transcript success/attempt `2026-06-13 18:30:47.405219+01` and remains `OK` / `automation_readiness=PARTIAL`.
+- Freshness remains `WARN` with no blockers; warnings still include historical provider credential and HH yt-dlp bot-verification failures.
+- Receipt: `.tmp/workflow-receipts/transcript_waterfall_canary/laptop-canonical-write1-20260613T173047Z.json`.
+
+Safety:
+
+- No cookies, secrets, env values, DB URLs, tokens, or credential-bearing remotes were printed.
+- No deploy, Whop mutation, public action, paid provider/API, broad DB write, destructive SQL, or destructive infra action occurred.
+- DB mutation was limited to one approved transcript ingest record through the existing application path.
+- Downstream extraction/matching/scoring was intentionally not run in this step because it writes production call/scoring state and should run only under an explicit bounded pipeline scope.
+
+Updated blocker ranking:
+
+- P0: none for known live public target-price safety or safe read-only/dry-run operation.
+- P1: prove repeated transcript cadence with bounded limit-5 laptop collector runs; then run downstream extraction/matching/scoring through approved bounded pipeline gates. Composio auth still needs refresh for full MCP tool discovery.
+- P2: normalize the fixed laptop script back into canonical repo script once the WSL SSH bridge path is confirmed stable; stale mirror cleanup and historical log redaction remain later work.
+
+Next exact safe action:
+
+```text
+Run `C:\Users\albak\run-transcript-collector-fixed-wslssh.ps1 -Limit 5 -Browser firefox -GapSeconds 45 -SinceDays 45 -HhHost hermes-agent-box -Write` from Omar laptop when cooldown is clear, then run bounded post-ingest extraction/matching/scoring only under explicit approved pipeline scope.
+```
+
 ```text
 CERTIFY AUTONOMOUS REVENUE: NO
 ```

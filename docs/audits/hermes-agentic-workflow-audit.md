@@ -50,14 +50,46 @@ Validation after patch:
 Updated blockers:
 
 - P0: none for safe read-only/dry-run operation.
-- P1: transcript useful cadence needs bounded laptop collector with cookies or local ASR setup; Composio read-only MCP needs refreshed local auth; Gemma promotion/write stays approval-gated.
+- P1: transcript useful cadence now has a successful bounded limit-1 laptop ingest; repeated limit-5 cadence and downstream extraction/matching/scoring verification remain; Composio read-only MCP needs refreshed local auth; Gemma promotion/write stays approval-gated.
 - P2: stale mirror archive/delete and historical log redaction.
 
 Next exact safe action:
 
 ```text
-Run bounded laptop_ytdlp collector for the handoff candidate from the operator laptop/browser-cookie environment, or install/configure local ASR and rerun the bounded media fallback canary; then re-run transcript_waterfall_canary and only run artifact-only Gemma/Qwen shadow if new transcript evidence exists.
+Run bounded laptop collector limit 5 through `C:\Users\albak\run-transcript-collector-fixed-wslssh.ps1` when cooldown is clear, then run approved bounded downstream extraction/matching/scoring verification; keep HH ASR fallback as future autonomy lane only.
 ```
+
+
+## 2026-06-13 canonical laptop transcript path reactivation
+
+Status: **PARTIAL -> transcript canary PASS for bounded limit 1**.
+
+Fresh correction:
+
+- Canonical transcript path is Omar laptop collector over Tailscale, certified by PR #64; HH direct yt-dlp/ASR are fallback diagnostics only.
+- Tailscale peer `omarslaptop-1` / `100.118.20.40` is reachable from HH.
+- HH access to laptop WSL works through the existing bridge key; Windows `ssh hh` was blocked, but WSL `ssh hermes-agent-box` works.
+- User-provided fixed collector: `C:\Users\albak\run-transcript-collector-fixed.ps1`.
+- Working copy created on laptop: `C:\Users\albak\run-transcript-collector-fixed-wslssh.ps1`, using explicit WSL SSH to HH.
+
+Evidence:
+
+- Laptop dry-run limit 1 fetched captions for `KQNpABBLxzs`, transcript length `3035` chars, no DB write.
+- Laptop write limit 1 succeeded through approved HH ingest path: `records=1`, `updated=1`.
+- HH Workplane latest transcript success moved to `2026-06-13 18:30:47.405219+01`.
+- Fresh worklist no longer starts with `KQNpABBLxzs`; next pending items include `iUCCAQYntNw`, `OpGyIwR0rzA`, `X9gvhAEMuQ4`.
+- Receipt: `.tmp/workflow-receipts/transcript_waterfall_canary/laptop-canonical-write1-20260613T173047Z.json`.
+
+Safety:
+
+- Cookies remained laptop-local.
+- HH received transcript result only through the approved ingest path.
+- No deploy, Whop mutation, public action, paid provider/API, broad DB write, destructive SQL, or destructive infra action.
+- Downstream production extraction/matching/scoring intentionally not run in this pass.
+
+Current remaining blocker:
+
+- FULL still requires repeated bounded limit-5 laptop cadence plus approved downstream extraction/matching/scoring verification; Composio read-only MCP discovery still needs refreshed auth.
 
 ## 1. Executive verdict
 
