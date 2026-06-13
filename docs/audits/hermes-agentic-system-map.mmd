@@ -36,10 +36,10 @@ flowchart LR
     Worklist[transcript worklist\nPASS limit 5]
     Media[media fallback\nBLOCKED: ASR unavailable]
     Laptop[laptop collector\noperator/cookies required]
-    Gemma[Gemma shadow\nBLOCKED: timeout/schema 0]
+    Gemma[Gemma+Qwen shadow\nBLOCKED: schema 0]
   end
   subgraph MCP[MCP / Toolbox]
-    Composio[Composio\nNOT FUNCTIONAL: api key missing]
+    Composio[Composio\nNOT FUNCTIONAL: key/CLI/SDK missing]
     HHBridge[HH bridge\nPARTIAL wrapper issue]
     UseAgents[UseAgents\nneeds verification]
     Context7[Context7\nneeds verification]
@@ -56,10 +56,10 @@ flowchart LR
     OpenGate[Open-ended scrape/extract/LLM]
   end
   subgraph BLOCKERS[Remaining Blockers]
-    B1[Composio auth]
+    B1[Composio auth/CLI/SDK]
     B2[Transcript cadence]
     B3[Gemma timeout/schema]
-    B4[Public count mismatch]
+    B4[Public count source drift\nlive HH-read vs local DB]
     B5[External rotation review]
   end
 
@@ -190,3 +190,7 @@ flowchart LR
   ROT -->|approval gate| REC
   INFRA -->|approval gate| REC
   OPEN -->|approval gate| REC
+
+
+%% 2026-06-13 readiness recheck note
+%% FULL remains blocked: Composio key/CLI/SDK absent, local ASR absent, Gemma/Qwen schema pass 0, live public counts use HH-read data while local verifier uses direct DB.

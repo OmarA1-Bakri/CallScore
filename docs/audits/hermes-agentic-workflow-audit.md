@@ -100,7 +100,7 @@ Non-agents: `$task-router`, `$ultraqa`, `$ultrawork`, `$ultragoal`, `$caveman` a
 
 ## 10. MCP/toolbox audit
 
-- Composio: configured files present under `/home/omar/.composio`, but API key missing; CLI binaries missing; SDK present but raises `ApiKeyNotProvidedError`; tool discovery not functional.
+- Composio: configured/context dirs present under `/home/omar/.composio` and `/srv/agents/hermes/composio-project-context`, but API key env is absent, CLI binary is absent, SDK import is absent in the active runtime; tool discovery not functional.
 - UseAgents: listed in toolbox metadata; direct Codex app wrapper returned unknown-tool errors; needs operator/toolbox repair.
 - HH bridge: listed; direct app wrapper returned unknown-tool errors, but local VM evidence exists. Treat as partial.
 - PostGREST: no positive proof.
@@ -133,8 +133,8 @@ Secrets printed: **no intentional secret values** in this audit artifact.
 
 ## 14. Activation blockers
 
-- P0: Composio auth/API key missing for functional MCP; external credential rotation review for previously exposed credentials if active.
-- P1: transcript useful cadence not proven; local ASR unavailable; Gemma canary timed out/schema pass 0; `verify:public --base-url` live count checks fail; audit pipeline blockers remain.
+- P0: Composio auth/API key/CLI/SDK missing for functional MCP; external credential rotation review for previously exposed credentials if active.
+- P1: transcript useful cadence not proven from this VM because local ASR is unavailable; Gemma and Qwen bounded shadow canaries wrote artifacts but schema pass remains 0; `verify:public --base-url` live count checks fail due local direct-DB counts versus live HH-read counts; audit pipeline blockers remain.
 - P2: stale mirror archive/delete; historical log redaction; Mermaid SVG rendering; prompt/doc consolidation.
 
 ## 15. Recommended migration to full Hermes control
@@ -174,3 +174,38 @@ No provider, DB, public channel, Whop, Docker volume/image, or destructive infra
 ## 19. Next exact safe action
 
 Repair the Composio MCP auth gap by supplying a valid Composio API key through the approved local secret store (not chat), then run read-only tool discovery; in parallel run the laptop transcript collector limit 5 or install/configure local ASR and rerun the bounded transcript canary.
+
+
+---
+
+## 2026-06-13 Full-readiness recheck from `27d6e94`
+
+Verdict: **PARTIAL**. Safe read-only/dry-run operation remains ready, but FULL is not safe to claim.
+
+Fresh evidence:
+
+- Baseline: branch `master`, HEAD `27d6e94`, clean tree before audit, `git diff --check` pass.
+- Target monetization: live `/api/health` returned healthy and `/api/creator/93?limit=100` had `known_numeric_leaks=0` for `1700`, `60`, `55000`.
+- Receipt/fail-closed gates: `tests/workflow-receipts.test.ts` + `tests/workplane-jobs.test.ts` pass `16/16`; public publish and Whop mutation smoke receipts block with `approval_missing`.
+- Composio MCP: context dirs exist, but API key env false, CLI absent, SDK import absent; receipt `composio_mcp_probe` blocked by `auth_missing`.
+- Transcript waterfall: `transcript:worklist -- --limit 5 --since-days 45` returned 5 candidates; `transcript:media-fallback -- --limit 1 --dry-run` classified `asr_unavailable`; corrected receipt `transcript_waterfall_canary` blocked by `asr_unavailable`.
+- Gemma/Qwen shadow: Gemma limit-1 artifact `.tmp/shadow-extraction/gemma-shadow-20260613T102337Z.jsonl` schema pass `0/1` due Ollama timeout; Qwen fallback artifact `.tmp/shadow-extraction/qwen-shadow-20260613T102425Z.jsonl` schema pass `0/1` due non-array model output. Promotion remains blocked.
+- Public count mismatch: `verify:public` local passes with direct DB counts `rankedCreators=40`, `publicScoredCalls=2812`, `trackedCalls=5258`. Live `verify:public -- --base-url https://call-score.com` fails because live source is `hh_read_api`, live leaderboard rows are `36`, and live homepage displays HH-read counts `raw calls=16,186`, `public scored=7,995`, `ranked creators=42`. Local `.env.hermes` has `DATABASE_URL` but no `HH_READ_API_BASE`; root cause is local verifier source drift versus live HH-read source, not the target-price monetization patch.
+- Whop/revenue gates: targeted Whop/auth/checkout/webhook tests pass `35/35`; mutation smoke fails closed with `approval_missing`; no Whop mutation performed.
+- Art of War: dry-run succeeds only from `/srv/agents/repos/Claude_Code_Automations` cwd, returns `decision=revise_or_hold`, `failure_class=audience_mismatch`, `public_action_performed=false`, `external_mutation_performed=false`; receipt written.
+- Validation: `npm run typecheck`, `npm run lint`, `npm run build`, full `node --import tsx --test $(find tests -name '*.test.ts' | sort)` pass `620/620`, and `npm run hygiene` reports `Secret hygiene: ok`.
+- Operational scripts: `workplane:status` reports `status=OK` and `automation_readiness=PARTIAL`; `freshness:check` exits `0` with `WARN` and no blockers; `audit:pipeline` exits `0` but shows remaining publication/transcript/shadow incompleteness.
+
+Updated blockers:
+
+- P0: Composio MCP not functional from this VM until local auth/API key + CLI/SDK are supplied through approved local secret store/runtime.
+- P1: transcript useful cadence from this VM not proven; local ASR unavailable, laptop/cookie or ASR setup required.
+- P1: Gemma/Qwen shadow extraction still schema pass `0`; needs prompt/model/runtime tuning, no production writes.
+- P1: live public-count verification needs source alignment: either run verifier against the same HH read API source or reconcile the direct local DB versus live HH-read dataset; no DB/deploy mutation performed.
+- P2: Art of War campaign content remains held for audience mismatch; private revision only, no public action/spend.
+
+Next exact safe action:
+
+```text
+Install/configure Composio locally without printing secrets (API key via approved local secret store, CLI/SDK available), then rerun read-only `composio_mcp_probe`; separately configure local ASR or run the laptop transcript collector limit 5, then rerun bounded transcript and shadow canaries.
+```

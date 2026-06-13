@@ -5184,3 +5184,41 @@ Next exact safe action:
 ```text
 Provide valid Composio API key/auth via the approved local secret store and run read-only Composio tool discovery; in parallel run laptop transcript collector limit 5 or install/configure local ASR, then rerun transcript/Gemma canaries.
 ```
+
+
+---
+
+## 2026-06-13 Canonical full-readiness recheck after `27d6e94`
+
+Strict verdict: **PARTIAL**. The system is safer and validated for read-only/dry-run operation, but FULL activation is still blocked by external/local runtime readiness gaps.
+
+Fresh pass evidence:
+
+- HEAD/branch: `27d6e94` on `master`; baseline tree clean before probe; `git diff --check` pass.
+- Target-price monetization remains live-safe: health OK and no public/free target-price leak for `1700`, `60`, or `55000` on creator `93`.
+- Receipt gates and Workplane safety tests pass `16/16`; full test sweep passes `620/620`.
+- `npm run typecheck`, `npm run lint`, `npm run build`, and `npm run hygiene` pass.
+- Whop/revenue gates are read-only/dry-run and fail closed; targeted Whop suite passes `35/35`; no Whop mutation.
+- Art of War dry-run performs no public action/spend and returns hold/revise for audience mismatch.
+
+Fresh blocker evidence:
+
+- Composio MCP: not functional. Config/context dirs exist, but API key env is absent, CLI absent, SDK import absent. Receipt: `composio_mcp_probe` blocked by `auth_missing`.
+- Transcript waterfall: worklist limit 5 passes, but media fallback dry-run limit 1 returns `asr_unavailable`; no useful transcript produced from this VM.
+- Gemma shadow: Gemma and Qwen bounded artifacts exist, but schema pass remains `0/1`; Gemma timed out, Qwen returned non-array output. No production writes; promotion blocked.
+- Public count verification: local `verify:public` passes against direct DB counts (`rankedCreators=40`, `publicScoredCalls=2812`, `trackedCalls=5258`), while live `verify:public -- --base-url https://call-score.com` fails because live uses HH-read counts (`leaderboard=36`, homepage raw/public/ranked `16,186/7,995/42`). Root cause is source drift between local direct DB verification and live HH-read API source; no DB/deploy mutation performed.
+- Workplane reports `automation_readiness=PARTIAL`; freshness is `WARN` with no blockers; audit pipeline still shows transcript/shadow/publication incompleteness.
+
+Do not mark FULL until:
+
+1. Composio MCP has local auth/CLI/SDK and read-only tool discovery receipt.
+2. Transcript canary produces at least one useful transcript or operator laptop/cookie/ASR blocker is resolved.
+3. Shadow extraction has schema pass >0 with artifact receipt; promotion remains separately approval-gated.
+4. Public verification compares against the same production data source or the HH-read/local DB drift is reconciled.
+5. Any externally exposed credentials from prior unsafe prompts are rotated by the provider owner if active.
+
+Next exact safe action:
+
+```text
+Supply Composio auth through the approved local secret store and install/enable the local Composio CLI/SDK without printing secrets; then rerun read-only composio_mcp_probe. In parallel, configure local ASR or run the laptop transcript collector limit 5, then rerun transcript_waterfall_canary and gemma_shadow_canary.
+```
