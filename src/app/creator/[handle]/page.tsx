@@ -131,7 +131,8 @@ export default async function CreatorPage({ params }: PageProps) {
     }
   }
 
-  const serializedCalls = serializeCalls(allCalls);
+  const currentTier = await getCurrentTier();
+  const serializedCalls = serializeCalls(allCalls, { userTier: currentTier });
   const displayCalls = serializedCalls.slice(0, CALL_LIMIT);
   const trackedCallCount = allCalls.length;
   const scoreAverages = computeCreatorScoreAverages(allCalls);
@@ -166,7 +167,6 @@ export default async function CreatorPage({ params }: PageProps) {
   const avgAlpha30d = computeCreatorAvgAlpha30d(allCalls);
   const scoredCallCount = scoredCalls.length;
   const hitRate = computeCreatorHitRate(allCalls);
-  const currentTier = await getCurrentTier();
   const canExport = hasAccess(currentTier, "pro");
   const canWatchCreator = hasAccess(currentTier, "pro");
 

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       [limit],
     );
     const rows = parseApiRows(callRowSchema, rawRows, "v1 calls");
-    return NextResponse.json({ data: serializeCalls(rows) }, { headers: noStoreHeaders() });
+    return NextResponse.json({ data: serializeCalls(rows, { userTier: "alpha" }) }, { headers: noStoreHeaders() });
   } catch (error) {
     logger.error("v1_calls_failed", {
       error: error instanceof Error ? error.message : String(error),

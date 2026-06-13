@@ -115,7 +115,8 @@ export default async function CallDetailPage({ params }: PageProps) {
     // Videos table may not be present in some environments
   }
 
-  const serializedCall = serializeCall(call);
+  const currentTier = await getCurrentTier();
+  const serializedCall = serializeCall(call, { userTier: currentTier });
   const creatorName = creator?.name ?? "Unknown Creator";
   const creatorHandle = creator?.youtube_handle ?? "unknown";
   const ticker = SYMBOL_TICKERS[serializedCall.symbol] ?? serializedCall.symbol.replace("USDT", "");
@@ -154,7 +155,6 @@ export default async function CallDetailPage({ params }: PageProps) {
       ? serializedCall.public_score.toFixed(1)
       : "—";
   const showLivePerformance = serializedCall.is_live_open && serializedCall.live_return !== null;
-  const currentTier = await getCurrentTier();
   const showUpgradeCta = !hasAccess(currentTier, "pro");
 
   const return30dCellValue =

@@ -31,6 +31,25 @@ function formatSignedPercent(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
+function formatTargetPrice(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
+  }).format(value);
+}
+
+function getTargetOutcomeLabel(call: SerializedCall): string {
+  if (call.hit_target === true) return "✓";
+  if (call.hit_target === false) return "✕";
+  if (call.target_status === "pending") return "Pending 90d";
+  return "—";
+}
+
+function getTargetOutcomeClass(call: SerializedCall): string {
+  if (call.hit_target === true) return "text-pos";
+  if (call.hit_target === false) return "text-neg";
+  return "text-ink-600";
+}
+
 export default function CallHistory({
   calls,
   totalCount,
@@ -252,18 +271,18 @@ export default function CallHistory({
                     )}
                   </td>
                   <td className="px-4 py-3 text-center hidden md:table-cell">
-                    {call.validated_target_price === null ? (
-                      <span className="text-ink-600">--</span>
-                    ) : call.target_status === "pending" ? (
-                      <span className="text-xs uppercase tracking-wider text-ink-600">
-                        Pending 90d
+                    {call.target_required_tier === null ? (
+                      <span className="text-ink-600">—</span>
+                    ) : call.can_view_target_price === false ? (
+                      <span className={getTargetOutcomeClass(call)}>
+                        Pro {getTargetOutcomeLabel(call)}
                       </span>
-                    ) : call.hit_target === true ? (
-                      <span aria-label="Target hit" role="img" className="text-pos">✓</span>
-                    ) : call.hit_target === false ? (
-                      <span aria-label="Target missed" role="img" className="text-neg">✕</span>
+                    ) : call.target_price !== null ? (
+                      <span className={getTargetOutcomeClass(call)}>
+                        {formatTargetPrice(call.target_price)} {getTargetOutcomeLabel(call)}
+                      </span>
                     ) : (
-                      <span className="text-ink-600">--</span>
+                      <span className="text-ink-600">—</span>
                     )}
                   </td>
                 </tr>

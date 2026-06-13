@@ -116,7 +116,7 @@ export async function GET(
       const parsedCalls = parseApiRows(callRowSchema, readApiCreator.calls, "creator read API calls");
       const sortedCalls = sortCalls(parsedCalls, sortParam);
       const offset = (page - 1) * limit;
-      const serializedCalls = serializeCalls(sortedCalls.slice(offset, offset + limit));
+      const serializedCalls = serializeCalls(sortedCalls.slice(offset, offset + limit), { userTier });
       const total = sortedCalls.length;
 
       return NextResponse.json({
@@ -213,7 +213,7 @@ export async function GET(
     const stats = statsRows.length > 0 ? parseApiRow(creatorStatsRowSchema, statsRows[0], "creator stats") : null;
     const total = parseInt(countRows[0]?.count ?? "0", 10);
     const parsedCalls = parseApiRows(callRowSchema, callRows, "creator calls");
-    const serializedCalls = serializeCalls(parsedCalls);
+    const serializedCalls = serializeCalls(parsedCalls, { userTier });
 
     return NextResponse.json({
       data: {

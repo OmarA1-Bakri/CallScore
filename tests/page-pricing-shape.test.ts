@@ -17,8 +17,13 @@ test("/pricing has a 3-column plan grid", () => {
   assert.match(src, /tab:grid-cols-3|desk:grid-cols-3|grid-cols-3/);
 });
 
-test("/pricing keeps the feature matrix table with 12 features", () => {
+test("/pricing keeps the feature matrix table with the target-price boundary", () => {
   assert.match(src, /const FEATURES/);
+  assert.equal((src.match(/free: "/g) ?? []).length, 13);
+  assert.match(src, /Creator profiles \+ call-history summaries/);
+  assert.match(src, /Target prices in call history/);
+  assert.match(src, /Pro unlocks target prices|Pro adds target\s+prices/);
+  assert.match(src, /Alpha adds(?: the Backtest Lab,)? API keys,\s+webhook delivery logs, and advanced signal workflows/);
 });
 
 test("/pricing presents only the 90d recent-context filter as a paid feature", () => {

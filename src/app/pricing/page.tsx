@@ -5,7 +5,7 @@ import { EditorialSection, MetaStrip } from "@/components/primitives";
 
 const TITLE = "Pricing — CallScore";
 const DESCRIPTION =
-  "Three tiers: free, pro ($19/mo), alpha ($49/mo). Full research free. Alerts, exports, and API on paid.";
+  "Three tiers: free, pro ($19/mo), alpha ($49/mo). Free profiles and call-history summaries; Pro target prices, alerts, exports, and watchlists; Alpha backtests, API, webhooks, and advanced signals.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -25,7 +25,8 @@ interface FeatureRow {
 
 const FEATURES: readonly FeatureRow[] = [
   { label: "Full leaderboard",                          free: "yes", pro: "yes", alpha: "yes", href: "/" },
-  { label: "Profiles + call history",                   free: "yes", pro: "yes", alpha: "yes", href: "/" },
+  { label: "Creator profiles + call-history summaries", free: "yes", pro: "yes", alpha: "yes", href: "/" },
+  { label: "Target prices in call history",             free: "no",  pro: "yes", alpha: "yes", href: "/pricing#plans" },
   { label: "Alpha breakdowns",                          free: "yes", pro: "yes", alpha: "yes", href: "/methodology" },
   { label: "Methodology",                               free: "yes", pro: "yes", alpha: "yes", href: "/methodology" },
   { label: "Per-creator email alerts + queue",          free: "no",  pro: "yes", alpha: "yes", href: "/alerts" },
@@ -155,7 +156,8 @@ export default function PricingPage(): ReactElement {
           <em className="italic font-normal text-accent">Free research, paid delivery.</em>
         </h1>
         <p className="font-serif text-[20px] text-ink-700 leading-relaxed max-w-[760px]">
-          Leaderboards stay free. Paid tiers add alerts, exports, backtests, and API access.
+          Free includes creator profiles and call-history summaries. Pro unlocks target prices,
+          alerts, exports, and watchlists. Alpha adds backtests, API keys, webhooks, and advanced signals.
         </p>
         <MetaStrip
           cells={[
@@ -226,7 +228,7 @@ export default function PricingPage(): ReactElement {
             name="Free"
             price="$0"
             cadence="forever"
-            tagline="Full public research."
+            tagline="Profiles and call-history summaries."
             cta="Browse leaderboard"
             ctaHref="/"
             ctaVariant="soft"
@@ -235,7 +237,7 @@ export default function PricingPage(): ReactElement {
             name="Pro"
             price="$19"
             cadence="/mo"
-            tagline="Alerts, watchlists, exports."
+            tagline="Target prices, alerts, watchlists, exports."
             cta="Upgrade to Pro"
             ctaHref="/api/checkout/pro"
             manageLinks={[
@@ -248,7 +250,7 @@ export default function PricingPage(): ReactElement {
             name="Alpha"
             price="$49"
             cadence="/mo"
-            tagline="Backtests, API, webhooks."
+            tagline="Backtests, API, webhooks, signals."
             cta="Upgrade to Alpha"
             ctaHref="/api/checkout/alpha"
             manageLinks={[
@@ -361,10 +363,10 @@ export default function PricingPage(): ReactElement {
           </p>
           <p>
             <b className="text-ink-900">What do paid tiers actually buy?</b> Delivery, not
-            data. Pro alerts you when ranked creators move so you don&apos;t have to refresh.
-            Alpha adds the Backtest Lab, API keys, and webhook delivery logs for users who want
-            to build on the data. Anti-consensus delivery is marked preview until the consensus
-            worker is live.
+            data. Free includes creator profiles and call-history summaries. Pro adds target
+            prices, alerts, watchlists, and exports. Alpha adds the Backtest Lab, API keys,
+            webhook delivery logs, and advanced signal workflows for users who want to build on
+            the data. Anti-consensus delivery is marked preview until the consensus worker is live.
           </p>
           <p>
             <b className="text-ink-900">Refunds?</b> 30 days, full refund. Send the
