@@ -434,7 +434,7 @@ test("shadow promotion write path can use an injected provider-portable transact
     })}\n`,
   );
 
-  const executed: string[] = [];
+  const executed: Array<{ sql: string; params: readonly unknown[] }> = [];
   await promoteShadowMain(
     [
       "--shadow-in",
@@ -455,8 +455,8 @@ test("shadow promotion write path can use an injected provider-portable transact
       replaceStoredCallsForVideo: (options) =>
         replaceStoredCallsForVideo(options, {
           transaction: async (callback) =>
-            callback(async (sql) => {
-              executed.push(sql.replace(/\s+/g, " ").trim());
+            callback(async (sql, params = []) => {
+              executed.push({ sql: sql.replace(/\s+/g, " ").trim(), params });
               return [];
             }),
         }),
@@ -464,13 +464,32 @@ test("shadow promotion write path can use an injected provider-portable transact
   );
 
   assert.deepEqual(
-    executed.map((sql) => sql.split(" ").slice(0, 3).join(" ")),
+    executed.map((statement) => statement.sql.split(" ").slice(0, 3).join(" ")),
     ["DELETE FROM calls", "INSERT INTO calls"],
   );
   const rows = readFileSync(auditOut, "utf8")
     .trim()
     .split(/\r?\n/)
     .map((line) => JSON.parse(line));
+  const insert = executed.find((statement) => statement.sql.startsWith("INSERT INTO calls"));
+  assert.ok(insert);
+  assert.deepEqual(insert.params.slice(0, 15), [
+    7,
+    101,
+    "BTCUSDT",
+    "bullish",
+    "buy",
+    100,
+    125,
+    90,
+    "30d",
+    "high",
+    "technical_analysis",
+    "BTC higher",
+    0.9,
+    0.8,
+    "2026-01-01T00:00:00.000Z",
+  ]);
   assert.equal(rows[0].phase, "before_write");
   assert.equal(rows[1].phase, "after_write");
 });
