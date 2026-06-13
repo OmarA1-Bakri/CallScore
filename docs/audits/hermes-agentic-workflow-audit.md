@@ -200,7 +200,7 @@ Updated blockers:
 
 - P0: Composio MCP not functional from this VM until local auth/API key + CLI/SDK are supplied through approved local secret store/runtime.
 - P1: transcript useful cadence from this VM not proven; local ASR unavailable, laptop/cookie or ASR setup required.
-- P1: Gemma shadow extraction still schema pass `0`; needs prompt/model/runtime tuning, no production writes.
+- Historical P1 at that point: Gemma shadow extraction still schema pass `0`; prompt/model/runtime tuning needed; no production writes.
 - P1: live public-count verification needs source alignment: either run verifier against the same HH read API source or reconcile the direct local DB versus live HH-read dataset; no DB/deploy mutation performed.
 - P2: Art of War campaign content remains held for audience mismatch; private revision only, no public action/spend.
 

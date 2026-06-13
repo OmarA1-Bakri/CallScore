@@ -139,7 +139,7 @@ const PRODUCTION_STRATEGY_TYPES = [
   "narrative",
   "contrarian",
 ] as const;
-const SUPPORTED_SYMBOLS = [
+const EVAL_SUPPORTED_SYMBOLS = [
   "BTCUSDT",
   "ETHUSDT",
   "SOLUSDT",
@@ -151,9 +151,12 @@ const SUPPORTED_SYMBOLS = [
   "DOTUSDT",
   "ARUSDT",
   "RENDERUSDT",
+] as const;
+const PRODUCTION_SUPPORTED_SYMBOLS = [
+  ...EVAL_SUPPORTED_SYMBOLS,
   "AVAXUSDT",
   "SUIUSDT",
-];
+] as const;
 
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -237,7 +240,7 @@ export function buildPrompt(
   fixture: Fixture,
 ): { readonly system?: string; readonly user: string } {
   const sharedRules = `${extractionSchemaText()}
-Only extract forward-looking, measurable crypto market calls for supported assets: ${SUPPORTED_SYMBOLS.join(", ")}.
+Only extract forward-looking, measurable crypto market calls for supported assets: ${EVAL_SUPPORTED_SYMBOLS.join(", ")}.
 Only creator-owned calls can use status accepted_call with confidence >= 0.70.
 Reject news, aggregation, guest calls, quoted third-party calls, retrospective claims, jokes, vague hype, and generic subtitle fragments.
 For no-call/rejected cases, return one rejected_* object rather than inventing a trade.
@@ -268,7 +271,7 @@ Decision policy:
 10. For creator-owned risk warnings like "avoid DOGE if it loses 12, drop toward 8 next month", use accepted_call, bearish, risk_warning, target "8", invalidation "12", timeframe "next month".
 11. For "cautious on Bitcoin below 90k", set entry_reference to "below 90k".
 12. Return [] only if the transcript is empty; otherwise return at least one accepted or rejected object.
-Supported assets: ${SUPPORTED_SYMBOLS.join(", ")}.
+Supported assets: ${EVAL_SUPPORTED_SYMBOLS.join(", ")}.
 Transcript:\n${fixture.transcript_text}`,
     };
   }
@@ -367,7 +370,7 @@ export function validateExtraction(item: unknown): {
   const confidence = confidenceValue(record.confidence);
   if (confidence === null) errors.push("invalid_confidence");
   const assetSymbol = textOrNull(record.asset_symbol);
-  if (assetSymbol !== null && !SUPPORTED_SYMBOLS.includes(assetSymbol))
+  if (assetSymbol !== null && !(EVAL_SUPPORTED_SYMBOLS as readonly string[]).includes(assetSymbol))
     errors.push("unsupported_asset_symbol");
   if (status === "accepted_call") {
     if (!assetSymbol) errors.push("accepted_missing_asset");
@@ -439,7 +442,7 @@ export function validateProductionExtraction(item: unknown): {
   const record = item as Record<string, unknown>;
   const symbol =
     typeof record.symbol === "string" ? record.symbol.toUpperCase() : "";
-  if (!SUPPORTED_SYMBOLS.includes(symbol)) errors.push("unsupported_symbol");
+  if (!(PRODUCTION_SUPPORTED_SYMBOLS as readonly string[]).includes(symbol)) errors.push("unsupported_symbol");
   const direction = record.direction as ProductionExtraction["direction"];
   if (!DIRECTIONS.filter(Boolean).includes(direction))
     errors.push("invalid_direction");

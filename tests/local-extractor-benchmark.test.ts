@@ -163,6 +163,45 @@ test("eval schema accepts PR66 normalized objects and rejects production objects
   assert.equal(validateExtractionForSchema(productionCall, "eval").ok, false);
 });
 
+test("eval and production schema use separate supported asset allowlists", () => {
+  const evalAvax = validateExtractionForSchema(
+    {
+      status: "accepted_call",
+      quote: "I am buying AVAX here",
+      asset_symbol: "AVAXUSDT",
+      direction: "bullish",
+      call_type: "directional",
+      thesis: null,
+      timeframe: null,
+      entry_reference: null,
+      target: null,
+      stop_loss_or_invalidation: null,
+      ownership: "creator_own_call",
+      is_creator_owned: true,
+      confidence: 0.8,
+      rejection_reason: null,
+    },
+    "eval",
+  );
+  assert.equal(evalAvax.ok, false);
+  assert.ok(evalAvax.errors.includes("unsupported_asset_symbol"));
+
+  const productionAvax = validateProductionExtraction({
+    symbol: "AVAXUSDT",
+    direction: "bullish",
+    call_type: "watch",
+    entry_price: null,
+    target_price: null,
+    stop_loss: null,
+    timeframe: null,
+    confidence: "medium",
+    strategy_type: "technical_analysis",
+    raw_quote: "I am watching AVAX here",
+    extraction_confidence: 0.75,
+  });
+  assert.equal(productionAvax.ok, true);
+});
+
 test("production schema accepts current Gemma objects and rejects malformed objects", () => {
   const productionCall = {
     symbol: "solusdt",
