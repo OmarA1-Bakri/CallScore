@@ -433,11 +433,12 @@ test("public surface verification only fetches external URLs when explicitly req
   );
 });
 
-test("public surface verification compares live score eligibility against cached creator stats", () => {
+test("public surface verification compares live score eligibility in the public judgment window", () => {
   const sql = buildLiveScoreEligibleStatsSql();
 
   assert.match(sql, /FROM calls c/);
   assert.match(sql, /COUNT\(DISTINCT c\.creator_id\)/);
+  assert.match(sql, /c\.call_date >= NOW\(\) - INTERVAL '365 days'/);
   assert.match(sql, /extraction_confidence >= 0\.7/);
   assert.match(sql, /price_at_call IS NOT NULL/);
   assert.match(sql, /return_30d IS NOT NULL/);

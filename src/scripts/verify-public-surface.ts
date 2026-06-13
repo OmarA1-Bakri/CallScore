@@ -1,6 +1,8 @@
 import { query } from "../lib/db";
 import { getPublicCounts } from "../lib/public-counts";
 import { getLeaderboardEligibilitySql } from "../lib/leaderboard-eligibility";
+import { getLegacyCreatorExclusionSql } from "../lib/legacy-creator-overrides";
+import { getJudgmentWindowSql } from "../lib/judgment-window";
 import { getCallEligibilitySql } from "../lib/public-methodology";
 import { writeJsonFile } from "../lib/shadow-extraction";
 import { loadEnv, timestamp } from "./script-helpers";
@@ -43,9 +45,10 @@ async function fetchText(url: string): Promise<string> {
 
 export function buildLiveScoreEligibleStatsSql(): string {
   const eligibleSql = getCallEligibilitySql("c");
+  const judgmentWindowSql = getJudgmentWindowSql("c");
   return `SELECT
-            COUNT(DISTINCT c.creator_id) FILTER (WHERE ${eligibleSql})::text AS ranked_creators,
-            COUNT(*) FILTER (WHERE ${eligibleSql})::text AS total_calls
+            COUNT(DISTINCT c.creator_id) FILTER (WHERE ${judgmentWindowSql} AND ${eligibleSql})::text AS ranked_creators,
+            COUNT(*) FILTER (WHERE ${judgmentWindowSql} AND ${eligibleSql})::text AS total_calls
           FROM calls c`;
 }
 
@@ -55,11 +58,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const checks: VerificationCheck[] = [];
   const publicCounts = await getPublicCounts();
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
+  const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("cr");
   const statsRows = await query<{ ranked_creators: string; total_calls: string }>(
     `SELECT COUNT(*) FILTER (WHERE ${leaderboardEligibleSql})::text AS ranked_creators,
-            COALESCE(SUM(total_calls) FILTER (WHERE ${leaderboardEligibleSql}), 0)::text AS total_calls
+            COALESCE(SUM(cs.total_calls) FILTER (WHERE ${leaderboardEligibleSql}), 0)::text AS total_calls
      FROM creator_stats cs
-     WHERE cs.period = 'all_time'`,
+     JOIN creators cr ON cr.id = cs.creator_id
+     WHERE cs.period = 'all_time'
+       AND ${legacyCreatorExclusionSql}`,
   );
   const stats = statsRows[0] ?? { ranked_creators: "0", total_calls: "0" };
   const liveEligibleRows = await query<{ ranked_creators: string; total_calls: string }>(
@@ -68,17 +74,15 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const liveEligible = liveEligibleRows[0] ?? { ranked_creators: "0", total_calls: "0" };
 
   checks.push({
-    name: "public_counts_match_creator_stats",
-    ok: publicCounts.rankedCreators === Number(stats.ranked_creators) && publicCounts.publicScoredCalls === Number(stats.total_calls),
-    detail: `counts ranked=${publicCounts.rankedCreators}/${stats.ranked_creators}, scored=${publicCounts.publicScoredCalls}/${stats.total_calls}`,
+    name: "public_ranked_creators_match_creator_stats",
+    ok: publicCounts.rankedCreators === Number(stats.ranked_creators),
+    detail: `counts ranked=${publicCounts.rankedCreators}/${stats.ranked_creators}`,
   });
 
   checks.push({
-    name: "live_score_eligible_calls_match_creator_stats",
-    ok:
-      Number(liveEligible.ranked_creators) === Number(stats.ranked_creators) &&
-      Number(liveEligible.total_calls) === Number(stats.total_calls),
-    detail: `live ranked=${liveEligible.ranked_creators}/${stats.ranked_creators}, calls=${liveEligible.total_calls}/${stats.total_calls}`,
+    name: "public_scored_calls_match_live_judgment_window",
+    ok: publicCounts.publicScoredCalls === Number(liveEligible.total_calls),
+    detail: `publicScored=${publicCounts.publicScoredCalls}/${liveEligible.total_calls}, liveCreators=${liveEligible.ranked_creators}`,
   });
 
   if (args.baseUrl) {
