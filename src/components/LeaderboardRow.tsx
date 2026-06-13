@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactElement } from "react";
-import { creatorHandlePath } from "@/lib/creator-handles";
+import { creatorHandlePath } from "@/lib/creator-handle-path";
 import type { LeaderboardRow as Row } from "@/lib/types";
 import RankTierBadge from "./RankTierBadge";
 

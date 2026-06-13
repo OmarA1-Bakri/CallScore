@@ -1,5 +1,5 @@
 import { neon, type NeonQueryFunction, neonConfig } from "@neondatabase/serverless";
-import type { Pool } from "pg";
+import pg, { type Pool } from "pg";
 
 export type DatabaseProvider = "neon" | "postgres";
 
@@ -172,9 +172,8 @@ function createNeonExecutor(url: string): QueryExecutor {
 async function getPgPool(url: string): Promise<Pool> {
   if (pgPool) return pgPool;
   if (!pgPoolPromise) {
-    pgPoolPromise = (0, eval)("import('pg')").then((mod: typeof import("pg")) => {
-      const PoolCtor = mod.Pool;
-      const pool = new PoolCtor({ connectionString: url, max: 5 });
+    pgPoolPromise = Promise.resolve().then(() => {
+      const pool = new pg.Pool({ connectionString: url, max: 5 });
       pgPool = pool;
       return pool;
     });

@@ -5,6 +5,17 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { query } from "../lib/db";
 import { writeJsonlRecord } from "../lib/shadow-extraction";
+import {
+  buildTranscriptExtractionPlan,
+  defaultTranscriptExtractionMethods,
+  envForTranscriptMethod,
+  isLocalBackfillMethod,
+  isYtDlpBackfillMethod,
+  parseTranscriptExtractionMethodChain,
+  resolveYtDlpBinaryForMethod,
+  transcriptMethodProvider,
+  type TranscriptExtractionMethod,
+} from "../lib/transcript-extraction-methods";
 import { loadEnv, sleep, timestamp } from "./script-helpers";
 
 const execFileAsync = promisify(execFile);
@@ -26,6 +37,7 @@ export interface BackfillTranscriptsArgs {
   readonly limit: number;
   readonly offset: number;
   readonly concurrency: number;
+  readonly methods: readonly TranscriptExtractionMethod[];
   readonly gapMs: number;
   readonly fallbackYtDlp: boolean;
   readonly useSerpApi: boolean;
@@ -52,13 +64,15 @@ interface MissingTranscriptVideo {
 interface TranscriptResult {
   readonly text: string;
   readonly quality: number;
-  readonly source: "serpapi" | "yt-dlp";
+  readonly source: string;
   readonly detail?: string;
 }
 
 export type TranscriptFailureReason =
   | "provider_credentials_missing"
   | "providers_returned_no_transcript"
+  | "external_handoff_required"
+  | "media_fallback_required"
   | "no_captions"
   | "bot_verification_required"
   | "cookie_invalid_or_rotated"
@@ -71,13 +85,23 @@ export type TranscriptFailureReason =
 interface TranscriptFailure {
   readonly reason: TranscriptFailureReason;
   readonly status: "failed";
-  readonly provider: "none" | "serpapi+yt-dlp" | "serpapi" | "yt-dlp";
+  readonly provider: string;
   readonly detail?: string;
+}
+
+interface TranscriptHandoff {
+  readonly reason: "external_handoff_required" | "media_fallback_required";
+  readonly status: "pending_handoff";
+  readonly provider: string;
+  readonly detail?: string;
+  readonly method: TranscriptExtractionMethod;
+  readonly previousFailureReason?: TranscriptFailureReason;
 }
 
 type TranscriptFetch =
   | { readonly ok: true; readonly transcript: TranscriptResult }
-  | { readonly ok: false; readonly failure: TranscriptFailure };
+  | { readonly ok: false; readonly failure: TranscriptFailure }
+  | { readonly ok: false; readonly handoff: TranscriptHandoff };
 
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -101,14 +125,22 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
     argValue(argv, "--yt-dlp-sleep-seconds") ?? process.env.YTDLP_SLEEP_INTERVAL_SECONDS ?? null,
     DEFAULT_YTDLP_SLEEP_SECONDS,
   );
+  const fallbackYtDlp = !argv.includes("--no-yt-dlp");
+  const useSerpApi = argv.includes("--serpapi");
+  const explicitMethods = parseTranscriptExtractionMethodChain(
+    argValue(argv, "--methods") ?? argValue(argv, "--method"),
+  );
   return {
     creator: argValue(argv, "--creator"),
     limit: positiveInt(argValue(argv, "--limit") ?? process.env.TRANSCRIPT_BATCH_LIMIT ?? null, DEFAULT_TRANSCRIPT_BATCH_LIMIT),
     offset: nonNegativeInt(argValue(argv, "--offset"), 0),
     concurrency: Math.min(MAX_TRANSCRIPT_CONCURRENCY, requestedConcurrency),
+    methods: explicitMethods.length > 0
+      ? explicitMethods
+      : defaultTranscriptExtractionMethods({ useSerpApi, fallbackYtDlp, env: process.env }),
     gapMs: nonNegativeInt(argValue(argv, "--gap-ms"), sleepSeconds * 1000),
-    fallbackYtDlp: !argv.includes("--no-yt-dlp"),
-    useSerpApi: argv.includes("--serpapi"),
+    fallbackYtDlp,
+    useSerpApi,
     ytDlpSleepSeconds: sleepSeconds,
     ytDlpMaxSleepSeconds: positiveInt(
       argValue(argv, "--yt-dlp-max-sleep-seconds") ?? process.env.YTDLP_MAX_SLEEP_INTERVAL_SECONDS ?? null,
@@ -315,10 +347,12 @@ export function buildYtDlpTranscriptArgs(
   args: BackfillTranscriptsArgs,
   env: Record<string, string | undefined> = process.env,
   authArgs: readonly string[] = ytDlpAuthArgs(env),
+  method: TranscriptExtractionMethod = "hh_ytdlp",
 ): string[] {
+  const methodEnv = envForTranscriptMethod(method, env);
   return [
     ...authArgs,
-    ...ytDlpExtraArgs(env),
+    ...ytDlpExtraArgs(methodEnv),
     "--skip-download",
     "--no-playlist",
     "--no-warnings",
@@ -342,7 +376,7 @@ export function buildYtDlpTranscriptArgs(
     "--extractor-retries",
     String(DEFAULT_YTDLP_EXTRACTOR_RETRIES),
     "--retry-sleep",
-    env.YTDLP_RETRY_SLEEP?.trim() || DEFAULT_YTDLP_RETRY_SLEEP,
+    methodEnv.YTDLP_RETRY_SLEEP?.trim() || DEFAULT_YTDLP_RETRY_SLEEP,
     "--print",
     "requested_subtitles",
     `https://www.youtube.com/watch?v=${videoId}`,
@@ -394,13 +428,18 @@ export function classifyYtDlpFailure(text: string): TranscriptFailureReason {
   return "failed_retryable";
 }
 
-async function fetchViaYtDlp(videoId: string, args: BackfillTranscriptsArgs): Promise<TranscriptFetch> {
+async function fetchViaYtDlp(
+  videoId: string,
+  args: BackfillTranscriptsArgs,
+  method: TranscriptExtractionMethod = "hh_ytdlp",
+): Promise<TranscriptFetch> {
   const inlineCookies = createInlineCookiesFile();
   try {
-    const authArgs = inlineCookies.args.length > 0 ? inlineCookies.args : ytDlpAuthArgs();
+    const methodEnv = envForTranscriptMethod(method);
+    const authArgs = inlineCookies.args.length > 0 ? inlineCookies.args : ytDlpAuthArgs(methodEnv);
     const { stdout } = await execFileAsync(
-      process.env.YTDLP_BIN ?? "yt-dlp",
-      buildYtDlpTranscriptArgs(videoId, args, process.env, authArgs),
+      resolveYtDlpBinaryForMethod(method, methodEnv),
+      buildYtDlpTranscriptArgs(videoId, args, methodEnv, authArgs, method),
       { timeout: 180_000, maxBuffer: 10 * 1024 * 1024 },
     );
     const subtitleUrl = extractRequestedSubtitleUrl(stdout);
@@ -411,32 +450,58 @@ async function fetchViaYtDlp(videoId: string, args: BackfillTranscriptsArgs): Pr
     if (text.length < 200) {
       return { ok: false, failure: { reason: "no_captions", status: "failed", provider: "yt-dlp" } };
     }
-    return { ok: true, transcript: { text, quality: transcriptQuality(text), source: "yt-dlp", detail: "slow-ytdlp" } };
+    return { ok: true, transcript: { text, quality: transcriptQuality(text), source: transcriptMethodProvider(method), detail: method } };
   } catch (error) {
     const maybeError = error as { stderr?: string; stdout?: string; message?: string };
     const detail = `${maybeError.stderr ?? ""}\n${maybeError.stdout ?? ""}\n${maybeError.message ?? ""}`.slice(0, 500);
-    return { ok: false, failure: { reason: classifyYtDlpFailure(detail), status: "failed", provider: "yt-dlp", detail } };
+    return { ok: false, failure: { reason: classifyYtDlpFailure(detail), status: "failed", provider: transcriptMethodProvider(method), detail } };
   } finally {
     inlineCookies.cleanup();
   }
 }
 
-async function fetchTranscript(videoId: string, args: BackfillTranscriptsArgs): Promise<TranscriptFetch> {
-  const hasSerp = args.useSerpApi && Boolean(serpApiKey());
-  if (hasSerp) {
-    const serp = await fetchViaSerpApi(videoId);
-    if (serp) return { ok: true, transcript: serp };
+export async function fetchTranscript(videoId: string, args: BackfillTranscriptsArgs): Promise<TranscriptFetch> {
+  let lastFailure: TranscriptFailure | null = null;
+  for (const method of args.methods) {
+    if (method === "serpapi_transcript") {
+      if (!serpApiKey()) {
+        lastFailure = { reason: "provider_credentials_missing", status: "failed", provider: "serpapi" };
+        continue;
+      }
+      const serp = await fetchViaSerpApi(videoId);
+      if (serp) return { ok: true, transcript: serp };
+      lastFailure = { reason: "providers_returned_no_transcript", status: "failed", provider: "serpapi" };
+      continue;
+    }
+
+    if (isYtDlpBackfillMethod(method)) {
+      const result = await fetchViaYtDlp(videoId, args, method);
+      if (result.ok) return result;
+      if ("failure" in result) lastFailure = result.failure;
+      continue;
+    }
+
+    const plan = buildTranscriptExtractionPlan([method])[0];
+    return {
+      ok: false,
+      handoff: {
+        reason: method === "media_asr_fallback" ? "media_fallback_required" : "external_handoff_required",
+        status: "pending_handoff",
+        provider: plan.provider,
+        detail: plan.command,
+        method,
+        previousFailureReason: lastFailure?.reason,
+      },
+    };
   }
-  if (args.fallbackYtDlp) return fetchViaYtDlp(videoId, args);
-  if (!hasSerp) {
-    return { ok: false, failure: { reason: "provider_credentials_missing", status: "failed", provider: "none" } };
-  }
+
   return {
     ok: false,
-    failure: {
-      reason: "providers_returned_no_transcript",
+    failure: lastFailure ?? {
+      reason: "provider_credentials_missing",
       status: "failed",
-      provider: hasSerp && args.fallbackYtDlp ? "serpapi+yt-dlp" : hasSerp ? "serpapi" : "yt-dlp",
+      provider: "none",
+      detail: "No transcript extraction methods configured",
     },
   };
 }
@@ -502,6 +567,8 @@ function acquireLock(lockFile: string): () => void {
 
 function isProviderBlock(reason: TranscriptFailureReason): boolean {
   return reason === "provider_credentials_missing"
+    || reason === "external_handoff_required"
+    || reason === "media_fallback_required"
     || reason === "bot_verification_required"
     || reason === "cookie_invalid_or_rotated"
     || reason === "po_token_required"
@@ -523,7 +590,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   try {
     const videos = await loadMissingTranscriptVideos(args);
-    console.log(`[${timestamp()}] slow yt-dlp transcript backfill ${args.write ? "WRITE" : "DRY-RUN"}: videos=${videos.length}, limit=${args.limit}, offset=${args.offset}, concurrency=${args.concurrency}, gapMs=${args.gapMs}, lock=${args.lockFile}, ytdlp=${JSON.stringify(redactedYtDlpOptionSummary())}`);
+    console.log(`[${timestamp()}] transcript backfill ${args.write ? "WRITE" : "DRY-RUN"}: videos=${videos.length}, limit=${args.limit}, offset=${args.offset}, concurrency=${args.concurrency}, gapMs=${args.gapMs}, methods=${args.methods.join(",") || "none"}, local_methods=${args.methods.filter(isLocalBackfillMethod).join(",") || "none"}, lock=${args.lockFile}, ytdlp=${JSON.stringify(redactedYtDlpOptionSummary())}`);
 
     let written = 0;
     let failed = 0;
@@ -537,6 +604,29 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
       for (const { video, transcript } of results) {
         if (!transcript.ok) {
+          if ("handoff" in transcript) {
+            audit(args, {
+              record_type: "transcript_backfill",
+              ts: timestamp(),
+              mode: args.write ? "WRITE" : "DRY",
+              status: transcript.handoff.status,
+              reason: transcript.handoff.reason,
+              provider: transcript.handoff.provider,
+              method: transcript.handoff.method,
+              video_id: video.id,
+              creator_id: video.creator_id,
+              youtube_video_id: video.youtube_video_id,
+              creator: video.youtube_handle,
+            });
+            console.log(`[${timestamp()}] ${transcript.handoff.status} ${video.youtube_video_id} ${video.creator_name} method=${transcript.handoff.method} reason=${transcript.handoff.reason}`);
+            if (
+              args.stopOnProviderBlock
+              && transcript.handoff.previousFailureReason
+              && isProviderBlock(transcript.handoff.previousFailureReason)
+            ) providerBlocked = true;
+            continue;
+          }
+
           failed++;
           await markTranscriptFailure(video.id, transcript.failure, args.write);
           audit(args, {

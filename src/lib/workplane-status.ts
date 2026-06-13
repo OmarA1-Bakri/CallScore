@@ -136,7 +136,10 @@ function latestFile(root: string | readonly string[], predicate: (name: string) 
       });
   });
   if (files.length === 0) return null;
-  return files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0] ?? null;
+  return files.sort((a, b) => {
+    const mtimeDelta = statSync(b).mtimeMs - statSync(a).mtimeMs;
+    return mtimeDelta || b.localeCompare(a);
+  })[0] ?? null;
 }
 
 export function latestGemmaShadowArtifact(root: string | readonly string[] = ["/tmp/callscore-shadow-extractions", ".tmp/shadow-extraction"]): ArtifactSummary {

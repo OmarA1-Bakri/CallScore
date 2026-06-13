@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
+import { fetchHhHome, getHhOfficialLeaderboardRows } from "@/lib/hh-read-api";
 import { noStoreHeaders } from "@/lib/http-cache";
 import { requireAlphaApiAccess } from "@/lib/premium";
 import {
@@ -15,7 +16,7 @@ import {
   getJudgmentWindowSql,
 } from "@/lib/judgment-window";
 import type { Period } from "@/lib/types";
-import { leaderboardQueryRowSchema, parseApiRows } from "@/lib/api-schemas";
+import { leaderboardQueryRowSchema, parseApiRows, type LeaderboardQueryRow } from "@/lib/api-schemas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +62,38 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const sampleThreshold = getLeaderboardSampleThreshold(period);
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs", period);
   const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("c");
+  const readApiHome = await fetchHhHome(period, 100).catch(() => null);
+  if (readApiHome) {
+    const rows = parseApiRows(
+      leaderboardQueryRowSchema,
+      getHhOfficialLeaderboardRows<LeaderboardQueryRow>(readApiHome, period),
+      "v1 leaderboard read API",
+    );
+    const windowRange = getWindowRange(period);
+    return NextResponse.json(
+      {
+        data: rows,
+        meta: {
+          total: rows.length,
+          period,
+          period_token: period,
+          display_window_label: getDisplayWindowLabel(period),
+          min_public_scored_calls: sampleThreshold.min_public_scored_calls,
+          low_n_warning_calls: sampleThreshold.low_n_warning_calls,
+          sample_floor_label: sampleThreshold.sample_floor_label,
+          window_days: getWindowDays(period),
+          window_start: windowRange.window_start,
+          window_end: windowRange.window_end,
+          latest_public_call_date: null,
+          freshness_notes: [RECENT_PUBLIC_SCORING_MATURITY_NOTE],
+          gated_periods: GATED_PERIODS,
+          data_maturity_note: RECENT_PUBLIC_SCORING_MATURITY_NOTE,
+        },
+      },
+      { headers: noStoreHeaders() },
+    );
+  }
+
   const rawRows = await query(
     `SELECT cs.*, c.name, c.youtube_handle
      FROM creator_stats cs

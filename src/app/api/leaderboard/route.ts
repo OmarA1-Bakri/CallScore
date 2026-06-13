@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { captureApiException } from "@/lib/monitoring";
 import { query } from "@/lib/db";
+import { fetchHhHome, getHhOfficialLeaderboardRows } from "@/lib/hh-read-api";
 import { getCreatorTier } from "@/lib/creator-tier";
 import { hasAccess } from "@/lib/whop";
 import { getUserTier } from "@/lib/whop-access";
@@ -166,6 +167,65 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           { status: 402 },
         );
       }
+    }
+
+    const readApiHome = await fetchHhHome(period, 100).catch(() => null);
+    if (readApiHome) {
+      const readApiRows = getHhOfficialLeaderboardRows<LeaderboardQueryRow>(readApiHome, period);
+      const rows = parseApiRows(leaderboardQueryRowSchema, readApiRows, "leaderboard read API");
+      const leaderboard: LeaderboardRow[] = rows.map((row, index) => {
+        const rank = index + 1;
+        return {
+          rank,
+          creator: buildCreator(row),
+          stats: buildStats(row),
+          best_call: buildCallSummary(
+            row.best_call_id,
+            row.best_call_symbol,
+            row.best_call_return,
+            row.best_call_score,
+            row.best_call_date,
+            row.best_call_direction,
+          ) as Call | null,
+          worst_call: buildCallSummary(
+            row.worst_call_id,
+            row.worst_call_symbol,
+            row.worst_call_return,
+            row.worst_call_score,
+            row.worst_call_date,
+            row.worst_call_direction,
+          ) as Call | null,
+          tier_required: getCreatorTier(rank),
+          trend: "stable",
+          selfCorrectionScore: 0,
+          revisionCount: 0,
+          selfCorrectionTier: "rarely",
+        };
+      });
+      const latestUpdate = rows.length > 0 ? rows[0].updated_at : null;
+      const windowRange = getWindowRange(period);
+      return NextResponse.json({
+        data: {
+          leaderboard,
+          updated_at: latestUpdate ?? new Date().toISOString(),
+        },
+        meta: {
+          total: leaderboard.length,
+          period,
+          period_token: period,
+          display_window_label: getDisplayWindowLabel(period),
+          min_public_scored_calls: sampleThreshold.min_public_scored_calls,
+          low_n_warning_calls: sampleThreshold.low_n_warning_calls,
+          sample_floor_label: sampleThreshold.sample_floor_label,
+          window_days: getWindowDays(period),
+          window_start: windowRange.window_start,
+          window_end: windowRange.window_end,
+          latest_public_call_date: null,
+          freshness_notes: [RECENT_PUBLIC_SCORING_MATURITY_NOTE],
+          gated_periods: GATED_PERIODS,
+          data_maturity_note: RECENT_PUBLIC_SCORING_MATURITY_NOTE,
+        },
+      });
     }
 
     const rawRows = await query<LeaderboardQueryRow>(

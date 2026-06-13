@@ -29,6 +29,7 @@
     "verify:public": "node --import tsx src/scripts/verify-public-surface.ts",
     "backfill:publication-dates": "node --import tsx src/scripts/backfill-publication-dates.ts",
     "backfill:transcripts": "node --import tsx src/scripts/backfill-transcripts.ts",
+    "transcript:extract": "node --import tsx src/scripts/backfill-transcripts.ts",
     "audit:recompute": "node --import tsx src/scripts/audit-recompute.ts",
     "audit:coverage": "node --import tsx src/scripts/audit-coverage-report.ts",
     "audit:global": "node --import tsx src/scripts/audit-global-coverage.ts",

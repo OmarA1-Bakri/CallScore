@@ -12,6 +12,8 @@ import {
   buildVerifierPrompt,
   transcriptContext,
   ML_VERIFIER_PROMPT_VERSION,
+  DEFAULT_ML_VERIFIER_MODEL,
+  DEFAULT_OLLAMA_HOST,
   DEFAULT_ML_VERIFIER_BATCH_SIZE,
   DEFAULT_ML_VERIFIER_ATTEMPT_TIMEOUTS_MS,
   verifyCandidateWithOllama,
@@ -329,8 +331,8 @@ test("buildVerifierPrompt: contains candidate details and transcript", () => {
 test("resolveMlVerifierConfig: defaults", () => {
   const config = resolveMlVerifierConfig({} as any);
   assert.equal(config.provider, "ollama");
-  assert.equal(config.model, "kimi-k2.6");
-  assert.equal(config.ollamaHost, "https://ollama.com");
+  assert.equal(config.model, DEFAULT_ML_VERIFIER_MODEL);
+  assert.equal(config.ollamaHost, DEFAULT_OLLAMA_HOST);
   assert.equal(config.promptVersion, "ml-verifier-v1");
   assert.equal(config.requestTimeoutMs, 180_000);
   assert.deepEqual(config.attemptTimeoutMs, [...DEFAULT_ML_VERIFIER_ATTEMPT_TIMEOUTS_MS]);

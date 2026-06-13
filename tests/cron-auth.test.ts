@@ -28,7 +28,7 @@ test("verifyCronSecret accepts a bearer token when the server env has surroundin
 test("verifyCronSecret does not trim the incoming bearer token", () => {
   process.env.CRON_SECRET = "\n cron-secret-value \n";
 
-  assert.equal(verifyCronSecret(request("Bearer cron-secret-value ")), false);
+  assert.equal(verifyCronSecret(request("Bearer  cron-secret-value")), false);
 });
 
 test("verifyCronSecret rejects an incorrect bearer token", () => {

@@ -1,13 +1,7 @@
 import { query } from "@/lib/db";
+import { normalizeCreatorHandle } from "@/lib/creator-handle-path";
+export { creatorHandlePath, normalizeCreatorHandle } from "@/lib/creator-handle-path";
 import type { Creator } from "@/lib/types";
-
-export function normalizeCreatorHandle(rawHandle: string): string {
-  return rawHandle.trim().replace(/^@+/, "");
-}
-
-export function creatorHandlePath(rawHandle: string): string {
-  return encodeURIComponent(normalizeCreatorHandle(rawHandle).toLowerCase());
-}
 
 export async function findCreatorByHandle<T extends Partial<Creator>>(
   rawHandle: string,

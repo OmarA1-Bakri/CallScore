@@ -1,5 +1,6 @@
-import type { ReadApiLeaderboardContract } from "@/lib/home-read-api-contract";
+import { getOfficialRankedReadApiRows, type ReadApiLeaderboardContract } from "@/lib/home-read-api-contract";
 import type { PublicCounts } from "@/lib/public-counts";
+import { toReadApiLeaderboardContract } from "@/lib/leaderboard-safety.mjs";
 import type { Call, Creator, CreatorStats, Period } from "@/lib/types";
 
 export interface HhHomePayload extends ReadApiLeaderboardContract<unknown> {
@@ -27,6 +28,24 @@ export function getHhReadApiBase(env: NodeJS.ProcessEnv = process.env): string |
   const value = env.HH_READ_API_BASE?.trim();
   if (!value) return null;
   return value.replace(/\/+$/, "");
+}
+
+
+export function getHhOfficialLeaderboardRows<Row>(
+  payload: ReadApiLeaderboardContract<unknown> | null | undefined,
+  period: Period,
+): readonly Row[] {
+  const officialRows = getOfficialRankedReadApiRows(payload);
+  if (officialRows.length > 0) return officialRows as readonly Row[];
+
+  const compatibilityRows = payload?.leaderboard?.rows;
+  if (!Array.isArray(compatibilityRows)) return [];
+
+  const safeContract = toReadApiLeaderboardContract(period, compatibilityRows, {
+    period,
+    requireFreshnessProof: false,
+  }) as ReadApiLeaderboardContract<unknown>;
+  return getOfficialRankedReadApiRows(safeContract) as readonly Row[];
 }
 
 export async function fetchHhHome(period: Period, limit = 100): Promise<HhHomePayload | null> {

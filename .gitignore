@@ -24,6 +24,8 @@ public/logo-variants.png
 squirrel.toml
 skills-lock.json
 output/playwright/
+*.backup.*
+*.bak
 
 
 # Local AI tool profiles

@@ -36,7 +36,7 @@ test("health ping uses injectable DB query and surfaces DB failures", async () =
 
   const unavailable = await buildHealthResponse(async () => {
     throw new Error("db unavailable");
-  });
+  }, { readApiBase: null });
   assert.equal(unavailable.status, 503);
   assert.deepEqual(await unavailable.json(), { ok: false, db: "unavailable" });
 });
