@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
 import { SYMBOL_TICKERS } from "@/lib/constants";
 import type { SerializedCall } from "@/lib/public-serializer";
 
@@ -260,9 +259,9 @@ export default function CallHistory({
                         Pending 90d
                       </span>
                     ) : call.hit_target === true ? (
-                      <span aria-hidden="true" className="text-pos">✓</span>
+                      <span aria-label="Target hit" role="img" className="text-pos">✓</span>
                     ) : call.hit_target === false ? (
-                      <X className="w-4 h-4 text-neg mx-auto" />
+                      <span aria-label="Target missed" role="img" className="text-neg">✕</span>
                     ) : (
                       <span className="text-ink-600">--</span>
                     )}
