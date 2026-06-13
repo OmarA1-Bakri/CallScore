@@ -277,6 +277,66 @@ Next exact safe action:
 Run `C:\Users\albak\run-transcript-collector-fixed-wslssh.ps1 -Limit 5 -Browser firefox -GapSeconds 45 -SinceDays 45 -HhHost hermes-agent-box -Write` from Omar laptop when cooldown is clear, then run bounded post-ingest extraction/matching/scoring only under explicit approved pipeline scope.
 ```
 
+
+### 0.0.5 2026-06-13 agentmemory / canonical recall update
+
+```text
+CANONICAL MEMORY DISCIPLINE: ACTIVE
+AGENTMEMORY SKILL PACK: INSTALLED / VALIDATED
+CALLSCORE MEMORY SKILL: PRESERVED AS callscore-memory
+LATEST CANONICAL REPO HEAD BEFORE THIS DOC UPDATE: fbf799f Record laptop transcript canary reactivation
+```
+
+Purpose:
+
+- Prevent future agents from forgetting canonical CallScore/Hermes basics already proven by PRs, committed docs, and bounded canaries.
+- Transcript work must load the canonical memory first and prefer the laptop/Tailscale collector path before falling back to HH direct `yt-dlp` or ASR diagnostics.
+
+Installed/validated local Codex skills:
+
+- `agentmemory-agents`
+- `agentmemory-architecture`
+- `agentmemory-config`
+- `agentmemory-hooks`
+- `agentmemory-mcp-tools`
+- `agentmemory-rest-api`
+- `commit-context`
+- `commit-history`
+- `forget`
+- `handoff`
+- `recall`
+- `recap`
+- `remember`
+- `session-history`
+- `write-agentmemory-skill`
+- `callscore-memory` — local CallScore/Hermes canonical basics skill restored from the prior custom `agentmemory` backup.
+
+Validation evidence:
+
+- All installed AgentMemory skill directories passed local `quick_validate.py` after frontmatter normalization for Codex-supported keys.
+- Shared troubleshooting references were installed under local Codex skills for AgentMemory cross-links.
+- Existing custom CallScore/Hermes memory was preserved; no secrets were printed.
+
+Canonical transcript memory now reinforced:
+
+- Near-term transcript acquisition is Omar laptop over Tailscale/residential browser cookies.
+- Working HH-to-laptop access: Tailscale peer `omarslaptop-1` / `100.118.20.40`, WSL host `OmarsLaptop`.
+- User-provided collector: `C:\Users\albak\run-transcript-collector-fixed.ps1`.
+- Current working copy for HH bridge: `C:\Users\albak\run-transcript-collector-fixed-wslssh.ps1` using `wsl.exe -d Ubuntu -u omar ssh hermes-agent-box`.
+- Latest bounded write evidence: one transcript ingested through approved HH transcript ingest path, receipt `.tmp/workflow-receipts/transcript_waterfall_canary/laptop-canonical-write1-20260613T173047Z.json`.
+
+Agent operating rule from this point:
+
+```text
+For CallScore/Hermes work, load `callscore-memory` / canonical basics before diagnosing transcript, Hermes readiness, Gemma/Qwen, Whop, Composio, Netlify, or marketing gates. Do not downgrade the certified laptop collector to generic HH yt-dlp/ASR fallback without fresh evidence.
+```
+
+Next exact safe action remains:
+
+```text
+Run bounded laptop collector limit 5 through `C:\Users\albak\run-transcript-collector-fixed-wslssh.ps1 -Limit 5 -Browser firefox -GapSeconds 45 -SinceDays 45 -HhHost hermes-agent-box -Write`, then run approved bounded downstream extraction/matching/scoring verification.
+```
+
 ```text
 CERTIFY AUTONOMOUS REVENUE: NO
 ```
