@@ -144,3 +144,11 @@ Promotion remains blocked until separate explicit approval plus larger shadow/di
 
 
 The eval-schema Modelfile intentionally preserves the PR #66 benchmark prompt as a controlled-fixture contract; do not use it for untrusted production transcript runs. Production shadow extraction uses the separate guarded production-schema Modelfile.
+
+### 2026-06-13 bounded full-coverage shadow/diff sample
+
+Canonical evidence lives in `docs/audits/hermes-agentic-workflow-audit.md` under this same heading.
+
+Summary: run `gemma-production-shadow-sample-fullcover-20260613T155241Z` was local Ollama only, artifact-only, limit 5, full transcript coverage, `5/5` schema-valid rows, `1` accepted call, `0` failed records, `shadow:validate ok=true`, and diff statuses `removed_calls=2`, `changed_calls=1`, `no_accepted_calls=2`, `manual_review=0`.
+
+Promotion remains blocked until explicit operator approval of the exact `shadow:promote --write` command after reviewing `.tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.diff.jsonl`. No production writes, DB mutation, deploy, Whop mutation, public action, or paid API/LLM calls were performed.

@@ -50,6 +50,11 @@ test("OpenRouter extraction parses and sanitizes chunk CLI arguments", () => {
   assert.equal(explicit.chunkChars, 1200);
   assert.equal(explicit.chunkOverlap, 200);
   assert.equal(explicit.maxChunks, 7);
+
+  const zeroOverlap = parseOpenRouterExtractionArgs(["--chunk-chars", "240", "--chunk-overlap", "0", "--max-chunks", "2"]);
+  assert.equal(zeroOverlap.chunkChars, 240);
+  assert.equal(zeroOverlap.chunkOverlap, 0);
+  assert.equal(zeroOverlap.maxChunks, 2);
   assert.equal(explicit.chunkAgents, 2);
 
   const invalid = parseOpenRouterExtractionArgs(["--chunk-chars", "0", "--chunk-overlap", "8000", "--max-chunks", "-1"]);
@@ -245,6 +250,20 @@ test("splitTranscriptIntoChunks covers text beyond first chunk with overlap and 
   const bounded = splitTranscriptIntoChunks(transcript, { chunkChars: 10, chunkOverlap: 3, maxChunks: 2 });
   assert.equal(bounded.length, 2);
   assert.equal(bounded[1]?.total, 2);
+});
+
+test("splitTranscriptIntoChunks uses chunkChars step when overlap is explicitly zero", () => {
+  const transcript = "x".repeat(520);
+  const chunks = splitTranscriptIntoChunks(transcript, { chunkChars: 240, chunkOverlap: 0, maxChunks: 10 });
+
+  assert.deepEqual(
+    chunks.map((chunk) => [chunk.index, chunk.total, chunk.start, chunk.end]),
+    [
+      [0, 3, 0, 240],
+      [1, 3, 240, 480],
+      [2, 3, 480, 520],
+    ],
+  );
 });
 
 test("openRouterPrompt uses chunk text and includes chunk metadata", () => {

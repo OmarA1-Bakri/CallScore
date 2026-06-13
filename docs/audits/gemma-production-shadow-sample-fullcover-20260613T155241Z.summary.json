@@ -1,0 +1,48 @@
+{
+  "artifact_checksums_sha256": {
+    ".tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.diff.jsonl": "f287fe515c9aa29c3064ca955ea1e940204b1fa764d6c062e8d5b906072e5830",
+    ".tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.jsonl": "0a0a1bd3d85b56d45fd6ac58ab4186f3fc4a0b2c48a6e64e3572604881baaa38",
+    ".tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.meta.json": "9fd16dc08f66da8e16076f406952a967da30e099cf17c2201e072b5d0ed1090a",
+    ".tmp/workflow-receipts/gemma_shadow_diff/gemma-production-shadow-sample-fullcover-20260613T155241Z.json": "eee1511b412e76f89be0e39326c939fdfe4d10eddf3a9feb012843a93f76b9e9",
+    ".tmp/workflow-receipts/gemma_shadow_sample/gemma-production-shadow-sample-fullcover-20260613T155241Z.json": "df249d8842135f393149c3533ee4cebffef70dc00f61ea07871fb26e84ddabb2"
+  },
+  "chunking": {
+    "chunk_chars": 4000,
+    "chunk_overlap": 0,
+    "max_chunks": 2
+  },
+  "diff": {
+    "manual_review": 0,
+    "rows": 5,
+    "statuses": {
+      "changed_calls": 1,
+      "no_accepted_calls": 2,
+      "removed_calls": 2
+    }
+  },
+  "promotion_gate": "No write canary or production promotion without explicit approval of exact shadow:promote --write command after diff review.",
+  "run_id": "gemma-production-shadow-sample-fullcover-20260613T155241Z",
+  "safety": {
+    "artifact_only": true,
+    "deploy": false,
+    "local_ollama_only": true,
+    "paid_api_or_llm": false,
+    "production_writes": false,
+    "public_action": false,
+    "shadow_promote": false,
+    "whop_mutation": false
+  },
+  "sample": {
+    "accepted_calls": 1,
+    "coverage_rows_reached_transcript_end": 5,
+    "failed_records": 0,
+    "models_used": [
+      "callscore-gemma4-extractor:latest",
+      "callscore-qwen25-3b-extractor:latest"
+    ],
+    "rows": 5,
+    "schema_valid_rows": 5,
+    "videos": 5
+  },
+  "scope": "bounded local Ollama artifact-only shadow sample and diff"
+}

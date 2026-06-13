@@ -302,3 +302,45 @@ Remaining gates:
 
 
 The eval-schema Modelfile intentionally preserves the PR #66 benchmark prompt as a controlled-fixture contract; do not use it for untrusted production transcript runs. Production shadow extraction uses the separate guarded production-schema Modelfile.
+
+### 2026-06-13 bounded full-coverage shadow/diff sample
+
+Run id: `gemma-production-shadow-sample-fullcover-20260613T155241Z`.
+
+Artifacts:
+
+- Shadow sample: `.tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.jsonl`
+- Run metadata: `.tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.meta.json`
+- Shadow diff: `.tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.diff.jsonl`
+- Receipts:
+  - `.tmp/workflow-receipts/gemma_shadow_sample/gemma-production-shadow-sample-fullcover-20260613T155241Z.json`
+  - `.tmp/workflow-receipts/gemma_shadow_diff/gemma-production-shadow-sample-fullcover-20260613T155241Z.json`
+- Durable sanitized summary/checksums: `docs/audits/gemma-production-shadow-sample-fullcover-20260613T155241Z.summary.json`
+
+Scope and safety:
+
+- Local Ollama only.
+- Limit `5` videos.
+- Full transcript coverage achieved with `--chunk-chars 4000 --chunk-overlap 0 --max-chunks 2`.
+- Artifact-only extraction and diff.
+- No `shadow:promote`.
+- No production writes, DB mutation, deploy, Whop mutation, public action, or paid API/LLM calls.
+
+Result:
+
+- Shadow rows: `5`.
+- Schema-valid rows: `5/5`.
+- Failed records: `0`.
+- Accepted calls: `1`.
+- Coverage: `5/5` rows reached transcript end.
+- `npm run shadow:validate`: `ok=true`, `records=5`, `videos=5`, `accepted_calls=1`, `issues=[]`.
+- Diff statuses: `removed_calls=2`, `changed_calls=1`, `no_accepted_calls=2`, `manual_review=0`.
+
+Implementation note:
+
+- Fixed extraction CLI parsing so explicit `--chunk-overlap 0` remains zero instead of falling back to default overlap. This prevents accidental one-character chunk steps in bounded shadow samples.
+
+Promotion gate:
+
+- This is promotion-readiness evidence, not promotion approval.
+- Before any write canary or production promotion, an operator must explicitly approve the exact `shadow:promote --write` command and review the diff artifact.

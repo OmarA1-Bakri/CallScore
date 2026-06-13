@@ -103,6 +103,12 @@ function positiveInt(value: string | null, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
+function nonNegativeInt(value: string | null, fallback: number): number {
+  if (value === null) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
 function boundedPositiveInt(
   value: string | null,
   fallback: number,
@@ -146,7 +152,7 @@ function sanitizeChunkSettings(settings: Partial<ChunkSettings>): ChunkSettings 
   const chunkChars = positiveInt(settings.chunkChars == null ? null : String(settings.chunkChars), DEFAULT_CHUNK_CHARS);
   const maxChunksInput = positiveInt(settings.maxChunks == null ? null : String(settings.maxChunks), DEFAULT_MAX_CHUNKS);
   const maxChunks = Math.min(maxChunksInput, MAX_ALLOWED_CHUNKS);
-  let chunkOverlap = positiveInt(settings.chunkOverlap == null ? null : String(settings.chunkOverlap), DEFAULT_CHUNK_OVERLAP);
+  let chunkOverlap = nonNegativeInt(settings.chunkOverlap == null ? null : String(settings.chunkOverlap), DEFAULT_CHUNK_OVERLAP);
   if (chunkOverlap >= chunkChars) {
     chunkOverlap = DEFAULT_CHUNK_OVERLAP < chunkChars ? DEFAULT_CHUNK_OVERLAP : Math.max(0, chunkChars - 1);
   }
@@ -158,7 +164,7 @@ export function parseOpenRouterExtractionArgs(argv = process.argv.slice(2)): Ope
   const provider = readProvider(argValue(argv, "--provider"));
   const chunkSettings = sanitizeChunkSettings({
     chunkChars: positiveInt(argValue(argv, "--chunk-chars"), DEFAULT_CHUNK_CHARS),
-    chunkOverlap: positiveInt(argValue(argv, "--chunk-overlap"), DEFAULT_CHUNK_OVERLAP),
+    chunkOverlap: nonNegativeInt(argValue(argv, "--chunk-overlap"), DEFAULT_CHUNK_OVERLAP),
     maxChunks: positiveInt(argValue(argv, "--max-chunks"), DEFAULT_MAX_CHUNKS),
   });
   const providerWasExplicit = argValue(argv, "--provider") != null;
