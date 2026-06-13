@@ -207,3 +207,8 @@ flowchart LR
 %% Fresh-batch Gemma shadow: rows=5 valid=5 failed=0 accepted=0; diff manual_review=5; extraction dry-run processed=5 failed=0 calls=0; no promotion/write/match/score was run.
 %% Live verify --source live passed; full tests 636/636; typecheck/lint/build/hygiene passed.
 %% Remaining PARTIAL blockers: downstream accepted fresh calls not yet proven, Composio MCP auth/SDK/CLI wiring, Art of War audience_mismatch/public publish gate, audit pipeline completeness.
+%% 2026-06-13 second laptop/write-canary update
+%% Second laptop batch: attempted=5, available=4, failed_no_content=1; receipt=.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-20260613T183717Z.json.
+%% Gemma second-batch shadow: records=4 accepted=1 failed=0; diff=new_calls:1,manual_review:2,no_accepted_calls:1.
+%% Write canary: one reviewed new_calls video 20290 promoted with --write --allow-statuses new_calls --video-ids 20290 --limit 1 --mark-video-extracted; receipt=.tmp/workflow-receipts/gemma_write_canary/gemma-laptop-batch2-20260613T184350Z.json.
+%% Safety fix: compute-scores now rejects unsupported --limit canary flags; use no args or --confirm-full-recompute for the established full recompute path. Dedicated bounded scoring canary remains P1.

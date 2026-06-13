@@ -26,6 +26,12 @@ function loadEnv(): void {
   }
 }
 
+export function parseComputeScoresArgs(argv = process.argv.slice(2)): { readonly fullRecompute: true } {
+  if (argv.length === 0) return { fullRecompute: true };
+  if (argv.length === 1 && argv[0] === "--confirm-full-recompute") return { fullRecompute: true };
+  throw new Error(`Unsupported compute-scores arguments: ${argv.join(" ")}. This script performs a full public score recompute; do not pass canary limits. Use --confirm-full-recompute or a dedicated bounded scoring canary.`);
+}
+
 export async function runComputeScores(): Promise<Record<string, unknown>> {
   const startedAt = Date.now();
   const metrics = await recomputeAllStats();
@@ -37,6 +43,7 @@ export async function runComputeScores(): Promise<Record<string, unknown>> {
 
 async function main(): Promise<void> {
   loadEnv();
+  parseComputeScoresArgs();
 
   logger.info("public_score_recompute_start");
   const metrics = await runComputeScores();

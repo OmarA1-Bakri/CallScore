@@ -470,3 +470,20 @@ Do not use stale `.tmp/laptop-collector/latest-state.json` alone to judge transc
 - P1: Composio MCP local auth/CLI/SDK wiring.
 - P1: Art of War content revision before any owned-channel publish approval.
 - P1: audit pipeline completeness: publication dates, transcript terminal coverage, shadow recheck coverage.
+
+### 2026-06-13 second laptop batch / write-canary update
+
+- Second canonical laptop batch: 5 worklist items attempted; 4 available transcripts, 1 failed/no-content update.
+- Receipt: `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-20260613T183717Z.json`.
+- Artifact-only Gemma shadow over the 4 available transcripts: `4/4` records, `1` accepted call, `0` failed records.
+- Diff counts: `new_calls=1`, `manual_review=2`, `no_accepted_calls=1`.
+- One-video write canary: video `20290`, status `new_calls`, `1` call promoted through repo-approved `shadow:promote --write --allow-statuses new_calls --video-ids 20290 --limit 1 --mark-video-extracted`.
+- Match canary: `npm run match -- --limit 1` considered one call and skipped it without matching.
+- Score canary safety defect found: `npm run score -- --limit 1` historically ignored the limit and performed a full public score recompute. The script is now patched to reject unsupported CLI args and prevent misleading bounded invocations.
+- No Netlify deploy, Whop mutation, public marketing, paid API/LLM, credential print, destructive infra, or broad shadow promotion occurred.
+
+Readiness impact:
+
+- Transcript cadence: **READY_WITH_GATES**, now two bounded laptop batches succeeded.
+- Gemma/Qwen: **READY_WITH_GATES+WRITE_CANARY**, one accepted call promoted via explicit one-video canary.
+- Match/score: **PARTIAL**. Match canary ran; bounded score canary is not implemented yet. Full recompute path remains explicit and guarded.

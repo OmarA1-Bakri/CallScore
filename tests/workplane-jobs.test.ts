@@ -196,6 +196,61 @@ test("transcript readiness trusts latest successful cadence receipt over stale c
   assert.ok(domains.transcript_collector.evidence.some((item) => item.includes("latest_cadence_receipt=")));
 });
 
+
+
+test("pipeline readiness recognizes latest Gemma write canary receipt", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-workplane-write-canary-"));
+  const transcriptDir = join(root, ".tmp", "workflow-receipts", "transcript_laptop_cadence");
+  const writeDir = join(root, ".tmp", "workflow-receipts", "gemma_write_canary");
+  mkdirSync(transcriptDir, { recursive: true });
+  mkdirSync(writeDir, { recursive: true });
+  writeFileSync(join(transcriptDir, "laptop-limit5.json"), JSON.stringify({
+    workflow_name: "transcript_laptop_cadence",
+    run_id: "laptop-limit5",
+    result: "passed",
+    blockers: [],
+  }));
+  writeFileSync(join(writeDir, "gemma-write.json"), JSON.stringify({
+    workflow_name: "gemma_write_canary",
+    run_id: "gemma-write",
+    result: "passed",
+    blockers: [],
+  }));
+
+  const domains = buildReadinessDomains({
+    repoRoot: root,
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: {
+      state_path: null,
+      status: "clear",
+      cooldown_until_utc: null,
+      cooldown_reason: null,
+      latest_failure_reason: null,
+      latest_job_id: null,
+      last_run_utc: null,
+      last_attempted_count: 0,
+      last_success_count: 0,
+      last_failure_count: 0,
+      last_success_rate: null,
+      recent_failure_reasons: {},
+      checked_at: "now",
+    },
+    latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 0,
+    dailyPipelineActive: true,
+    nextAction: { action: "none", reason: "test", job_type: "gemma_shadow_extract", allowed: true },
+    now: new Date("2026-06-13T18:30:00.000Z"),
+  });
+
+  assert.deepEqual(domains.callscore_pipeline.blockers, [
+    "bounded transcript cadence and one-video Gemma write canary passed; dedicated bounded scoring canary remains missing",
+  ]);
+  assert.match(String(domains.callscore_pipeline.safe_next_action), /bounded scoring canary/);
+  assert.ok(domains.callscore_pipeline.evidence.some((item) => item.includes("latest_gemma_write_canary_receipt=")));
+});
+
 test("readiness domains cover all activation surfaces with mutation gates", async () => {
   const { buildReadinessDomains } = await import("../src/lib/workplane-status");
   const domains = buildReadinessDomains({

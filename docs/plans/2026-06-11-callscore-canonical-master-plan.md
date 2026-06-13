@@ -5631,3 +5631,47 @@ Remaining readiness blockers:
 - **P1:** `audit:pipeline` still reports missing publication dates, missing transcript terminal coverage, and pending shadow recheck coverage.
 
 Next exact safe action: run another bounded canonical laptop collector batch (`Limit 5`, laptop cookies, write through approved ingest), then run full-transcript Gemma/Qwen shadow and extraction dry-run over the newly ingested videos; if accepted calls appear, proceed only through receipt-gated diff review and bounded write-canary approval gates.
+
+### 2026-06-13 Follow-on bounded laptop batch and one-call write canary
+
+A second bounded canonical laptop batch was run after the first 5/5 success. The Windows collector was invoked through the laptop/Tailscale path with `Limit 5`, Firefox cookies, `SinceDays 45`, `GapSeconds 45`, and `Write`.
+
+Second-batch transcript result:
+
+- Write attempts completed for 5 worklist items.
+- Four videos became `transcript_status=available`: `2PpVxXJaBHw`, `MQMFWrm2AXY`, `RxpehAp_Jro`, and `-UdmwzCwdfU`.
+- One item, `0xqf93bBMKk`, was updated as failed/no transcript content.
+- Receipt: `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-20260613T183717Z.json`.
+
+Second-batch Gemma/Qwen result:
+
+- Artifact-only local Ollama shadow run over the four available transcripts completed with `4/4` records, `1` accepted call, and `0` failed records.
+- Shadow validation passed with `accepted_calls=1`, `issue_count=0`, `ok=true`.
+- Shadow diff status counts: `new_calls=1`, `manual_review=2`, `no_accepted_calls=1`.
+- The accepted call was a bounded production-schema `BTCUSDT` bullish watch call from video id `20290`; target and entry were null.
+- Dry-run promotion showed it would promote exactly video `20290` as `new_calls`.
+- A one-video write canary was then executed through the repo-approved `shadow:promote` path with explicit `--write`, `--allow-statuses new_calls`, `--video-ids 20290`, `--limit 1`, and `--mark-video-extracted`.
+- Result: one production call was inserted/promoted for video `20290`; no broad shadow promotion was run.
+- Receipt: `.tmp/workflow-receipts/gemma_write_canary/gemma-laptop-batch2-20260613T184350Z.json`.
+
+Post-write downstream result:
+
+- `npm run match -- --limit 1` ran a bounded match canary; it considered call id `6105`, matched `0`, skipped `1`.
+- `npm run score -- --limit 1` was attempted as a bounded score canary, but the score script did not support `--limit` and performed a full public score recompute. This completed successfully but was classified as a safety defect because the CLI accepted a misleading bounded flag.
+- The score CLI is now patched to reject unsupported canary flags and require either no args for the established full recompute path or `--confirm-full-recompute` for explicit operator intent.
+- New regression test: `compute-scores CLI rejects misleading bounded canary flags`.
+
+Validation after this follow-on work:
+
+- `npm run freshness:check`: `WARN`, no blockers; latest transcript, call insert, and scoring timestamps updated.
+- `npm run audit:pipeline`: exit `0`, still reports completeness blockers: `missing_publication_dates`, `missing_transcripts_or_terminal_reasons`, `pending_shadow_recheck`.
+- `npm run verify:public -- --source live --base-url https://call-score.com`: pass.
+- `npm run typecheck`: pass.
+- `npm run lint`: pass.
+- `npm run build`: pass.
+- `npm run hygiene`: pass.
+- Targeted tests for score CLI, Workplane jobs, and shadow scripts: `28/28` pass.
+
+Safety note: the accidental broad score recompute happened because `compute-scores.ts` historically ignored CLI arguments. It is now guarded so future attempts to use `--limit` fail closed rather than silently recomputing all public stats.
+
+Current verdict remains **PARTIAL** but materially advanced: transcript cadence is proven across two bounded laptop batches, one accepted Gemma call has passed artifact validation/diff and a one-video write canary, and the scoring CLI safety defect is fixed. FULL still requires a dedicated bounded score canary or explicit full-recompute approval path, more transcript/extraction cadence, Composio MCP auth/tool discovery, Art of War audience-fit revision, and audit completeness reduction.

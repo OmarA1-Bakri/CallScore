@@ -463,6 +463,10 @@ export function buildReadinessDomains(input: {
   const transcriptCadencePassed = transcriptCadenceReceipt.exists
     && !transcriptCadenceReceipt.malformed
     && transcriptCadenceReceipt.summary.result === "passed";
+  const gemmaWriteCanaryReceipt = latestWorkflowReceipt("gemma_write_canary", repoRoot);
+  const gemmaWriteCanaryPassed = gemmaWriteCanaryReceipt.exists
+    && !gemmaWriteCanaryReceipt.malformed
+    && gemmaWriteCanaryReceipt.summary.result === "passed";
 
   return {
     root_hygiene: domain({
@@ -484,11 +488,16 @@ export function buildReadinessDomains(input: {
         `apiUnsafeOfficial=${input.apiUnsafeOfficialCount}`,
         `dailyPipelineActive=${input.dailyPipelineActive}`,
         transcriptCadenceReceipt.path ? `latest_transcript_cadence_receipt=${transcriptCadenceReceipt.path}` : "latest_transcript_cadence_receipt=missing",
+        gemmaWriteCanaryReceipt.path ? `latest_gemma_write_canary_receipt=${gemmaWriteCanaryReceipt.path}` : "latest_gemma_write_canary_receipt=missing",
       ],
       blockers: publicSafe
-        ? (transcriptCadencePassed ? ["bounded transcript cadence passed; downstream extraction produced no accepted fresh calls yet"] : ["transcript freshness remains rate-limit controlled"])
+        ? (gemmaWriteCanaryPassed
+          ? ["bounded transcript cadence and one-video Gemma write canary passed; dedicated bounded scoring canary remains missing"]
+          : (transcriptCadencePassed ? ["bounded transcript cadence passed; downstream extraction produced no accepted fresh calls yet"] : ["transcript freshness remains rate-limit controlled"]))
         : ["public safety violation detected"],
-      safe_next_action: transcriptCadencePassed ? "continue bounded laptop cadence and review fresh transcript extraction settings" : input.nextAction.action,
+      safe_next_action: gemmaWriteCanaryPassed
+        ? "implement dedicated bounded scoring canary or run explicit full recompute only with approval"
+        : (transcriptCadencePassed ? "continue bounded laptop cadence and review fresh transcript extraction settings" : input.nextAction.action),
       risky_actions_blocked: ["unbounded transcript collection", "Gemma production writes", "creator_stats mutation from shadow output"],
       required_approvals: ["production extractor default change"],
       relevant_commands: ["npm run freshness:check", "npm run workplane:status"],
