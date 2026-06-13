@@ -215,6 +215,15 @@ export function extractJsonArrayText(text: string): string {
       for (const key of ["calls", "items", "results", "extractions", "output"]) {
         if (Array.isArray(parsed[key])) return JSON.stringify(parsed[key]);
       }
+      const keys = Object.keys(parsed);
+      if (keys.length === 0) return "[]";
+      if (
+        typeof parsed.symbol === "string" ||
+        typeof parsed.raw_quote === "string" ||
+        typeof parsed.direction === "string"
+      ) {
+        return JSON.stringify([parsed]);
+      }
     } catch {
       // Fall through to bracket extraction / structured error below.
     }

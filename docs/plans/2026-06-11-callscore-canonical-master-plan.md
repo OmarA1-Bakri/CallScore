@@ -5222,3 +5222,52 @@ Next exact safe action:
 ```text
 Supply Composio auth through the approved local secret store and install/enable the local Composio CLI/SDK without printing secrets; then rerun read-only composio_mcp_probe. In parallel, configure local ASR or run the laptop transcript collector limit 5, then rerun transcript_waterfall_canary and gemma_shadow_canary.
 ```
+
+---
+
+## 2026-06-13 Readiness blocker remediation update from `8c21d93`
+
+Status: **PARTIAL; safe operation mode ready for read-only/dry-run lanes**.
+
+What changed:
+
+- Fixed workflow receipt approval detection so benign `read-only` commands no longer false-trip paid ad gating, while paid ad/public/spend/Whop/DB/provider mutation workflows still fail closed without approval evidence.
+- Added live-source public verification mode: `npm run verify:public -- --base-url https://call-score.com --source live`. This compares live HH-read API/UI surfaces like-for-like and passes.
+- Hardened local model extraction parser for Ollama JSON-mode outputs: `{}` is treated as no calls, and a single call object is wrapped as one candidate. Bounded Qwen shadow canary now has schema pass `1/1` with artifact-only output and no production writes.
+- Composio read-only SDK probe passed through existing local venv and local env loading without printing secrets; full MCP/CLI wiring remains a P1 formalization task.
+- Whop/revenue tests pass and mutation gate fails closed with `approval_missing`; no Whop mutation was performed.
+- Art of War dry-run runs from the correct automation cwd, remains private/zero-cost, performs no public action/spend/external mutation, and holds on `audience_mismatch`.
+- Target-price monetization remains live-safe: health ok; known 99Bitcoins target rows expose no public numeric target prices and preserve gated outcomes.
+
+Fresh validation:
+
+- `git diff --check`: pass.
+- Targeted changed tests: `81/81` pass.
+- `npm run typecheck`: pass.
+- `npm run lint`: pass.
+- `npm run build`: pass.
+- Full test sweep: pass; no suite failure stopped execution.
+- `npm run hygiene`: pass.
+- `npm run workplane:status`: pass/OK with partial readiness.
+- `npm run freshness:check`: exit 0 with transcript warnings only.
+- `npm run audit:pipeline`: exit 0 but reports data completeness blockers.
+- `npm run verify:public` with `.env.hermes`: pass local direct-DB mode.
+- `npm run verify:public -- --base-url https://call-score.com --source live`: pass live HH-read mode.
+
+Remaining blockers before FULL:
+
+- P1 transcript: useful cadence not proven from this VM. Bounded canary terminal reason is `bot_verification_required`; local ASR is absent. Safe next action: configure local ASR or run the operator laptop/cookie collector limit 5, then rerun `transcript_waterfall_canary`.
+- P1 shadow: Qwen fallback schema pass is now positive, but Gemma still needs tuning and accepted-call quality remains zero. Promotion remains approval-gated.
+- P1 audit pipeline: missing publication dates, transcript terminal coverage, and shadow recheck coverage remain incomplete.
+- P1 Composio: SDK read-only probe works; MCP/CLI integration should be formalized before broad Composio automation.
+- P2 cleanup: stale mirrors, historical log redaction, and credential rotation review require explicit archive/rotation owner action.
+
+Next exact safe action:
+
+```bash
+cd /opt/crypto-tuber-ranked
+# artifact-only, bounded; no production writes
+npm run shadow:extract -- --execute --provider ollama --ollama-host http://127.0.0.1:11434 --model callscore-gemma4-extractor:latest --fallback-model callscore-qwen25-3b-extractor:latest --limit 1 --video-agents 1 --chunk-agents 1 --model-attempts 1 --chunk-chars 160 --chunk-overlap 0 --max-chunks 1 --num-predict 80 --request-timeout-ms 30000 --gap-ms 0
+```
+
+In parallel, configure local ASR or run the laptop transcript collector limit 5. Do not deploy, publish, spend, mutate Whop, or mutate production DB without a separate explicit approval receipt.

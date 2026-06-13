@@ -30,16 +30,16 @@ flowchart LR
     Dist[distribution-agent\napproval-gated]
     Growth[growth-agent\nzero-cost private]
     Sentinel[marketing sentinel\nread-only]
-    AoW[Art of War dry-runs\naudience mismatch]
+    AoW[Art of War dry-runs\nprivate hold: audience mismatch]
   end
   subgraph PIPE[Transcript + Gemma]
     Worklist[transcript worklist\nPASS limit 5]
-    Media[media fallback\nBLOCKED: ASR unavailable]
+    Media[transcript waterfall\nBLOCKED: bot verification / ASR absent]
     Laptop[laptop collector\noperator/cookies required]
-    Gemma[Gemma+Qwen shadow\nBLOCKED: schema 0]
+    Gemma[Gemma+Qwen shadow\nQwen schema pass 1/1; promotion blocked]
   end
   subgraph MCP[MCP / Toolbox]
-    Composio[Composio\nNOT FUNCTIONAL: key/CLI/SDK missing]
+    Composio[Composio\nREAD-ONLY SDK probe pass via local venv]
     HHBridge[HH bridge\nPARTIAL wrapper issue]
     UseAgents[UseAgents\nneeds verification]
     Context7[Context7\nneeds verification]
@@ -56,10 +56,10 @@ flowchart LR
     OpenGate[Open-ended scrape/extract/LLM]
   end
   subgraph BLOCKERS[Remaining Blockers]
-    B1[Composio auth/CLI/SDK]
-    B2[Transcript cadence]
-    B3[Gemma timeout/schema]
-    B4[Public count source drift\nlive HH-read vs local DB]
+    B1[Composio CLI/MCP wiring optional; SDK probe pass]
+    B2[Transcript cadence: bot verification / ASR absent]
+    B3[Shadow promotion approval; Gemma timeout remains]
+    B4[Public count source drift resolved by --source live]
     B5[External rotation review]
   end
 
@@ -87,9 +87,10 @@ flowchart LR
   Worklist -->|receipt pass| Receipts
   Media -->|blocked by| B2
   Laptop -->|requires operator-side cookies| B2
-  Gemma -->|blocked by| B3
-  Composio -->|blocked by| B1
-  Scripts -->|verify public failed| B4
+  Gemma -->|schema-pass receipt| Receipts
+  Gemma -->|promotion blocked by| B3
+  Composio -->|read-only probe receipt| Receipts
+  Scripts -->|verify public --source live passed| B4
   HG -->|rotation review| B5
   DeployGate -->|requires approval| Netlify
   DBGate -->|requires approval| DB
@@ -131,7 +132,7 @@ flowchart TD
     O5[Docker/systemd]
   end
   subgraph NO_CONTROL
-    N1[Composio until API key auth]
+    N1[Composio write/outbound tools]
     N2[Public social/email channels]
     N3[Paid marketing tools]
     N4[Whop mutations]
@@ -193,4 +194,4 @@ flowchart LR
 
 
 %% 2026-06-13 readiness recheck note
-%% FULL remains blocked: Composio key/CLI/SDK absent, local ASR absent, Gemma/Qwen schema pass 0, live public counts use HH-read data while local verifier uses direct DB.
+%% 2026-06-13 latest: Composio read-only SDK probe passed via local venv; public verify --source live passed; Qwen schema pass 1/1; transcript remains degraded by bot verification / ASR absence; no public/spend/Whop/DB mutation.

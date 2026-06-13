@@ -7,9 +7,12 @@ import { getCallEligibilitySql } from "../lib/public-methodology";
 import { writeJsonFile } from "../lib/shadow-extraction";
 import { loadEnv, timestamp } from "./script-helpers";
 
+type VerifyPublicSurfaceSource = "local" | "live";
+
 interface VerifyPublicSurfaceArgs {
   readonly baseUrl: string | null;
   readonly auditOut: string | null;
+  readonly source: VerifyPublicSurfaceSource;
 }
 
 interface VerificationCheck {
@@ -24,10 +27,17 @@ function argValue(argv: readonly string[], flag: string): string | null {
   return argv[index + 1];
 }
 
+function readSource(value: string | null): VerifyPublicSurfaceSource {
+  if (value === null || value === "" || value === "local") return "local";
+  if (value === "live") return "live";
+  throw new Error(`Unsupported verify public source: ${value}. Expected local or live.`);
+}
+
 export function parseVerifyPublicSurfaceArgs(argv = process.argv.slice(2)): VerifyPublicSurfaceArgs {
   return {
     baseUrl: argValue(argv, "--base-url"),
     auditOut: argValue(argv, "--audit-out"),
+    source: readSource(argValue(argv, "--source")),
   };
 }
 
@@ -52,10 +62,84 @@ export function buildLiveScoreEligibleStatsSql(): string {
           FROM calls c`;
 }
 
+export function extractLiveMetric(html: string, label: string): number | null {
+  const text = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+  const pattern = new RegExp(`${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+([0-9][0-9,]*)`, "i");
+  const match = text.match(pattern);
+  if (!match) return null;
+  const parsed = Number(match[1].replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function verifyLivePublicSurface(baseUrl: string): Promise<{ readonly checks: VerificationCheck[]; readonly publicCounts: null }> {
+  const checks: VerificationCheck[] = [];
+
+  try {
+    const health = await fetchJson(`${baseUrl}/api/health`) as { readonly ok?: boolean; readonly source?: string };
+    checks.push({
+      name: "live_health_ok",
+      ok: health.ok === true,
+      detail: `ok=${health.ok === true}, source=${health.source ?? "unknown"}`,
+    });
+  } catch (error) {
+    checks.push({ name: "live_health_ok", ok: false, detail: error instanceof Error ? error.message : String(error) });
+  }
+
+  try {
+    const leaderboard = await fetchJson(`${baseUrl}/api/leaderboard?period=all_time&limit=100`) as {
+      readonly meta?: { readonly total?: number };
+      readonly data?: { readonly leaderboard?: readonly unknown[] };
+    };
+    const rows = leaderboard.data?.leaderboard ?? [];
+    const apiTotal = leaderboard.meta?.total ?? rows.length;
+    checks.push({
+      name: "live_leaderboard_meta_matches_rows",
+      ok: apiTotal === rows.length && rows.length > 0,
+      detail: `api=${apiTotal}, rows=${rows.length}`,
+    });
+  } catch (error) {
+    checks.push({ name: "live_leaderboard_meta_matches_rows", ok: false, detail: error instanceof Error ? error.message : String(error) });
+  }
+
+  try {
+    const homepage = await fetchText(baseUrl);
+    const rawCalls = extractLiveMetric(homepage, "raw calls");
+    const publicScored = extractLiveMetric(homepage, "public scored");
+    const rankedCreators = extractLiveMetric(homepage, "ranked creators");
+    checks.push({
+      name: "live_homepage_contains_nonzero_funnel_counts",
+      ok: Boolean(rawCalls && publicScored && rankedCreators),
+      detail: `raw=${rawCalls ?? "missing"}, public=${publicScored ?? "missing"}, ranked=${rankedCreators ?? "missing"}`,
+    });
+  } catch (error) {
+    checks.push({ name: "live_homepage_contains_nonzero_funnel_counts", ok: false, detail: error instanceof Error ? error.message : String(error) });
+  }
+
+  return { checks, publicCounts: null };
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
   const args = parseVerifyPublicSurfaceArgs(argv);
   const checks: VerificationCheck[] = [];
+  if (args.source === "live") {
+    if (!args.baseUrl) throw new Error("--source live requires --base-url");
+    const baseUrl = args.baseUrl.replace(/\/+$/, "");
+    const live = await verifyLivePublicSurface(baseUrl);
+    const payload = {
+      generated_at: timestamp(),
+      base_url: args.baseUrl,
+      source: args.source,
+      publicCounts: live.publicCounts,
+      checks: live.checks,
+      ok: live.checks.every((check) => check.ok),
+    };
+    if (args.auditOut) writeJsonFile(args.auditOut, payload);
+    console.log(JSON.stringify(payload, null, 2));
+    if (!payload.ok) process.exitCode = 1;
+    return;
+  }
+
   const publicCounts = await getPublicCounts();
   const leaderboardEligibleSql = getLeaderboardEligibilitySql("cs");
   const legacyCreatorExclusionSql = getLegacyCreatorExclusionSql("cr");
@@ -134,6 +218,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const payload = {
     generated_at: timestamp(),
     base_url: args.baseUrl,
+    source: args.source,
     publicCounts,
     checks,
     ok: checks.every((check) => check.ok),

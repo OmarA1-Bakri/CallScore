@@ -36,6 +36,7 @@ import {
 } from "../src/lib/scoring";
 import {
   buildLiveScoreEligibleStatsSql,
+  extractLiveMetric,
   parseVerifyPublicSurfaceArgs,
 } from "../src/scripts/verify-public-surface";
 import { parseRepairPriceAtCallArgs, toleranceBand } from "../src/scripts/repair-price-at-call";
@@ -426,11 +427,22 @@ test("consensus detection advances past the full anchored window", () => {
 
 test("public surface verification only fetches external URLs when explicitly requested", () => {
   assert.equal(parseVerifyPublicSurfaceArgs([]).baseUrl, null);
-  assert.equal(
-    parseVerifyPublicSurfaceArgs(["--base-url", "https://call-score.com"])
-      .baseUrl,
-    "https://call-score.com",
-  );
+  assert.equal(parseVerifyPublicSurfaceArgs([]).source, "local");
+  const liveArgs = parseVerifyPublicSurfaceArgs(["--base-url", "https://call-score.com", "--source", "live"]);
+  assert.equal(liveArgs.baseUrl, "https://call-score.com");
+  assert.equal(liveArgs.source, "live");
+});
+
+
+test("live public surface metric parser reads values after labels without CSS number noise", () => {
+  const html = '<div class="px-5">raw calls</div><div>16,186</div><div class="w-5">public scored</div><div>7,995</div><div>ranked creators</div><div>42</div>';
+  assert.equal(extractLiveMetric(html, "raw calls"), 16186);
+  assert.equal(extractLiveMetric(html, "public scored"), 7995);
+  assert.equal(extractLiveMetric(html, "ranked creators"), 42);
+});
+
+test("public surface verification rejects unknown source modes", () => {
+  assert.throws(() => parseVerifyPublicSurfaceArgs(["--source", "prod-db"]), /Unsupported verify public source/);
 });
 
 test("public surface verification compares live score eligibility in the public judgment window", () => {

@@ -209,3 +209,49 @@ Next exact safe action:
 ```text
 Install/configure Composio locally without printing secrets (API key via approved local secret store, CLI/SDK available), then rerun read-only `composio_mcp_probe`; separately configure local ASR or run the laptop transcript collector limit 5, then rerun bounded transcript and shadow canaries.
 ```
+
+---
+
+## 2026-06-13 canonical readiness remediation update from `8c21d93`
+
+Strict verdict: **PARTIAL, operation-ready for safe read-only/dry-run lanes**. FULL autonomous revenue remains too strong because transcript acquisition is still degraded and public/spend/Whop/DB mutations remain approval-gated by design.
+
+Fresh fixes and evidence:
+
+- Baseline: `master` at `8c21d93` before edits; `git diff --check` passed.
+- Receipt gate fix: dangerous-workflow regex no longer treats benign `read-only` text as paid `ad` intent. Regression: `tests/workflow-receipts.test.ts` covers read-only receipts and paid-ad detection.
+- Composio: local context exists and existing venv `/srv/agents/hermes/venvs/composio-sdk` imports `composio`; after loading local env without printing values, SDK client construction and tool accessor discovery passed. Receipt: `.tmp/workflow-receipts/composio_mcp_probe/composio-mcp-venv-fixed-20260613T112819Z.json`. No write action, no outbound marketing, no spend.
+- Transcript waterfall: `transcript:worklist -- --limit 5 --since-days 45` passed with 5 candidates. Bounded dry-run extraction limit 3/serial returned terminal provider reason `bot_verification_required`; no useful transcript was produced and no DB write was attempted. ASR binaries are still absent. Receipt: `.tmp/workflow-receipts/transcript_waterfall_canary/transcript-waterfall-20260613T112908Z.json`.
+- Shadow extraction: local Ollama JSON-mode returns `{}` for empty extraction. Parser now treats `{}` as no calls and wraps single-call objects. Bounded Qwen fallback produced artifact `.tmp/shadow-extraction/qwen-shadow-fixed-20260613T113210Z.jsonl` with `schemaValid=1/1`, `accepted=0`, no production writes. Receipt: `.tmp/workflow-receipts/gemma_shadow_canary/qwen-shadow-fixed-20260613T113210Z.json`.
+- Public count verification: verifier now supports `--source live` to compare live HH-read source with live API/UI instead of direct local DB counts. `npm run verify:public -- --base-url https://call-score.com --source live` passed: health `source=hh_read_api`, leaderboard `api=36 rows=36`, homepage funnel `raw=16186 public=7995 ranked=42`.
+- Whop/revenue gates: targeted Whop/auth/checkout/webhook suite passed `28/28`; mutation smoke receipt blocked with `approval_missing`. No Whop mutation performed.
+- Art of War: dry-run from canonical automation cwd produced report, no public action, no external mutation, decision `revise_or_hold`, failure class `audience_mismatch`. Receipt: `.tmp/workflow-receipts/art_of_war_private_dry_run/art-of-war-dry-run-20260613T113655Z.json`.
+- Live target-price safety: `https://call-score.com/api/health` healthy via HH read API; `/api/creator/93?limit=100` leak count `0`; ETH/SOL/BTC known target rows preserve outcomes and expose `target_required_tier="pro"`, `can_view_target_price=false`, `target_price=null`, `validated_target_price=null`.
+
+Validation:
+
+- `node --import tsx --test tests/workflow-receipts.test.ts tests/workplane-jobs.test.ts tests/extract-calls-openrouter.test.ts tests/data-pipeline.test.ts`: `81/81` pass.
+- `npm run typecheck`: pass.
+- `npm run lint`: pass.
+- `npm run build`: pass.
+- Full `node --import tsx --test $(find tests -name '*.test.ts' | sort)`: pass; subsequent gates ran, so no failing test stopped execution.
+- `npm run hygiene`: pass, `Secret hygiene: ok`.
+- `npm run workplane:status`: pass/OK, readiness still partial.
+- `npm run freshness:check`: exit 0 with `WARN`; warnings are transcript provider credential missing and yt-dlp bot verification failures.
+- `npm run audit:pipeline`: exit 0 but reports remaining data completeness blockers: missing publication dates, missing transcripts or terminal reasons, pending shadow recheck.
+- `npm run verify:public` with `.env.hermes`: pass local direct-DB mode.
+- `npm run verify:public -- --base-url https://call-score.com --source live`: pass live HH-read mode.
+
+Remaining blockers:
+
+- P0: none for safe read-only/dry-run operation.
+- P1: transcript useful cadence from this VM still not proven; YouTube bot verification and absent local ASR block useful extraction. Next safe action: configure local ASR or run operator laptop/cookie collector limit 5, then rerun `transcript_waterfall_canary`.
+- P1: Gemma model still times out; Qwen fallback gives schema pass but no accepted calls. Next safe action: tune Gemma prompt/runtime over existing transcripts, artifact-only, limit 1.
+- P1: `audit:pipeline` data completeness remains partial until transcript terminal reasons and shadow recheck coverage improve.
+- P1: Composio SDK read-only probe works, but full MCP/CLI wiring should be formalized before claiming broad Composio-managed operations.
+- P2: stale mirror/archive cleanup and historical secret rotation review remain external/approval-gated.
+
+Operational posture:
+
+- Safe autonomous lanes: health checks, local/live public verification, hygiene, Workplane status, freshness/audit read-only reports, private Art of War dry-runs, Whop fixture/read-only tests, receipt generation.
+- Still approval-gated: Netlify deploy, production DB mutation, Whop mutation, public publishing/outreach, paid spend, provider env changes, credential rotation, destructive infra, open-ended extraction/model jobs.

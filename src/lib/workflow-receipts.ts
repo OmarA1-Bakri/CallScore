@@ -22,7 +22,7 @@ export interface WorkflowReceiptWriteResult {
   readonly receipt: WorkflowReceipt;
 }
 
-const DANGEROUS_WORKFLOW_RE = /(?:publish|public[_-]?(?:action|posting|publication|marketing)|outreach|email|dm|message|spend|paid|ad\b|whop[_-]?(?:mutation|write|pricing|customer|payment)|db[_-]?(?:mutation|write)|credential[_-]?rotation|destructive|open[_-]?ended|deploy)/i;
+const DANGEROUS_WORKFLOW_RE = /(?:publish|public[_-]?(?:action|posting|publication|marketing)|outreach|email|dm|message|spend|paid|\bad\b|\bads\b|whop[_-]?(?:mutation|write|pricing|customer|payment)|db[_-]?(?:mutation|write)|credential[_-]?rotation|destructive|open[_-]?ended|deploy)/i;
 
 function safeSegment(value: string, field: string): string {
   const raw = value.trim();

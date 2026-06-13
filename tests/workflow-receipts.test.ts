@@ -48,6 +48,13 @@ test("public spend and provider mutation workflows fail closed without approval 
   assert.equal(approved.result, "passed");
 });
 
+
+test("read-only receipts do not trip paid-ad approval gate", () => {
+  assert.equal(isApprovalRequiredWorkflow("composio_mcp_probe", "read-only SDK/tool surface probe"), false);
+  assert.equal(isApprovalRequiredWorkflow("freshness_check", "read-only public verification"), false);
+  assert.equal(isApprovalRequiredWorkflow("marketing_ad_launch", "paid ad campaign"), true);
+});
+
 test("receipt CLI parser keeps required schema fields", () => {
   const parsed = buildReceiptFromArgv([
     "--workflow", "gemma_shadow_extract",

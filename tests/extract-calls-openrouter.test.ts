@@ -351,3 +351,13 @@ test("extractJsonArrayText unwraps common Ollama JSON object array keys", () => 
   );
   assert.equal(extractJsonArrayText('{"results":[]}'), "[]");
 });
+
+
+test("extractJsonArrayText treats Ollama empty JSON object as no calls", () => {
+  assert.equal(extractJsonArrayText("{}"), "[]");
+});
+
+test("extractJsonArrayText wraps single Ollama call object", () => {
+  const text = extractJsonArrayText('{"symbol":"BTCUSDT","direction":"bullish","raw_quote":"BTC can rally"}');
+  assert.deepEqual(JSON.parse(text), [{ symbol: "BTCUSDT", direction: "bullish", raw_quote: "BTC can rally" }]);
+});
