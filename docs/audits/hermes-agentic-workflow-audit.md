@@ -431,3 +431,42 @@ Promotion gate:
 
 - This is promotion-readiness evidence, not promotion approval.
 - Before any write canary or production promotion, an operator must explicitly approve the exact `shadow:promote --write` command and review the diff artifact.
+
+---
+
+## 2026-06-13 full-production operation push update
+
+Verdict: **PARTIAL**, improved. Canonical laptop transcript cadence is now proven for a bounded 5-video batch; Workplane now treats the latest successful laptop cadence receipt as readiness evidence instead of stale HH-local collector state.
+
+### Evidence
+
+| Area | Result | Evidence |
+| --- | --- | --- |
+| Laptop transcript cadence | PASS, 5/5 ingested | `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-20260613T1806Z.json` |
+| Fresh transcript ids | `iUCCAQYntNw`, `OpGyIwR0rzA`, `X9gvhAEMuQ4`, `Y4irJGDZdLM`, `8nKIOo5CeEc` | approved ingest path / DB readback |
+| Workplane transcript readiness | READY | `src/lib/workplane-status.ts` now reads latest `transcript_laptop_cadence` receipt |
+| Gemma fresh-batch shadow | valid artifact, 0 accepted calls | `.tmp/workflow-receipts/gemma_shadow_sample/gemma-fresh-laptop5-20260613T181320Z.json` |
+| Shadow diff | complete, manual_review=5 | `.tmp/workflow-receipts/gemma_shadow_diff/gemma-fresh-laptop5-20260613T181320Z.json` |
+| Extraction dry-run | processed=5, failed=0, calls=0 | `.tmp/workflow-receipts/pipeline_extract_canary/fresh-laptop5-extract-dry-run-20260613T1818Z.json` |
+| Public live verify | PASS | `npm run verify:public -- --source live --base-url https://call-score.com` |
+| Full tests | PASS, 636/636 | `node --import tsx --test $(find tests -name '*.test.ts' | sort)` |
+
+### Updated readiness map
+
+- Transcript pipeline: **READY_WITH_GATES** for bounded canonical laptop cadence; HH-only yt-dlp/ASR remains diagnostic/fallback and still shows historical bot/ASR blockers.
+- Downstream extraction/match/score: **PARTIAL**. Fresh batch yielded no accepted calls, so match/score/write-canary was intentionally not run.
+- Gemma/Qwen: **READY_WITH_GATES** for artifact-only shadow and diff; promotion/write remains approval-gated.
+- Whop Auto: **READY_WITH_GATES** for tests/read-only/dry-run; no live mutation performed.
+- Art of War: **READY_WITH_GATES** for private dry-run only; latest campaign remains `revise_or_hold` / `audience_mismatch`.
+- Composio MCP: **PARTIAL/BLOCKED_BY_AUTH_OR_SDK** from this operator environment; no write/outbound/spend action performed.
+
+### Canonical control note
+
+Do not use stale `.tmp/laptop-collector/latest-state.json` alone to judge transcript readiness. The fixed canonical laptop script can succeed through the approved ingest path without refreshing that HH-local state file. Use latest successful `transcript_laptop_cadence` receipt plus DB latest transcript success as the current readiness evidence.
+
+### Remaining blockers
+
+- P1: collect more bounded laptop batches and run extraction/diff review until accepted fresh calls are observed.
+- P1: Composio MCP local auth/CLI/SDK wiring.
+- P1: Art of War content revision before any owned-channel publish approval.
+- P1: audit pipeline completeness: publication dates, transcript terminal coverage, shadow recheck coverage.

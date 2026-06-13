@@ -5579,3 +5579,55 @@ Canonical evidence lives in `docs/audits/hermes-agentic-workflow-audit.md` under
 Summary: run `gemma-production-shadow-sample-fullcover-20260613T155241Z` was local Ollama only, artifact-only, limit 5, full transcript coverage, `5/5` schema-valid rows, `1` accepted call, `0` failed records, `shadow:validate ok=true`, and diff statuses `removed_calls=2`, `changed_calls=1`, `no_accepted_calls=2`, `manual_review=0`.
 
 Promotion remains blocked until explicit operator approval of the exact `shadow:promote --write` command after reviewing `.tmp/shadow-extraction/gemma-production-shadow-sample-fullcover-20260613T155241Z.diff.jsonl`. No production writes, DB mutation, deploy, Whop mutation, public action, or paid API/LLM calls were performed.
+
+---
+
+## 2026-06-13 Full-production operation push / laptop cadence restored
+
+Strict verdict: **PARTIAL, with canonical transcript cadence restored and Workplane readiness corrected**. FULL production operation is still not certified because downstream extraction produced no accepted fresh calls from the new laptop batch, Composio MCP remains auth/SDK-blocked from this operator environment, Art of War public launch remains held by private verifier/audience fit, and audit pipeline still reports data-completeness blockers.
+
+What changed in this run:
+
+- Canonical laptop path was used first, as required: HH connected to Omar laptop over Tailscale at `100.118.20.40` using the bridge key and invoked the Windows collector with explicit PowerShell path.
+- Bounded laptop collector command ran with `-Limit 5`, Firefox cookies on the laptop, `-SinceDays 45`, `-GapSeconds 45`, and `-Write`.
+- Transcript ingest succeeded through the approved repo path for 5/5 videos: `iUCCAQYntNw`, `OpGyIwR0rzA`, `X9gvhAEMuQ4`, `Y4irJGDZdLM`, and `8nKIOo5CeEc`.
+- HH received transcript JSON/results only. No cookies, auth headers, credential values, raw provider secrets, public action, paid API, Whop mutation, deploy, destructive infra, or broad DB write occurred.
+- Freshness now shows latest transcript attempt/success at `2026-06-13 19:10:20+01` with no freshness blockers; remaining freshness warnings are historical provider credential/bot-verification failures from HH-only paths.
+- Receipt written: `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-20260613T1806Z.json`.
+- Workplane readiness logic now trusts the latest successful `transcript_laptop_cadence` workflow receipt over stale HH-local laptop collector state, because the fixed laptop script writes through the ingest path without refreshing `.tmp/laptop-collector/latest-state.json`.
+- New regression test: `transcript readiness trusts latest successful cadence receipt over stale collector state`.
+
+Downstream result from the fresh batch:
+
+- Artifact-only Gemma shadow sample over the five fresh transcripts completed with `5/5` valid rows, `0` failed records, and `0` accepted calls.
+- Shadow validation passed with `ok=true`; shadow diff completed with `manual_review=5` and no production promotion.
+- Production extraction dry-run over the same five videos completed with `processed=5`, `failed=0`, `calls=0`; therefore matching/scoring/write-canary was intentionally not run for that batch.
+- Receipts written: `gemma_shadow_sample`, `gemma_shadow_diff`, and `pipeline_extract_canary` under `.tmp/workflow-receipts/`.
+
+Operational gates verified after the patch:
+
+- Targeted Workplane/receipt/Whop tests: `34/34` pass.
+- Full test sweep: `636/636` pass.
+- `npm run typecheck`: pass.
+- `npm run lint`: pass.
+- `npm run build`: pass.
+- `npm run hygiene`: `Secret hygiene: ok`.
+- `npm run verify:public -- --source live --base-url https://call-score.com`: pass.
+- Live health: `ok=true`, `db=ok`, `source=hh_read_api`.
+- Live creator API for creator `93`: public `target_price` values remain null; no known 99Bitcoins target-price leak for `1700` or `55000`, and no non-null public target prices were observed.
+
+Other lanes:
+
+- Whop/revenue: targeted tests passed; mutation gates remain fail-closed; no Whop mutation performed.
+- Art of War: private dry-run completed with `decision=revise_or_hold`, `failure_class=audience_mismatch`, no public action, no external mutation, no spend.
+- Composio: local CLI/SDK/auth probe remains blocked from this operator environment; no write/outbound/spend action performed.
+
+Remaining readiness blockers:
+
+- **P0:** none for safe read-only/dry-run production operation and public target-price monetization.
+- **P1:** downstream call extraction from newly collected transcripts has not yet produced accepted fresh calls; continue bounded laptop batches plus extraction/diff review until accepted calls are observed, then run approved match/score/write-canary gates.
+- **P1:** Composio MCP/tool discovery still requires valid local auth/SDK/CLI wiring through approved local secret storage, never chat.
+- **P1:** Art of War public/owned-channel launch remains held pending content revision and publish approval receipt; zero-cost private loops only.
+- **P1:** `audit:pipeline` still reports missing publication dates, missing transcript terminal coverage, and pending shadow recheck coverage.
+
+Next exact safe action: run another bounded canonical laptop collector batch (`Limit 5`, laptop cookies, write through approved ingest), then run full-transcript Gemma/Qwen shadow and extraction dry-run over the newly ingested videos; if accepted calls appear, proceed only through receipt-gated diff review and bounded write-canary approval gates.

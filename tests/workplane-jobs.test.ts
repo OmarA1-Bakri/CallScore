@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec } from "../src/lib/workplane-jobs";
 import {
+  buildReadinessDomains,
   decideNextAutonomousAction,
   latestArtOfWarCampaignReceipt,
   latestGemmaShadowArtifact,
@@ -148,6 +149,51 @@ test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe w
   assert.equal(decideNextAutonomousAction({ ...base, collectorLastAttemptedCount: 5, collectorLastSuccessCount: 0 }).action, "repair_transcript_targeting_or_failure_classification");
   assert.equal(decideNextAutonomousAction({ ...base, latestMlEval: { path: "r", exists: true, modified_at: "now", malformed: false, summary: { promotion_gate: { eligible_for_write_canary: false } } } }).action, "start_artofwar_internal_growth_intelligence");
   assert.equal(decideNextAutonomousAction(base).job_type, "gemma_shadow_extract");
+});
+
+
+test("transcript readiness trusts latest successful cadence receipt over stale collector state", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-workplane-receipt-"));
+  const receiptDir = join(root, ".tmp", "workflow-receipts", "transcript_laptop_cadence");
+  mkdirSync(receiptDir, { recursive: true });
+  writeFileSync(join(receiptDir, "laptop-limit5.json"), JSON.stringify({
+    workflow_name: "transcript_laptop_cadence",
+    run_id: "laptop-limit5",
+    result: "passed",
+    blockers: [],
+  }));
+
+  const domains = buildReadinessDomains({
+    repoRoot: root,
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: {
+      state_path: ".tmp/laptop-collector/latest-state.json",
+      status: "clear",
+      cooldown_until_utc: null,
+      cooldown_reason: null,
+      latest_failure_reason: "transcript_failed",
+      latest_job_id: "old-job",
+      last_run_utc: "2026-06-12T18:33:23Z",
+      last_attempted_count: 5,
+      last_success_count: 0,
+      last_failure_count: 5,
+      last_success_rate: 0,
+      recent_failure_reasons: { transcript_failed: 5 },
+      checked_at: "now",
+    },
+    latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 5,
+    dailyPipelineActive: true,
+    nextAction: { action: "repair_transcript_targeting_or_failure_classification", reason: "stale", job_type: "transcript_collect_laptop", allowed: true },
+    now: new Date("2026-06-13T18:30:00.000Z"),
+  });
+
+  assert.equal(domains.transcript_collector.status, "READY");
+  assert.deepEqual(domains.transcript_collector.blockers, []);
+  assert.match(String(domains.transcript_collector.safe_next_action), /continue bounded laptop collector/);
+  assert.ok(domains.transcript_collector.evidence.some((item) => item.includes("latest_cadence_receipt=")));
 });
 
 test("readiness domains cover all activation surfaces with mutation gates", async () => {

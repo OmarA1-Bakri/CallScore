@@ -191,6 +191,30 @@ export function latestMlEvalArtifact(root: string | readonly string[] = ["/tmp/c
 }
 
 
+function latestWorkflowReceipt(workflow: string, repoRoot = process.cwd()): ArtifactSummary {
+  const dir = join(repoRoot, ".tmp", "workflow-receipts", workflow);
+  const path = latestFile(dir, (name) => name.endsWith(".json"));
+  if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
+  try {
+    const json = readJsonObject(path);
+    return {
+      path,
+      exists: true,
+      modified_at: statSync(path).mtime.toISOString(),
+      malformed: false,
+      summary: {
+        run_id: json.run_id ?? null,
+        result: json.result ?? null,
+        workflow_name: json.workflow_name ?? null,
+        blockers: Array.isArray(json.blockers) ? json.blockers : [],
+        artifact_path: json.artifact_path ?? json.artifact ?? null,
+      },
+    };
+  } catch (error) {
+    return { path, exists: true, modified_at: statSync(path).mtime.toISOString(), malformed: true, summary: { error: error instanceof Error ? error.message : String(error) } };
+  }
+}
+
 export function latestArtOfWarCampaignReceipt(root: string | readonly string[] = ["/tmp", ".tmp/workplane-jobs"]): ArtifactSummary {
   const path = latestFile(root, (name) => name.endsWith(".json") && name.includes("callscore-art-of-war") && (name.includes("campaign") || name.includes("receipts-proof")));
   if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
@@ -435,6 +459,10 @@ export function buildReadinessDomains(input: {
   const mlGate = (input.latestMlEval.summary.promotion_gate ?? {}) as Record<string, unknown>;
   const external = externalReadinessSnapshot(repoRoot, now);
   const publicSafe = input.unsafeSourceRanks === 0 && input.apiUnsafeOfficialCount === 0;
+  const transcriptCadenceReceipt = latestWorkflowReceipt("transcript_laptop_cadence", repoRoot);
+  const transcriptCadencePassed = transcriptCadenceReceipt.exists
+    && !transcriptCadenceReceipt.malformed
+    && transcriptCadenceReceipt.summary.result === "passed";
 
   return {
     root_hygiene: domain({
@@ -451,9 +479,16 @@ export function buildReadinessDomains(input: {
     }, now),
     callscore_pipeline: domain({
       status: publicSafe ? "PARTIAL" : "BLOCKED",
-      evidence: [`unsafeSourceRanks=${input.unsafeSourceRanks}`, `apiUnsafeOfficial=${input.apiUnsafeOfficialCount}`, `dailyPipelineActive=${input.dailyPipelineActive}`],
-      blockers: publicSafe ? ["transcript freshness remains rate-limit controlled"] : ["public safety violation detected"],
-      safe_next_action: input.nextAction.action,
+      evidence: [
+        `unsafeSourceRanks=${input.unsafeSourceRanks}`,
+        `apiUnsafeOfficial=${input.apiUnsafeOfficialCount}`,
+        `dailyPipelineActive=${input.dailyPipelineActive}`,
+        transcriptCadenceReceipt.path ? `latest_transcript_cadence_receipt=${transcriptCadenceReceipt.path}` : "latest_transcript_cadence_receipt=missing",
+      ],
+      blockers: publicSafe
+        ? (transcriptCadencePassed ? ["bounded transcript cadence passed; downstream extraction produced no accepted fresh calls yet"] : ["transcript freshness remains rate-limit controlled"])
+        : ["public safety violation detected"],
+      safe_next_action: transcriptCadencePassed ? "continue bounded laptop cadence and review fresh transcript extraction settings" : input.nextAction.action,
       risky_actions_blocked: ["unbounded transcript collection", "Gemma production writes", "creator_stats mutation from shadow output"],
       required_approvals: ["production extractor default change"],
       relevant_commands: ["npm run freshness:check", "npm run workplane:status"],
@@ -462,7 +497,9 @@ export function buildReadinessDomains(input: {
       canary_available: true,
     }, now),
     transcript_collector: domain({
-      status: input.collectorCooldown.status === "malformed" ? "BLOCKED" : "PARTIAL",
+      status: input.collectorCooldown.status === "malformed"
+        ? "BLOCKED"
+        : (transcriptCadencePassed ? "READY" : "PARTIAL"),
       evidence: [
         `cooldown=${input.collectorCooldown.status}`,
         `state=${input.collectorCooldown.state_path ?? "unknown"}`,
@@ -473,17 +510,23 @@ export function buildReadinessDomains(input: {
         `last_failure=${input.collectorCooldown.last_failure_count ?? "unknown"}`,
         `last_success_rate=${input.collectorCooldown.last_success_rate ?? "unknown"}`,
         `recent_failure_reasons=${JSON.stringify(input.collectorCooldown.recent_failure_reasons)}`,
+        transcriptCadenceReceipt.path ? `latest_cadence_receipt=${transcriptCadenceReceipt.path}` : "latest_cadence_receipt=missing",
+        transcriptCadenceReceipt.modified_at ? `latest_cadence_checked_at=${transcriptCadenceReceipt.modified_at}` : "latest_cadence_checked_at=unknown",
       ],
       blockers: input.collectorCooldown.status === "active"
         ? [`cooldown_until=${input.collectorCooldown.cooldown_until_utc}`]
-        : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
-          ? ["latest bounded batch had 0 transcript successes; inspect targeting/failure classification before another batch"]
-          : []),
+        : (transcriptCadencePassed
+          ? []
+          : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
+            ? ["latest HH-visible laptop state had 0 transcript successes; use latest transcript_laptop_cadence receipt before retrying"]
+            : [])),
       safe_next_action: input.collectorCooldown.status === "active"
         ? "wait_for_collector_cooldown"
-        : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
-          ? "repair transcript targeting/failure classification before next 5-video run"
-          : "claim transcript_collect_laptop limit 5 from laptop runner"),
+        : (transcriptCadencePassed
+          ? "continue bounded laptop collector cadence limit 5 and downstream extraction review"
+          : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
+            ? "run canonical laptop collector via Tailscale rather than HH-only fallback"
+            : "claim transcript_collect_laptop limit 5 from laptop runner")),
       risky_actions_blocked: ["25-video batch without explicit gate", "cookie transfer to HH", "retry hammering after 429"],
       required_approvals: ["large transcript batch >5"],
       relevant_commands: ["scripts/windows/run-transcript-collector.ps1 -Workplane -Limit 5 -Write"],
