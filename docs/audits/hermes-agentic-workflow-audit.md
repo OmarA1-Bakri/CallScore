@@ -266,7 +266,7 @@ What changed:
 
 - PR #66 10/10 benchmark evidence was reconciled with current production-shadow behavior.
 - Root cause of the apparent regression: PR #66 validated the normalized eval schema, while later production-shadow Modelfile changes emit production-schema rows.
-- Eval and production contracts are now separate:
+- Eval and production contracts are now separate; production schema validation uses a bounded production-shadow symbol subset rather than the full tracked-symbol universe:
   - `ops/ollama/Modelfile.callscore-gemma4-eval-extractor` preserves PR #66 eval-schema prompt.
   - `ops/ollama/Modelfile.callscore-gemma4-extractor` remains production-schema shadow model.
   - `src/scripts/benchmark-local-extractors.ts` supports `--schema eval` and `--schema production`.

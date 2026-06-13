@@ -152,7 +152,10 @@ const EVAL_SUPPORTED_SYMBOLS = [
   "ARUSDT",
   "RENDERUSDT",
 ] as const;
-const PRODUCTION_SUPPORTED_SYMBOLS = [
+const PRODUCTION_SHADOW_SUPPORTED_SYMBOLS = [
+  // Intentional shadow-eval subset, not the full TRACKED_SYMBOLS universe.
+  // Keep aligned with the local production Modelfile examples/allowlist until
+  // larger real-transcript shadow coverage proves additional assets safe.
   ...EVAL_SUPPORTED_SYMBOLS,
   "AVAXUSDT",
   "SUIUSDT",
@@ -442,7 +445,7 @@ export function validateProductionExtraction(item: unknown): {
   const record = item as Record<string, unknown>;
   const symbol =
     typeof record.symbol === "string" ? record.symbol.toUpperCase() : "";
-  if (!(PRODUCTION_SUPPORTED_SYMBOLS as readonly string[]).includes(symbol)) errors.push("unsupported_symbol");
+  if (!(PRODUCTION_SHADOW_SUPPORTED_SYMBOLS as readonly string[]).includes(symbol)) errors.push("unsupported_symbol");
   const direction = record.direction as ProductionExtraction["direction"];
   if (!DIRECTIONS.filter(Boolean).includes(direction))
     errors.push("invalid_direction");

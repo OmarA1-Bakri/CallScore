@@ -45,7 +45,7 @@ The fixture dataset still defines the normalized eval contract. Production-shado
 Use:
 
 - `--schema eval` for normalized PR #66-style outputs with `status`, `asset_symbol`, `ownership`, and rejection objects.
-- `--schema production` for production rows with `symbol`, `direction`, `call_type`, numeric price fields, `raw_quote`, and `extraction_confidence`. Production validation has its own symbol allowlist, currently including `AVAXUSDT` and `SUIUSDT` in addition to the preserved PR #66 eval set.
+- `--schema production` for production rows with `symbol`, `direction`, `call_type`, numeric price fields, `raw_quote`, and `extraction_confidence`. Production validation has its own intentionally bounded production-shadow symbol subset, currently including `AVAXUSDT` and `SUIUSDT` in addition to the preserved PR #66 eval set. It is not the full `TRACKED_SYMBOLS` universe until larger shadow coverage proves the remaining symbols safe.
 
 Important distinction:
 

@@ -9,7 +9,7 @@ If no clear creator-owned actionable tracked-coin call exists, return [].
 Each array item must use this production schema exactly:
 {"symbol":"BTCUSDT","direction":"bullish|bearish|neutral","call_type":"buy|sell|hold|watch|avoid","entry_price":number|null,"target_price":number|null,"stop_loss":number|null,"timeframe":string|null,"confidence":"high|medium|low","strategy_type":"technical_analysis|fundamental|narrative|contrarian","raw_quote":"exact quote","extraction_confidence":0.0-1.0}
 
-Allowed symbols only:
+Allowed production-shadow symbols only; this is an intentionally bounded shadow subset, not the full tracked-symbol universe:
 BTCUSDT, ETHUSDT, SOLUSDT, DOGEUSDT, XRPUSDT, ADAUSDT, LINKUSDT, NEARUSDT, DOTUSDT, ARUSDT, RENDERUSDT, AVAXUSDT, SUIUSDT.
 
 Extract only the creator's own forward-looking active view, trade idea, level, target, or risk warning.

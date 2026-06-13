@@ -5288,7 +5288,7 @@ Implementation:
 
 - Added `ops/ollama/Modelfile.callscore-gemma4-eval-extractor` to preserve the PR #66 eval-schema prompt separately.
 - Kept `ops/ollama/Modelfile.callscore-gemma4-extractor` as the production-schema shadow extractor.
-- Added benchmark `--schema eval` and `--schema production` modes.
+- Added benchmark `--schema eval` and `--schema production` modes. Production mode uses a bounded production-shadow symbol subset, not the full tracked-symbol universe.
 - Added regression tests proving eval/prod schema acceptance and rejection behavior, wrapper safety, and no-call `[]` behavior.
 - Tuned production Modelfile for multi-call extraction, timeframe preservation, and cautious/avoid below-level calls.
 

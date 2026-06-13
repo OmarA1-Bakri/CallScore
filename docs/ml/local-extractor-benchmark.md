@@ -94,7 +94,7 @@ The contracts are now split explicitly:
 - `ops/ollama/Modelfile.callscore-gemma4-eval-extractor` preserves the PR #66 optimized eval-schema prompt.
 - `ops/ollama/Modelfile.callscore-gemma4-extractor` remains the production-schema shadow extractor.
 - `npm run benchmark:extractors` accepts `--schema eval` or `--schema production`.
-- The benchmark records the schema contract in each row and summary.
+- The benchmark records the schema contract in each row and summary. The production-schema benchmark uses an intentionally bounded production-shadow symbol subset, not the full `TRACKED_SYMBOLS` universe.
 
 Rebuild local models:
 
