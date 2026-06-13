@@ -141,3 +141,6 @@ Bounded real-transcript shadow canary:
 - Scope: local Ollama only, limit `1`, one chunk, artifact-only, no production writes, no promotion.
 
 Promotion remains blocked until separate explicit approval plus larger shadow/diff review. This reconciliation proves benchmark contracts and bounded shadow readiness; it does not authorize production writes.
+
+
+The eval-schema Modelfile intentionally preserves the PR #66 benchmark prompt as a controlled-fixture contract; do not use it for untrusted production transcript runs. Production shadow extraction uses the separate guarded production-schema Modelfile.

@@ -59,3 +59,6 @@ Latest local evidence:
 - Eval model `callscore-gemma4-eval-extractor:latest`: `10/10` fixture pass under `--schema eval`.
 - Production model `callscore-gemma4-extractor:latest`: `10/10` fixture pass under `--schema production`.
 - Real-transcript production shadow canary wrote one artifact with `schema_valid=true` and no production writes.
+
+
+The eval-schema Modelfile intentionally preserves the PR #66 benchmark prompt as a controlled-fixture contract; do not use it for untrusted production transcript runs. Production shadow extraction uses the separate guarded production-schema Modelfile.

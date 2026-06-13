@@ -5205,7 +5205,7 @@ Fresh blocker evidence:
 
 - Composio MCP: not functional. Config/context dirs exist, but API key env is absent, CLI absent, SDK import absent. Receipt: `composio_mcp_probe` blocked by `auth_missing`.
 - Transcript waterfall: worklist limit 5 passes, but media fallback dry-run limit 1 returns `asr_unavailable`; no useful transcript produced from this VM.
-- Gemma shadow: Gemma and Qwen bounded artifacts exist, but schema pass remains `0/1`; Gemma timed out, Qwen returned non-array output. No production writes; promotion blocked.
+- Gemma shadow: Earlier Gemma and Qwen bounded artifacts existed with schema pass `0/1`; Gemma timed out, Qwen returned non-array output. No production writes; promotion blocked.
 - Public count verification: local `verify:public` passes against direct DB counts (`rankedCreators=40`, `publicScoredCalls=2812`, `trackedCalls=5258`), while live `verify:public -- --base-url https://call-score.com` fails because live uses HH-read counts (`leaderboard=36`, homepage raw/public/ranked `16,186/7,995/42`). Root cause is source drift between local direct DB verification and live HH-read API source; no DB/deploy mutation performed.
 - Workplane reports `automation_readiness=PARTIAL`; freshness is `WARN` with no blockers; audit pipeline still shows transcript/shadow/publication incompleteness.
 
@@ -5274,7 +5274,7 @@ In parallel, configure local ASR or run the laptop transcript collector limit 5.
 
 ---
 
-## 2026-06-13 Gemma/Qwen schema-contract reconciliation
+## 2026-06-13 Gemma schema-contract reconciliation
 
 Status: **GEMMA SHADOW READINESS IMPROVED TO READY_WITH_GATES / ARTIFACT-ONLY; PRODUCTION WRITES STILL BLOCKED**.
 
@@ -5322,7 +5322,10 @@ Receipts:
 
 Activation impact:
 
-- Gemma/Qwen schema-readiness blocker is no longer P1 zero-state.
+- Gemma schema-readiness blocker is no longer P1 zero-state.
 - Gemma production-schema shadow extraction is ready for bounded artifact-only operation with gates.
 - Production write canary remains blocked until explicit approval plus larger shadow/diff evidence.
 - Transcript acquisition/cadence remains separate from model schema readiness.
+
+
+The eval-schema Modelfile intentionally preserves the PR #66 benchmark prompt as a controlled-fixture contract; do not use it for untrusted production transcript runs. Production shadow extraction uses the separate guarded production-schema Modelfile.

@@ -268,6 +268,102 @@ test("shadow promotion emits structured dry-run audit rows before any write", as
   assert.equal(rows[0].video.id, 101);
 });
 
+
+test("production-schema shadow calls reach dry-run promotion audit without writes", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "shadow-promote-production-schema-"));
+  const shadowIn = join(dir, "shadow.jsonl");
+  const diffIn = join(dir, "diff.jsonl");
+  const auditOut = join(dir, "promote.jsonl");
+  const video = {
+    id: 202,
+    creator_id: 7,
+    creator_name: "Creator",
+    youtube_handle: "@Creator",
+    youtube_video_id: "yt202",
+    title: "SOL update",
+    published_at: "2026-01-01T00:00:00.000Z",
+    created_at: "2026-01-01T00:00:00.000Z",
+  };
+  const productionSchemaCall = {
+    symbol: "SOLUSDT",
+    direction: "bullish" as const,
+    call_type: "watch" as const,
+    entry_price: 145,
+    target_price: 180,
+    stop_loss: 132,
+    timeframe: "next few weeks",
+    confidence: "high" as const,
+    strategy_type: "technical_analysis" as const,
+    raw_quote: "SOL can break above 145 and run toward 180 over the next few weeks",
+    extraction_confidence: 0.91,
+    specificity_score: 0.9,
+    validation_notes: [],
+  };
+
+  writeFileSync(
+    shadowIn,
+    `${JSON.stringify({
+      record_type: "shadow_extraction",
+      ts: "2026-01-01T00:00:00.000Z",
+      run_id: "shadow-production-schema-test",
+      provider: "ollama",
+      model: "callscore-gemma4-extractor:latest",
+      fallback_model: null,
+      video,
+      transcript_sha256: "abc",
+      transcript_length: 100,
+      schema_valid: true,
+      candidate_count: 1,
+      accepted_count: 1,
+      accepted_calls: [productionSchemaCall],
+      chunk_summary: {
+        chunk_count: 1,
+        covered_until_offset: 100,
+        reached_transcript_end: true,
+      },
+      error: null,
+    })}\n`,
+  );
+  writeFileSync(
+    diffIn,
+    `${JSON.stringify({
+      record_type: "shadow_diff",
+      ts: "2026-01-01T00:00:00.000Z",
+      run_id: "shadow-production-schema-test",
+      video,
+      status: "new_calls",
+      existing_count: 0,
+      accepted_count: 1,
+      unchanged_count: 0,
+      added: ["SOLUSDT bullish watch target=180"],
+      removed: [],
+      reasons: [],
+    })}\n`,
+  );
+
+  await promoteShadowMain([
+    "--shadow-in",
+    shadowIn,
+    "--diff-in",
+    diffIn,
+    "--confirm-run-id",
+    "shadow-production-schema-test",
+    "--audit-out",
+    auditOut,
+  ]);
+
+  const rows = readFileSync(auditOut, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => JSON.parse(line));
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].mode, "DRY");
+  assert.equal(rows[0].phase, "dry_run");
+  assert.equal(rows[0].action, "promote");
+  assert.equal(rows[0].accepted_calls, 1);
+  assert.equal(rows[0].video.id, 202);
+});
+
 test("shadow promotion write path can use an injected provider-portable transaction executor", async () => {
   const dir = mkdtempSync(join(tmpdir(), "shadow-promote-portable-"));
   const shadowIn = join(dir, "shadow.jsonl");

@@ -200,7 +200,7 @@ Updated blockers:
 
 - P0: Composio MCP not functional from this VM until local auth/API key + CLI/SDK are supplied through approved local secret store/runtime.
 - P1: transcript useful cadence from this VM not proven; local ASR unavailable, laptop/cookie or ASR setup required.
-- P1: Gemma/Qwen shadow extraction still schema pass `0`; needs prompt/model/runtime tuning, no production writes.
+- P1: Gemma shadow extraction still schema pass `0`; needs prompt/model/runtime tuning, no production writes.
 - P1: live public-count verification needs source alignment: either run verifier against the same HH read API source or reconcile the direct local DB versus live HH-read dataset; no DB/deploy mutation performed.
 - P2: Art of War campaign content remains held for audience mismatch; private revision only, no public action/spend.
 
@@ -258,7 +258,7 @@ Operational posture:
 
 ---
 
-## 2026-06-13 Gemma/Qwen schema-contract reconciliation update
+## 2026-06-13 Gemma schema-contract reconciliation update
 
 Verdict update for Gemma shadow readiness: **READY_WITH_GATES for bounded artifact-only shadow**, not approved for promotion or production writes.
 
@@ -299,3 +299,6 @@ Remaining gates:
 - Larger real-transcript shadow sample and `shadow:diff` review before any write-canary discussion.
 - Explicit operator approval required before promotion or production writes.
 - Transcript acquisition cadence remains a separate P1 blocker.
+
+
+The eval-schema Modelfile intentionally preserves the PR #66 benchmark prompt as a controlled-fixture contract; do not use it for untrusted production transcript runs. Production shadow extraction uses the separate guarded production-schema Modelfile.
