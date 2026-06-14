@@ -12,6 +12,11 @@ flowchart LR
     Specs[Workplane job specs]
     Receipts[workflow receipt helper\n.tmp/workflow-receipts]
   end
+  subgraph WHOPAUTO[Whop Auto]
+    WAR[/srv/whop-auto registry\nCANONICALIZED -> /opt manifest]
+    WAW[stale workspaces\ninventory only]
+    WAG[provider mutation\nmanifest+diff+rollback+receipt gate]
+  end
   subgraph REPO[CallScore Repo]
     Repo[/opt/crypto-tuber-ranked\nCANONICAL]
     Scripts[npm scripts\nworkplane/freshness/audit/verify]
@@ -61,6 +66,7 @@ flowchart LR
     B3[Production promotion remains receipt/approval-gated]
     B4[Public count source drift resolved by --source live]
     B5[External rotation review]
+    B6[Whop Auto live provider/purchase proof gated]
   end
 
   Operator -->|manual trigger| HG
@@ -89,6 +95,11 @@ flowchart LR
   Laptop -->|bounded write cadence| Receipts
   Gemma -->|schema-pass receipt| Receipts
   Gemma -->|promotion blocked by| B3
+  WAR -->|uses manifest| Repo
+  WAW -->|do not patch as source| WAR
+  WAR -->|writes receipt before mutation| Receipts
+  WAG -->|blocked unless all gates pass| WhopGate
+  WAG -->|remaining provider proof| B6
   Composio -->|optional setup if needed| B1
   Scripts -->|verify public --source live passed| B4
   HG -->|rotation review| B5
@@ -224,3 +235,5 @@ flowchart LR
 %% Workplane gemma_shadow_extraction now treats successful bounded shadow sample receipts/clean artifacts as READY while production promotion remains gated.
 %% audit:pipeline remains PARTIAL due missing_publication_dates and missing_transcripts_or_terminal_reasons; dry-run publication-date backfill limit=3 found no source dates for video ids 6548/6553/8000.
 %% Third-party apps essential now: Netlify, HH PostgreSQL/read API, Tailscale/SSH laptop collector, Omar laptop browser cookies, YouTube/yt-dlp laptop lane, local Ollama models. Revenue requires Whop setup/auth/gated manifest. Marketing owned-channel apps remain operator-selected/gated. Composio is optional/deferred unless future repo evidence makes it essential.
+%% 2026-06-14 Whop Auto canonicalization update
+%% /srv/whop-auto registry now points crypto-tuber-ranked to /opt/crypto-tuber-ranked/.whop-pipeline.json and records canonicalSource=/opt/crypto-tuber-ranked. Stale /srv/whop-auto/workspace/* mirrors remain inventory only; no provider/customer/payment mutation, deploy, secret print, or cleanup/delete occurred. Live Whop Auto mutation remains manifest+diff+rollback+receipt+local-auth gated.

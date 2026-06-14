@@ -63,6 +63,35 @@ Approved provider context evidence collected on 2026-06-11:
   - drafted/inactive Pro membership denies Pro product access.
 - No Whop pricing, payment settings, products, plans, billing economics, secrets, DNS, or infrastructure were changed.
 
+
+## 2026-06-14 Whop Auto Canonicalization Evidence
+
+Status: `WHOP AUTO REGISTRY CANONICALIZED — /opt/crypto-tuber-ranked IS SOURCE OF TRUTH; STALE WORKSPACES INVENTORY ONLY`.
+
+Fresh non-mutating evidence collected on 2026-06-14:
+
+- Whop Auto registry `/srv/whop-auto/state/.whop-pipeline/registry.json` now points `crypto-tuber-ranked` at `/opt/crypto-tuber-ranked/.whop-pipeline.json`.
+- Registry metadata records `/opt/crypto-tuber-ranked` as `canonicalSource`.
+- Stale Whop Auto workspaces under `/srv/whop-auto/workspace/*` remain inventory/snapshot areas only; they were not deleted or treated as source of truth.
+- No active `whop-auto` service/process/timer was found; Whop Auto remains an on-demand gated workflow surface, not an autonomous mutator.
+- Secret-bearing Whop Auto artifacts were inventoried by location/type only in canonical memory; contents were not printed, copied, or committed.
+- New regression coverage: `tests/infrastructure-canonical.test.ts` checks the Whop Auto registry when present and fails if it points back to stale `/workspace` state.
+
+
+Whop Auto receipts from this run:
+
+- `.tmp/workflow-receipts/whop_manifest_diff/whop-manifest-diff-20260614T051415Z.json`
+- `.tmp/workflow-receipts/whop_provider_health/whop-provider-health-20260614T051415Z.json`
+- `.tmp/workflow-receipts/whop_entitlement_sync/whop-entitlement-sync-20260614T051426Z.json`
+- `.tmp/workflow-receipts/whop_webhook_verify/whop-webhook-verify-20260614T051426Z.json`
+- `.tmp/workflow-receipts/whop_activation_review/whop-activation-review-20260614T051415Z.json` (`blocked` by live mutation/purchase gate)
+
+Current Whop Auto operating rule:
+
+- read-only/provider-health, manifest diff, entitlement dry-run, webhook safe replay, and activation review are allowed when locally authenticated;
+- pricing/product/customer/payment/provider mutations remain fail-closed unless manifest-backed, diff-reviewed, rollback-documented, receipt-gated, locally authenticated, and explicitly safe;
+- stale mirrors may be archived/deleted only after separate operator archive/cleanup approval.
+
 ## Non-Mutating Rules
 
 Allowed during certification:

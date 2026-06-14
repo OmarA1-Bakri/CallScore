@@ -557,3 +557,42 @@ Verdict: **PARTIAL**, but with no P0 blocker for safe public website/read-only/d
 - P2: optional Composio/email/analytics/external model provider integrations.
 
 Next exact safe action: implement bounded terminal-reason classification for known unavailable publication-date/transcript cases, rerun `audit:pipeline`, and keep Whop/public marketing actions behind manifest/receipt approval gates.
+
+## 2026-06-14 Whop Auto canonicalization audit
+
+Verdict: **PARTIAL / improved**. Active Whop Auto registry now points at canonical CallScore repo; no provider/customer/payment mutation occurred.
+
+Evidence:
+
+- Registry repaired: `/srv/whop-auto/state/.whop-pipeline/registry.json` -> `/opt/crypto-tuber-ranked/.whop-pipeline.json`.
+- Canonical source recorded: `/opt/crypto-tuber-ranked`.
+- Stale mirrors remain inventory only: `/srv/whop-auto/workspace/*`, `/srv/agents/crypto-tuber-ranked`, `/srv/agents/repos/crypto-tuber-ranked`, and `/opt/crypto-tuber-ranked.pre-canonical-*`.
+- Regression check added: `tests/infrastructure-canonical.test.ts` validates registry canonicality when `/srv/whop-auto` is present.
+- No Vercel or Neon production target was reintroduced; Netlify and HH local PostgreSQL/HH Read API remain canonical.
+- No Whop pricing/product/customer/payment mutation, public marketing, paid action, credential print, broad DB write, destructive infra, or deployment occurred.
+
+Whop Auto gate status:
+
+| Lane | Status | Evidence / gate |
+| --- | --- | --- |
+| Registry canonicality | READY | `/srv/whop-auto/state/.whop-pipeline/registry.json` points to `/opt/crypto-tuber-ranked/.whop-pipeline.json` |
+| Provider health | READY_WITH_GATES | run read-only only when local auth is available; no secret output |
+| Manifest diff | READY_WITH_GATES | manifest exists at `/opt/crypto-tuber-ranked/.whop-pipeline.json` |
+| Entitlement dry-run | READY_WITH_GATES | repo tests cover product-resource entitlement semantics |
+| Webhook safe replay | READY_WITH_GATES | fixture route tests remain required before changes |
+| Live mutation | BLOCKED_BY_GATE | requires manifest, diff, rollback, approval receipt, local auth, and explicit safe mutation classification |
+
+
+Whop Auto receipts from this run:
+
+- `.tmp/workflow-receipts/whop_manifest_diff/whop-manifest-diff-20260614T051415Z.json`
+- `.tmp/workflow-receipts/whop_provider_health/whop-provider-health-20260614T051415Z.json`
+- `.tmp/workflow-receipts/whop_entitlement_sync/whop-entitlement-sync-20260614T051426Z.json`
+- `.tmp/workflow-receipts/whop_webhook_verify/whop-webhook-verify-20260614T051426Z.json`
+- `.tmp/workflow-receipts/whop_activation_review/whop-activation-review-20260614T051415Z.json` (`blocked` by live mutation/purchase gate)
+
+Remaining TD:
+
+- P1: audit-pipeline corpus completeness still has publication-date and transcript-terminal-reason gaps.
+- P1: live Whop purchase/provider mutation proof remains gated; do not call FULL commercial automation until provider proof/receipts are current.
+- P2: archive/delete stale mirrors and quarantine/rotate stale secret-bearing Whop Auto artifacts only with separate approval.

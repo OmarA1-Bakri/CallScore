@@ -5747,3 +5747,33 @@ Current remaining blockers:
 - **P2:** optional Composio, external model providers, email, analytics, and SEO tooling are not required for current FULL core operation unless intentionally added to scope.
 
 Next exact safe action: reduce `audit:pipeline` completeness blockers by adding bounded terminal-reason handling for known unavailable transcript/publication-date cases, then rerun `audit:pipeline`, `workplane:status`, `freshness:check`, and live `verify:public`. In parallel, prepare Whop manifest/live setup checklist for the operator; do not mutate Whop until the manifest diff, rollback, and approval receipt exist.
+
+## 2026-06-14 Whop Auto canonicalization update
+
+Verdict: **PARTIAL**, improved. Safe public/app/data operation remains ready; full commercial automation still depends on remaining P1 external/provider and corpus-completeness gates.
+
+Evidence:
+
+- `/srv/whop-auto/state/.whop-pipeline/registry.json` now points the `crypto-tuber-ranked` manifest to `/opt/crypto-tuber-ranked/.whop-pipeline.json` and records `/opt/crypto-tuber-ranked` as `canonicalSource`.
+- Whop Auto stale workspaces under `/srv/whop-auto/workspace/*` are inventory only; no mirror was deleted and no secret-bearing artifact was printed.
+- Netlify remains canonical hosting; Vercel remains defunct/stale except historical/test/compatibility references.
+- HH local PostgreSQL / HH Read API remains canonical data source; Neon remains defunct/stale backup compatibility only.
+- Whop Auto provider mutations remain fail-closed unless manifest-backed, diff-reviewed, rollback-documented, receipt-gated, locally authenticated, and explicitly safe.
+- Added regression coverage in `tests/infrastructure-canonical.test.ts` so a present Whop Auto registry must target `/opt/crypto-tuber-ranked`.
+
+
+Whop Auto receipts from this run:
+
+- `.tmp/workflow-receipts/whop_manifest_diff/whop-manifest-diff-20260614T051415Z.json`
+- `.tmp/workflow-receipts/whop_provider_health/whop-provider-health-20260614T051415Z.json`
+- `.tmp/workflow-receipts/whop_entitlement_sync/whop-entitlement-sync-20260614T051426Z.json`
+- `.tmp/workflow-receipts/whop_webhook_verify/whop-webhook-verify-20260614T051426Z.json`
+- `.tmp/workflow-receipts/whop_activation_review/whop-activation-review-20260614T051415Z.json` (`blocked` by live mutation/purchase gate)
+
+
+Remaining blockers:
+
+- P1: `audit:pipeline` corpus completeness (`missing_publication_dates`, `missing_transcripts_or_terminal_reasons`).
+- P1: Whop Auto provider/live-purchase proof is still gated; no hidden pricing/product/customer/payment mutation was performed.
+- P1: Art of War owned-channel setup/publish gate remains operator-selected and receipt-gated.
+- P2: stale mirror archive/delete and secret-bearing artifact rotation/quarantine review require separate cleanup/rotation approval.
