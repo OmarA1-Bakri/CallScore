@@ -61,3 +61,7 @@ Fail-closed gates:
 3. [`docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md`](../ops/2026-06-14-full-system-live-canary-gate-decisions.md)
 4. [`docs/handovers/2026-06-14-hermes-agent-callscore-activation.md`](../handovers/2026-06-14-hermes-agent-callscore-activation.md)
 5. `agentmemory` / `callscore-memory`
+
+## GTM agent registry
+
+The canonical GTM/channel ownership map is [`docs/ops/callscore-gtm-agent-registry.json`](../ops/callscore-gtm-agent-registry.json). Human summary: [`docs/ops/callscore-gtm-agent-registry.md`](../ops/callscore-gtm-agent-registry.md). Diagram: [`docs/architecture/callscore-gtm-agent-registry.mmd`](./callscore-gtm-agent-registry.mmd). Future GTM work must update the registry before changing channel ownership, gates, connected apps, receipt paths, rollback paths, or live-action permissions.

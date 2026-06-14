@@ -1,0 +1,70 @@
+flowchart TD
+  Hermes["Hermes / Workplane governance"] --> Registry["CallScore GTM Agent Registry<br/>docs/ops/callscore-gtm-agent-registry.json"]
+  Registry --> AOW["Art of War campaign engine"]
+  Registry --> Whop[Whop Auto]
+  Registry --> Composio[Composio hub]
+  Registry --> Automation[Automation registry / health]
+
+  subgraph Channels[Channel owners]
+    X["X / Twitter<br/>marketing-channel-growth"]
+    LI["LinkedIn<br/>marketing-channel-growth + content_creator"]
+    Email["Gmail / email<br/>marketing-channel-growth"]
+    Community["Discord / Telegram / Reddit<br/>marketing-community-drops"]
+    SEO["YouTube / SEO<br/>marketing-channel-growth + creator-video-swipefile"]
+    News["Crypto newsletters<br/>marketing-channel-growth"]
+    Partners["Creator partnerships<br/>marketing-channel-growth"]
+    Marketplace["Whop marketplace<br/>marketing-whop-marketplace"]
+  end
+
+  AOW --> X
+  AOW --> LI
+  AOW --> Email
+  AOW --> Community
+  AOW --> SEO
+  AOW --> News
+  AOW --> Partners
+  AOW --> Marketplace
+
+  subgraph Apps[Connected apps]
+    Attio[Attio CRM]
+    Gmail[Composio Gmail]
+    Twitter[Composio Twitter/X]
+    PostHog[PostHog]
+    HF[Hugging Face]
+    LinkedIn[Composio LinkedIn]
+    Discord[Composio Discord]
+  end
+
+  Composio --> Attio
+  Composio --> Gmail
+  Composio --> Twitter
+  Composio --> PostHog
+  Composio --> HF
+  Composio --> LinkedIn
+  Composio --> Discord
+
+  subgraph Gates[Fail-closed gates]
+    Publish[PUBLISH_GATE]
+    Send[SEND_GATE]
+    Spend[SPEND_GATE]
+    Financial[FINANCIAL_GATE]
+    Production[PRODUCTION_GATE]
+    Secret[SECRET_GATE]
+  end
+
+  X --> Publish
+  LI --> Publish
+  LI --> Send
+  Email --> Send
+  Community --> Send
+  SEO --> Publish
+  News --> Send
+  Partners --> Send
+  Marketplace --> Publish
+  Whop --> Financial
+  Whop --> Production
+  Composio --> Secret
+  Automation --> Production
+
+  Gates --> Receipts["Approval receipts + rollback paths"]
+  Receipts --> Registry

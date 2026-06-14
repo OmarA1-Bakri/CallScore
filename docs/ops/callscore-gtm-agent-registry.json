@@ -1,0 +1,778 @@
+{
+  "schema_version": "callscore_gtm_agent_registry.v1",
+  "generated_at": "2026-06-14T16:55:00Z",
+  "canonical_status": {
+    "readiness_model": "CONTROLLED_FULL",
+    "hosting": "Netlify is canonical. Stale Vercel references are not a CallScore deployment target.",
+    "data_source": "Local HH PostgreSQL plus HH Read API are canonical. Stale Neon references are not a CallScore data source.",
+    "dangerous_actions": "fail_closed"
+  },
+  "gate_rules": {
+    "PUBLISH_GATE": "Required before public posts/pages/listings/methodology/ranking/correction publication.",
+    "SEND_GATE": "Required before email, DM, newsletter, community send, or outreach.",
+    "SPEND_GATE": "Required before paid ads, boosts, enrichment, APIs, LLMs, or paid SaaS activation.",
+    "FINANCIAL_GATE": "Required before Whop pricing/product/payment/customer changes, payouts, revenue share, or money movement.",
+    "PRODUCTION_GATE": "Required before DB writes, deployments, provider mutations, infra changes, or webhook changes.",
+    "SECRET_GATE": "Always applies: never expose secrets, env values, tokens, cookies, auth headers, DB URLs, or private keys."
+  },
+  "entries": [
+    {
+      "channel": "X / Twitter",
+      "surface_type": "public_post",
+      "primary_owner_agent": "marketing-channel-growth",
+      "supporting_agents": [
+        "content_creator",
+        "marketing-compliance-linter",
+        "artofwar_campaign_dossier",
+        "Composio Twitter/X"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Composio Twitter/X",
+      "workplane_jobs": [
+        "artofwar_strategy_brief",
+        "artofwar_content_queue_dry_run",
+        "artofwar_campaign_plan_generate",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft launch threads",
+        "draft creator comparison posts",
+        "prepare approval packet"
+      ],
+      "forbidden_actions": [
+        "live public post without approval receipt",
+        "paid boost or paid API use",
+        "provider/account mutation",
+        "secret/env/token/cookie exposure"
+      ],
+      "required_gate": "PUBLISH_GATE + TRUST_GATE + DATA_POLICY_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved publish receipt with payload hash and destination",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_publish_approval_review/<run-id>.json",
+      "rollback_path": "No current external action. If future approved post occurs, delete/retract post and record correction receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Generate draft and compliance lint only.",
+      "operator_action_required": "Approve exact post payload and destination before live post.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+      ]
+    },
+    {
+      "channel": "LinkedIn",
+      "surface_type": "public_post",
+      "primary_owner_agent": "marketing-channel-growth",
+      "supporting_agents": [
+        "content_creator",
+        "marketing-compliance-linter",
+        "Composio LinkedIn"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Composio LinkedIn",
+      "workplane_jobs": [
+        "artofwar_content_queue_dry_run",
+        "artofwar_campaign_dossier",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft LinkedIn post",
+        "draft partnership message",
+        "prepare approval packet"
+      ],
+      "forbidden_actions": [
+        "live post without approval receipt",
+        "LinkedIn DM without SEND_GATE",
+        "paid promotion",
+        "secret exposure"
+      ],
+      "required_gate": "PUBLISH_GATE or SEND_GATE + TRUST_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "publish/send approval receipt with payload hash",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
+      "rollback_path": "No current external action. If future approved post/message occurs, delete/retract and record rollback receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Use draft-only CallScore channel asset flow.",
+      "operator_action_required": "Approve exact post or outreach payload before live use.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/content_creator/SKILL.md"
+      ]
+    },
+    {
+      "channel": "Gmail / email",
+      "surface_type": "email",
+      "primary_owner_agent": "marketing-channel-growth",
+      "supporting_agents": [
+        "marketing-compliance-linter",
+        "Composio Gmail/email"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Composio Gmail/email",
+      "workplane_jobs": [
+        "artofwar_outreach_queue_prepare",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft newsletter outreach",
+        "draft creator-partner email",
+        "prepare suppression/gate checklist"
+      ],
+      "forbidden_actions": [
+        "send email without SEND_GATE receipt",
+        "bulk outreach without suppression check",
+        "paid enrichment",
+        "secret exposure"
+      ],
+      "required_gate": "SEND_GATE + TRUST_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved send receipt with recipient set and message hash",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
+      "rollback_path": "No current send. If future approved send needs rollback, send correction/follow-up and record receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Prepare drafts and recipient assumptions only.",
+      "operator_action_required": "Approve exact recipient set and message hash before sending.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+      ]
+    },
+    {
+      "channel": "Discord",
+      "surface_type": "community",
+      "primary_owner_agent": "marketing-community-drops",
+      "supporting_agents": [
+        "marketing-compliance-linter",
+        "Composio Discord"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Composio Discord",
+      "workplane_jobs": [
+        "artofwar_audience_research_dry_run",
+        "artofwar_content_queue_dry_run",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft non-spam community post",
+        "record server/channel rule assumptions",
+        "prepare approval packet"
+      ],
+      "forbidden_actions": [
+        "send/post without SEND_GATE receipt",
+        "ignore community rules",
+        "paid promotion",
+        "secret exposure"
+      ],
+      "required_gate": "SEND_GATE + TRUST_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved community send receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
+      "rollback_path": "No current external action. If future approved post occurs, delete/retract and record receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Draft community-safe copy only.",
+      "operator_action_required": "Approve exact server/channel, payload, and rule checklist before send.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/marketing-community-drops/SKILL.md"
+      ]
+    },
+    {
+      "channel": "Telegram",
+      "surface_type": "community",
+      "primary_owner_agent": "marketing-community-drops",
+      "supporting_agents": [
+        "marketing-compliance-linter",
+        "artofwar_campaign_dossier"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Telegram/community surface",
+      "workplane_jobs": [
+        "artofwar_audience_research_dry_run",
+        "artofwar_content_queue_dry_run",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft mod-friendly summary",
+        "prepare approval packet"
+      ],
+      "forbidden_actions": [
+        "send without SEND_GATE receipt",
+        "spam communities",
+        "paid promotion",
+        "secret exposure"
+      ],
+      "required_gate": "SEND_GATE + TRUST_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved community send receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
+      "rollback_path": "No current send. If future approved message occurs, delete/retract where possible and record receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Draft only.",
+      "operator_action_required": "Approve exact chat/channel and payload before send.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+      ]
+    },
+    {
+      "channel": "Reddit",
+      "surface_type": "community",
+      "primary_owner_agent": "marketing-community-drops",
+      "supporting_agents": [
+        "opportunity_matrix",
+        "marketing-compliance-linter"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Reddit/community surface",
+      "workplane_jobs": [
+        "artofwar_audience_research_dry_run",
+        "artofwar_campaign_dossier",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft transparent discussion/comment",
+        "record subreddit rule assumptions",
+        "prepare approval packet"
+      ],
+      "forbidden_actions": [
+        "post/comment without SEND_GATE receipt",
+        "promotional spam",
+        "skip subreddit rule check",
+        "secret exposure"
+      ],
+      "required_gate": "SEND_GATE + TRUST_GATE + DATA_POLICY_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved subreddit send receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
+      "rollback_path": "No current external action. If future approved post/comment occurs, delete/retract and record receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Research rules and draft only.",
+      "operator_action_required": "Approve exact subreddit, rule checklist, and payload before live post/comment.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/opportunity_matrix/SKILL.md"
+      ]
+    },
+    {
+      "channel": "YouTube / SEO",
+      "surface_type": "seo",
+      "primary_owner_agent": "marketing-channel-growth",
+      "supporting_agents": [
+        "creator-video-swipefile",
+        "marketing-compliance-linter",
+        "CallScore evidence pipeline"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Netlify public app / SEO pages",
+      "workplane_jobs": [
+        "artofwar_strategy_brief",
+        "artofwar_campaign_plan_generate",
+        "artofwar_campaign_verify"
+      ],
+      "allowed_actions_now": [
+        "draft SEO page briefs",
+        "draft methodology/ranking snippets",
+        "build video hook swipefile"
+      ],
+      "forbidden_actions": [
+        "publish public page without PUBLISH_GATE",
+        "unsupported creator claim",
+        "production deploy without PRODUCTION_GATE",
+        "secret exposure"
+      ],
+      "required_gate": "PUBLISH_GATE + TRUST_GATE + DATA_POLICY_GATE + PRODUCTION_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved publication/deploy receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_publish_approval_review/<run-id>.json",
+      "rollback_path": "No current deploy/publication. If future approved page ships, revert commit/deploy and publish correction if needed.",
+      "current_status": "gated",
+      "next_safe_action": "Create draft briefs only.",
+      "operator_action_required": "Approve exact page payload and deploy path before publication.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/creator-video-swipefile/SKILL.md"
+      ]
+    },
+    {
+      "channel": "Crypto newsletters",
+      "surface_type": "email",
+      "primary_owner_agent": "marketing-channel-growth",
+      "supporting_agents": [
+        "content_creator",
+        "marketing-compliance-linter",
+        "Composio Gmail/email"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Gmail/email or partner newsletter surface",
+      "workplane_jobs": [
+        "artofwar_outreach_queue_prepare",
+        "artofwar_campaign_dossier",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft partner pitch",
+        "draft data-led story angle",
+        "prepare sample chart/scorecard packet"
+      ],
+      "forbidden_actions": [
+        "send without SEND_GATE receipt",
+        "paid placement without SPEND_GATE",
+        "unsupported claims",
+        "secret exposure"
+      ],
+      "required_gate": "SEND_GATE + TRUST_GATE + DATA_POLICY_GATE + SPEND_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved outreach/send receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
+      "rollback_path": "No current send/spend. If future approved outreach requires rollback, send correction/withdrawal and record receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Draft pitch packet only.",
+      "operator_action_required": "Approve recipient set and message hash before outreach.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+      ]
+    },
+    {
+      "channel": "Creator partnerships",
+      "surface_type": "email",
+      "primary_owner_agent": "marketing-channel-growth",
+      "supporting_agents": [
+        "creator-video-swipefile",
+        "marketing-compliance-linter",
+        "Composio Gmail/email",
+        "Composio LinkedIn"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Gmail/email or LinkedIn",
+      "workplane_jobs": [
+        "artofwar_outreach_queue_prepare",
+        "artofwar_campaign_dossier",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft right-of-reply invitation",
+        "draft creator evidence packet",
+        "prepare partnership brief"
+      ],
+      "forbidden_actions": [
+        "send outreach without SEND_GATE receipt",
+        "defamatory wording",
+        "unapproved terms/commitments",
+        "secret exposure"
+      ],
+      "required_gate": "SEND_GATE + TRUST_GATE + RIGHT_OF_REPLY_GATE + DATA_POLICY_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved outreach/right-of-reply receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
+      "rollback_path": "No current outreach. If future approved message needs rollback, send correction/withdrawal and record receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Prepare evidence packet and draft only.",
+      "operator_action_required": "Approve exact creator, contact route, and payload before outreach.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+      ]
+    },
+    {
+      "channel": "Whop marketplace",
+      "surface_type": "commerce",
+      "primary_owner_agent": "marketing-whop-marketplace",
+      "supporting_agents": [
+        "marketing-compliance-linter",
+        "whop_auto",
+        "artofwar_campaign_dossier"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "Whop marketplace",
+      "workplane_jobs": [
+        "whop_activation_review",
+        "artofwar_campaign_dossier",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "draft listing title/subtitle",
+        "draft FAQ/trust section",
+        "prepare screenshot checklist"
+      ],
+      "forbidden_actions": [
+        "live listing edit without PUBLISH_GATE",
+        "pricing/payment change without FINANCIAL_GATE",
+        "provider mutation without PRODUCTION_GATE",
+        "secret exposure"
+      ],
+      "required_gate": "PUBLISH_GATE + FINANCIAL_GATE + PRODUCTION_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved Whop listing or financial mutation receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/whop_activation_review/<run-id>.json",
+      "rollback_path": "No current provider mutation. If future approved edit occurs, restore prior manifest/listing and record provider readback receipt.",
+      "current_status": "gated",
+      "next_safe_action": "Generate listing assets only.",
+      "operator_action_required": "Approve exact listing/price/customer mutation separately before provider write.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
+        "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/marketing-whop-marketplace/SKILL.md",
+        "/opt/crypto-tuber-ranked/docs/ops/whop-auto-certification.md"
+      ]
+    },
+    {
+      "channel": "Whop provider / entitlement",
+      "surface_type": "commerce",
+      "primary_owner_agent": "whop_auto",
+      "supporting_agents": [
+        "whop_provider_health",
+        "whop_plan_inventory_check",
+        "whop_entitlement_sync_dry_run",
+        "whop_webhook_replay_safe",
+        "whop_customer_status_check",
+        "whop_activation_review"
+      ],
+      "canonical_repo_or_path": "/srv/whop-auto",
+      "connected_app_or_provider": "Whop provider",
+      "workplane_jobs": [
+        "whop_provider_health",
+        "whop_plan_inventory_check",
+        "whop_entitlement_sync_dry_run",
+        "whop_webhook_replay_safe",
+        "whop_customer_status_check",
+        "whop_activation_review"
+      ],
+      "allowed_actions_now": [
+        "read-only provider health",
+        "manifest diff",
+        "entitlement dry-run",
+        "webhook safe replay",
+        "activation review"
+      ],
+      "forbidden_actions": [
+        "pricing/product/customer/payment mutation without full gate",
+        "live entitlement mutation",
+        "webhook/provider write without rollback",
+        "secret exposure"
+      ],
+      "required_gate": "FINANCIAL_GATE + PRODUCTION_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "manifest/diff/rollback/approval/local-auth mutation receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/whop_*/*.json",
+      "rollback_path": "Restore prior manifest/provider settings from rollback doc; verify with readback receipt.",
+      "current_status": "monitored",
+      "next_safe_action": "Run read-only provider health/inventory if needed.",
+      "operator_action_required": "Approve exact manifest-backed mutation before any provider write.",
+      "evidence": [
+        "/srv/whop-auto/state/.whop-pipeline/registry.json",
+        "/srv/whop-auto/plugin/agent_workflows/whop_auto/README.md",
+        "/opt/crypto-tuber-ranked/docs/ops/whop-auto-certification.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts"
+      ]
+    },
+    {
+      "channel": "Attio CRM",
+      "surface_type": "crm",
+      "primary_owner_agent": "Composio Attio lane",
+      "supporting_agents": [
+        "automation_health_check",
+        "marketing-compliance-linter"
+      ],
+      "canonical_repo_or_path": "/opt/crypto-tuber-ranked",
+      "connected_app_or_provider": "Composio Attio",
+      "workplane_jobs": [
+        "automation_health_check",
+        "automation_activation_review"
+      ],
+      "allowed_actions_now": [
+        "read-only connection inventory",
+        "draft CRM field/update plan"
+      ],
+      "forbidden_actions": [
+        "CRM mutation without provider approval receipt",
+        "contact enrichment spend without SPEND_GATE",
+        "secret exposure"
+      ],
+      "required_gate": "PRODUCTION_GATE + SEND_GATE where outreach-linked + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved CRM mutation receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/composio_app_inventory/*.json",
+      "rollback_path": "No current CRM write. If future approved mutation occurs, restore previous field/contact values from receipt/readback.",
+      "current_status": "monitored",
+      "next_safe_action": "Inventory only before any CRM action.",
+      "operator_action_required": "Approve exact CRM object/payload before write.",
+      "evidence": [
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-status.ts"
+      ]
+    },
+    {
+      "channel": "PostHog analytics",
+      "surface_type": "analytics",
+      "primary_owner_agent": "Composio PostHog lane",
+      "supporting_agents": [
+        "marketing-channel-growth",
+        "automation_health_check"
+      ],
+      "canonical_repo_or_path": "/opt/crypto-tuber-ranked",
+      "connected_app_or_provider": "Composio PostHog",
+      "workplane_jobs": [
+        "automation_health_check"
+      ],
+      "allowed_actions_now": [
+        "read-only analytics inventory",
+        "draft campaign feedback summary"
+      ],
+      "forbidden_actions": [
+        "analytics/project mutation without PRODUCTION_GATE",
+        "tracking change without deploy gate",
+        "secret exposure"
+      ],
+      "required_gate": "PRODUCTION_GATE + SECRET_GATE",
+      "gate_status": "fail_closed",
+      "required_receipt": "approved analytics/provider mutation receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/composio_app_inventory/*.json",
+      "rollback_path": "No current analytics mutation. If future approved change occurs, restore previous settings and record readback.",
+      "current_status": "monitored",
+      "next_safe_action": "Read-only analytics feedback only.",
+      "operator_action_required": "Approve exact tracking/provider change before mutation.",
+      "evidence": [
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+      ]
+    },
+    {
+      "channel": "Hugging Face",
+      "surface_type": "model_tooling",
+      "primary_owner_agent": "Composio Hugging Face lane",
+      "supporting_agents": [
+        "Gemma/Qwen local model path",
+        "automation_health_check"
+      ],
+      "canonical_repo_or_path": "/opt/crypto-tuber-ranked",
+      "connected_app_or_provider": "Composio Hugging Face / Hugging Face plugin",
+      "workplane_jobs": [
+        "automation_health_check"
+      ],
+      "allowed_actions_now": [
+        "verify auth/status",
+        "draft model/dataset action plan"
+      ],
+      "forbidden_actions": [
+        "paid inference without SPEND_GATE",
+        "model/dataset upload without approval",
+        "secret exposure"
+      ],
+      "required_gate": "SPEND_GATE + PRODUCTION_GATE + SECRET_GATE",
+      "gate_status": "monitored",
+      "required_receipt": "approved model/tooling action receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/composio_app_inventory/*.json",
+      "rollback_path": "No current Hugging Face action. If future approved mutation occurs, remove/revert uploaded artifact and record receipt.",
+      "current_status": "auth_blocked",
+      "next_safe_action": "Treat Composio Hugging Face as non-core unless lane specifically needs it.",
+      "operator_action_required": "Reload/auth Composio Hugging Face only if needed for model/tooling lane.",
+      "evidence": [
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "agentmemory callscore-canonical-basics.md"
+      ]
+    },
+    {
+      "channel": "Composio hub",
+      "surface_type": "governance",
+      "primary_owner_agent": "Composio MCP lane",
+      "supporting_agents": [
+        "automation_health_check",
+        "Workplane / Hermes governance"
+      ],
+      "canonical_repo_or_path": "/opt/crypto-tuber-ranked",
+      "connected_app_or_provider": "Composio MCP",
+      "workplane_jobs": [
+        "automation_health_check",
+        "automation_activation_review"
+      ],
+      "allowed_actions_now": [
+        "read-only tool discovery",
+        "read-only connected app inventory"
+      ],
+      "forbidden_actions": [
+        "send/post/write/provider mutation without gate",
+        "paid action",
+        "secret exposure"
+      ],
+      "required_gate": "SECRET_GATE + action-specific PUBLISH_GATE/SEND_GATE/SPEND_GATE/PRODUCTION_GATE",
+      "gate_status": "monitored",
+      "required_receipt": "read-only inventory receipt or action-specific approval receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/composio_*/*.json",
+      "rollback_path": "No current external mutation. Disable/reload MCP or revert provider action per app receipt if future approved action fails.",
+      "current_status": "monitored",
+      "next_safe_action": "Use read-only inventory before app-specific action.",
+      "operator_action_required": "Approve exact app action before write/send/post.",
+      "evidence": [
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "agentmemory callscore-canonical-basics.md"
+      ]
+    },
+    {
+      "channel": "Art of War campaign engine",
+      "surface_type": "governance",
+      "primary_owner_agent": "Art of War",
+      "supporting_agents": [
+        "artofwar_strategy_brief",
+        "artofwar_campaign_preflight",
+        "artofwar_campaign_verify",
+        "artofwar_campaign_persona_test",
+        "artofwar_campaign_gemma_eval",
+        "artofwar_campaign_dossier",
+        "artofwar_campaign_receipt"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "local dry-run CLI",
+      "workplane_jobs": [
+        "artofwar_strategy_brief",
+        "artofwar_content_queue_dry_run",
+        "artofwar_campaign_plan_generate",
+        "artofwar_audience_research_dry_run",
+        "artofwar_outreach_queue_prepare",
+        "artofwar_campaign_preflight",
+        "artofwar_campaign_iteration",
+        "artofwar_campaign_verify",
+        "artofwar_campaign_persona_test",
+        "artofwar_campaign_dry_run",
+        "artofwar_campaign_gemma_eval",
+        "artofwar_campaign_receipt",
+        "artofwar_campaign_dossier",
+        "artofwar_campaign_approval_review"
+      ],
+      "allowed_actions_now": [
+        "private dry-run",
+        "persona score",
+        "Gemma eval",
+        "approval dossier",
+        "receipt generation"
+      ],
+      "forbidden_actions": [
+        "public action without approval",
+        "spend",
+        "provider mutation",
+        "production DB/write impact",
+        "secret exposure"
+      ],
+      "required_gate": "PUBLISH_GATE/SEND_GATE/SPEND_GATE/PRODUCTION_GATE as action-specific + SECRET_GATE",
+      "gate_status": "monitored",
+      "required_receipt": "campaign receipt and approval review receipt",
+      "receipt_path_pattern": "docs/plans/artifacts/art-of-war/campaign-receipts/<campaign-id>-iter-<n>.json",
+      "rollback_path": "No current external action. Delete/replace draft artifacts if wrong; if future live action occurs use channel rollback.",
+      "current_status": "monitored",
+      "next_safe_action": "Run governed preflight/persona/dry-run/Gemma/receipt before any approval packet.",
+      "operator_action_required": "Approve exact public/spend/provider action separately.",
+      "evidence": [
+        "/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py",
+        "/srv/agents/repos/Claude_Code_Automations/docs/marketing/README.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts"
+      ]
+    },
+    {
+      "channel": "Workplane / Hermes governance",
+      "surface_type": "governance",
+      "primary_owner_agent": "Hermes / Workplane",
+      "supporting_agents": [
+        "HH control bridge",
+        "agentmemory",
+        "callscore-memory"
+      ],
+      "canonical_repo_or_path": "/opt/crypto-tuber-ranked",
+      "connected_app_or_provider": "Hermes / HH control bridge",
+      "workplane_jobs": [
+        "automation_registry_refresh",
+        "automation_dry_run",
+        "automation_health_check",
+        "automation_activation_review"
+      ],
+      "allowed_actions_now": [
+        "readiness status",
+        "gate classification",
+        "receipt review",
+        "handover update"
+      ],
+      "forbidden_actions": [
+        "destructive infra/DB action without approval",
+        "secret exposure",
+        "unsafe provider mutation",
+        "unreviewed deploy"
+      ],
+      "required_gate": "SECRET_GATE + PRODUCTION_GATE for mutations",
+      "gate_status": "released",
+      "required_receipt": "workplane status evidence; for mutations, approved PRODUCTION_GATE receipt and handover update",
+      "receipt_path_pattern": "docs/handovers/*; receipts/workplane/*; approved production gate receipt for any mutation",
+      "rollback_path": "Revert docs/config commit if wrong; restore previous Workplane gate state from git and validate.",
+      "current_status": "ready",
+      "next_safe_action": "Read registry before GTM action and keep gates fail-closed.",
+      "operator_action_required": "None for docs/read-only governance; approval required for destructive/provider/production mutation.",
+      "evidence": [
+        "/opt/crypto-tuber-ranked/README.md",
+        "/opt/crypto-tuber-ranked/docs/architecture/callscore-agentic-platform.md",
+        "/opt/crypto-tuber-ranked/src/lib/workplane-status.ts"
+      ]
+    },
+    {
+      "channel": "Automation registry / health checks",
+      "surface_type": "governance",
+      "primary_owner_agent": "automation_registry_refresh",
+      "supporting_agents": [
+        "automation_dry_run",
+        "automation_health_check",
+        "automation_activation_review",
+        "Claude_Code_Automations workplane"
+      ],
+      "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
+      "connected_app_or_provider": "local automation registry",
+      "workplane_jobs": [
+        "automation_registry_refresh",
+        "automation_dry_run",
+        "automation_health_check",
+        "automation_activation_review"
+      ],
+      "allowed_actions_now": [
+        "read-only scan",
+        "dry-run selected automation",
+        "health check",
+        "activation review"
+      ],
+      "forbidden_actions": [
+        "unsafe automation execution",
+        "provider/public/spend/destructive action without gate",
+        "secret exposure"
+      ],
+      "required_gate": "SECRET_GATE + action-specific approval gate",
+      "gate_status": "monitored",
+      "required_receipt": "automation health/activation receipt",
+      "receipt_path_pattern": ".tmp/workflow-receipts/automation_*/*.json",
+      "rollback_path": "No current mutation. Disable selected automation or revert registry docs if unsafe classification found.",
+      "current_status": "monitored",
+      "next_safe_action": "Run report-only health/registry refresh.",
+      "operator_action_required": "Approve any provider/public/spend/destructive activation separately.",
+      "evidence": [
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "/srv/agents/repos/Claude_Code_Automations/workplane/package.json"
+      ]
+    }
+  ]
+}

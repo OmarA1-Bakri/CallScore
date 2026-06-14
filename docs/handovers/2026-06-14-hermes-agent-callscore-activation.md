@@ -54,7 +54,7 @@ What Hermes must not repeat:
 
 - Do not re-litigate laptop transcript architecture; it is canonical and uses laptop-side `yt-dlp`.
 - Do not carry non-discounted Whop cash settlement as functional-readiness blocker.
-- Do not use Vercel/Neon as production targets.
+- Do not use stale Vercel deployment or stale Neon data-source assumptions.
 - Do not patch stale mirrors as CallScore source.
 
 What Hermes must not mutate:
@@ -256,4 +256,13 @@ Final safe stop reason:
 - Diagram scope: public product, canonical data plane, laptop transcript lane, extraction/matching/scoring/audit, Hermes/Workplane/HH bridge, receipts, Whop Auto, Art of War, Composio connected apps, monitored gates, and fail-closed dangerous gates.
 - Latest docs validation expected: `git diff --check`, `npm run workplane:status || npm run workplane`, `npm run freshness:check`, `npm run verify:public -- --source live --base-url https://call-score.com`; if docs touch canonical state, also typecheck/lint/build/workplane targeted tests.
 - Hermes should read README and the architecture diagram before rediscovering directories or asking which repo/service is canonical.
-- Do not repeat: Vercel/Neon production assumptions, HH-only transcript fallback as canonical, nonzero Whop cash proof demand, public publish without approval receipt, or 429 hammer retry.
+- Do not repeat: stale deployment/data-source assumptions; HH-only transcript fallback as canonical; nonzero Whop cash proof demand; public publish without approval receipt; or 429 hammer retry.
+
+## 2026-06-14 canonical GTM agent registry update
+
+- Registry JSON: `/opt/crypto-tuber-ranked/docs/ops/callscore-gtm-agent-registry.json`.
+- Registry summary: `/opt/crypto-tuber-ranked/docs/ops/callscore-gtm-agent-registry.md`.
+- Registry diagram: `/opt/crypto-tuber-ranked/docs/architecture/callscore-gtm-agent-registry.mmd`.
+- Hermes must read the registry before any GTM, marketing, Whop, Composio, CRM, social, email, community, analytics, or provider action.
+- Do not repeat channel-ownership rediscovery unless registry evidence is stale; update registry first when ownership/gates/apps/receipts change.
+- Public sends/posts, spend, provider writes, Whop/customer/payment mutations, destructive DB/infra actions, and secret exposure remain fail-closed.

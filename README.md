@@ -349,3 +349,7 @@ Read these before any new production activation run:
 - Optional: complete Hugging Face Composio auth if a Composio-backed HF lane becomes required.
 - Optional: approve one owned-channel publish receipt before any Art of War public canary.
 - Optional: stale mirror/archive/secret quarantine cleanup with separate explicit approval.
+
+## Canonical GTM agent registry
+
+GTM/channel ownership lives in [`docs/ops/callscore-gtm-agent-registry.json`](docs/ops/callscore-gtm-agent-registry.json), with human summary at [`docs/ops/callscore-gtm-agent-registry.md`](docs/ops/callscore-gtm-agent-registry.md) and diagram at [`docs/architecture/callscore-gtm-agent-registry.mmd`](docs/architecture/callscore-gtm-agent-registry.mmd). Read it before any marketing, Whop, Composio, CRM, social, email, community, analytics, or provider action.
