@@ -616,3 +616,27 @@ Remaining blocker:
 - P1: continue bounded laptop cadence and classify remaining actionable pending/provider-blocked transcript rows; do not broad backfill.
 
 Clarification: this is an **audit corpus-completeness** P1, not a transcript acquisition mechanism blocker. The canonical laptop/Tailscale lane uses laptop-side browser cookies/`yt-dlp`, is proven, and remains READY_WITH_GATES. The remaining audit blocker means historical/actionable rows still need either bounded collection or a terminal reason recorded.
+
+## 2026-06-14 activation audit refresh
+
+Verdict: `PARTIAL`, safe production operation remains healthy, and no unsafe mutation occurred.
+
+Fresh evidence:
+
+- Live website verifier passed via HH Read API: `npm run verify:public -- --source live --base-url https://call-score.com`.
+- Local verifier passed against HH PostgreSQL: `npm run verify:public`.
+- Canonical laptop transcript lane wrote `5/5` fresh transcripts using Omar laptop over Tailscale/residential Firefox cookies/laptop-side `yt-dlp`; receipt `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-activation-20260614T094841Z.json`.
+- Freshness check returned `WARN` but `blockers=[]`; latest transcript success was current during the run.
+- Audit readiness still reports `missing_transcripts_or_terminal_reasons`, classified as audit corpus/backlog coverage rather than transcript acquisition failure.
+- Gemma local Ollama shadow run `gemma-activation-shadow-20260614T094949Z` processed `5/5`, accepted `2` calls, failed `0`; diff produced `manual_review=5`. No promotion/write performed.
+- Whop route/certification/infrastructure tests passed `16/16`; no live Whop mutation performed.
+- Art of War campaign-loop dry-run completed safely with `public_action_performed=false`, `external_mutation_performed=false`, and `failure_class=audience_mismatch`.
+- Composio MCP config/probe passed with redacted header and `7` discovered tools.
+- Full repository tests passed: `643` tests, `0` failed. Typecheck, lint, build, and hygiene passed.
+
+Remaining audit blockers:
+
+- P1: continue bounded transcript collection and terminal-reason classification for `missing_transcripts_or_terminal_reasons`.
+- P1: review fresh Gemma diff rows before any promotion/write.
+- P1: Art of War publish approval remains absent; no public action or spend allowed.
+- P2: stale mirror/archive/delete/secret quarantine requires separate approval.

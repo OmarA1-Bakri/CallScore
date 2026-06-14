@@ -5797,3 +5797,34 @@ Remaining blocker:
 - P1: continue bounded laptop cadence and classify remaining actionable pending/provider-blocked transcript rows; do not broad backfill.
 
 Clarification: the transcript acquisition mechanism itself is solved for current operations through the canonical Omar laptop over Tailscale/residential browser cookies with laptop-side `yt-dlp`. Remaining `missing_transcripts_or_terminal_reasons` is an audit completeness/backlog classification item: rows still need bounded collection or terminal reason records, not a replacement transcript architecture.
+
+## 2026-06-14 production activation run — PARTIAL with fresh evidence
+
+Verdict: `PARTIAL`.
+
+Evidence collected in this activation run:
+
+- Baseline: branch `master`, HEAD `11df761`, `git diff --check` passed at start.
+- Website: `npm run verify:public -- --source live --base-url https://call-score.com` passed at `2026-06-14T09:41:26Z`; live health source is `hh_read_api`, leaderboard rows matched, homepage funnel counts were nonzero.
+- Local public verifier: `npm run verify:public` passed with direct HH PostgreSQL counts.
+- Canonical transcript cadence: Omar laptop over Tailscale/residential Firefox cookies/laptop-side `yt-dlp` wrote `5/5` transcripts in a bounded batch at `2026-06-14T09:43-09:47Z` for videos `9_yBtjN8cEM`, `Qhzl_ZDrezg`, `KvioAIKg-iw`, `73R3rYtS9sc`, and `TDR084lXY1Q`.
+- Transcript receipt: `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-activation-20260614T094841Z.json`.
+- Freshness: `npm run freshness:check` returned `WARN` with blockers `[]`; warnings remain the legacy/HH fallback transcript provider credential and bot-verification counts, not failure of the canonical laptop lane.
+- Audit pipeline: `npm run audit:pipeline -- --summary --allow-partial-shadow` still reports blocker `missing_transcripts_or_terminal_reasons`; this remains audit backlog/terminal-reason coverage, not transcript mechanism failure.
+- Gemma/Qwen: bounded local Ollama shadow sample `gemma-activation-shadow-20260614T094949Z` processed `5/5` videos, `2` accepted calls, `0` failed records. Artifact: `.tmp/shadow-extraction/gemma-activation-shadow-20260614T094949Z.jsonl`.
+- Shadow diff: `.tmp/shadow-extraction/gemma-activation-shadow-20260614T094949Z.diff.jsonl` produced `5` rows, all `manual_review`. Receipts: `.tmp/workflow-receipts/gemma_shadow_sample/gemma-activation-shadow-20260614T094949Z.json` and `.tmp/workflow-receipts/gemma_shadow_diff/gemma-activation-shadow-20260614T094949Z-diff.json`.
+- Whop Auto: targeted Whop/infrastructure tests passed `16/16`; checkout/payment authorization proof remains the recorded discounted/tokenized Pro renewal. No Whop provider/customer/payment/pricing mutation was performed.
+- Art of War: private campaign-loop dry-run completed with `decision=revise_or_hold`, `failure_class=audience_mismatch`, `public_action_allowed=false`, `public_action_performed=false`, `external_mutation_performed=false`.
+- Composio MCP: direct initialize and `tools/list` probe passed with HTTP 200 SSE and `7` tools; token/header remained redacted.
+- Services: `callscore-read-api.service`, `callscore-enqueue.service`, `callscore-daily-pipeline.timer`, `hermes-worker.service`, and `hh-control-bridge.service` all reported active.
+- Validation: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run hygiene`, and full `node --import tsx --test $(find tests -name '*.test.ts' | sort)` passed (`643` passing tests).
+
+Remaining P1 gates:
+
+- Audit corpus completeness: `missing_transcripts_or_terminal_reasons` remains; continue bounded laptop batches and terminal-reason classification. No broad backfill.
+- Shadow diff rows from the fresh sample are `manual_review`; do not promote or broad-write until review gate passes.
+- Whop provider/customer/payment/pricing mutations remain manifest/diff/rollback/receipt/local-auth gated; current checkout/payment authorization proof is sufficient for functional readiness.
+- Art of War public publish/outreach/spend remains approval-gated; current dry-run intentionally held on `audience_mismatch`.
+- Optional stale mirror/archive/delete and secret-bearing artifact quarantine remain separate approval work.
+
+No production deploy was required because app/runtime code did not change.

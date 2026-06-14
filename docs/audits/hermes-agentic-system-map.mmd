@@ -61,12 +61,12 @@ flowchart LR
     OpenGate[Open-ended scrape/extract/LLM]
   end
   subgraph BLOCKERS[Remaining Blockers]
-    B1[Composio optional/deferred; new account needed if used]
+    B1[Composio ready after restart/reload if first-class tools needed]
     B2[HH-only fallback: bot verification / ASR absent; laptop lane proven]
     B3[Production promotion remains receipt/approval-gated]
     B4[Public count source drift resolved by --source live]
     B5[External rotation review]
-    B6[Whop Auto live provider/purchase proof gated]
+    B6[Whop Auto provider mutations gated; checkout auth proof recorded]
   end
 
   Operator -->|manual trigger| HG
@@ -99,8 +99,8 @@ flowchart LR
   WAW -->|do not patch as source| WAR
   WAR -->|writes receipt before mutation| Receipts
   WAG -->|blocked unless all gates pass| WhopGate
-  WAG -->|remaining provider proof| B6
-  Composio -->|optional setup if needed| B1
+  WAG -->|mutation gate remains| B6
+  Composio -->|reload if needed| B1
   Scripts -->|verify public --source live passed| B4
   HG -->|rotation review| B5
   DeployGate -->|requires approval| Netlify
@@ -143,7 +143,7 @@ flowchart TD
     O5[Docker/systemd]
   end
   subgraph NO_CONTROL
-    N1[Composio write/outbound tools]
+    N1[Composio write/outbound tools without gate]
     N2[Public social/email channels]
     N3[Paid marketing tools]
     N4[Whop mutations]
@@ -237,3 +237,10 @@ flowchart LR
 %% Third-party apps essential now: Netlify, HH PostgreSQL/read API, Tailscale/SSH laptop collector, Omar laptop browser cookies, YouTube/yt-dlp laptop lane, local Ollama models. Revenue requires Whop setup/auth/gated manifest. Marketing owned-channel apps remain operator-selected/gated. Composio is optional/deferred unless future repo evidence makes it essential.
 %% 2026-06-14 Whop Auto canonicalization update
 %% /srv/whop-auto registry now points crypto-tuber-ranked to /opt/crypto-tuber-ranked/.whop-pipeline.json and records canonicalSource=/opt/crypto-tuber-ranked. Stale /srv/whop-auto/workspace/* mirrors remain inventory only; no provider/customer/payment mutation, deploy, secret print, or cleanup/delete occurred. Live Whop Auto mutation remains manifest+diff+rollback+receipt+local-auth gated.
+
+%% 2026-06-14 activation refresh
+%% Website live verify --source live passed via HH Read API; local verify passed; canonical laptop/Tailscale Firefox/laptop-side yt-dlp wrote 5/5 fresh transcripts at 2026-06-14T09:43-09:47Z; receipt=.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-activation-20260614T094841Z.json.
+%% Gemma local Ollama shadow run gemma-activation-shadow-20260614T094949Z processed 5/5 videos, accepted=2, failed=0; diff manual_review=5; receipts under gemma_shadow_sample and gemma_shadow_diff. No promotion/write.
+%% Composio MCP live probe READY: initialize HTTP 200 SSE, session id present, tools/list returned 7 tools; current Codex may need restart/reload for first-class tool exposure.
+%% Whop discounted/tokenized Pro renewal remains checkout/payment authorization proof; no Whop mutation. Art of War dry-run held with audience_mismatch and no public action/spend.
+%% Validation passed: typecheck, lint, build, hygiene, workplane status OK/PARTIAL, freshness WARN blockers=[], audit blocker missing_transcripts_or_terminal_reasons, verify public local+live, full tests 643 pass.
