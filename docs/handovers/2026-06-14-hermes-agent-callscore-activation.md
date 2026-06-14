@@ -202,3 +202,36 @@ Fresh close-out evidence:
 - Current commit is pending from this handover update; resolve exact commit with `git log -1 --oneline` after final commit.
 
 Hermes must not repeat architecture discovery. Resume only from bounded audit reduction, Gemma diff review, Art of War owned-channel approval packet repair, or Whop/provider gated checks.
+
+## 2026-06-14T11:40Z Forced-finish continuation evidence
+
+Operator requested maximum safe execution. Safe lanes continued after commit `d1d54c3`.
+
+New evidence:
+
+- OMX workflow overlap was cleared with `omx state clear` for `ultraqa`, `ultrawork`, and `ultragoal`.
+- Transcript: attempted one bounded larger laptop batch (`Limit 25`, `SinceDays 365`) to reduce audit backlog. It processed 2 rows before rate-limit evidence appeared, then was stopped per canonical rule. DB result: `DwqYFmdjwNY` available transcript (`laptop_collector_firefox`, len 689), `HVghAIIcoZo` terminal `no_captions` failure. Receipt: `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit25-rate-stop-20260614T112708Z.json`.
+- Audit after that partial batch: `missing_transcripts` still 98 creators, `terminalCoverage.transcriptVideos=3861`, blocker remains `missing_transcripts_or_terminal_reasons`. This is a corpus/backlog/provider-rate limit issue, not architecture confusion.
+- Gemma: attempted full-cover local Ollama recheck for the five manual-review rows. It completed 1/5 full-cover row with `reached_transcript_end=true`, then made no progress within the bounded operator window and was killed. Receipt: `.tmp/workflow-receipts/gemma_shadow_fullcover/gemma-fullcover-final-20260614T112755Z-interrupted.json`. No paid API, no production write, no promotion.
+- Art of War: patched canonical Art of War repo `/srv/agents/repos/Claude_Code_Automations` so E4/E5 auto-risk private campaign candidates can pass persona/verifier gates and reach `approval_packet_ready` while public publish/spend/outreach remains approval-gated. Commit there: `bf5233d Make Art of War private campaign gate reach approval packet`. Validation: `python3 -m py_compile scripts/art_of_war.py`, `python3 scripts/art_of_war.py validate-docs`, and private campaign-loop assertion all passed.
+
+Current resume point:
+
+1. Do not rerun broad transcript collection immediately; last bounded batch hit HTTP 429. Respect cooldown / smaller `Limit 5` later.
+2. Continue audit reduction only via bounded laptop batches or terminal-reason classification.
+3. Use Art of War commit `bf5233d` as current private marketing readiness proof; public action remains approval receipt gated.
+4. Do not promote Gemma rows until diff/manual-review gate clears or a bounded full-cover run completes without hang.
+
+## 2026-06-14T11:43Z Final forced-finish close
+
+Additional fix after rate-limit receipt:
+
+- Workplane decision logic now recognizes `partial_rate_limited_stop` transcript cadence receipts and returns `wait_for_laptop_collector_rate_limit_cooldown` instead of stale `repair_transcript_targeting_or_failure_classification`.
+- Current `npm run workplane:status`: `status=OK`, `automation_readiness=PARTIAL`, transcript domain `PARTIAL`, next action `wait_for_laptop_collector_rate_limit_cooldown`, `allowed=false`.
+- Current `npm run freshness:check`: `status=WARN`, `blockers=[]`; latest transcript success `2026-06-14 12:26:25.292051+01`.
+- Current `npm run audit:pipeline -- --summary --allow-partial-shadow`: blocker remains `missing_transcripts_or_terminal_reasons`, `missing_transcripts=98`, `terminalCoverage.transcriptVideos=3861`.
+- Validation after this patch: `node --import tsx --test tests/workplane-jobs.test.ts` passed 15/15; `npm run typecheck`, `npm run lint`, `npm run build`, `npm run hygiene`, `npm run verify:public`, live public verify, and full test suite passed (`643` pass, `0` fail).
+
+Final safe stop reason:
+
+- FULL still not claimable because Workplane itself reports `automation_readiness=PARTIAL`, transcript domain is now provider-rate-limited cooldown, and audit blocker remains. This is no longer a permission issue; it is provider/rate-limit plus corpus backlog. Continuing immediate transcript collection would violate the stop-on-429/cooldown rule.

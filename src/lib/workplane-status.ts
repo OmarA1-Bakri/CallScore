@@ -36,6 +36,7 @@ export interface WorkplaneDecisionInput {
   readonly collectorLastAttemptedCount: number | null;
   readonly collectorLastSuccessCount: number | null;
   readonly latestTranscriptCadencePassed?: boolean;
+  readonly latestTranscriptCadenceResult?: string | null;
 }
 
 export interface WorkplaneDecision {
@@ -265,6 +266,14 @@ export function decideNextAutonomousAction(input: WorkplaneDecisionInput): Workp
   }
   if (input.collectorCooldown.status === "malformed") {
     return { action: "repair_or_replace_collector_state", reason: "collector cooldown state is malformed", job_type: "transcript_collect_laptop", allowed: false };
+  }
+  if (input.latestTranscriptCadenceResult?.includes("rate_limited")) {
+    return {
+      action: "wait_for_laptop_collector_rate_limit_cooldown",
+      reason: "latest bounded laptop transcript receipt stopped on provider rate-limit; avoid blind retry and resume with smaller bounded batch after cooldown",
+      job_type: "transcript_collect_laptop",
+      allowed: false,
+    };
   }
   if (!input.latestTranscriptCadencePassed && (input.collectorLastAttemptedCount ?? 0) >= 5 && (input.collectorLastSuccessCount ?? 0) === 0) {
     return {

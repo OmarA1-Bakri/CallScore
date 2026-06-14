@@ -5860,3 +5860,17 @@ npm run workplane:status
 npm run audit:pipeline -- --summary --allow-partial-shadow
 npm run freshness:check
 ```
+
+### 2026-06-14 Forced-finish continuation
+
+- Cleared stale OMX `ultraqa`/`ultrawork`/`ultragoal` overlap and continued safe execution.
+- Transcript audit reduction: a bounded laptop `Limit 25` run was attempted under full operator authority but stopped after rate-limit evidence. It safely wrote one available transcript and one terminal `no_captions` row; no cookies were printed, no HH-only fallback was used, and no broad scrape continued. Receipt: `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit25-rate-stop-20260614T112708Z.json`.
+- Audit state after partial batch: `missing_transcripts=98`, `terminalCoverage.transcriptVideos=3861`, blocker remains `missing_transcripts_or_terminal_reasons`. This is now proven to require cooldown/bounded batches over time or terminal-reason classification; authority alone cannot bypass YouTube 429/provider behavior safely.
+- Gemma full-cover recheck was attempted locally via Ollama only. It completed 1/5 rows and was stopped after bounded no-progress wait; no paid API, write, or promotion occurred. Receipt: `.tmp/workflow-receipts/gemma_shadow_fullcover/gemma-fullcover-final-20260614T112755Z-interrupted.json`.
+- Art of War readiness improved in `/srv/agents/repos/Claude_Code_Automations` commit `bf5233d`: private campaign-loop can now reach `approval_packet_ready` for E4/E5 auto-risk evidence while public publish/spend/outreach remains approval-gated.
+
+Verdict remains PARTIAL until Workplane reports FULL/READY and audit/Gemma/provider/public gates are resolved or formally downgraded by repo policy.
+
+### 2026-06-14 final forced-finish close
+
+Workplane was patched to treat `partial_rate_limited_stop` transcript cadence receipts as a cooldown wait state, not a targeting-repair failure. Final state after validation: Workplane `OK`, `automation_readiness=PARTIAL`, transcript domain `PARTIAL`, next action `wait_for_laptop_collector_rate_limit_cooldown`, audit blocker `missing_transcripts_or_terminal_reasons`, full test suite `643/643` passed. FULL is not claimed because immediate continuation would violate the canonical stop-on-429/cooldown rule.

@@ -183,6 +183,10 @@ test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe w
     decideNextAutonomousAction({ ...base, collectorLastAttemptedCount: 5, collectorLastSuccessCount: 0, latestTranscriptCadencePassed: true }).action,
     "run_gemma_shadow_extract_limit_10",
   );
+  assert.equal(
+    decideNextAutonomousAction({ ...base, collectorLastAttemptedCount: 5, collectorLastSuccessCount: 0, latestTranscriptCadenceResult: "partial_rate_limited_stop" }).action,
+    "wait_for_laptop_collector_rate_limit_cooldown",
+  );
   assert.equal(decideNextAutonomousAction({ ...base, latestMlEval: { path: "r", exists: true, modified_at: "now", malformed: false, summary: { promotion_gate: { eligible_for_write_canary: false } } } }).action, "start_artofwar_internal_growth_intelligence");
   assert.equal(decideNextAutonomousAction(base).job_type, "gemma_shadow_extract");
 });

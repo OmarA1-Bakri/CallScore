@@ -97,6 +97,9 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
   const latestTranscriptCadencePassed = latestTranscriptCadenceReceipt.exists
     && !latestTranscriptCadenceReceipt.malformed
     && latestTranscriptCadenceReceipt.summary.result === "passed";
+  const latestTranscriptCadenceResult = typeof latestTranscriptCadenceReceipt.summary.result === "string"
+    ? latestTranscriptCadenceReceipt.summary.result
+    : null;
   const unsafeOfficial = await fetchUnsafeOfficial(args.readApiBase);
   const latestFailure = await latestCollectorFailure();
   const unsafeSourceRanks = Number(freshness.unsafeSourceRanks ?? 0);
@@ -111,6 +114,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     collectorLastAttemptedCount: collectorCooldown.last_attempted_count,
     collectorLastSuccessCount: collectorCooldown.last_success_count,
     latestTranscriptCadencePassed,
+    latestTranscriptCadenceResult,
   });
   const dailyTimer = freshness.dailyTimer as Record<string, unknown> | null | undefined;
   const dailyPipelineActive = dailyTimer?.active === true || dailyTimer?.state === "active";

@@ -672,3 +672,16 @@ npm run workplane:status
 npm run audit:pipeline -- --summary --allow-partial-shadow
 npm run freshness:check
 ```
+
+### 2026-06-14 forced-finish continuation
+
+- Bounded transcript escalation tried `Limit 25` through canonical laptop/Tailscale collector and stopped on rate-limit evidence. It wrote 1 available transcript and 1 terminal `no_captions` row; terminal transcript coverage moved to 3861, but `missing_transcripts_or_terminal_reasons` remains at 98 creators.
+- Gemma full-cover recheck was attempted using local Ollama only, but was stopped after bounded no-progress wait after 1/5 rows; no promotion/write occurred.
+- Art of War private readiness advanced: `/srv/agents/repos/Claude_Code_Automations` commit `bf5233d` makes E4/E5 auto-risk private campaign-loop receipts reach `approval_packet_ready`; public actions remain explicitly fail-closed behind approval receipt.
+- No public posting, spend, Whop mutation, DB broad write, provider mutation, deploy, or secret exposure was intentionally performed.
+
+### 2026-06-14 final forced-finish close
+
+- Workplane now classifies the latest transcript state as provider rate-limit cooldown (`wait_for_laptop_collector_rate_limit_cooldown`) instead of stale targeting repair.
+- Final verification passed: typecheck, lint, build, hygiene, workplane status, freshness, audit summary, public verify local/live, and full TS suite (`643` pass, `0` fail).
+- Activation verdict remains PARTIAL solely because Workplane/audit still expose provider/corpus backlog and gated promotion/public/provider actions.
