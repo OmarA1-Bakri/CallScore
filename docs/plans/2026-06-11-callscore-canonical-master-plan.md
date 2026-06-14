@@ -927,7 +927,7 @@ Certification:
 Local service: `callscore-enqueue.service`
 Local bind: `127.0.0.1:8788`
 Endpoint: `POST /internal/callscore/enqueue`
-Auth: `Authorization: Bearer <HH_ENQUEUE_SECRET>`
+Auth: use the approved local enqueue secret mechanism; do not print or paste header values.
 
 Cloudflared public route:
 
@@ -5878,3 +5878,7 @@ Workplane was patched to treat `partial_rate_limited_stop` transcript cadence re
 ## 2026-06-14 controlled-full gate release update
 
 Full-system live canary review moved non-core hard gates into monitored production gates where evidence supports it. `automation_readiness=CONTROLLED_FULL` is allowed only while website/read API verification passes, laptop transcript mechanism remains proven, audit backlog is handled by bounded cadence/cooldown, Gemma writes remain receipt-gated, Whop dangerous mutations remain fail-closed, Art of War public actions remain approval-gated, and full validation passes. See `docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md`.
+
+## 2026-06-14 canonical platform documentation
+
+The canonical first-read documentation is now the root `README.md`, with the canonical platform diagram at `docs/architecture/callscore-agentic-platform.mmd` and supporting narrative at `docs/architecture/callscore-agentic-platform.md`. These documents supersede older historical sections that still mention prior `automation_readiness=PARTIAL` snapshots, stale mirror inventories, Vercel/Neon historical notes, or pre-controlled-full gate states. Current readiness model is `CONTROLLED_FULL` while dangerous public/provider/payment/destructive gates remain fail-closed.

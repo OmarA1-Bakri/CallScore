@@ -1,0 +1,100 @@
+flowchart TD
+  %% CallScore canonical agentic platform map. No secrets. Netlify + HH PostgreSQL/HH Read API are canonical.
+
+  subgraph PublicProduct[Public Product]
+    Visitor[Public visitor / buyer]
+    Netlify[Netlify CallScore app\ncall-score.com]
+    PublicAPI[Next.js public/API routes]
+    Visitor --> Netlify --> PublicAPI
+  end
+
+  subgraph CanonicalDataPlane[Canonical Data Plane]
+    HHRead[HH Read API\npublic read source]
+    PG[(Local HH PostgreSQL\ncanonical production DB)]
+    PublicAPI --> HHRead --> PG
+  end
+
+  subgraph TranscriptCollection[Transcript Collection]
+    YT[YouTube / creator source data]
+    Laptop[Omar laptop\nTailscale + residential browser cookies\nlaptop-side yt-dlp]
+    Ingest[Approved transcript ingest path\nbounded writes only]
+    HHFallback[HH yt-dlp / ASR / vpn-ytdlp\ndiagnostic future fallback only]
+    YT --> Laptop --> Ingest --> PG
+    YT -. diagnostic only .-> HHFallback -. terminal evidence / future canary .-> Ingest
+  end
+
+  subgraph IntelligencePipeline[Scoring / Intelligence Pipeline]
+    Extract[Claim extraction\nrule path + shadow model canaries]
+    Ollama[Local Ollama\nGemma / Qwen shadow + diff]
+    Match[Matching / symbol normalization]
+    Score[Scoring / freshness / audit]
+    PublicRows[Public-safe ranked rows\nmonetization target fields gated]
+    PG --> Extract
+    Extract --> Ollama --> Extract
+    Extract --> Match --> Score --> PublicRows --> HHRead
+  end
+
+  subgraph AgenticControl[Agentic Control Plane]
+    Hermes[Hermes control plane\n/srv/agents/hermes]
+    Workplane[Workplane readiness + job registry\nCONTROLLED_FULL]
+    HHBridge[HH control bridge\n/srv/agents/hh-control-bridge]
+    Receipts[Workflow receipts\n.tmp/workflow-receipts]
+    Docs[Docs / handovers / memory\nREADME + architecture + agentmemory]
+    Library[Local library catalog\n/srv/agents/library]
+    Hermes --> Workplane --> HHBridge
+    Workplane --> Receipts
+    Workplane --> Docs
+    Hermes --> Library
+    Workplane -. monitors .-> PG
+    Workplane -. monitors .-> Netlify
+  end
+
+  subgraph CommercialPlane[Commercial / Entitlement Plane]
+    WhopAuto[Whop Auto\n/srv/whop-auto]
+    Whop[Whop checkout / entitlement\nzero-dollar token proof recorded]
+    Entitlement[Pro / Alpha entitlement checks]
+    WhopAuto --> Whop --> Entitlement --> PublicAPI
+  end
+
+  subgraph GrowthPlane[Marketing / Growth Plane]
+    Art[Art of War automation\n/srv/agents/repos/Claude_Code_Automations]
+    Packet[Private campaign dry-run\napproval_packet_ready]
+    OwnedCanary[Owned-channel publish canary\nrequires approval receipt]
+    Art --> Packet --> OwnedCanary
+  end
+
+  subgraph ConnectedApps[Composio Connected Apps]
+    Composio[Composio MCP hub\nread-only inventory ready]
+    Attio[Attio CRM]
+    Gmail[Gmail / email]
+    X[Twitter / X]
+    PostHog[PostHog]
+    HF[Hugging Face\nComposio auth initiated; HF plugin separate]
+    LinkedIn[LinkedIn]
+    Discord[Discord]
+    Composio --> Attio
+    Composio --> Gmail
+    Composio --> X
+    Composio --> PostHog
+    Composio --> HF
+    Composio --> LinkedIn
+    Composio --> Discord
+    Art -. read-only / gated actions .-> Composio
+    Workplane -. inventory .-> Composio
+  end
+
+  subgraph SafetyGates[Safety Gates / Receipts]
+    Monitored[Monitored gates\ntranscript backlog\nHTTP 429 cooldown\nGemma manual-review deltas\nComposio non-core gaps]
+    FailClosed[Fail-closed gates\npaid spend\npublic sends/posts without approval\nWhop pricing/product/customer/payment mutation\ndestructive SQL/infra\nbroad DB backfills\ncredential rotation\nsecret exposure\n429 hammer retry]
+    Rollback[Rollback path\nrestore PARTIAL/BLOCKED if core checks fail]
+    Receipts --> Monitored
+    Receipts --> FailClosed
+    Monitored --> Rollback
+    FailClosed --> Rollback
+  end
+
+  Workplane -. controls .-> TranscriptCollection
+  Workplane -. controls .-> IntelligencePipeline
+  Workplane -. controls .-> CommercialPlane
+  Workplane -. controls .-> GrowthPlane
+  Workplane -. records .-> SafetyGates

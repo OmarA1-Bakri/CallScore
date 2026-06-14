@@ -247,3 +247,13 @@ Final safe stop reason:
 - Gate decision doc: `docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md`.
 - Resume command: `cd /opt/crypto-tuber-ranked && npm run workplane && npm run verify:public -- --source live --base-url https://call-score.com`.
 - Do not repeat: architecture rediscovery, HH-only transcript fallback, nonzero Whop cash proof demand, public publish without approval receipt, or 429 hammer retry.
+
+## 2026-06-14 canonical platform documentation update
+
+- New operator first-read: `/opt/crypto-tuber-ranked/README.md`.
+- Canonical platform diagram: `/opt/crypto-tuber-ranked/docs/architecture/callscore-agentic-platform.mmd`.
+- Supporting architecture narrative: `/opt/crypto-tuber-ranked/docs/architecture/callscore-agentic-platform.md`.
+- Diagram scope: public product, canonical data plane, laptop transcript lane, extraction/matching/scoring/audit, Hermes/Workplane/HH bridge, receipts, Whop Auto, Art of War, Composio connected apps, monitored gates, and fail-closed dangerous gates.
+- Latest docs validation expected: `git diff --check`, `npm run workplane:status || npm run workplane`, `npm run freshness:check`, `npm run verify:public -- --source live --base-url https://call-score.com`; if docs touch canonical state, also typecheck/lint/build/workplane targeted tests.
+- Hermes should read README and the architecture diagram before rediscovering directories or asking which repo/service is canonical.
+- Do not repeat: Vercel/Neon production assumptions, HH-only transcript fallback as canonical, nonzero Whop cash proof demand, public publish without approval receipt, or 429 hammer retry.

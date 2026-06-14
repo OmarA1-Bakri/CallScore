@@ -689,3 +689,7 @@ npm run freshness:check
 ## 2026-06-14 controlled-full readiness audit note
 
 Workplane now distinguishes production-blocking failures from monitored gates. Historical transcript/audit backlog, provider cooldown, Gemma manual-review deltas with no missing/extra calls, and fail-closed public/provider mutation gates do not block core production readiness. They remain monitored and receipt-gated. P0 blockers remain: broken website/live verify/read API, broken transcript mechanism, unsafe writes, failed validation, missing handover, or opened payment/public/destructive gates.
+
+## 2026-06-14 canonical platform documentation audit note
+
+The current canonical platform overview is the root `README.md`; the canonical Mermaid architecture diagram is `docs/architecture/callscore-agentic-platform.mmd`; and the narrative architecture companion is `docs/architecture/callscore-agentic-platform.md`. Agents should treat those files plus the latest handover and gate-decision doc as current truth before relying on older historical audit snapshots.
