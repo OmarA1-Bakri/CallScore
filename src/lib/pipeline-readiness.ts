@@ -11,6 +11,7 @@ export interface CreatorCompletenessInput {
   readonly extraction_eligible_videos: number;
   readonly missing_transcript_videos: number;
   readonly low_quality_transcript_videos: number;
+  readonly terminal_transcript_videos?: number;
   readonly production_calls: number;
 }
 
@@ -220,7 +221,7 @@ export function summarizeCreatorCompleteness(
   const summaries = rows.map((row) => {
     const shadowVideos = shadowByCreator.get(row.creator_id)?.size ?? 0;
     const terminalPublicationDateVideos = terminalDatesByCreator.get(row.creator_id)?.size ?? 0;
-    const terminalTranscriptVideos = terminalTranscriptsByCreator.get(row.creator_id)?.size ?? 0;
+    const terminalTranscriptVideos = (row.terminal_transcript_videos ?? 0) + (terminalTranscriptsByCreator.get(row.creator_id)?.size ?? 0);
     const effectiveRow = {
       ...row,
       published_videos: Math.min(row.total_videos, row.published_videos + terminalPublicationDateVideos),
@@ -303,7 +304,8 @@ export function buildPipelineReadinessSummary(input: {
     promotion,
     terminalCoverage: {
       publicationDateVideos: terminalVideoIds(terminalPublicationDateRecords, ["missing_date", "terminal_missing_date"]).size,
-      transcriptVideos: terminalVideoIds(terminalTranscriptRecords, ["terminal_no_transcript", "terminal_transcript_unavailable"]).size,
+      transcriptVideos: input.creators.reduce((sum, row) => sum + (row.terminal_transcript_videos ?? 0), 0)
+        + terminalVideoIds(terminalTranscriptRecords, ["terminal_no_transcript", "terminal_transcript_unavailable"]).size,
     },
     blockers,
   };

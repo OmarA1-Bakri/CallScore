@@ -5777,3 +5777,19 @@ Remaining blockers:
 - P1: Whop Auto provider/live-purchase proof is still gated; no hidden pricing/product/customer/payment mutation was performed.
 - P1: Art of War owned-channel setup/publish gate remains operator-selected and receipt-gated.
 - P2: stale mirror archive/delete and secret-bearing artifact rotation/quarantine review require separate cleanup/rotation approval.
+
+## 2026-06-14 audit terminal-coverage update
+
+Verdict: **PARTIAL / improved**. Audit completeness no longer blocks on known missing publication dates; transcript terminal/actionable classification is improved but not complete.
+
+Evidence:
+
+- Added durable terminal publication-date audit records at `data/audit/terminal-publication-dates.jsonl` for four videos whose bounded provider dry-run found no Invidious or `yt-dlp` source date.
+- `audit:pipeline` now loads durable terminal audit inputs by default when present.
+- `audit:pipeline` now counts DB-level terminal transcript failures separately from actionable missing transcripts.
+- Latest audit summary with `--allow-partial-shadow`: `missing_publication_dates=0`, `missing_transcripts=99`, `pending_shadow=79`, `shadow_complete=1`, `terminalCoverage.publicationDateVideos=4`, `terminalCoverage.transcriptVideos=3859`, blockers=`[missing_transcripts_or_terminal_reasons]`.
+- Receipt: `.tmp/workflow-receipts/pipeline_audit_completeness/pipeline-audit-terminal-coverage-blocked-20260614T052422Z.json`.
+
+Remaining blocker:
+
+- P1: continue bounded laptop cadence and classify remaining actionable pending/provider-blocked transcript rows; do not broad backfill.

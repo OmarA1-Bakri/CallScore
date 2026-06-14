@@ -41,13 +41,17 @@ function argValue(argv: readonly string[], flag: string): string | null {
   return argv[index + 1];
 }
 
+function defaultAuditInput(path: string): string | null {
+  return existsSync(path) ? path : null;
+}
+
 export function parsePipelineReadinessArgs(argv = process.argv.slice(2)): PipelineReadinessArgs {
   return {
     shadowIn: argValue(argv, "--shadow-in"),
     diffIn: argValue(argv, "--diff-in"),
     promoteIn: argValue(argv, "--promote-in"),
-    publicationDateAuditIn: argValue(argv, "--publication-date-audit-in"),
-    transcriptAuditIn: argValue(argv, "--transcript-audit-in"),
+    publicationDateAuditIn: argValue(argv, "--publication-date-audit-in") ?? defaultAuditInput("data/audit/terminal-publication-dates.jsonl"),
+    transcriptAuditIn: argValue(argv, "--transcript-audit-in") ?? defaultAuditInput("data/audit/terminal-transcripts.jsonl"),
     runId: argValue(argv, "--run-id"),
     auditOut: argValue(argv, "--audit-out"),
     failOnBlockers: argv.includes("--fail-on-blockers"),
@@ -91,6 +95,7 @@ async function loadCreatorCompleteness(): Promise<CreatorCompletenessInput[]> {
     extraction_eligible_videos: string | number;
     missing_transcript_videos: string | number;
     low_quality_transcript_videos: string | number;
+    terminal_transcript_videos: string | number;
     production_calls: string | number;
   }>(
     `WITH video_agg AS (
@@ -99,7 +104,34 @@ async function loadCreatorCompleteness(): Promise<CreatorCompletenessInput[]> {
               COUNT(*) FILTER (WHERE published_at IS NOT NULL) AS published_videos,
               COUNT(*) FILTER (WHERE transcript IS NOT NULL AND length(transcript) > 0) AS transcript_videos,
               COUNT(*) FILTER (WHERE transcript IS NOT NULL AND transcript_quality > 0.2) AS extraction_eligible_videos,
-              COUNT(*) FILTER (WHERE transcript IS NULL OR length(transcript) = 0) AS missing_transcript_videos,
+              COUNT(*) FILTER (
+                WHERE (transcript IS NULL OR length(transcript) = 0)
+                  AND NOT (
+                    transcript_status = 'failed'
+                    AND (
+                      transcript_error IN ('failed_terminal','terminal-no-transcript','terminal_no_transcript','no_captions','transcript_unavailable','creator disabled transcripts')
+                      OR transcript_error ILIKE '%transcript is disabled%'
+                      OR transcript_error ILIKE '%creator disabled transcripts%'
+                      OR transcript_error ILIKE '%no captions%'
+                      OR transcript_error ILIKE '%transcript_unavailable%'
+                      OR transcript_error ILIKE '%video unavailable%'
+                      OR transcript_error ILIKE '%private video%'
+                    )
+                  )
+              ) AS missing_transcript_videos,
+              COUNT(*) FILTER (
+                WHERE (transcript IS NULL OR length(transcript) = 0)
+                  AND transcript_status = 'failed'
+                  AND (
+                    transcript_error IN ('failed_terminal','terminal-no-transcript','terminal_no_transcript','no_captions','transcript_unavailable','creator disabled transcripts')
+                    OR transcript_error ILIKE '%transcript is disabled%'
+                    OR transcript_error ILIKE '%creator disabled transcripts%'
+                    OR transcript_error ILIKE '%no captions%'
+                    OR transcript_error ILIKE '%transcript_unavailable%'
+                    OR transcript_error ILIKE '%video unavailable%'
+                    OR transcript_error ILIKE '%private video%'
+                  )
+              ) AS terminal_transcript_videos,
               COUNT(*) FILTER (WHERE transcript IS NOT NULL AND transcript_quality <= 0.2) AS low_quality_transcript_videos
        FROM videos
        GROUP BY creator_id
@@ -116,6 +148,7 @@ async function loadCreatorCompleteness(): Promise<CreatorCompletenessInput[]> {
             COALESCE(v.transcript_videos, 0) AS transcript_videos,
             COALESCE(v.extraction_eligible_videos, 0) AS extraction_eligible_videos,
             COALESCE(v.missing_transcript_videos, 0) AS missing_transcript_videos,
+            COALESCE(v.terminal_transcript_videos, 0) AS terminal_transcript_videos,
             COALESCE(v.low_quality_transcript_videos, 0) AS low_quality_transcript_videos,
             COALESCE(ca.production_calls, 0) AS production_calls
      FROM creators c
@@ -133,6 +166,7 @@ async function loadCreatorCompleteness(): Promise<CreatorCompletenessInput[]> {
     transcript_videos: Number(row.transcript_videos),
     extraction_eligible_videos: Number(row.extraction_eligible_videos),
     missing_transcript_videos: Number(row.missing_transcript_videos),
+    terminal_transcript_videos: Number(row.terminal_transcript_videos),
     low_quality_transcript_videos: Number(row.low_quality_transcript_videos),
     production_calls: Number(row.production_calls),
   }));
