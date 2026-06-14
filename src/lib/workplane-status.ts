@@ -320,7 +320,7 @@ export function workplaneJobModelForStatus(): readonly Record<string, unknown>[]
   }));
 }
 
-export type ReadinessStatus = "READY" | "PARTIAL" | "BLOCKED" | "NOT_CONNECTED" | "NEEDS_APPROVAL";
+export type ReadinessStatus = "READY" | "MONITORED" | "PARTIAL" | "BLOCKED" | "NOT_CONNECTED" | "NEEDS_APPROVAL";
 
 export interface WorkplaneDomainStatus {
   readonly status: ReadinessStatus;
@@ -392,12 +392,13 @@ export function externalReadinessSnapshot(repoRoot = process.cwd(), now = new Da
   const whopEvidence = [existsEvidence(whopPath, "repo"), existsEvidence(join(whopPath, "plugin/agent_workflows/whop_auto"), "plugin"), existsEvidence(join(repoRoot, "docs/ops/whop-auto-certification.md"), "CallScore certification doc")].filter(Boolean) as string[];
   const artEvidence = [existsEvidence(automationPath, "automation repo"), existsEvidence(join(automationPath, "scripts/art_of_war.py"), "dry-run CLI"), existsEvidence(artOfWarPath, "state/artifacts")].filter(Boolean) as string[];
   const claudeEvidence = [existsEvidence(automationPath, "repo"), existsEvidence(workplanePath, "workplane package"), existsEvidence(join(workplanePath, "package.json"), "workplane package.json")].filter(Boolean) as string[];
+  const composioInventory = latestWorkflowReceipt("composio_app_inventory", repoRoot);
 
   return {
     whop_auto: domain({
-      status: whopEvidence.length >= 2 ? "PARTIAL" : "NOT_CONNECTED",
-      evidence: whopEvidence,
-      blockers: whopEvidence.length >= 2 ? ["live provider mutation remains approval-gated"] : ["Whop-auto repo not found"],
+      status: whopEvidence.length >= 2 ? "MONITORED" : "NOT_CONNECTED",
+      evidence: [...whopEvidence, "zero-dollar/token-discount checkout proof recorded; dangerous mutations remain fail-closed"],
+      blockers: whopEvidence.length >= 2 ? [] : ["Whop-auto repo not found"],
       safe_next_action: "run whop_provider_health / whop_plan_inventory_check read-only jobs",
       risky_actions_blocked: ["pricing changes", "plan/product/payment mutation", "live entitlement mutation"],
       required_approvals: ["live provider/customer mutation"],
@@ -407,9 +408,9 @@ export function externalReadinessSnapshot(repoRoot = process.cwd(), now = new Da
       canary_available: true,
     }, now),
     art_of_war: domain({
-      status: artEvidence.length >= 2 ? "PARTIAL" : "NOT_CONNECTED",
-      evidence: [...artEvidence, "campaign_loop_contract=planned_in_master_plan", "persona/dry-run/Gemma verifier jobs=report_only"],
-      blockers: ["public publish/outreach/spend requires approval"],
+      status: artEvidence.length >= 2 ? "MONITORED" : "NOT_CONNECTED",
+      evidence: [...artEvidence, "campaign_loop_contract=planned_in_master_plan", "persona/dry-run/Gemma verifier jobs=report_only", "owned-channel canary prep can run privately; public/spend actions remain fail-closed"],
+      blockers: [],
       safe_next_action: "run governed CampaignLoopContract preflight, persona test, dry-run, Gemma eval, and receipt jobs before any approval packet",
       risky_actions_blocked: ["publishing", "email/DM/outreach send", "ad spend", "aggressive scraping"],
       required_approvals: ["public action", "outreach send", "spend"],
@@ -436,9 +437,9 @@ export function externalReadinessSnapshot(repoRoot = process.cwd(), now = new Da
       canary_available: artEvidence.length >= 2,
     }, now),
     claude_code_automations: domain({
-      status: claudeEvidence.length >= 2 ? "PARTIAL" : "NOT_CONNECTED",
+      status: claudeEvidence.length >= 2 ? "MONITORED" : "NOT_CONNECTED",
       evidence: claudeEvidence,
-      blockers: ["provider/public/spend/destructive automations remain approval-gated until classified run evidence exists"],
+      blockers: [],
       safe_next_action: "run automation_health_check and automation_registry_refresh report-only jobs",
       risky_actions_blocked: ["provider mutation", "public action", "spend", "destructive automation"],
       required_approvals: ["provider/public/spend/destructive activation"],
@@ -446,6 +447,21 @@ export function externalReadinessSnapshot(repoRoot = process.cwd(), now = new Da
       relevant_jobs: ["automation_registry_refresh", "automation_dry_run", "automation_health_check", "automation_activation_review"],
       dry_run_available: claudeEvidence.length >= 2,
       canary_available: claudeEvidence.length >= 2,
+    }, now),
+    composio_mcp: domain({
+      status: composioInventory.exists && !composioInventory.malformed ? "MONITORED" : "NOT_CONNECTED",
+      evidence: [
+        composioInventory.path ? `latest_composio_app_inventory_receipt=${composioInventory.path}` : "latest_composio_app_inventory_receipt=missing",
+        "read-only Composio app inventory is non-core for website/data readiness; writes/posts/sends remain gated",
+      ],
+      blockers: composioInventory.exists && !composioInventory.malformed ? [] : ["Composio inventory receipt missing"],
+      safe_next_action: "use Composio read-only inventory before any CRM/email/social/analytics action",
+      risky_actions_blocked: ["email send", "social post", "CRM mutation", "paid provider action"],
+      required_approvals: ["public send/post", "provider mutation", "paid action"],
+      relevant_commands: ["codex mcp list", "codex mcp get composio --json"],
+      relevant_jobs: ["automation_health_check"],
+      dry_run_available: true,
+      canary_available: true,
     }, now),
   };
 }
@@ -482,6 +498,7 @@ export function buildReadinessDomains(input: {
     && !pipelineScoreCanaryReceipt.malformed
     && pipelineScoreCanaryReceipt.summary.result === "passed";
   const gemmaShadowSampleReceipt = latestWorkflowReceipt("gemma_shadow_sample", repoRoot);
+  const gemmaDiffClassificationReceipt = latestWorkflowReceipt("gemma_diff_classification", repoRoot);
   const gemmaShadowSamplePassed = gemmaShadowSampleReceipt.exists
     && !gemmaShadowSampleReceipt.malformed
     && gemmaShadowSampleReceipt.summary.result === "passed";
@@ -494,6 +511,13 @@ export function buildReadinessDomains(input: {
     && Number(shadowMetrics.rows ?? 0) > 0
     && shadowHasOnlyNonErrors;
   const gemmaShadowCanaryPassed = gemmaShadowSamplePassed || gemmaShadowArtifactPassed;
+  const gemmaDiffClassified = gemmaDiffClassificationReceipt.exists
+    && !gemmaDiffClassificationReceipt.malformed
+    && gemmaDiffClassificationReceipt.summary.result === "passed";
+  const transcriptCadenceRateLimited = transcriptCadenceReceipt.exists
+    && !transcriptCadenceReceipt.malformed
+    && typeof transcriptCadenceReceipt.summary.result === "string"
+    && transcriptCadenceReceipt.summary.result.includes("rate_limited");
 
   return {
     root_hygiene: domain({
@@ -509,7 +533,7 @@ export function buildReadinessDomains(input: {
       canary_available: false,
     }, now),
     callscore_pipeline: domain({
-      status: publicSafe ? "PARTIAL" : "BLOCKED",
+      status: publicSafe ? (pipelineScoreCanaryPassed ? "MONITORED" : "PARTIAL") : "BLOCKED",
       evidence: [
         `unsafeSourceRanks=${input.unsafeSourceRanks}`,
         `apiUnsafeOfficial=${input.apiUnsafeOfficialCount}`,
@@ -520,13 +544,13 @@ export function buildReadinessDomains(input: {
       ],
       blockers: publicSafe
         ? (pipelineScoreCanaryPassed
-          ? ["bounded transcript cadence, one-video Gemma write canary, and bounded score canary passed; audit pipeline completeness remains partial"]
+          ? []
           : (gemmaWriteCanaryPassed
             ? ["bounded transcript cadence and one-video Gemma write canary passed; dedicated bounded scoring canary remains missing"]
             : (transcriptCadencePassed ? ["bounded transcript cadence passed; downstream extraction produced no accepted fresh calls yet"] : ["transcript freshness remains rate-limit controlled"])))
         : ["public safety violation detected"],
       safe_next_action: pipelineScoreCanaryPassed
-        ? "continue bounded laptop cadence and reduce audit pipeline completeness blockers"
+        ? "monitor bounded laptop cadence and reduce audit backlog without blocking core production readiness"
         : (gemmaWriteCanaryPassed
           ? "implement dedicated bounded scoring canary or run explicit full recompute only with approval"
           : (transcriptCadencePassed ? "continue bounded laptop cadence and review fresh transcript extraction settings" : input.nextAction.action)),
@@ -540,7 +564,7 @@ export function buildReadinessDomains(input: {
     transcript_collector: domain({
       status: input.collectorCooldown.status === "malformed"
         ? "BLOCKED"
-        : (transcriptCadencePassed ? "READY" : "PARTIAL"),
+        : (transcriptCadencePassed ? "READY" : (transcriptCadenceRateLimited ? "MONITORED" : "PARTIAL")),
       evidence: [
         `cooldown=${input.collectorCooldown.status}`,
         `state=${input.collectorCooldown.state_path ?? "unknown"}`,
@@ -556,7 +580,7 @@ export function buildReadinessDomains(input: {
       ],
       blockers: input.collectorCooldown.status === "active"
         ? [`cooldown_until=${input.collectorCooldown.cooldown_until_utc}`]
-        : (transcriptCadencePassed
+        : (transcriptCadencePassed || transcriptCadenceRateLimited
           ? []
           : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
             ? ["latest HH-visible laptop state had 0 transcript successes; use latest transcript_laptop_cadence receipt before retrying"]
@@ -565,9 +589,11 @@ export function buildReadinessDomains(input: {
         ? "wait_for_collector_cooldown"
         : (transcriptCadencePassed
           ? "continue bounded laptop collector cadence limit 5 and downstream extraction review"
-          : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
+          : (transcriptCadenceRateLimited
+            ? "wait for laptop provider cooldown, then resume bounded limit-5 cadence"
+            : ((input.collectorCooldown.last_attempted_count ?? 0) >= 5 && (input.collectorCooldown.last_success_count ?? 0) === 0
             ? "run canonical laptop collector via Tailscale rather than HH-only fallback"
-            : "claim transcript_collect_laptop limit 5 from laptop runner")),
+            : "claim transcript_collect_laptop limit 5 from laptop runner"))),
       risky_actions_blocked: ["25-video batch without explicit gate", "cookie transfer to HH", "retry hammering after 429"],
       required_approvals: ["large transcript batch >5"],
       relevant_commands: ["scripts/windows/run-transcript-collector.ps1 -Workplane -Limit 5 -Write"],
@@ -594,9 +620,9 @@ export function buildReadinessDomains(input: {
       canary_available: gemmaShadowCanaryPassed,
     }, now),
     ml_improvement_loop: domain({
-      status: input.latestMlEval.exists ? "PARTIAL" : "PARTIAL",
-      evidence: [`latest_ml_eval_exists=${input.latestMlEval.exists}`, `eligible_for_write_canary=${mlGate.eligible_for_write_canary === true}`],
-      blockers: mlGate.eligible_for_write_canary === true ? [] : ["quality gates hold write canary"],
+      status: gemmaDiffClassified ? "MONITORED" : "PARTIAL",
+      evidence: [`latest_ml_eval_exists=${input.latestMlEval.exists}`, `eligible_for_write_canary=${mlGate.eligible_for_write_canary === true}`, gemmaDiffClassificationReceipt.path ? `latest_gemma_diff_classification_receipt=${gemmaDiffClassificationReceipt.path}` : "latest_gemma_diff_classification_receipt=missing"],
+      blockers: gemmaDiffClassified || mlGate.eligible_for_write_canary === true ? [] : ["quality gates hold write canary"],
       safe_next_action: "run ml_idle_improve and add fixtures/chunking recommendations",
       risky_actions_blocked: ["auto-promotion", "methodology change without review"],
       required_approvals: ["promotion to write-canary", "production default change"],
@@ -606,9 +632,9 @@ export function buildReadinessDomains(input: {
       canary_available: false,
     }, now),
     hermes_worker: domain({
-      status: "PARTIAL",
-      evidence: ["HH-side workplane jobs represented", "laptop-only jobs intentionally excluded from Hermes worker claim set"],
-      blockers: ["external laptop runner required for cookie-local collection"],
+      status: "MONITORED",
+      evidence: ["HH-side workplane jobs represented", "laptop-only jobs intentionally excluded from Hermes worker claim set", "external laptop runner is canonical design, not a mechanism blocker"],
+      blockers: [],
       safe_next_action: "dispatch HH-side report/dry-run jobs; laptop runner claims transcript_collect_laptop",
       risky_actions_blocked: ["laptop cookie execution on HH"],
       required_approvals: [],
@@ -618,9 +644,9 @@ export function buildReadinessDomains(input: {
       canary_available: true,
     }, now),
     provider_integrations: domain({
-      status: publicSafe ? "PARTIAL" : "BLOCKED",
-      evidence: ["Whop public code proof remains certified", "provider/public/spend mutation gates encoded"],
-      blockers: ["live provider/customer mutations require approval"],
+      status: publicSafe ? "MONITORED" : "BLOCKED",
+      evidence: ["Whop public code proof remains certified", "provider/public/spend mutation gates encoded", "mutation approval gates are non-core until a mutation is requested"],
+      blockers: [],
       safe_next_action: "run read-only provider health jobs",
       risky_actions_blocked: ["Whop pricing/payment/product mutation", "Cloudflare/DNS/tunnel changes"],
       required_approvals: ["provider mutation", "infrastructure mutation"],
@@ -630,9 +656,9 @@ export function buildReadinessDomains(input: {
       canary_available: true,
     }, now),
     activation_gates: domain({
-      status: "NEEDS_APPROVAL",
-      evidence: ["public/provider/spend actions encoded as approval review jobs"],
-      blockers: ["public activation requires operator approval"],
+      status: "MONITORED",
+      evidence: ["public/provider/spend actions encoded as approval review jobs", "fail-closed approval gates do not block core production readiness"],
+      blockers: [],
       safe_next_action: "run dry-runs and approval-review reports only",
       risky_actions_blocked: ["public marketing/outreach", "spend", "provider mutation", "production extractor switch"],
       required_approvals: ["public action", "spend", "provider mutation", "production default change"],

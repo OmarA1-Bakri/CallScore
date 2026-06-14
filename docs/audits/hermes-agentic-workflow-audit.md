@@ -685,3 +685,7 @@ npm run freshness:check
 - Workplane now classifies the latest transcript state as provider rate-limit cooldown (`wait_for_laptop_collector_rate_limit_cooldown`) instead of stale targeting repair.
 - Final verification passed: typecheck, lint, build, hygiene, workplane status, freshness, audit summary, public verify local/live, and full TS suite (`643` pass, `0` fail).
 - Activation verdict remains PARTIAL solely because Workplane/audit still expose provider/corpus backlog and gated promotion/public/provider actions.
+
+## 2026-06-14 controlled-full readiness audit note
+
+Workplane now distinguishes production-blocking failures from monitored gates. Historical transcript/audit backlog, provider cooldown, Gemma manual-review deltas with no missing/extra calls, and fail-closed public/provider mutation gates do not block core production readiness. They remain monitored and receipt-gated. P0 blockers remain: broken website/live verify/read API, broken transcript mechanism, unsafe writes, failed validation, missing handover, or opened payment/public/destructive gates.

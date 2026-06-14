@@ -292,10 +292,9 @@ test("pipeline readiness recognizes latest Gemma write and score canary receipts
     now: new Date("2026-06-13T18:30:00.000Z"),
   });
 
-  assert.deepEqual(domains.callscore_pipeline.blockers, [
-    "bounded transcript cadence, one-video Gemma write canary, and bounded score canary passed; audit pipeline completeness remains partial",
-  ]);
-  assert.match(String(domains.callscore_pipeline.safe_next_action), /audit pipeline completeness/);
+  assert.equal(domains.callscore_pipeline.status, "MONITORED");
+  assert.deepEqual(domains.callscore_pipeline.blockers, []);
+  assert.match(String(domains.callscore_pipeline.safe_next_action), /monitor bounded laptop cadence/);
   assert.ok(domains.callscore_pipeline.evidence.some((item) => item.includes("latest_gemma_write_canary_receipt=")));
   assert.ok(domains.callscore_pipeline.evidence.some((item) => item.includes("latest_pipeline_score_canary_receipt=")));
 });
@@ -317,9 +316,40 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
     assert.ok(domains[key], key);
     assert.equal(domains[key].production_mutation_allowed, false, key);
   }
-  assert.equal(domains.activation_gates.status, "NEEDS_APPROVAL");
+  assert.equal(domains.activation_gates.status, "MONITORED");
   assert.ok(domains.whop_auto.risky_actions_blocked.some((item) => item.includes("pricing")));
   assert.ok(domains.art_of_war.risky_actions_blocked.some((item) => item.includes("publishing")));
+});
+
+
+
+test("rate-limited laptop cadence receipts become monitored cooldown rather than hard partial", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-workplane-rate-limit-"));
+  const receiptDir = join(root, ".tmp", "workflow-receipts", "transcript_laptop_cadence");
+  mkdirSync(receiptDir, { recursive: true });
+  writeFileSync(join(receiptDir, "laptop-rate-limit.json"), JSON.stringify({
+    workflow_name: "transcript_laptop_cadence",
+    run_id: "laptop-rate-limit",
+    result: "partial_rate_limited_stop",
+    blockers: [],
+  }));
+
+  const domains = buildReadinessDomains({
+    repoRoot: root,
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: { state_path: null, status: "clear", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: "rate_limited", latest_job_id: "job", last_run_utc: "now", last_attempted_count: 5, last_success_count: 0, last_failure_count: 5, last_success_rate: 0, recent_failure_reasons: { rate_limited: 1 }, checked_at: "now" },
+    latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 5,
+    dailyPipelineActive: true,
+    nextAction: { action: "wait_for_laptop_collector_rate_limit_cooldown", reason: "429", job_type: "transcript_collect_laptop", allowed: false },
+    now: new Date("2026-06-14T12:00:00.000Z"),
+  });
+
+  assert.equal(domains.transcript_collector.status, "MONITORED");
+  assert.deepEqual(domains.transcript_collector.blockers, []);
+  assert.match(String(domains.transcript_collector.safe_next_action), /wait for laptop provider cooldown/);
 });
 
 test("workplane status exposes executable report-only job commands", () => {

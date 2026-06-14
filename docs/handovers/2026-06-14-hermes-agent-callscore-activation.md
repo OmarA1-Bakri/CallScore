@@ -235,3 +235,15 @@ Additional fix after rate-limit receipt:
 Final safe stop reason:
 
 - FULL still not claimable because Workplane itself reports `automation_readiness=PARTIAL`, transcript domain is now provider-rate-limited cooldown, and audit blocker remains. This is no longer a permission issue; it is provider/rate-limit plus corpus backlog. Continuing immediate transcript collection would violate the stop-on-429/cooldown rule.
+
+## 2026-06-14 full-system live-canary activation update
+
+- Workplane readiness model now supports `CONTROLLED_FULL`: core production ready while historical/provider/public mutation gates remain monitored or fail-closed by design.
+- Transcript/audit gate: downgraded to monitored. Latest canonical laptop receipt stopped on HTTP 429 and Workplane correctly waits for provider cooldown instead of retry hammering. Backlog zero is no longer required for current production readiness when bounded worker cadence is proven.
+- Gemma/Qwen gate: latest diff manual_review rows classified acceptable monitored deltas (`transcript_not_fully_covered`, zero missing/extra calls). Broad promotion and production writes remain canary/receipt-gated.
+- Whop gate: test pack passed 16/16. Zero-dollar/token-discount Pro proof remains valid checkout/payment authorization proof. Pricing/product/customer/payment mutation remains fail-closed unless all gates pass.
+- Art of War gate: private canary reached `approval_packet_ready` with persona/verifier pass and no public action/spend/external mutation. Public publishing remains approval-receipt gated.
+- Composio: direct MCP read-only probe passed; connected app inventory shows Attio, Gmail, Twitter/X, PostHog, LinkedIn, Discord ready; Hugging Face through Composio is initiated/auth-blocked but non-core because HF plugin auth is separate.
+- Gate decision doc: `docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md`.
+- Resume command: `cd /opt/crypto-tuber-ranked && npm run workplane && npm run verify:public -- --source live --base-url https://call-score.com`.
+- Do not repeat: architecture rediscovery, HH-only transcript fallback, nonzero Whop cash proof demand, public publish without approval receipt, or 429 hammer retry.

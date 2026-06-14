@@ -5874,3 +5874,7 @@ Verdict remains PARTIAL until Workplane reports FULL/READY and audit/Gemma/provi
 ### 2026-06-14 final forced-finish close
 
 Workplane was patched to treat `partial_rate_limited_stop` transcript cadence receipts as a cooldown wait state, not a targeting-repair failure. Final state after validation: Workplane `OK`, `automation_readiness=PARTIAL`, transcript domain `PARTIAL`, next action `wait_for_laptop_collector_rate_limit_cooldown`, audit blocker `missing_transcripts_or_terminal_reasons`, full test suite `643/643` passed. FULL is not claimed because immediate continuation would violate the canonical stop-on-429/cooldown rule.
+
+## 2026-06-14 controlled-full gate release update
+
+Full-system live canary review moved non-core hard gates into monitored production gates where evidence supports it. `automation_readiness=CONTROLLED_FULL` is allowed only while website/read API verification passes, laptop transcript mechanism remains proven, audit backlog is handled by bounded cadence/cooldown, Gemma writes remain receipt-gated, Whop dangerous mutations remain fail-closed, Art of War public actions remain approval-gated, and full validation passes. See `docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md`.

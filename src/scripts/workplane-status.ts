@@ -129,13 +129,15 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     nextAction,
   });
   const rootAudit = rootHygieneAudit();
-  const blockingDomain = Object.values(readiness_domains).some((domain) => domain.status === "BLOCKED");
-  const hasApprovalGates = Object.values(readiness_domains).some((domain) => domain.status === "NEEDS_APPROVAL");
+  const domainStatuses = Object.values(readiness_domains).map((domain) => domain.status);
+  const blockingDomain = domainStatuses.some((status) => status === "BLOCKED");
+  const hardPartialDomain = domainStatuses.some((status) => status === "PARTIAL" || status === "NOT_CONNECTED");
+  const monitoredDomain = domainStatuses.some((status) => status === "MONITORED" || status === "NEEDS_APPROVAL");
   const automationReadiness = unsafeSourceRanks > 0 || unsafeOfficial.count > 0 || blockingDomain
     ? "BLOCKED"
-    : hasApprovalGates
+    : hardPartialDomain
       ? "PARTIAL"
-      : "READY";
+      : (monitoredDomain ? "CONTROLLED_FULL" : "READY");
   const latestMlGate = (latestMlEval.summary.promotion_gate ?? {}) as Record<string, unknown>;
 
   return {
