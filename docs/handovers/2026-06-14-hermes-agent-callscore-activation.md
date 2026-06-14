@@ -159,3 +159,46 @@ npm run audit:pipeline -- --summary --allow-partial-shadow
 ```
 
 Then run next bounded laptop cadence batch or terminal-reason classifier only if safe. Keep all promotion, public, spend, and provider mutation gates closed.
+
+## 2026-06-14T11:10Z Final readiness execution update
+
+Verdict remains **PARTIAL**: no P0 blockers found, but FULL is not justified while audit corpus completeness and public/provider gates remain P1.
+
+Fresh evidence collected in this run:
+
+- Website: `npm run verify:public -- --source live --base-url https://call-score.com` passed; `/api/health` returned `ok=true`, source `hh_read_api`; `/creator/99bitcoins` returned HTTP 200.
+- Transcript cadence: canonical laptop/Tailscale collector ran `Limit 5` via Omar laptop. Result: 4 available transcripts and 1 terminal `no_captions` failure; receipt `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-final2-20260614T105522Z.json`.
+- Audit pipeline: after fresh laptop batch, `missing_transcripts` improved from 99 creators to 98 creators; `terminalCoverage.transcriptVideos` improved to 3860; blocker remains `missing_transcripts_or_terminal_reasons`.
+- Gemma/Qwen: local Ollama artifact-only run `gemma-final-shadow-20260614T110138Z` processed 5/5 videos, accepted 2 calls, errors none=5; diff status remains `manual_review=5`; receipts written under `.tmp/workflow-receipts/gemma_shadow_sample/` and `.tmp/workflow-receipts/gemma_shadow_diff/`.
+- Workplane: patched stale next-action logic so a passed `transcript_laptop_cadence` receipt suppresses the old HH-local zero-success collector-state repair recommendation; targeted `tests/workplane-jobs.test.ts` passed 15/15.
+- Composio: active connection inventory confirmed for Attio CRM, Gmail/email, Twitter/X, PostHog, LinkedIn, and Discord; Hugging Face plugin identity is authenticated. Treat Hugging Face via Composio as needing explicit Composio-tool surfacing/reload if required by an automation lane.
+- Art of War: private dry-run ran and stayed fail-closed with `decision=revise_or_hold`, `failure_class=audience_mismatch`, no public action and no spend.
+- Whop: targeted Whop tests passed 16/16; discounted/tokenized Pro renewal proof remains accepted; no live provider/customer/payment/pricing mutation performed.
+
+Remaining P1:
+
+1. Continue bounded laptop transcript batches and terminal-reason classification until audit blocker is reduced or exact exhaustion is documented.
+2. Review Gemma diff rows before any write canary or promotion.
+3. Fix/approve Art of War owned-channel publish packet before public action.
+4. Keep Whop/provider/customer/payment/pricing and public/spend actions behind manifest/diff/rollback/receipt/local-auth gates.
+
+Hermes next command:
+
+```bash
+cd /opt/crypto-tuber-ranked
+set -a; . ./.env.hermes >/dev/null 2>&1; set +a
+npm run workplane:status
+npm run audit:pipeline -- --summary --allow-partial-shadow
+npm run freshness:check
+```
+
+## 2026-06-14T11:18Z Validation close
+
+Fresh close-out evidence:
+
+- `npm run workplane:status`: `status=OK`, `automation_readiness=PARTIAL`, next autonomous action `start_artofwar_internal_growth_intelligence`; transcript collector `READY` from latest cadence receipt despite stale HH-local zero-success state.
+- `npm run freshness:check`: `status=WARN`, `blockers=[]`; warnings are provider credential missing failures=2 and legacy yt-dlp bot verification failures=9; latest transcript success age was under 1 hour.
+- Full validation already completed in this run: `git diff --check`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run hygiene`, `npm run audit:pipeline -- --summary --allow-partial-shadow`, `npm run verify:public`, `npm run verify:public -- --source live --base-url https://call-score.com`, and `node --import tsx --test $(find tests -name '*.test.ts' | sort)` all passed except audit still reports the known P1 blocker `missing_transcripts_or_terminal_reasons`.
+- Current commit is pending from this handover update; resolve exact commit with `git log -1 --oneline` after final commit.
+
+Hermes must not repeat architecture discovery. Resume only from bounded audit reduction, Gemma diff review, Art of War owned-channel approval packet repair, or Whop/provider gated checks.

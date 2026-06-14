@@ -35,6 +35,7 @@ export interface WorkplaneDecisionInput {
   readonly transcriptBacklogRecent30d: number;
   readonly collectorLastAttemptedCount: number | null;
   readonly collectorLastSuccessCount: number | null;
+  readonly latestTranscriptCadencePassed?: boolean;
 }
 
 export interface WorkplaneDecision {
@@ -191,7 +192,7 @@ export function latestMlEvalArtifact(root: string | readonly string[] = ["/tmp/c
 }
 
 
-function latestWorkflowReceipt(workflow: string, repoRoot = process.cwd()): ArtifactSummary {
+export function latestWorkflowReceipt(workflow: string, repoRoot = process.cwd()): ArtifactSummary {
   const dir = join(repoRoot, ".tmp", "workflow-receipts", workflow);
   const path = latestFile(dir, (name) => name.endsWith(".json"));
   if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
@@ -265,7 +266,7 @@ export function decideNextAutonomousAction(input: WorkplaneDecisionInput): Workp
   if (input.collectorCooldown.status === "malformed") {
     return { action: "repair_or_replace_collector_state", reason: "collector cooldown state is malformed", job_type: "transcript_collect_laptop", allowed: false };
   }
-  if ((input.collectorLastAttemptedCount ?? 0) >= 5 && (input.collectorLastSuccessCount ?? 0) === 0) {
+  if (!input.latestTranscriptCadencePassed && (input.collectorLastAttemptedCount ?? 0) >= 5 && (input.collectorLastSuccessCount ?? 0) === 0) {
     return {
       action: "repair_transcript_targeting_or_failure_classification",
       reason: "latest bounded laptop batch had zero transcript successes; avoid blind retry and inspect targeting/failure detail",
