@@ -1,16 +1,16 @@
 # Whop-Auto Commerce Certification Pack
 
 Date: 2026-06-11
-Status: provider dashboard corrected; checkout, OAuth, webhook target, product inventory, and entitlement access semantics certified; live paid-purchase proof not performed.
+Status: provider dashboard corrected; checkout, OAuth, webhook target, product inventory, entitlement access semantics, and operator-provided zero-dollar Pro renewal proof certified; nonzero paid-revenue capture proof not performed.
 Scope: CallScore Whop checkout, OAuth, entitlement, webhook, and revenue-event operating proof.
 
 ## Certification Verdict
 
-`CERTIFY WHOP COMMERCE LIVE: YES / PROVIDER CONFIG PROOF PASS / LIVE PURCHASE NOT RUN`
+`CERTIFY WHOP COMMERCE LIVE: YES / PROVIDER CONFIG PROOF PASS / ZERO-DOLLAR PRO RENEWAL PROOF OBSERVED / NONZERO PAID REVENUE NOT RUN`
 
 Repository code has canonical-domain checkout, OAuth, session-tier, and webhook primitives. Approved provider API evidence on 2026-06-11 corrected the public Whop app dashboard URL/callback drift, certified the four product/plan checkout resources, certified the webhook target URL, and proved live Whop access checks against current product resources. No pricing, payment, product, or plan economics were changed.
 
-Live paid-purchase proof was not performed; current certification relies on provider reads plus live access-check semantics for existing non-destructive membership states.
+Nonzero paid-revenue proof was not performed; current certification relies on provider reads, live access-check semantics for existing non-destructive membership states, and the 2026-06-14 operator-provided zero-dollar Pro renewal screenshot evidence below.
 
 
 ## 2026-06-11 Safe Certification Start Evidence
@@ -85,6 +85,31 @@ Whop Auto receipts from this run:
 - `.tmp/workflow-receipts/whop_entitlement_sync/whop-entitlement-sync-20260614T051426Z.json`
 - `.tmp/workflow-receipts/whop_webhook_verify/whop-webhook-verify-20260614T051426Z.json`
 - `.tmp/workflow-receipts/whop_activation_review/whop-activation-review-20260614T051415Z.json` (`blocked` by live mutation/purchase gate)
+
+## 2026-06-14 Operator-Provided Zero-Dollar Pro Renewal Proof
+
+Status: `LIVE ZERO-DOLLAR PRO RENEWAL OBSERVED — NONZERO PAID REVENUE CAPTURE STILL NOT PROVEN`.
+
+Evidence was retrieved from the operator laptop over the approved Tailscale/SSH path and inspected locally without printing private fields. The ignored private artifact is:
+
+- `.tmp/private-evidence/whop-purchase-proof/whatsapp-image-2026-06-07-221016.jpeg`
+
+Redacted receipt:
+
+- `.tmp/workflow-receipts/whop_live_purchase_proof/whop-zero-dollar-pro-renewal-screenshot-20260614T065913Z.json`
+
+Non-sensitive observed fields:
+
+- provider surface: Whop payment detail screenshot;
+- company: CallScore;
+- product: Pro;
+- status: Succeeded;
+- type: Renewal;
+- amount paid: `US$0.00`;
+- method brand: Mastercard;
+- displayed payment datetime: `2026-06-06 22:20` as shown in the screenshot.
+
+Private fields such as email, payment id, customer identity, and card last digits were not printed or committed. This closes the zero-dollar live renewal proof gap, but it is not evidence of a nonzero paid purchase or revenue settlement.
 
 Current Whop Auto operating rule:
 

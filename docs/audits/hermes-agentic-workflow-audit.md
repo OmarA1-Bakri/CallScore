@@ -580,6 +580,7 @@ Whop Auto gate status:
 | Manifest diff | READY_WITH_GATES | manifest exists at `/opt/crypto-tuber-ranked/.whop-pipeline.json` |
 | Entitlement dry-run | READY_WITH_GATES | repo tests cover product-resource entitlement semantics |
 | Webhook safe replay | READY_WITH_GATES | fixture route tests remain required before changes |
+| Zero-dollar Pro renewal proof | READY | operator-provided Whop screenshot inspected locally via Tailscale; receipt `.tmp/workflow-receipts/whop_live_purchase_proof/whop-zero-dollar-pro-renewal-screenshot-20260614T065913Z.json`; private fields redacted |
 | Live mutation | BLOCKED_BY_GATE | requires manifest, diff, rollback, approval receipt, local auth, and explicit safe mutation classification |
 
 
@@ -590,6 +591,7 @@ Whop Auto receipts from this run:
 - `.tmp/workflow-receipts/whop_entitlement_sync/whop-entitlement-sync-20260614T051426Z.json`
 - `.tmp/workflow-receipts/whop_webhook_verify/whop-webhook-verify-20260614T051426Z.json`
 - `.tmp/workflow-receipts/whop_activation_review/whop-activation-review-20260614T051415Z.json` (`blocked` by live mutation/purchase gate)
+- `.tmp/workflow-receipts/whop_live_purchase_proof/whop-zero-dollar-pro-renewal-screenshot-20260614T065913Z.json` (`passed_with_scope_note`: live zero-dollar Pro renewal, not nonzero paid-revenue capture)
 
 Remaining TD:
 

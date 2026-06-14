@@ -5760,6 +5760,7 @@ Evidence:
 - HH local PostgreSQL / HH Read API remains canonical data source; Neon remains defunct/stale backup compatibility only.
 - Whop Auto provider mutations remain fail-closed unless manifest-backed, diff-reviewed, rollback-documented, receipt-gated, locally authenticated, and explicitly safe.
 - Added regression coverage in `tests/infrastructure-canonical.test.ts` so a present Whop Auto registry must target `/opt/crypto-tuber-ranked`.
+- Operator-provided live Whop zero-dollar Pro renewal proof was retrieved from the laptop over Tailscale and inspected locally on 2026-06-14. Redacted receipt: `.tmp/workflow-receipts/whop_live_purchase_proof/whop-zero-dollar-pro-renewal-screenshot-20260614T065913Z.json`. The screenshot shows CallScore Pro, succeeded renewal, amount `US$0.00`; private fields were not printed or committed. This proves a live zero-dollar renewal/payment event, not nonzero paid-revenue capture.
 
 
 Whop Auto receipts from this run:
@@ -5769,12 +5770,13 @@ Whop Auto receipts from this run:
 - `.tmp/workflow-receipts/whop_entitlement_sync/whop-entitlement-sync-20260614T051426Z.json`
 - `.tmp/workflow-receipts/whop_webhook_verify/whop-webhook-verify-20260614T051426Z.json`
 - `.tmp/workflow-receipts/whop_activation_review/whop-activation-review-20260614T051415Z.json` (`blocked` by live mutation/purchase gate)
+- `.tmp/workflow-receipts/whop_live_purchase_proof/whop-zero-dollar-pro-renewal-screenshot-20260614T065913Z.json` (`passed_with_scope_note`: zero-dollar Pro renewal proof; nonzero paid-revenue proof remains unproven)
 
 
 Remaining blockers:
 
 - P1: `audit:pipeline` corpus completeness (`missing_publication_dates`, `missing_transcripts_or_terminal_reasons`).
-- P1: Whop Auto provider/live-purchase proof is still gated; no hidden pricing/product/customer/payment mutation was performed.
+- P1: Whop Auto nonzero paid-revenue proof and any future provider/customer/payment/pricing mutation remain gated; zero-dollar Pro renewal proof is now recorded.
 - P1: Art of War owned-channel setup/publish gate remains operator-selected and receipt-gated.
 - P2: stale mirror archive/delete and secret-bearing artifact rotation/quarantine review require separate cleanup/rotation approval.
 
