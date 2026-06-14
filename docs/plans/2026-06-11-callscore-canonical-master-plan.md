@@ -5696,3 +5696,54 @@ Validation after bounded score canary:
 - Targeted Workplane and compute-score CLI tests pass.
 
 Current activation state remains **PARTIAL** because `audit:pipeline` still reports broader completeness blockers (`missing_publication_dates`, `missing_transcripts_or_terminal_reasons`, `pending_shadow_recheck`) and Composio/Art of War remain gated. The core connected data path is now proven end-to-end at canary scale: laptop transcript ingest → Gemma shadow/diff → one-video write canary → bounded match canary → bounded score canary.
+
+---
+
+## 2026-06-14 Production readiness push / third-party inventory
+
+Strict verdict: **PARTIAL, with no current P0 blocker for safe website/read-only/dry-run operation**. FULL revenue/marketing operation still depends on provider/account setup and corpus-completeness work, but the core website, canonical transcript lane, and bounded model/data canary path are operational.
+
+Fresh evidence from this run:
+
+- Baseline repo: `master` at `7b21f3f` when the run started; tree was clean before the new Workplane/docs patch.
+- Live website verification passed: `npm run verify:public -- --source live --base-url https://call-score.com`.
+- Live health passed: `/api/health` returned `ok=true`, `db=ok`, `source=hh_read_api`.
+- Public creator API leak check passed for creator `93`: no public/free `target_price` leak for known target values `1700`, `60`, or `55000`.
+- Canonical laptop transcript collector was used first over Tailscale to `omarslaptop-1`; HH received transcript JSON/results only.
+- Bounded laptop collector result: attempted `5`, available transcripts `5/5` for `-ULpSxZXxHI`, `J6vyR9Z9yW0`, `1hrA9NUZ-WE`, `kyq3QiXi6nI`, and `tv7cTi3xSqU`.
+- Transcript receipt: `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-20260614T035559Z.json`.
+- Fresh Gemma/Qwen artifact-only shadow over the new laptop batch completed with `5` rows, `1` accepted call, and `0` failed records.
+- Shadow diff completed with `no_accepted_calls=4` and `manual_review=1`; no production promotion/write was performed.
+- Workplane Gemma readiness was corrected so successful bounded `gemma_shadow_sample` receipts and clean artifacts mark `gemma_shadow_extraction` as `READY` while promotion/write stays approval-gated.
+- `npm run audit:pipeline -- --summary --allow-partial-shadow` still reports corpus-completeness blockers: `missing_publication_dates` and `missing_transcripts_or_terminal_reasons`.
+- Bounded publication-date dry-run (`limit=3`, no write) could not find source dates for video ids `6548`, `6553`, and `8000`, so this remains a data/source blocker rather than a code fix.
+- Whop targeted tests pass and mutation paths remain fail-closed; no Whop mutation was performed.
+- Art of War private dry-run remains fail-closed with `safety_gate_blocked` / audience-fit issues; no public action, outreach, external mutation, or spend occurred.
+
+Third-party app/account inventory:
+
+| Provider/app | Purpose | Required for FULL now | Current status | Operator setup required | Blocking level |
+| --- | --- | --- | --- | --- | --- |
+| Netlify `call-score` | production website/deploy | yes | configured/live healthy | keep deploy token/project access available for clean commits | P0 only if deploy auth lost |
+| HH PostgreSQL + HH read API | canonical data store and public read source | yes | configured/healthy | maintain credentials in local/provider secret store only | P0 if unavailable |
+| Tailscale + SSH bridge | HH to Omar laptop transcript lane | yes for transcript cadence | configured/proven | keep laptop online and Tailscale connected | P1 operational dependency |
+| Omar laptop browser cookies + `yt-dlp` | residential transcript collection | yes for current transcript cadence | configured/proven | keep cookies/browser usable; optionally install impersonation extras if warnings recur | P1 |
+| Local Ollama models | Gemma/Qwen extraction | yes for local zero-cost extraction | configured/proven | keep `callscore-gemma4-extractor` and `callscore-qwen25-3b-extractor` available | P1 |
+| Whop | revenue, plans, entitlements, webhooks | yes for paid revenue | tests/gates configured; live mutation not performed | configure/verify production app/products/plans/webhooks via manifest-backed, diff-reviewed, rollback-documented receipt | P1 |
+| Owned marketing channels | Art of War owned-channel distribution | needed for marketing launch | not selected/approved in this run | operator selects owned channels and grants explicit publish receipt only after private verifier/persona pass | P1 |
+| Resend/email | alerts/email if enabled | no for current safe operation | referenced/config-gated | configure only if email alerts are desired | P2 |
+| Sentry/analytics/SEO tools | observability/marketing analytics | no for current safe operation | optional/reference only | configure if monitoring/SEO reporting is desired | P2 |
+| GitHub | source/PR/CI/push workflows | no for local operation; useful for release flow | repo present | ensure deploy branch/push access if CI release is required | P2 |
+| OpenRouter/NVIDIA NIM/Gemini/Groq | optional cloud model providers | no | optional lanes; local Ollama works | configure only if choosing paid/free external model fallback | deferred |
+| Composio | optional external app automation | no, unless future repo evidence makes it essential | deferred; new account needed | create/configure outside chat if desired, then run read-only probe | deferred |
+
+Current remaining blockers:
+
+- **P0:** none for safe public website, target-price monetization, read-only/dry-run operation, canonical laptop transcript cadence, or bounded model/data canaries.
+- **P1:** audit pipeline corpus completeness: missing publication dates and missing transcripts/terminal reasons remain at historical scale.
+- **P1:** Whop production revenue activation requires operator provider setup and manifest/rollback/receipt-gated live checks before any mutation.
+- **P1:** Art of War public/owned-channel launch requires content revision, persona/verifier pass, selected owned-channel app setup, and explicit publish approval receipt.
+- **P1:** production shadow promotion remains approval-gated; current evidence supports bounded canaries, not broad autonomous promotion.
+- **P2:** optional Composio, external model providers, email, analytics, and SEO tooling are not required for current FULL core operation unless intentionally added to scope.
+
+Next exact safe action: reduce `audit:pipeline` completeness blockers by adding bounded terminal-reason handling for known unavailable transcript/publication-date cases, then rerun `audit:pipeline`, `workplane:status`, `freshness:check`, and live `verify:public`. In parallel, prepare Whop manifest/live setup checklist for the operator; do not mutate Whop until the manifest diff, rollback, and approval receipt exist.

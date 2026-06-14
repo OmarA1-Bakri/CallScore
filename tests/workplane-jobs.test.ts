@@ -133,6 +133,38 @@ test("artifact readers summarize Gemma shadow and ML reports without throwing on
   assert.equal(latestGemmaShadowArtifact(dir).malformed, true);
 });
 
+test("Gemma readiness trusts bounded shadow sample receipts and clean artifacts", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-gemma-shadow-receipt-"));
+  const receiptDir = join(root, ".tmp", "workflow-receipts", "gemma_shadow_sample");
+  mkdirSync(receiptDir, { recursive: true });
+  writeFileSync(join(receiptDir, "gemma-laptop-batch3.json"), JSON.stringify({
+    workflow_name: "gemma_shadow_sample",
+    run_id: "gemma-laptop-batch3",
+    result: "passed",
+    artifact_path: ".tmp/shadow-extraction/gemma-laptop-batch3.jsonl",
+    blockers: [],
+  }));
+
+  const domains = buildReadinessDomains({
+    repoRoot: root,
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: { state_path: null, status: "clear", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, latest_job_id: null, last_run_utc: null, last_attempted_count: 0, last_success_count: 0, last_failure_count: 0, last_success_rate: null, recent_failure_reasons: {}, checked_at: "now" },
+    latestGemmaShadow: { path: ".tmp/shadow-extraction/gemma-laptop-batch3.jsonl", exists: true, modified_at: "now", malformed: false, summary: { rows: 5, accepted_calls: 1, errors: { none: 5 } } },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 0,
+    dailyPipelineActive: true,
+    nextAction: { action: "none", reason: "test", job_type: "gemma_shadow_extract", allowed: true },
+    now: new Date("2026-06-14T04:10:00.000Z"),
+  });
+
+  assert.equal(domains.gemma_shadow_extraction.status, "READY");
+  assert.deepEqual(domains.gemma_shadow_extraction.blockers, []);
+  assert.equal(domains.gemma_shadow_extraction.canary_available, true);
+  assert.match(String(domains.gemma_shadow_extraction.safe_next_action), /shadow diff/);
+  assert.ok(domains.gemma_shadow_extraction.evidence.some((item) => item.includes("latest_gemma_shadow_sample_receipt=")));
+});
+
 test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe work", () => {
   const base = {
     unsafeSourceRanks: 0,

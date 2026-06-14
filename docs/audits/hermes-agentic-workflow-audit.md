@@ -496,3 +496,64 @@ Readiness impact:
 - Result: `considered_calls=1`, `scored_calls=0`, which is acceptable for the promoted watch call because it is not public-score mature/eligible yet.
 - Receipt: `.tmp/workflow-receipts/pipeline_score_canary/score-video20290-20260613T190556Z.json`.
 - Workplane now recognizes latest score-canary receipt and reports the pipeline blocker as audit-completeness, not missing scoring canary.
+
+---
+
+## 2026-06-14 production-readiness update
+
+Verdict: **PARTIAL**, but with no P0 blocker for safe public website/read-only/dry-run operation. The remaining blockers are P1 provider/account setup and corpus-completeness work, not target-price safety or core canary-path failures.
+
+### Evidence
+
+| Area | Result | Evidence |
+| --- | --- | --- |
+| Live public verify | PASS | `npm run verify:public -- --source live --base-url https://call-score.com` |
+| Live health | PASS | `/api/health`: `ok=true`, `db=ok`, `source=hh_read_api` |
+| Target-price leak | PASS | creator `93` has no public/free target leak for `1700`, `60`, `55000` |
+| Canonical laptop transcript batch | PASS, `5/5` available | `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-20260614T035559Z.json` |
+| New transcript ids | `-ULpSxZXxHI`, `J6vyR9Z9yW0`, `1hrA9NUZ-WE`, `kyq3QiXi6nI`, `tv7cTi3xSqU` | DB readback via approved local environment; no secrets printed |
+| Fresh Gemma/Qwen shadow | PASS artifact, `5` rows, `1` accepted, `0` failed | `.tmp/workflow-receipts/gemma_shadow_sample/gemma-laptop-batch3-20260614T035712Z.json` |
+| Shadow diff | PASS, `manual_review=1`, `no_accepted_calls=4` | `.tmp/workflow-receipts/gemma_shadow_diff/gemma-laptop-batch3-20260614T035712Z.json` |
+| Workplane Gemma readiness | READY after patch | `src/lib/workplane-status.ts`; `tests/workplane-jobs.test.ts` |
+| Audit pipeline | PARTIAL | `missing_publication_dates`, `missing_transcripts_or_terminal_reasons` |
+| Publication-date bounded dry-run | BLOCKED by missing source dates | video ids `6548`, `6553`, `8000`; no write |
+| Whop/revenue gates | READY_WITH_GATES | targeted Whop tests pass; mutation still approval-gated |
+| Art of War | READY_WITH_GATES / held | private dry-run blocked by safety/audience; no public action/spend |
+
+### Third-party app inventory
+
+| Provider/app | Required for FULL now | Required lane | Current status | Operator setup action | Blocker |
+| --- | --- | --- | --- | --- | --- |
+| Netlify | yes | website/deploy | live healthy | keep project/deploy access available | none now |
+| HH PostgreSQL + HH read API | yes | public data/API | healthy | maintain secret-store credentials only | none now |
+| Tailscale + SSH laptop bridge | yes | transcript cadence | proven | keep `omarslaptop-1` online/reachable | operational P1 |
+| Omar laptop Firefox/browser cookies | yes | transcript cadence | proven | keep cookies valid; no cookie values leave laptop | operational P1 |
+| YouTube/yt-dlp laptop lane | yes | transcript cadence | proven with warnings | optionally install/refresh impersonation extras if warnings become failures | P2 |
+| Local Ollama/Gemma/Qwen | yes | extraction | proven | keep local models available | none now |
+| Whop | yes for revenue | entitlements/webhooks/revenue | tests/gates only | configure live app/products/plans/webhooks via manifest-backed approval receipt | P1 |
+| Owned marketing channels | needed for launch | Art of War | not selected/approved | choose channels and grant publish receipt after verifier/persona pass | P1 |
+| GitHub | useful | release/CI | repo available | ensure push/CI access if used | P2 |
+| Resend/email | optional | alerts | referenced/config-gated | configure only if alerts desired | P2 |
+| Sentry/analytics/SEO | optional | monitoring/SEO | optional | configure if desired | P2 |
+| External model providers | optional | fallback extraction | not needed now | configure only if intentionally adding cloud fallback | deferred |
+| Composio | optional/deferred | app automation | not essential to current operation | create/configure new account outside chat if later needed | deferred |
+
+### Updated readiness map
+
+- Website: **READY**.
+- Canonical laptop transcript pipeline: **READY_WITH_GATES**; HH-only yt-dlp/ASR remains diagnostic/fallback.
+- Data pipeline: **READY_WITH_GATES at canary scale**, still **PARTIAL** for whole-corpus audit completeness.
+- Gemma/Qwen: **READY_WITH_GATES** for artifact shadow/diff and bounded canaries; broad promotion remains approval-gated.
+- Whop Auto: **READY_WITH_GATES** for tests/read-only/dry-run; live revenue mutation requires provider setup and approval receipt.
+- Art of War: **READY_WITH_GATES** for private dry-run; public/owned-channel action requires revised content, selected channel, and publish approval receipt.
+- Composio: **DEFERRED**, not essential unless future repo evidence makes it required.
+
+### Remaining blockers
+
+- P1: `audit:pipeline` corpus completeness: missing publication dates and missing transcript terminal reasons.
+- P1: Whop production provider setup/verification before revenue mutations.
+- P1: Art of War owned-channel setup plus content/persona/verifier pass before publication.
+- P1: broad Gemma production promotion remains gated.
+- P2: optional Composio/email/analytics/external model provider integrations.
+
+Next exact safe action: implement bounded terminal-reason classification for known unavailable publication-date/transcript cases, rerun `audit:pipeline`, and keep Whop/public marketing actions behind manifest/receipt approval gates.

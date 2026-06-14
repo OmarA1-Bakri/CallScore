@@ -143,7 +143,7 @@ function latestFile(root: string | readonly string[], predicate: (name: string) 
 }
 
 export function latestGemmaShadowArtifact(root: string | readonly string[] = ["/tmp/callscore-shadow-extractions", ".tmp/shadow-extraction"]): ArtifactSummary {
-  const path = latestFile(root, (name) => name.endsWith(".jsonl") && (name.includes("gemma-shadow") || name.includes("shadow")) && !name.includes(".diff"));
+  const path = latestFile(root, (name) => name.endsWith(".jsonl") && (name.includes("gemma") || name.includes("shadow")) && !name.includes(".diff"));
   if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
   try {
     const lines = readFileSync(path, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -471,6 +471,19 @@ export function buildReadinessDomains(input: {
   const pipelineScoreCanaryPassed = pipelineScoreCanaryReceipt.exists
     && !pipelineScoreCanaryReceipt.malformed
     && pipelineScoreCanaryReceipt.summary.result === "passed";
+  const gemmaShadowSampleReceipt = latestWorkflowReceipt("gemma_shadow_sample", repoRoot);
+  const gemmaShadowSamplePassed = gemmaShadowSampleReceipt.exists
+    && !gemmaShadowSampleReceipt.malformed
+    && gemmaShadowSampleReceipt.summary.result === "passed";
+  const shadowErrorSummary = (shadowMetrics.errors && typeof shadowMetrics.errors === "object" && !Array.isArray(shadowMetrics.errors))
+    ? shadowMetrics.errors as Record<string, unknown>
+    : {};
+  const shadowHasOnlyNonErrors = Object.entries(shadowErrorSummary).every(([key, value]) => key === "none" || Number(value) === 0);
+  const gemmaShadowArtifactPassed = input.latestGemmaShadow.exists
+    && !input.latestGemmaShadow.malformed
+    && Number(shadowMetrics.rows ?? 0) > 0
+    && shadowHasOnlyNonErrors;
+  const gemmaShadowCanaryPassed = gemmaShadowSamplePassed || gemmaShadowArtifactPassed;
 
   return {
     root_hygiene: domain({
@@ -553,16 +566,22 @@ export function buildReadinessDomains(input: {
       canary_available: true,
     }, now),
     gemma_shadow_extraction: domain({
-      status: "PARTIAL",
-      evidence: [`latest_shadow_exists=${input.latestGemmaShadow.exists}`, `shadow_summary=${JSON.stringify(shadowMetrics)}`],
-      blockers: ["latest real-transcript run timed out/invalid; not canary eligible"],
-      safe_next_action: "run bounded gemma_shadow_extract after prompt/chunk controls",
+      status: gemmaShadowCanaryPassed ? "READY" : "PARTIAL",
+      evidence: [
+        `latest_shadow_exists=${input.latestGemmaShadow.exists}`,
+        `shadow_summary=${JSON.stringify(shadowMetrics)}`,
+        gemmaShadowSampleReceipt.path ? `latest_gemma_shadow_sample_receipt=${gemmaShadowSampleReceipt.path}` : "latest_gemma_shadow_sample_receipt=missing",
+      ],
+      blockers: gemmaShadowCanaryPassed ? [] : ["latest real-transcript run timed out/invalid; not canary eligible"],
+      safe_next_action: gemmaShadowCanaryPassed
+        ? "review bounded shadow diff; keep promotion/write approval-gated"
+        : "run bounded gemma_shadow_extract after prompt/chunk controls",
       risky_actions_blocked: ["Gemma production call writes", "public ranking impact"],
       required_approvals: ["write-canary promotion"],
-      relevant_commands: ["npm run shadow:extract"],
+      relevant_commands: ["npm run shadow:extract", "npm run shadow:diff"],
       relevant_jobs: ["gemma_shadow_extract", "extraction_promotion_review"],
       dry_run_available: true,
-      canary_available: false,
+      canary_available: gemmaShadowCanaryPassed,
     }, now),
     ml_improvement_loop: domain({
       status: input.latestMlEval.exists ? "PARTIAL" : "PARTIAL",

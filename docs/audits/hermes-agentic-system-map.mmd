@@ -35,11 +35,11 @@ flowchart LR
   subgraph PIPE[Transcript + Gemma]
     Worklist[transcript worklist\nPASS limit 5]
     Media[transcript waterfall\nBLOCKED: bot verification / ASR absent]
-    Laptop[laptop collector\noperator/cookies required]
-    Gemma[Gemma shadow\neval+production schema 10/10; bounded 5-row full-transcript sample; diff no manual_review; promotion blocked]
+    Laptop[laptop collector\nREADY_WITH_GATES: Tailscale/residential cookies]
+    Gemma[Gemma/Qwen shadow\nREADY_WITH_GATES: schema pass; diff/write canary proven]
   end
   subgraph MCP[MCP / Toolbox]
-    Composio[Composio\nREAD-ONLY SDK probe pass via local venv]
+    Composio[Composio\nDEFERRED: not essential unless future workflow requires]
     HHBridge[HH bridge\nPARTIAL wrapper issue]
     UseAgents[UseAgents\nneeds verification]
     Context7[Context7\nneeds verification]
@@ -56,9 +56,9 @@ flowchart LR
     OpenGate[Open-ended scrape/extract/LLM]
   end
   subgraph BLOCKERS[Remaining Blockers]
-    B1[Composio CLI/MCP wiring optional; SDK probe pass]
-    B2[Transcript cadence: bot verification / ASR absent]
-    B3[Shadow promotion approval; review full-cover diff first]
+    B1[Composio optional/deferred; new account needed if used]
+    B2[HH-only fallback: bot verification / ASR absent; laptop lane proven]
+    B3[Production promotion remains receipt/approval-gated]
     B4[Public count source drift resolved by --source live]
     B5[External rotation review]
   end
@@ -85,11 +85,11 @@ flowchart LR
   Sentinel -->|observes| ReadAPI
   AoW -->|dry-run receipt| Receipts
   Worklist -->|receipt pass| Receipts
-  Media -->|blocked by| B2
-  Laptop -->|requires operator-side cookies| B2
+  Media -->|fallback blocked by| B2
+  Laptop -->|bounded write cadence| Receipts
   Gemma -->|schema-pass receipt| Receipts
   Gemma -->|promotion blocked by| B3
-  Composio -->|read-only probe receipt| Receipts
+  Composio -->|optional setup if needed| B1
   Scripts -->|verify public --source live passed| B4
   HG -->|rotation review| B5
   DeployGate -->|requires approval| Netlify
@@ -216,3 +216,11 @@ flowchart LR
 %% compute-scores now supports scoped --call-id/--call-ids/--video-id canaries with --limit<=5 and rejects unsupported misleading flags.
 %% Score canary: npm run score -- --video-id 20290 --limit 1 => considered_calls=1 scored_calls=0, receipt=.tmp/workflow-receipts/pipeline_score_canary/score-video20290-20260613T190556Z.json.
 %% Core data path proven at canary scale: laptop transcript -> Gemma shadow/diff -> one-video write canary -> match canary -> score canary. Remaining PARTIAL blockers are audit completeness, Composio auth/tooling, and Art of War audience/public gate.
+
+%% 2026-06-14 production-readiness update
+%% Website live health and verify: PASS via https://call-score.com with HH-read source; public target-price leak remains fixed for known targets 1700/60/55000.
+%% Canonical laptop transcript lane: PASS limit=5 via Tailscale to omarslaptop-1, attempted=5, available=5; receipt=.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit5-20260614T035559Z.json.
+%% Fresh Gemma/Qwen shadow over new laptop batch: records=5 accepted=1 failed=0; shadow diff statuses no_accepted_calls=4 manual_review=1; receipts under gemma_shadow_sample/gemma_shadow_diff.
+%% Workplane gemma_shadow_extraction now treats successful bounded shadow sample receipts/clean artifacts as READY while production promotion remains gated.
+%% audit:pipeline remains PARTIAL due missing_publication_dates and missing_transcripts_or_terminal_reasons; dry-run publication-date backfill limit=3 found no source dates for video ids 6548/6553/8000.
+%% Third-party apps essential now: Netlify, HH PostgreSQL/read API, Tailscale/SSH laptop collector, Omar laptop browser cookies, YouTube/yt-dlp laptop lane, local Ollama models. Revenue requires Whop setup/auth/gated manifest. Marketing owned-channel apps remain operator-selected/gated. Composio is optional/deferred unless future repo evidence makes it essential.
