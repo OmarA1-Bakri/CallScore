@@ -455,3 +455,9 @@ Current classification:
 - Composio MCP is now correctly configured and usable.
 - X/Twitter owned GTM is ready by policy and registry, but actual publication is blocked by X/Twitter `CreditsDepleted`.
 - Next action: restore X API credits/access for the connected Composio Twitter account or explicitly approve a paid X API credit path; do not use raw X fallback unless explicitly approved.
+
+### Composio status after env consolidation
+
+- Composio MCP config is present in `/opt/crypto-tuber-ranked/.env.hermes` through redacted key names `COMPOSIO_API_KEY` and `COMPOSIO_MCP_URL`.
+- Read-only Composio connection listing reports Attio, Gmail, Twitter/X, PostHog, Hugging Face, LinkedIn, and Discord as active.
+- Hermes should still use the GTM registry before action execution. Active connection does not grant permission for sends, DMs, paid actions, CRM/analytics writes, Whop/provider mutations, or restricted claims.

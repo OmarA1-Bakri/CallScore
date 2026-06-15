@@ -4,11 +4,10 @@ LOG=".tmp/hermes-worker.log"
 mkdir -p .tmp
 
 while true; do
-# Load .env.local into the current shell
-# Use eval to handle values with spaces safely (we know our env file format)
+# Load canonical CallScore/Hermes env into the current shell.
 PROJECT_DIR="${CALLSCORE_APP_DIR:-/opt/crypto-tuber-ranked}"
 ENV_FILE="${CALLSCORE_ENV_FILE:-$PROJECT_DIR/.env.hermes}"
-[ -f "$ENV_FILE" ] || ENV_FILE="$PROJECT_DIR/.env.local"
+[ -f "$ENV_FILE" ] || { echo "Canonical env missing at $ENV_FILE"; exit 1; }
 cd "$PROJECT_DIR" || { echo "Cannot cd to project dir"; exit 1; }
 set -o allexport
 source "$ENV_FILE"

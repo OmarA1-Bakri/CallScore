@@ -2,7 +2,7 @@
 """
 hermes-worker-wrapper.py
 Safe wrapper for the pipeline worker.
-- Parses .env.local with python-dotenv (no special-char issues in bash)
+- Parses the canonical .env.hermes with python-dotenv (no special-char issues in bash)
 - Fixes DNS to IPv4-first
 - Restarts worker automatically
 - Logs to .tmp/hermes-worker.log
@@ -24,15 +24,13 @@ def log(msg: str):
 def load_env():
     env_path = os.environ.get("CALLSCORE_ENV_FILE", os.path.join(PROJECT_DIR, ".env.hermes"))
     if not os.path.exists(env_path):
-        env_path = os.path.join(PROJECT_DIR, ".env.local")
-    if not os.path.exists(env_path):
-        log(f"WARNING: .env.local not found at {env_path}")
-        return
+        log(f"ERROR: canonical env not found at {env_path}")
+        sys.exit(1)
     try:
         try:
             from dotenv import load_dotenv
             load_dotenv(env_path, override=True)
-            log("Loaded .env.local via python-dotenv")
+            log("Loaded canonical .env.hermes via python-dotenv")
         except ImportError:
             # Fallback: manual parse
             with open(env_path, "r", encoding="utf-8") as f:
@@ -42,9 +40,9 @@ def load_env():
                         continue
                     k, v = line.split("=", 1)
                     os.environ[k] = v
-            log("Loaded .env.local via manual parse")
+            log("Loaded canonical .env.hermes via manual parse")
     except Exception as e:
-        log(f"ERROR loading .env.local: {e}")
+        log(f"ERROR loading canonical .env.hermes: {e}")
         sys.exit(1)
 
 def main():
@@ -52,10 +50,10 @@ def main():
     load_env()
     os.chdir(PROJECT_DIR)
 
-    # Verify DB URL is set
-    db_url = os.environ.get("NEON_DATABASE_URL")
+    # Verify canonical local PostgreSQL URL is set.
+    db_url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
     if not db_url:
-        log("ERROR: NEON_DATABASE_URL not set after loading .env.local")
+        log("ERROR: DATABASE_URL/POSTGRES_URL not set after loading canonical .env.hermes")
         sys.exit(1)
     log("DB URL present (redacted)")
 

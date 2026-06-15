@@ -21,7 +21,7 @@ CallScore is an agentic crypto creator intelligence platform:
 - serves a public website and API through Netlify + HH Read API;
 - supports monetization and entitlements through Whop / Whop Auto;
 - uses Hermes/Workplane for governed autonomous operations, receipts, and handovers;
-- uses Art of War and Composio for controlled, approval-gated growth/marketing automation.
+- uses Art of War and Composio for default-open owned organic GTM, with restricted actions still fail-closed.
 
 ## Current production status
 
@@ -33,9 +33,9 @@ CallScore is an agentic crypto creator intelligence platform:
 | Transcript cadence | Proven and bounded | Omar laptop over Tailscale + residential browser cookies + laptop-side `yt-dlp`; cooldown respected after HTTP 429 |
 | Gemma/Qwen | Ready with gates | local Ollama shadow/diff/write-canary path; broad promotion remains fail-closed |
 | Whop | Certified for current readiness | zero-dollar/token-discount Pro renewal proof is valid checkout/payment authorization evidence |
-| Art of War | Private canary ready | `approval_packet_ready`; public/spend actions require approval receipt |
-| Composio | Read-only inventory ready | Attio, Gmail, Twitter/X, PostHog, LinkedIn, Discord active; Hugging Face via Composio is non-core setup gap |
-| Dangerous actions | Fail-closed | spend, public posts/sends, Whop mutations, destructive infra/SQL, broad DB writes, secret exposure |
+| Art of War | Owned public canary ready | safe owned organic public posts are `READY_PUBLIC_OWNED`; spend/email/DM/non-owned/restricted claims still require approval receipt |
+| Composio | Read-only inventory ready | Attio, Gmail, Twitter/X, PostHog, Hugging Face, LinkedIn, and Discord active; writes/sends remain action-gated |
+| Dangerous actions | Fail-closed | paid spend, email/DM/outreach/newsletters, non-owned posting, Whop financial/customer/payment/provider mutations, destructive infra/SQL, broad DB writes, secret exposure |
 
 ## Canonical architecture diagram
 
@@ -109,6 +109,23 @@ For the full subgraph version, open [`docs/architecture/callscore-agentic-platfo
 | Handover | `docs/handovers/2026-06-14-hermes-agent-callscore-activation.md` | Resume point for agents | Hermes Agent | Canonical current handover | Read first |
 | Agent memory | `agentmemory` / `callscore-memory` | Durable canonical facts | Codex/Hermes | Required context | Update after canonical facts |
 
+## Canonical environment
+
+Canonical local runtime env source:
+
+```bash
+/opt/crypto-tuber-ranked/.env.hermes
+```
+
+Rules:
+
+- `.env.hermes` is local-only, `chmod 600`, and gitignored.
+- Do not print values, tokens, cookies, DB URLs, auth headers, private keys, or credential-bearing remotes.
+- Hermes, Workplane, CallScore scripts, Whop Auto checks, Art of War workflows, Composio tooling, and owned public GTM tooling should source this file first.
+- Compatibility env paths should be symlinks/loaders to this canonical file, not competing secret stores.
+- Redacted manifest: [`docs/ops/callscore-canonical-env-manifest.md`](docs/ops/callscore-canonical-env-manifest.md).
+- Validator: `node --import tsx scripts/validate-hermes-env.ts`.
+
 ## Runtime architecture
 
 ### Public product
@@ -160,7 +177,7 @@ Composio is the MCP hub for connected app inventory and possible future governed
 - LinkedIn;
 - Discord.
 
-Current read-only inventory found Attio, Gmail, Twitter/X, PostHog, LinkedIn, and Discord ready. Hugging Face through Composio was initiated/auth-blocked during the controlled-full canary; Hugging Face plugin auth is separate and non-core unless a lane specifically requires Composio-backed Hugging Face.
+Current read-only inventory found Attio, Gmail, Twitter/X, PostHog, Hugging Face, LinkedIn, and Discord active through Composio. Active connection does not override the GTM registry: sends, DMs, paid actions, CRM/analytics writes, provider mutations, and restricted claims remain gated.
 
 ## Data flow
 

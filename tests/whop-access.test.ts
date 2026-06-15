@@ -73,6 +73,9 @@ test("getUserTier returns alpha when product access is granted", async () => {
 test("getUserTier keeps legacy plan fallback only when product IDs are absent", async () => {
   process.env.WHOP_API_KEY = "whop_test";
   process.env.WHOP_API_BASE_URL = "https://api.whop.test/api/v1";
+  delete process.env.WHOP_PRO_PRODUCT_ID;
+  delete process.env.WHOP_ALPHA_PRODUCT_ID;
+  delete process.env.WHOP_ELITE_PRODUCT_ID;
   process.env.WHOP_PRO_PLAN_ID = "plan_pro_legacy";
   process.env.WHOP_ALPHA_PLAN_ID = "plan_alpha_legacy";
 

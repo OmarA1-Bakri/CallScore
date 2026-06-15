@@ -7,6 +7,7 @@ Canonical owner map for CallScore GTM, marketing, commercial, connected-app, and
 - Local HH PostgreSQL plus HH Read API are canonical. Stale Neon references are not a CallScore data source.
 - Owned CallScore public organic GTM is `READY_PUBLIC_OWNED` by default when safe, zero-cost, non-financial, non-secret, non-destructive, owned/managed, and inside canonical messaging policy.
 - Restricted actions remain fail-closed: email/DM/outreach, newsletters, non-owned public posting, paid spend, Whop/customer/payment/provider mutation, CRM/analytics writes, DB/deploy/infra/webhook mutation, credential rotation, destructive action, secret exposure, named accusations, legal claims, investment advice, guarantees, and private-data claims.
+- Canonical local env for all Hermes/GTM/Composio/Whop tooling is `/opt/crypto-tuber-ranked/.env.hermes`; see `docs/ops/callscore-canonical-env-manifest.md`.
 
 ## Gate rules
 - `PUBLISH_GATE` — Required before public posts/pages/listings/methodology/ranking/correction publication.
