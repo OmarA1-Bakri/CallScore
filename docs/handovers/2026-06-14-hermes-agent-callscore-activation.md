@@ -335,3 +335,40 @@ Still fail-closed without exact gate + receipt + rollback:
 - Post-execution receipt is mandatory after publication under `.tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json`.
 - Still fail-closed: paid spend, paid ads/boosts/APIs/LLMs/SaaS, email sends, DMs, outreach to named people, newsletters, non-owned public posting, CRM/analytics/provider writes, Whop pricing/product/payment/customer/entitlement/payout/provider mutation, DB/deploy/infra/webhook mutation, credential rotation, destructive actions, secret exposure, named creator accusations, legal/compliance claims, investment advice, performance guarantees, and private-data claims.
 - Hermes next GTM action: run the X canary from `docs/ops/2026-06-15-x-twitter-public-canary-approval-packet.md` as a `READY_PUBLIC_OWNED` canary, then write execution receipt and monitor read-only metrics.
+
+
+## 2026-06-15T17:29Z Public owned GTM execution attempt
+
+Operator policy update: CONTROLLED_FULL revenue activation now treats safe owned organic public GTM as executable by default when content is non-paid, non-destructive, non-financial, non-secret, non-defamatory, and inside CallScore messaging policy. Restricted actions remain fail-closed.
+
+Execution target: first owned X/Twitter canary using canonical post from `/opt/crypto-tuber-ranked/docs/ops/2026-06-15-x-twitter-public-canary-approval-packet.md`. Payload hash `6be1a693803db3fd746d06017449a2104ecbc1f9345f2c5a7739c0b7db2e3f42`.
+
+Preflight evidence:
+
+- Repo baseline clean at `a45ee67` on `master`; `git diff --check` passed.
+- Workplane: env-sourced `npm run workplane:status` returned `status=OK`, `automation_readiness=CONTROLLED_FULL`; next transcript action remains `wait_for_laptop_collector_rate_limit_cooldown`, `allowed=false`.
+- Public app: live `npm run verify:public -- --source live --base-url https://call-score.com` passed; health `ok=true`, source `hh_read_api`, leaderboard `api=36, rows=36`.
+- Art of War prior packet exists and was safe/non-mutating.
+
+Execution result:
+
+- `xurl` was not installed in the active tool environment.
+- `x-cli` exists and credential file is present, but read-check failed with X API HTTP 402 `CreditsDepleted`.
+- Composio MCP is configured but current Codex MCP state is `Not logged in`.
+- Therefore no X post was published. No paid API credit purchase/spend was performed. No DM, Whop mutation, DB write, deployment, provider/account mutation, or secret exposure occurred.
+
+Receipt:
+
+- `/opt/crypto-tuber-ranked/.tmp/workflow-receipts/artofwar_owned_public_execution/callscore-x-public-canary-20260615.json`
+
+Current classification:
+
+- CallScore remains CONTROLLED_FULL and healthy.
+- X public owned GTM content is publishable by policy, but execution is currently `blocked_external_tool` / `CreditsDepleted` until an owned X execution path is restored.
+- Continue independent safe lanes. Do not buy X API credits or use paid APIs without explicit approval.
+
+Next autonomous action:
+
+1. Restore or provide a non-spend owned X posting path, or explicitly approve the required X API credit path if Omar wants paid API usage.
+2. Re-run `x-cli` or `xurl` readiness without printing secrets.
+3. Publish the same payload once the owned X execution path works, then replace blocked receipt with successful execution receipt including post ID/URL and monitoring results.
