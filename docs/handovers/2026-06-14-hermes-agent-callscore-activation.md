@@ -405,3 +405,53 @@ Current classification:
 - CallScore remains CONTROLLED_FULL and healthy.
 - Owned X GTM is ready by policy and registry, but blocked by Composio auth/tool availability in the active environment.
 - Next action is to authenticate/reload Composio MCP for the owned X/Twitter connector on a browser-capable environment or restart Hermes with working Composio auth, then publish through Composio. Do not fall back to raw X APIs unless explicitly approved.
+
+## 2026-06-15 canonical secret/env consolidation
+
+- Canonical local env source is now `/opt/crypto-tuber-ranked/.env.hermes` for CallScore scripts, Hermes/Workplane, Whop Auto safe checks, Art of War workflows, Composio tooling, owned public GTM tooling, and local model/runtime checks.
+- `.env.hermes` exists, is gitignored, and is protected with `600` permissions. Do not print values. Do not commit `.env.hermes` or timestamped backups.
+- Redacted key manifest: `/opt/crypto-tuber-ranked/docs/ops/callscore-canonical-env-manifest.md`.
+- Validator: `cd /opt/crypto-tuber-ranked && node --import tsx scripts/validate-hermes-env.ts`.
+- Compatibility pointers now resolve to canonical env: `/srv/agents/hermes/.env`, `/home/omar/.config/x-cli/.env`, and `/srv/whop-auto/plugin/agent_workflows/whop_auto/.env.hetzner`; timestamped local backups were preserved with restrictive permissions.
+- Stale Whop workspace env files were not deleted or symlinked. They remain cleanup/rotation inventory only unless separately approved.
+- Hermes should source canonical env before readiness, GTM, Whop, Composio, transcript, or public verification commands:
+
+```bash
+cd /opt/crypto-tuber-ranked
+set -a; . /opt/crypto-tuber-ranked/.env.hermes >/dev/null 2>&1; set +a
+node --import tsx scripts/validate-hermes-env.ts
+npm run workplane:status
+```
+
+
+
+## 2026-06-15T18:10Z Public owned GTM execution through Composio after MCP reload
+
+Operator directive: rerun the public owned GTM prompt after MCP reload, using Composio as canonical third-party access. Raw `xurl`, `x-cli`, direct X API, or ad-hoc provider SDKs were not used.
+
+Preflight evidence:
+
+- Repo baseline: clean at `089bb67` on `master`; `git diff --check` passed.
+- GTM registry X/Twitter row: `current_status=ready_public_owned`, `gate_status=ready_public_owned`, connected provider `Composio Twitter/X`, next safe action is owned public X canary publish plus receipt and read-only monitoring.
+- Workplane: env-sourced `npm run workplane:status` returned `status=OK`, `automation_readiness=CONTROLLED_FULL`; transcript next action remains rate-limit cooldown wait with `allowed=false`.
+- Public app: live `npm run verify:public -- --source live --base-url https://call-score.com` passed; source `hh_read_api`, leaderboard `api=36, rows=36`, homepage counts nonzero.
+- Hermes MCP test for Composio: connected and discovered 7 Composio meta-tools.
+
+Composio execution evidence:
+
+- `COMPOSIO_SEARCH_TOOLS` found Twitter publishing plan and active `twitter` connection.
+- `TWITTER_USER_LOOKUP_ME` confirmed the connected default account: `@0marbakri` / `BinaryBaron`, user id `1604458354797051912`, status active.
+- `TWITTER_CREATION_OF_A_POST` was attempted with canonical payload hash `6be1a693803db3fd746d06017449a2104ecbc1f9345f2c5a7739c0b7db2e3f42`.
+- Publish failed with provider HTTP 402 `CreditsDepleted` from X/Twitter.
+- Therefore no X post was published. No raw-provider fallback was used. No paid action, Whop mutation, DB write, deployment, provider/account mutation, or secret exposure occurred.
+
+Receipt:
+
+- `/opt/crypto-tuber-ranked/.tmp/workflow-receipts/artofwar_owned_public_execution/callscore-x-public-canary-composio-20260615T181025Z.json`
+
+Current classification:
+
+- CallScore remains CONTROLLED_FULL and healthy.
+- Composio MCP is now correctly configured and usable.
+- X/Twitter owned GTM is ready by policy and registry, but actual publication is blocked by X/Twitter `CreditsDepleted`.
+- Next action: restore X API credits/access for the connected Composio Twitter account or explicitly approve a paid X API credit path; do not use raw X fallback unless explicitly approved.
