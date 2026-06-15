@@ -372,3 +372,36 @@ Next autonomous action:
 1. Restore or provide a non-spend owned X posting path, or explicitly approve the required X API credit path if Omar wants paid API usage.
 2. Re-run `x-cli` or `xurl` readiness without printing secrets.
 3. Publish the same payload once the owned X execution path works, then replace blocked receipt with successful execution receipt including post ID/URL and monitoring results.
+
+
+## 2026-06-15T17:40Z Public owned GTM rerun through Composio
+
+Operator directive: use Composio for all canonical third-party application access. Raw `xurl`, `x-cli`, direct provider APIs, or ad-hoc SDKs are fallback only when Composio is unavailable or Omar explicitly approves direct fallback.
+
+Rerun target: first owned X/Twitter canary through the Composio Twitter/X connector using the canonical payload hash `6be1a693803db3fd746d06017449a2104ecbc1f9345f2c5a7739c0b7db2e3f42`.
+
+Preflight evidence:
+
+- Repo baseline: clean at `c9f918c` on `master`; `git diff --check` passed.
+- GTM registry X/Twitter row: `current_status=ready_public_owned`, `gate_status=ready_public_owned`, connected provider `Composio Twitter/X`, next safe action is owned public X canary publish plus receipt and read-only monitoring.
+- Workplane: env-sourced `npm run workplane:status` returned `status=OK`, `automation_readiness=CONTROLLED_FULL`; transcript next action remains rate-limit cooldown wait with `allowed=false`.
+- Public app: live `npm run verify:public -- --source live --base-url https://call-score.com` passed; source `hh_read_api`, leaderboard `api=36, rows=36`, homepage counts nonzero.
+
+Composio execution result:
+
+- Codex MCP config contains Composio and reports it enabled, but auth state is `Not logged in`.
+- `mcporter list` reports Composio `auth required`.
+- `mcporter list composio --schema` attempted OAuth and timed out in the headless environment, so schemas/tools were unavailable.
+- No native Hermes Composio tools are present in the current tool schema.
+- No raw X/Twitter fallback was used because Composio is canonical.
+- Therefore no X post was published. No external mutation, paid action, Whop mutation, DB write, deployment, or secret exposure occurred.
+
+Receipt:
+
+- `/opt/crypto-tuber-ranked/.tmp/workflow-receipts/artofwar_owned_public_execution/callscore-x-public-canary-composio-20260615T174048Z.json`
+
+Current classification:
+
+- CallScore remains CONTROLLED_FULL and healthy.
+- Owned X GTM is ready by policy and registry, but blocked by Composio auth/tool availability in the active environment.
+- Next action is to authenticate/reload Composio MCP for the owned X/Twitter connector on a browser-capable environment or restart Hermes with working Composio auth, then publish through Composio. Do not fall back to raw X APIs unless explicitly approved.
