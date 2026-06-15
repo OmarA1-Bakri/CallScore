@@ -311,3 +311,17 @@ Next safe autonomous action:
 Still fail-closed without exact gate + receipt + rollback:
 
 - Public posts/sends, Gmail/email sends, DMs, Discord/Telegram/Reddit/newsletter sends, paid spend/ads/APIs/LLM/SaaS, Whop pricing/product/customer/payment/provider mutation, CRM writes, analytics writes, production DB writes, deployments, infra mutation, webhook mutation, credential rotation, destructive actions, and secret exposure.
+
+## 2026-06-15 Hermes skill canonicalization audit
+
+- Audit doc: `/opt/crypto-tuber-ranked/docs/ops/hermes-skill-canonicalization-audit.md`.
+- Regression test: `/opt/crypto-tuber-ranked/tests/hermes-skill-canonical-process.test.ts`.
+- Canonicalized live Hermes skill files:
+  - `/srv/agents/hermes/skills/commerce/art-of-war-operations/SKILL.md`
+  - `/srv/agents/hermes/skills/callscore-autopilot/SKILL.md`
+  - `/srv/agents/hermes/skills/devops/workplane-status/SKILL.md`
+  - `/srv/agents/hermes/skills/commerce/whop-automation/SKILL.md`
+  - `/srv/agents/hermes/skills/creative/humanizer/SKILL.md`
+  - `/srv/agents/hermes/skills/social-media/xurl/SKILL.md`
+- Hermes must use the GTM registry plus Workplane status before any GTM, public, commercial, Whop, provider, CRM, analytics, DB, deploy, or infra action.
+- Public sends/posts, spend, Whop/customer/payment/provider mutations, CRM/analytics writes, DB writes, deployments, infra actions, credential rotation, and destructive actions remain fail-closed without approval receipt, rollback path, and payload hash where content-bound.

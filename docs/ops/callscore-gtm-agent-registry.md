@@ -39,3 +39,7 @@ Canonical owner map for CallScore GTM, marketing, commercial, connected-app, and
 ## Machine-readable source
 
 `docs/ops/callscore-gtm-agent-registry.json` is canonical. Update JSON first, then this Markdown summary, before changing channel ownership, gates, connected apps, or live-action permissions.
+
+## Hermes skill enforcement
+
+The following Hermes skills have been canonicalized against this registry and Workplane gate process: `art-of-war-operations`, `callscore-autopilot`, `workplane-status`, `whop-automation`, `humanizer`, and `xurl`. Audit details: [`docs/ops/hermes-skill-canonicalization-audit.md`](./hermes-skill-canonicalization-audit.md).
