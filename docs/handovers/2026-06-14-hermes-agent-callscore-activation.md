@@ -2,9 +2,9 @@
 
 ## 1. Activation verdict
 
-`PARTIAL`.
+`CONTROLLED_FULL` as of the latest startup validation.
 
-Safe production operation is healthy. FULL not claimed because Workplane still reports P1 gated lanes: audit corpus completeness, manual-review Gemma diff rows, public/provider/spend gates, and optional stale mirror/secret quarantine.
+Core production is live and governed. Historical transcript/audit backlog, Gemma/Qwen review, Whop/provider, public/channel, spend, deploy, and destructive DB/infra surfaces remain monitored or fail-closed by design rather than production-blocking. Earlier PARTIAL notes below are retained as historical execution context.
 
 ## 2. Current system state
 
@@ -266,3 +266,48 @@ Final safe stop reason:
 - Hermes must read the registry before any GTM, marketing, Whop, Composio, CRM, social, email, community, analytics, or provider action.
 - Do not repeat channel-ownership rediscovery unless registry evidence is stale; update registry first when ownership/gates/apps/receipts change.
 - Public sends/posts, spend, provider writes, Whop/customer/payment mutations, destructive DB/infra actions, and secret exposure remain fail-closed.
+
+
+## 2026-06-15T10:41Z CONTROLLED_FULL system startup
+
+Startup verdict: **STARTED_WITH_MONITORED_COOLDOWN**. No P0/P1 production blocker found. CONTROLLED_FULL remains valid. Dangerous/public/provider/spend/destructive lanes remain fail-closed.
+
+Evidence from startup run:
+
+- Baseline: `/opt/crypto-tuber-ranked` clean at `2bbe514` on `master`; `git diff --check` passed. README, handover, GTM registry JSON/MD, and full-system gate decision doc exist and were read.
+- Workplane/Hermes: env-sourced `npm run workplane:status` returned `status=OK`, `automation_readiness=CONTROLLED_FULL`, daily pipeline active. Next recommended autonomous action: `wait_for_laptop_collector_rate_limit_cooldown`, `allowed=false`.
+- Timer: `callscore-daily-pipeline.timer` is enabled and active; next run scheduled by systemd. Last service run exited `0/SUCCESS`.
+- Freshness: `npm run freshness:check` exited 0 with `status=WARN`, `blockers=[]`; warnings remain transcript provider credential missing failures=2 and yt-dlp bot verification failures=9.
+- Public verification: local `npm run verify:public` passed; live `npm run verify:public -- --source live --base-url https://call-score.com` passed with health `ok=true`, source `hh_read_api`, leaderboard `api=36, rows=36`, homepage nonzero funnel counts.
+- Audit: `npm run audit:pipeline -- --summary --allow-partial-shadow` exited 0 and still reports `missing_transcripts_or_terminal_reasons`; this remains monitored backlog, not CONTROLLED_FULL downgrade.
+- Transcript cadence: collector was **not run** because Workplane explicitly returned cooldown action `wait_for_laptop_collector_rate_limit_cooldown`, `allowed=false`. No 429 hammer retry performed. Latest relevant receipt remains `.tmp/workflow-receipts/transcript_laptop_cadence/laptop-limit25-rate-stop-20260614T112708Z.json`.
+- Gemma/Qwen: monitored by Workplane and full test coverage; no promotion/write performed. Review/promotion remains gated.
+- GTM registry: JSON validated to `/tmp/callscore-gtm-agent-registry.startup.validated.json`; `node --import tsx --test tests/gtm-agent-registry.test.ts` passed 6/6. Registry statuses: ready=`Workplane / Hermes governance`; monitored=`Whop provider / entitlement`, `Attio CRM`, `PostHog analytics`, `Composio hub`, `Art of War campaign engine`, `Automation registry / health checks`; gated=`X / Twitter`, `LinkedIn`, `Gmail / email`, `Discord`, `Telegram`, `Reddit`, `YouTube / SEO`, `Crypto newsletters`, `Creator partnerships`, `Whop marketplace`; auth_blocked=`Hugging Face`; formal non_core entries=0.
+- Art of War: private-only `campaign-loop --dry-run --campaign-id callscore-controlled-full-startup` passed with `decision=approval_packet_ready`, `verifier_passed=true`, `external_mutation_performed=false`, `public_action_allowed=false`, output `/tmp/callscore-art-of-war-startup.json`.
+- Whop Auto: read-only/test lane passed; Whop/infrastructure tests passed 16/16. No provider/customer/payment/pricing mutation performed.
+- Composio: `codex mcp list` shows Composio server enabled but current Codex MCP auth state is `Not logged in`; no app tool read/write/send/post was invoked. Treat Attio/Gmail/Twitter/PostHog/LinkedIn/Discord app inventory as `NEEDS_RELOAD` in this Codex context, Hugging Face as `AUTH_BLOCKED`/nonessential until a model-tooling lane needs it.
+- Final validation: `npm run typecheck`, `npm run lint`, env-sourced `npm run build`, `npm run hygiene`, final Workplane/freshness/audit/public verify all passed. Full test suite rerun with `find tests -name '*.test.ts' -print0 | xargs -0 node --import tsx --test` passed: tests=650, pass=650, fail=0.
+
+Started/confirmed lanes:
+
+1. Workplane / Hermes governance: ready.
+2. Daily pipeline timer: active.
+3. Freshness check: active, WARN/no blockers.
+4. Public verification: passed local and live.
+5. Audit pipeline allow-partial-shadow: active, monitored backlog.
+6. Transcript cadence monitor: active via Workplane; collector held by cooldown.
+7. Laptop transcript collector: held; cooldown `allowed=false`.
+8. Gemma/Qwen local monitored shadow/diff lane: monitored, no production write.
+9. Whop Auto: read-only/test lane passed; mutations gated.
+10. Art of War: private approval-packet lane passed; public action gated.
+11. Composio: MCP config visible; app inventory needs reload/auth in current Codex context; no writes.
+12. GTM registry validation: passed.
+13. Receipt/handover loop: this section updated.
+
+Next safe autonomous action:
+
+- Wait for laptop collector provider cooldown, then resume bounded `Limit 5` laptop cadence only if Workplane changes `allowed=true`. Until then, continue report-only health, public verify, audit/freshness monitoring, Art of War private approval-packet work, Whop read-only/test checks, and registry/receipt review.
+
+Still fail-closed without exact gate + receipt + rollback:
+
+- Public posts/sends, Gmail/email sends, DMs, Discord/Telegram/Reddit/newsletter sends, paid spend/ads/APIs/LLM/SaaS, Whop pricing/product/customer/payment/provider mutation, CRM writes, analytics writes, production DB writes, deployments, infra mutation, webhook mutation, credential rotation, destructive actions, and secret exposure.
