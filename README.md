@@ -2,7 +2,7 @@
 
 [![Netlify Status](https://api.netlify.com/api/v1/badges/5bea28b8-e56d-4173-aee1-6c75efb64adb/deploy-status)](https://app.netlify.com/projects/callscore/deploys)
 
-CallScore ranks crypto creators by evidence-backed prediction quality. It ingests creator/video/transcript data, extracts claims and market signals, matches them to outcomes, scores creator credibility/performance, and exposes a public product through [call-score.com](https://call-score.com). The platform is commercially gated through Whop and operationally governed by Hermes/Workplane receipts, handovers, and fail-closed automation gates.
+CallScore ranks crypto creators by evidence-backed prediction quality. It ingests creator/video/transcript data, extracts claims and market signals, matches them to outcomes, scores creator credibility/performance, and exposes a public product through [call-score.com](https://call-score.com). The platform is commercially gated through Whop and operationally governed by Hermes/Workplane receipts, handovers, default-open owned public GTM policy, and fail-closed restricted-action gates.
 
 - **Live product:** <https://call-score.com>
 - **Canonical deploy target:** Netlify
@@ -29,7 +29,7 @@ CallScore is an agentic crypto creator intelligence platform:
 | --- | --- | --- |
 | Readiness verdict | `CONTROLLED_FULL` | `npm run workplane` reports `status=OK`, `automation_readiness=CONTROLLED_FULL` |
 | Website | Live | `npm run verify:public -- --source live --base-url https://call-score.com` passes |
-| Workplane | OK / controlled-full | historical/provider/public mutation gates monitored or fail-closed |
+| Workplane | OK / controlled-full | owned public GTM ready; historical/provider/restricted mutation gates monitored or fail-closed |
 | Transcript cadence | Proven and bounded | Omar laptop over Tailscale + residential browser cookies + laptop-side `yt-dlp`; cooldown respected after HTTP 429 |
 | Gemma/Qwen | Ready with gates | local Ollama shadow/diff/write-canary path; broad promotion remains fail-closed |
 | Whop | Certified for current readiness | zero-dollar/token-discount Pro renewal proof is valid checkout/payment authorization evidence |
@@ -100,7 +100,7 @@ For the full subgraph version, open [`docs/architecture/callscore-agentic-platfo
 | HH transcript fallback | `/srv/agents/vpn-ytdlp`, HH yt-dlp/ASR | Diagnostic/future autonomy fallback | HH | Non-canonical | Canary only |
 | Hermes | `/srv/agents/hermes` | Agentic control plane | Hermes Agent | Active | Receipts/handover required |
 | HH control bridge | `/srv/agents/hh-control-bridge` | HH bridge/control tooling | HH bridge | Active | Read/write safety gates |
-| Workplane | `src/lib/workplane-status.ts`, `src/scripts/workplane-status.ts` | Machine-readable readiness, jobs, safe next actions | Hermes / Codex | `CONTROLLED_FULL` | Monitored/fail-closed gates |
+| Workplane | `src/lib/workplane-status.ts`, `src/scripts/workplane-status.ts` | Machine-readable readiness, jobs, safe next actions | Hermes / Codex | `CONTROLLED_FULL` | Owned public GTM ready; restricted lanes gated |
 | Receipts | `.tmp/workflow-receipts/` | Runtime evidence for canaries and gates | Workplane jobs | Ignored runtime evidence | Do not commit disposable receipts |
 | Whop Auto | `/srv/whop-auto` | Whop registry/workflows and provider checks | Revenue operator | Canonicalized to app repo | Mutations fail-closed |
 | Art of War | `/srv/agents/repos/Claude_Code_Automations` | Private/dry-run growth automation | Marketing operator | Private canary ready | Public/spend approval-gated |
@@ -146,7 +146,7 @@ Whop Auto and Whop provide checkout, Pro/Alpha entitlement checks, webhook handl
 
 ### Growth / marketing plane
 
-Art of War lives under `/srv/agents/repos/Claude_Code_Automations`. It supports private campaign dry-runs, persona scoring, approval packets, and owned-channel preflight. Public posts, outbound sends, non-owned public marketing, and spend remain fail-closed without approval receipt.
+Art of War lives under `/srv/agents/repos/Claude_Code_Automations`. It supports campaign generation, persona scoring, owned-channel public canaries, post-execution receipts, monitoring, and restricted-lane approval packets. Owned CallScore organic posts on owned/managed channels are allowed by default when zero-cost, safe, non-financial, non-secret, and within messaging policy. Email/DM/outreach, non-owned posting, paid actions, provider/customer/payment changes, and restricted claims remain fail-closed without approval receipt.
 
 ### Connected apps
 
@@ -299,7 +299,7 @@ cd /srv/agents/repos/Claude_Code_Automations
 python3 scripts/art_of_war.py campaign-loop --dry-run --campaign-id callscore-readiness-check --output /tmp/callscore-art-of-war-readiness-check.json
 ```
 
-Public posting and spend remain fail-closed without approval receipt.
+Owned CallScore organic public posting is default-open under `READY_PUBLIC_OWNED` after messaging-policy pass and must write a post-execution receipt. Spend, email/DM/outreach, non-owned posting, Whop/payment/customer/provider mutation, DB/deploy/infra mutation, and secrets remain fail-closed without approval receipt.
 
 ### Composio inventory
 
@@ -347,9 +347,9 @@ Read these before any new production activation run:
 
 - Continue bounded transcript backlog clearing after cooldown.
 - Optional: complete Hugging Face Composio auth if a Composio-backed HF lane becomes required.
-- Optional: approve one owned-channel publish receipt before any Art of War public canary.
+- Next GTM action: run one owned X/Twitter public canary under `READY_PUBLIC_OWNED`, then write execution receipt and monitor read-only metrics.
 - Optional: stale mirror/archive/secret quarantine cleanup with separate explicit approval.
 
 ## Canonical GTM agent registry
 
-GTM/channel ownership lives in [`docs/ops/callscore-gtm-agent-registry.json`](docs/ops/callscore-gtm-agent-registry.json), with human summary at [`docs/ops/callscore-gtm-agent-registry.md`](docs/ops/callscore-gtm-agent-registry.md) and diagram at [`docs/architecture/callscore-gtm-agent-registry.mmd`](docs/architecture/callscore-gtm-agent-registry.mmd). Read it before any marketing, Whop, Composio, CRM, social, email, community, analytics, or provider action.
+GTM/channel ownership lives in [`docs/ops/callscore-gtm-agent-registry.json`](docs/ops/callscore-gtm-agent-registry.json), with human summary at [`docs/ops/callscore-gtm-agent-registry.md`](docs/ops/callscore-gtm-agent-registry.md) and diagram at [`docs/architecture/callscore-gtm-agent-registry.mmd`](docs/architecture/callscore-gtm-agent-registry.mmd). Read it before any marketing, Whop, Composio, CRM, social, email, community, analytics, or provider action. It now marks owned organic X/LinkedIn/owned-community/SEO/Whop-copy lanes as `READY_PUBLIC_OWNED`; restricted lanes remain gated.

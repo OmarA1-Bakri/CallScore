@@ -66,3 +66,8 @@ Run receipt: `.tmp/workflow-receipts/hermes_skill_canonicalization/hermes-skill-
 - No live public post/send/spend/provider mutation was performed. This is intentional.
 - `/srv/agents/hermes` skill tree is not a git repo on HH, so actual skill-file patches are live filesystem changes, while test/docs/handover evidence is committed in the CallScore repo.
 - Future skill additions must repeat this audit and update the GTM registry if channel ownership, gate, receipt, rollback, or connected app behavior changes.
+
+
+## 2026-06-15 revenue activation amendment
+
+Hermes skills were amended after the initial fail-closed audit. New stance: safe owned CallScore public organic GTM is `READY_PUBLIC_OWNED` and does not require pre-approval. Art of War persona committee is quality control, not a hard blocker. Required after any live owned public action: post-execution receipt, rollback path, payload hash, and read-only monitoring. Restricted actions remain fail-closed: email/DM/outreach, non-owned public posting, paid spend, Whop/customer/payment/provider mutation, CRM/analytics writes, DB/deploy/infra/webhook mutation, credential rotation, destructive action, secret exposure, named accusations, legal/compliance claims, investment advice, guarantees, and private data.

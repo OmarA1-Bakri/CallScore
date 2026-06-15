@@ -325,3 +325,13 @@ Still fail-closed without exact gate + receipt + rollback:
   - `/srv/agents/hermes/skills/social-media/xurl/SKILL.md`
 - Hermes must use the GTM registry plus Workplane status before any GTM, public, commercial, Whop, provider, CRM, analytics, DB, deploy, or infra action.
 - Public sends/posts, spend, Whop/customer/payment/provider mutations, CRM/analytics writes, DB writes, deployments, infra actions, credential rotation, and destructive actions remain fail-closed without approval receipt, rollback path, and payload hash where content-bound.
+
+
+## 2026-06-15 default-public GTM revenue activation update
+
+- Commit pending in this run updates CallScore GTM policy from approval-packet-only to `READY_PUBLIC_OWNED` for safe owned organic public channels.
+- Owned CallScore X/Twitter, LinkedIn, owned Discord/Telegram/community posts, repo-controlled SEO/public content, and safe Whop marketplace copy/assets may execute by default when zero-cost, owned/managed, non-financial, non-secret, non-destructive, no email/DM/outreach send occurs, no provider/customer/payment/DB/deploy/infra mutation occurs, and copy passes canonical messaging policy.
+- Persona/committee scoring is quality control, not hard approval, unless it flags restricted content.
+- Post-execution receipt is mandatory after publication under `.tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json`.
+- Still fail-closed: paid spend, paid ads/boosts/APIs/LLMs/SaaS, email sends, DMs, outreach to named people, newsletters, non-owned public posting, CRM/analytics/provider writes, Whop pricing/product/payment/customer/entitlement/payout/provider mutation, DB/deploy/infra/webhook mutation, credential rotation, destructive actions, secret exposure, named creator accusations, legal/compliance claims, investment advice, performance guarantees, and private-data claims.
+- Hermes next GTM action: run the X canary from `docs/ops/2026-06-15-x-twitter-public-canary-approval-packet.md` as a `READY_PUBLIC_OWNED` canary, then write execution receipt and monitor read-only metrics.

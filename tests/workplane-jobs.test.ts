@@ -34,6 +34,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
     "artofwar_audience_research_dry_run",
     "artofwar_outreach_queue_prepare",
     "artofwar_publish_approval_review",
+    "artofwar_owned_public_execution",
     "artofwar_spend_approval_review",
     "artofwar_campaign_preflight",
     "artofwar_campaign_iteration",
@@ -318,7 +319,8 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
   }
   assert.equal(domains.activation_gates.status, "MONITORED");
   assert.ok(domains.whop_auto.risky_actions_blocked.some((item) => item.includes("pricing")));
-  assert.ok(domains.art_of_war.risky_actions_blocked.some((item) => item.includes("publishing")));
+  assert.ok(domains.art_of_war.risky_actions_blocked.some((item) => item.includes("email/DM/outreach")));
+  assert.match(domains.art_of_war.safe_next_action ?? "", /owned-channel GTM loop/);
 });
 
 
@@ -364,7 +366,7 @@ test("workplane status exposes executable report-only job commands", () => {
 });
 
 
-test("Art of War campaign loop jobs are report-only and approval-gated", () => {
+test("Art of War campaign loop supports owned public execution while restricted lanes stay gated", () => {
   const campaignJobs = [
     "artofwar_campaign_preflight",
     "artofwar_campaign_iteration",
@@ -383,7 +385,6 @@ test("Art of War campaign loop jobs are report-only and approval-gated", () => {
     assert.equal(spec.production_db_writes_allowed, false, type);
     assert.equal(spec.production_call_writes_allowed, false, type);
     assert.equal(spec.public_ranking_impact_allowed, false, type);
-    assert.ok(spec.failure_classification.includes("approval_missing"), type);
     assert.doesNotMatch(spec.default_safe_command, /publish|send|spend|whop:bootstrap|shadow:promote/i, type);
   }
 
@@ -395,7 +396,16 @@ test("Art of War campaign loop jobs are report-only and approval-gated", () => {
   assert.equal(persona.input_payload.threshold, 70);
 
   const approval = getWorkplaneJobSpec("artofwar_campaign_approval_review");
-  assert.match(approval.success_criteria.join(" "), /approval_missing blocks/);
+  assert.match(approval.success_criteria.join(" "), /owned public publish allowed by default/);
+
+  const owned = getWorkplaneJobSpec("artofwar_owned_public_execution");
+  assert.equal(owned.production_db_writes_allowed, false);
+  assert.equal(owned.production_call_writes_allowed, false);
+  assert.equal(owned.public_ranking_impact_allowed, false);
+  assert.equal(owned.input_payload.ready_public_owned, true);
+  assert.equal(owned.input_payload.receipt_required_after_execution, true);
+  assert.match(owned.success_criteria.join(" "), /post-execution receipt required/);
+  assert.ok(owned.failure_classification.includes("not_owned_channel"));
 });
 
 test("Gemma Ollama Modelfile is aligned to production shadow extraction schema", () => {

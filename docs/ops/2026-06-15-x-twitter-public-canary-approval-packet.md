@@ -1,28 +1,27 @@
-# X/Twitter public canary approval packet — CallScore
+# X/Twitter public canary execution packet — CallScore
 
 Generated: 2026-06-15T10:52:25Z
 Channel: X / Twitter only
-Status: approval packet ready, not approved, not published
+Status: publishable under READY_PUBLIC_OWNED; not yet published in this patch run
 Campaign ID: callscore-x-public-canary-approval-packet
 Art of War evidence: /tmp/callscore-x-canary-artofwar.json
 
 ## Safety boundary
 
-This packet is draft-only. It does not authorize publication.
+This packet is now reclassified under the 2026-06-15 default-public policy. It authorizes owned CallScore X/Twitter organic publication when executed by Hermes on the owned/managed CallScore/Omar account, zero-cost, with the exact payload/destination below, no DM/outreach, no paid boost/API, no provider/account mutation, no Whop/customer/payment/pricing mutation, no secrets, and post-execution receipt written immediately after publish.
 
 Registry row: X / Twitter
 Owner: marketing-channel-growth
 Provider: Composio Twitter/X
-Current status: gated
-Gate status: fail_closed
-Required gate: PUBLISH_GATE + TRUST_GATE + DATA_POLICY_GATE + SECRET_GATE
-Required receipt: approved publish receipt with payload hash and destination
-Receipt path pattern: .tmp/workflow-receipts/artofwar_publish_approval_review/<run-id>.json
-Rollback path: if approved post occurs, delete/retract post and record correction receipt.
+Current status: ready_public_owned
+Gate status: ready_public_owned
+Required gate: READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + POST_EXECUTION_RECEIPT + SECRET_GATE
+Required receipt: post-execution public GTM receipt with payload hash, destination, provider response/post URL when available, rollback path, and monitoring plan
+Receipt path pattern: .tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json
+Rollback path: after live post, delete/retract post if needed and record correction/rollback receipt.
 
-Forbidden without explicit approval receipt:
+Still forbidden without explicit approval receipt:
 
-- live public post
 - DM
 - paid boost or paid API use
 - provider/account mutation
@@ -33,7 +32,7 @@ Forbidden without explicit approval receipt:
 
 Categories: sales, social, marketing, compliance, governance
 Primary skills used: art-of-war-operations, callscore-autopilot, humanizer, xurl safety rules
-Execution mode: controlled draft/approval packet only
+Execution mode: default-public owned X canary; no live post performed during this patch run
 
 ## Primary post copy
 
@@ -49,6 +48,16 @@ https://call-score.com
 
 Character count: 259
 Payload SHA-256: 6be1a693803db3fd746d06017449a2104ecbc1f9345f2c5a7739c0b7db2e3f42
+
+## Default-public classification
+
+Publishable under default-public policy: yes.
+
+Reason: owned CallScore X/Twitter organic post; zero-cost; no DM/email/outreach; no paid boost/API; no provider/account mutation; no Whop/customer/payment/pricing mutation; no named creator accusation; no investment advice; no performance guarantee; no private data; safe canonical URL.
+
+Payload hash: `6be1a693803db3fd746d06017449a2104ecbc1f9345f2c5a7739c0b7db2e3f42`.
+
+Execution receipt path: `.tmp/workflow-receipts/artofwar_owned_public_execution/callscore-x-public-canary-20260615.json`.
 
 ## Alternate post variant 1
 
@@ -143,7 +152,7 @@ Prepared response posture: explain methodology neutrally. Do not argue with crea
 
 ## Risk and compliance lint
 
-Result: pass for draft-only approval packet.
+Result: pass for owned public organic execution under READY_PUBLIC_OWNED.
 
 Checks:
 
@@ -166,7 +175,7 @@ Risk notes:
 
 ## Rollback/delete instruction
 
-If this post is later approved and published, rollback is:
+If this post is published, rollback is:
 
 1. Delete the X/Twitter post through the approved provider/tooling path.
 2. Capture delete receipt with original post ID, deletion timestamp, operator, reason, and provider response.
@@ -208,22 +217,22 @@ Forbidden monitoring actions without separate approval:
 - account/profile changes
 - deleting the post unless rollback approval path applies
 
-## Approval receipt template
+## Post-execution receipt template
 
-Save exact approved receipt to:
+Save exact post-execution receipt to:
 
 ```text
-/opt/crypto-tuber-ranked/.tmp/workflow-receipts/artofwar_publish_approval_review/callscore-x-public-canary-20260615.json
+/opt/crypto-tuber-ranked/.tmp/workflow-receipts/artofwar_owned_public_execution/callscore-x-public-canary-20260615.json
 ```
 
 Template:
 
 ```json
 {
-  "schema": "callscore.publish_approval_receipt.v1",
-  "approved": true,
-  "approved_at": "<ISO-8601 timestamp>",
-  "approved_by": "Omar Al-Bakri",
+  "schema": "callscore.owned_public_execution_receipt.v1",
+  "executed": true,
+  "executed_at": "<ISO-8601 timestamp>",
+  "executed_by": "Hermes/OMX operator",
   "channel": "X / Twitter",
   "provider": "Composio Twitter/X or xurl, whichever execution path is explicitly approved",
   "destination_account": "<exact X account/handle>",
@@ -234,9 +243,9 @@ Template:
   "landing_url": "https://call-score.com",
   "utm_url": "https://call-score.com/?utm_source=x&utm_medium=social&utm_campaign=controlled_full_public_canary_20260615&utm_content=primary_evidence_not_hype",
   "required_gates": [
-    "PUBLISH_GATE",
-    "TRUST_GATE",
-    "DATA_POLICY_GATE",
+    "READY_PUBLIC_OWNED",
+    "PUBLIC_MESSAGING_POLICY",
+    "POST_EXECUTION_RECEIPT",
     "SECRET_GATE"
   ],
   "forbidden_actions_confirmed": [
@@ -249,34 +258,39 @@ Template:
   ],
   "rollback_instruction": "Delete/retract post and record rollback receipt if the approved post causes material confusion, policy risk, unsupported claim risk, or operator requests rollback.",
   "post_publication_monitoring_plan": "Read-only monitoring at T+15m, T+1h, T+4h, T+24h; draft responses only unless separately approved.",
-  "operator_exact_approval_phrase": "APPROVE X PUBLIC CANARY callscore-x-public-canary-approval-packet primary payload_sha256=6be1a693803db3fd746d06017449a2104ecbc1f9345f2c5a7739c0b7db2e3f42 destination=<exact handle>"
+  "execution_command": "xurl post <exact payload text>",
+  "post_url_or_id": "<provider response post id/url>"
 }
 ```
 
-## Exact approval needed before publishing
+## Exact execution action
 
-Omar must provide an approval receipt containing the exact selected variant, payload hash, destination account, landing URL, rollback path, and monitoring plan.
-
-Minimum approval phrase:
-
-```text
-APPROVE X PUBLIC CANARY callscore-x-public-canary-approval-packet primary payload_sha256=6be1a693803db3fd746d06017449a2104ecbc1f9345f2c5a7739c0b7db2e3f42 destination=<exact handle>
-```
-
-After receipt exists, run validation before any post:
+Pre-approval is no longer required for this owned organic post. Before executing, confirm the destination is the owned/managed CallScore/Omar X account and run validation:
 
 ```bash
 cd /opt/crypto-tuber-ranked
-python3 -m json.tool .tmp/workflow-receipts/artofwar_publish_approval_review/callscore-x-public-canary-20260615.json >/tmp/callscore-x-canary-approval.validated.json
+python3 -m json.tool .tmp/workflow-receipts/artofwar_owned_public_execution/callscore-x-public-canary-20260615.json >/tmp/callscore-x-canary-approval.validated.json
 node --import tsx --test tests/gtm-agent-registry.test.ts tests/workflow-receipts.test.ts tests/workplane-jobs.test.ts
 ```
 
-Publishing command is intentionally omitted from this packet because publication is still gated. The execution path must be selected only after the approval receipt exists and validates.
+Publish command for Hermes when live execution mode is invoked:
+
+```bash
+xurl post "Crypto is loud. CallScore is a quieter way to check who was right.
+
+It ranks crypto creators by evidence: their calls, claims, transcripts, and what happened after.
+
+Use it to separate signal from noise before you trust another thread.
+
+https://call-score.com"
+```
+
+Immediately save the provider response/post URL or ID into `.tmp/workflow-receipts/artofwar_owned_public_execution/callscore-x-public-canary-20260615.json`, then run read-only monitoring.
 
 ## Final status
 
-Approval packet ready.
-Public action performed: no.
+READY_PUBLIC_OWNED execution packet ready.
+Public action performed in this patch run: no.
 External mutation performed: no.
 Paid action performed: no.
 Whop/customer/payment/pricing mutation performed: no.

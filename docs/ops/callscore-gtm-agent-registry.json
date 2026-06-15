@@ -1,11 +1,11 @@
 {
   "schema_version": "callscore_gtm_agent_registry.v1",
-  "generated_at": "2026-06-14T16:55:00Z",
+  "generated_at": "2026-06-15T11:25:00Z",
   "canonical_status": {
     "readiness_model": "CONTROLLED_FULL",
     "hosting": "Netlify is canonical. Stale Vercel references are not a CallScore deployment target.",
     "data_source": "Local HH PostgreSQL plus HH Read API are canonical. Stale Neon references are not a CallScore data source.",
-    "dangerous_actions": "fail_closed"
+    "dangerous_actions": "restricted actions fail_closed; owned CallScore public organic GTM is READY_PUBLIC_OWNED by default when safe, zero-cost, non-financial, non-secret, non-destructive, and inside canonical messaging policy."
   },
   "gate_rules": {
     "PUBLISH_GATE": "Required before public posts/pages/listings/methodology/ranking/correction publication.",
@@ -13,7 +13,10 @@
     "SPEND_GATE": "Required before paid ads, boosts, enrichment, APIs, LLMs, or paid SaaS activation.",
     "FINANCIAL_GATE": "Required before Whop pricing/product/payment/customer changes, payouts, revenue share, or money movement.",
     "PRODUCTION_GATE": "Required before DB writes, deployments, provider mutations, infra changes, or webhook changes.",
-    "SECRET_GATE": "Always applies: never expose secrets, env values, tokens, cookies, auth headers, DB URLs, or private keys."
+    "SECRET_GATE": "Always applies: never expose secrets, env values, tokens, cookies, auth headers, DB URLs, or private keys.",
+    "READY_PUBLIC_OWNED": "Owned CallScore public organic posts/listing-copy/page content may execute by default after canonical messaging policy pass, owned/managed-channel confirmation, zero-cost check, destination/hash capture, and post-execution receipt.",
+    "PUBLIC_MESSAGING_POLICY": "Content must avoid investment advice, guarantees, named-creator accusations, defamation, harassment, doxxing, legal/compliance claims, private data, and unsupported accuracy claims.",
+    "POST_EXECUTION_RECEIPT": "Required after owned public execution; records channel, account/destination, payload hash, URL/UTM, provider response/post URL when available, rollback path, and monitoring plan."
   },
   "entries": [
     {
@@ -32,32 +35,37 @@
         "artofwar_strategy_brief",
         "artofwar_content_queue_dry_run",
         "artofwar_campaign_plan_generate",
-        "artofwar_campaign_approval_review"
+        "artofwar_campaign_approval_review",
+        "artofwar_owned_public_execution"
       ],
       "allowed_actions_now": [
-        "draft launch threads",
-        "draft creator comparison posts",
-        "prepare approval packet"
+        "generate owned public X post",
+        "publish owned zero-cost X post when safe content policy passes",
+        "generate UTM link",
+        "record post-execution receipt",
+        "monitor read-only results"
       ],
       "forbidden_actions": [
-        "live public post without approval receipt",
-        "paid boost or paid API use",
-        "provider/account mutation",
+        "DMs or outreach without SEND_GATE",
+        "paid boost or paid API use without SPEND_GATE",
+        "provider/account mutation without PRODUCTION_GATE",
+        "named creator accusations/investment advice/guarantees/private-data claims without explicit approval",
         "secret/env/token/cookie exposure"
       ],
-      "required_gate": "PUBLISH_GATE + TRUST_GATE + DATA_POLICY_GATE + SECRET_GATE",
-      "gate_status": "fail_closed",
-      "required_receipt": "approved publish receipt with payload hash and destination",
-      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_publish_approval_review/<run-id>.json",
-      "rollback_path": "No current external action. If future approved post occurs, delete/retract post and record correction receipt.",
-      "current_status": "gated",
-      "next_safe_action": "Generate draft and compliance lint only.",
-      "operator_action_required": "Approve exact post payload and destination before live post.",
+      "required_gate": "READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + POST_EXECUTION_RECEIPT + SECRET_GATE; SEND_GATE for DMs/outreach; SPEND_GATE for paid actions",
+      "gate_status": "ready_public_owned",
+      "required_receipt": "post-execution public GTM receipt with payload hash, destination, provider response/post URL when available, rollback path, and monitoring plan",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json",
+      "rollback_path": "Delete/retract owned post if needed, record rollback receipt, and draft correction if material confusion occurred.",
+      "current_status": "ready_public_owned",
+      "next_safe_action": "Publish the safe owned X canary under default-public policy, then record execution receipt and monitor read-only metrics.",
+      "operator_action_required": "None for safe owned organic post; explicit approval still required for DMs, paid boosts, provider/account mutation, named accusations, investment advice, or guarantees.",
       "evidence": [
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
-        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "2026-06-15 revenue activation policy: owned public organic execution allowed by default under READY_PUBLIC_OWNED; restricted actions remain gated."
       ]
     },
     {
@@ -74,33 +82,37 @@
       "workplane_jobs": [
         "artofwar_content_queue_dry_run",
         "artofwar_campaign_dossier",
-        "artofwar_campaign_approval_review"
+        "artofwar_campaign_approval_review",
+        "artofwar_owned_public_execution"
       ],
       "allowed_actions_now": [
-        "draft LinkedIn post",
-        "draft partnership message",
-        "prepare approval packet"
+        "generate owned public LinkedIn post",
+        "publish owned zero-cost LinkedIn post when safe content policy passes",
+        "record post-execution receipt",
+        "monitor read-only results"
       ],
       "forbidden_actions": [
-        "live post without approval receipt",
-        "LinkedIn DM without SEND_GATE",
-        "paid promotion",
+        "LinkedIn DM/outreach without SEND_GATE",
+        "paid promotion without SPEND_GATE",
+        "company/profile/provider mutation without PRODUCTION_GATE",
+        "named accusations/investment advice/guarantees/private-data claims without explicit approval",
         "secret exposure"
       ],
-      "required_gate": "PUBLISH_GATE or SEND_GATE + TRUST_GATE + SECRET_GATE",
-      "gate_status": "fail_closed",
-      "required_receipt": "publish/send approval receipt with payload hash",
-      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
-      "rollback_path": "No current external action. If future approved post/message occurs, delete/retract and record rollback receipt.",
-      "current_status": "gated",
-      "next_safe_action": "Use draft-only CallScore channel asset flow.",
-      "operator_action_required": "Approve exact post or outreach payload before live use.",
+      "required_gate": "READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + POST_EXECUTION_RECEIPT + SECRET_GATE; SEND_GATE for DMs/outreach; SPEND_GATE for paid promotion",
+      "gate_status": "ready_public_owned",
+      "required_receipt": "post-execution public GTM receipt with payload hash, destination, provider response/post URL when available, rollback path, and monitoring plan",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json",
+      "rollback_path": "Delete/retract owned post if needed, record rollback receipt, and draft correction if material confusion occurred.",
+      "current_status": "ready_public_owned",
+      "next_safe_action": "Publish safe owned organic LinkedIn product/methodology post after messaging policy pass and log receipt.",
+      "operator_action_required": "None for safe owned organic post; explicit approval required for DMs/outreach, paid promotion, provider/profile mutation, legal claims, or named accusations.",
       "evidence": [
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
-        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/content_creator/SKILL.md"
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/content_creator/SKILL.md",
+        "2026-06-15 revenue activation policy: owned public organic execution allowed by default under READY_PUBLIC_OWNED; restricted actions remain gated."
       ]
     },
     {
@@ -140,7 +152,8 @@
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
-        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
       ]
     },
     {
@@ -156,33 +169,37 @@
       "workplane_jobs": [
         "artofwar_audience_research_dry_run",
         "artofwar_content_queue_dry_run",
-        "artofwar_campaign_approval_review"
+        "artofwar_campaign_approval_review",
+        "artofwar_owned_public_execution"
       ],
       "allowed_actions_now": [
-        "draft non-spam community post",
-        "record server/channel rule assumptions",
-        "prepare approval packet"
+        "generate owned community post",
+        "publish zero-cost post to owned/managed channel when rules and messaging policy pass",
+        "record post-execution receipt",
+        "monitor read-only replies/metrics"
       ],
       "forbidden_actions": [
-        "send/post without SEND_GATE receipt",
-        "ignore community rules",
-        "paid promotion",
+        "DMs/outreach without SEND_GATE",
+        "posting to non-owned communities without explicit approval",
+        "spam or rule-breaking posts",
+        "paid promotion without SPEND_GATE",
         "secret exposure"
       ],
-      "required_gate": "SEND_GATE + TRUST_GATE + SECRET_GATE",
-      "gate_status": "fail_closed",
-      "required_receipt": "approved community send receipt",
-      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
-      "rollback_path": "No current external action. If future approved post occurs, delete/retract and record receipt.",
-      "current_status": "gated",
-      "next_safe_action": "Draft community-safe copy only.",
-      "operator_action_required": "Approve exact server/channel, payload, and rule checklist before send.",
+      "required_gate": "READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + community rules check + POST_EXECUTION_RECEIPT + SECRET_GATE; SEND_GATE for DMs/outreach or non-owned community posting",
+      "gate_status": "ready_public_owned",
+      "required_receipt": "post-execution owned community receipt with payload hash, channel/server/chat, rollback/delete path, and monitoring plan",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json",
+      "rollback_path": "Delete/retract owned community post where possible, record rollback receipt, and draft correction if needed.",
+      "current_status": "ready_public_owned",
+      "next_safe_action": "Publish safe owned/managed community update only in owned channel, then record receipt.",
+      "operator_action_required": "None for safe owned/managed channel post; explicit approval required for DMs, outreach, non-owned communities, paid promotion, or named accusations.",
       "evidence": [
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
-        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/marketing-community-drops/SKILL.md"
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/marketing-community-drops/SKILL.md",
+        "2026-06-15 revenue activation policy: owned public organic execution allowed by default under READY_PUBLIC_OWNED; restricted actions remain gated."
       ]
     },
     {
@@ -198,31 +215,36 @@
       "workplane_jobs": [
         "artofwar_audience_research_dry_run",
         "artofwar_content_queue_dry_run",
-        "artofwar_campaign_approval_review"
+        "artofwar_campaign_approval_review",
+        "artofwar_owned_public_execution"
       ],
       "allowed_actions_now": [
-        "draft mod-friendly summary",
-        "prepare approval packet"
+        "generate owned community post",
+        "publish zero-cost post to owned/managed channel when rules and messaging policy pass",
+        "record post-execution receipt",
+        "monitor read-only replies/metrics"
       ],
       "forbidden_actions": [
-        "send without SEND_GATE receipt",
-        "spam communities",
-        "paid promotion",
+        "DMs/outreach without SEND_GATE",
+        "posting to non-owned communities without explicit approval",
+        "spam or rule-breaking posts",
+        "paid promotion without SPEND_GATE",
         "secret exposure"
       ],
-      "required_gate": "SEND_GATE + TRUST_GATE + SECRET_GATE",
-      "gate_status": "fail_closed",
-      "required_receipt": "approved community send receipt",
-      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
-      "rollback_path": "No current send. If future approved message occurs, delete/retract where possible and record receipt.",
-      "current_status": "gated",
-      "next_safe_action": "Draft only.",
-      "operator_action_required": "Approve exact chat/channel and payload before send.",
+      "required_gate": "READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + community rules check + POST_EXECUTION_RECEIPT + SECRET_GATE; SEND_GATE for DMs/outreach or non-owned community posting",
+      "gate_status": "ready_public_owned",
+      "required_receipt": "post-execution owned community receipt with payload hash, channel/server/chat, rollback/delete path, and monitoring plan",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json",
+      "rollback_path": "Delete/retract owned community post where possible, record rollback receipt, and draft correction if needed.",
+      "current_status": "ready_public_owned",
+      "next_safe_action": "Publish safe owned/managed community update only in owned channel, then record receipt.",
+      "operator_action_required": "None for safe owned/managed channel post; explicit approval required for DMs, outreach, non-owned communities, paid promotion, or named accusations.",
       "evidence": [
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
-        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "2026-06-15 revenue activation policy: owned public organic execution allowed by default under READY_PUBLIC_OWNED; restricted actions remain gated."
       ]
     },
     {
@@ -264,7 +286,8 @@
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
-        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/opportunity_matrix/SKILL.md"
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/opportunity_matrix/SKILL.md",
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
       ]
     },
     {
@@ -281,33 +304,37 @@
       "workplane_jobs": [
         "artofwar_strategy_brief",
         "artofwar_campaign_plan_generate",
-        "artofwar_campaign_verify"
+        "artofwar_campaign_verify",
+        "artofwar_owned_public_execution"
       ],
       "allowed_actions_now": [
         "draft SEO page briefs",
-        "draft methodology/ranking snippets",
-        "build video hook swipefile"
+        "publish repo-controlled safe SEO/methodology content when validation passes",
+        "generate UTM links",
+        "record publication/deploy receipt"
       ],
       "forbidden_actions": [
-        "publish public page without PUBLISH_GATE",
+        "runtime/app deploy without validation",
         "unsupported creator claim",
-        "production deploy without PRODUCTION_GATE",
+        "investment advice or guarantees",
+        "named accusations without explicit approval",
         "secret exposure"
       ],
-      "required_gate": "PUBLISH_GATE + TRUST_GATE + DATA_POLICY_GATE + PRODUCTION_GATE + SECRET_GATE",
-      "gate_status": "fail_closed",
-      "required_receipt": "approved publication/deploy receipt",
-      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_publish_approval_review/<run-id>.json",
-      "rollback_path": "No current deploy/publication. If future approved page ships, revert commit/deploy and publish correction if needed.",
-      "current_status": "gated",
-      "next_safe_action": "Create draft briefs only.",
-      "operator_action_required": "Approve exact page payload and deploy path before publication.",
+      "required_gate": "READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + POST_EXECUTION_RECEIPT + SECRET_GATE; PRODUCTION_GATE when runtime/app deploy or provider mutation is required",
+      "gate_status": "ready_public_owned",
+      "required_receipt": "publication receipt or deploy receipt with commit/deploy id when applicable, payload hash, rollback path, and validation result",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json",
+      "rollback_path": "Revert content commit/deploy or remove page, then record rollback/correction receipt.",
+      "current_status": "ready_public_owned",
+      "next_safe_action": "Publish safe repo-controlled owned content only after validation; no Netlify deploy for docs-only changes.",
+      "operator_action_required": "None for safe repo-controlled content with validation; explicit approval required for named accusations, provider mutation, or unvalidated deploy.",
       "evidence": [
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
-        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/creator-video-swipefile/SKILL.md"
+        "/srv/agents/repos/Claude_Code_Automations/agent_workflows/creator-video-swipefile/SKILL.md",
+        "2026-06-15 revenue activation policy: owned public organic execution allowed by default under READY_PUBLIC_OWNED; restricted actions remain gated."
       ]
     },
     {
@@ -349,7 +376,8 @@
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
-        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
       ]
     },
     {
@@ -392,7 +420,8 @@
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
-        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
       ]
     },
     {
@@ -409,34 +438,36 @@
       "workplane_jobs": [
         "whop_activation_review",
         "artofwar_campaign_dossier",
-        "artofwar_campaign_approval_review"
+        "artofwar_campaign_approval_review",
+        "artofwar_owned_public_execution"
       ],
       "allowed_actions_now": [
         "draft listing title/subtitle",
-        "draft FAQ/trust section",
-        "prepare screenshot checklist"
+        "prepare screenshot checklist",
+        "publish safe marketplace copy/assets when no pricing/payment/customer/entitlement/payout/provider-state mutation occurs",
+        "record listing-copy receipt"
       ],
       "forbidden_actions": [
-        "live listing edit without PUBLISH_GATE",
-        "pricing/payment change without FINANCIAL_GATE",
-        "provider mutation without PRODUCTION_GATE",
+        "pricing/payment/product/plan/customer/entitlement/payout/provider mutation without FINANCIAL_GATE and PRODUCTION_GATE",
+        "unsupported claims",
         "secret exposure"
       ],
-      "required_gate": "PUBLISH_GATE + FINANCIAL_GATE + PRODUCTION_GATE + SECRET_GATE",
-      "gate_status": "fail_closed",
-      "required_receipt": "approved Whop listing or financial mutation receipt",
+      "required_gate": "READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + POST_EXECUTION_RECEIPT + SECRET_GATE for copy/assets; FINANCIAL_GATE + PRODUCTION_GATE for pricing/product/customer/payment/entitlement/payout/provider mutation",
+      "gate_status": "ready_public_owned",
+      "required_receipt": "marketplace copy/assets receipt; manifest/diff/rollback/approval/local-auth receipt for financial or provider mutation",
       "receipt_path_pattern": ".tmp/workflow-receipts/whop_activation_review/<run-id>.json",
-      "rollback_path": "No current provider mutation. If future approved edit occurs, restore prior manifest/listing and record provider readback receipt.",
-      "current_status": "gated",
-      "next_safe_action": "Generate listing assets only.",
-      "operator_action_required": "Approve exact listing/price/customer mutation separately before provider write.",
+      "rollback_path": "Restore prior listing copy/assets from receipt. For approved provider mutation, restore prior manifest/provider settings and verify readback.",
+      "current_status": "ready_public_owned",
+      "next_safe_action": "Publish safe marketplace copy/assets only if no financial/customer/payment/provider mutation is included.",
+      "operator_action_required": "None for safe copy/assets; explicit approval required for pricing/product/customer/payment/entitlement/payout/provider mutation.",
       "evidence": [
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
         "/srv/agents/repos/Claude_Code_Automations/agent_workflows/marketing-whop-marketplace/SKILL.md",
-        "/opt/crypto-tuber-ranked/docs/ops/whop-auto-certification.md"
+        "/opt/crypto-tuber-ranked/docs/ops/whop-auto-certification.md",
+        "2026-06-15 revenue activation policy: owned public organic execution allowed by default under READY_PUBLIC_OWNED; restricted actions remain gated."
       ]
     },
     {
@@ -486,7 +517,8 @@
         "/srv/whop-auto/state/.whop-pipeline/registry.json",
         "/srv/whop-auto/plugin/agent_workflows/whop_auto/README.md",
         "/opt/crypto-tuber-ranked/docs/ops/whop-auto-certification.md",
-        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts"
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
       ]
     },
     {
@@ -522,7 +554,8 @@
       "operator_action_required": "Approve exact CRM object/payload before write.",
       "evidence": [
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
-        "/opt/crypto-tuber-ranked/src/lib/workplane-status.ts"
+        "/opt/crypto-tuber-ranked/src/lib/workplane-status.ts",
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
       ]
     },
     {
@@ -556,7 +589,8 @@
       "next_safe_action": "Read-only analytics feedback only.",
       "operator_action_required": "Approve exact tracking/provider change before mutation.",
       "evidence": [
-        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md"
+        "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
       ]
     },
     {
@@ -591,7 +625,8 @@
       "operator_action_required": "Reload/auth Composio Hugging Face only if needed for model/tooling lane.",
       "evidence": [
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
-        "agentmemory callscore-canonical-basics.md"
+        "agentmemory callscore-canonical-basics.md",
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
       ]
     },
     {
@@ -610,24 +645,27 @@
       ],
       "allowed_actions_now": [
         "read-only tool discovery",
-        "read-only connected app inventory"
+        "read-only connected app inventory",
+        "owned public organic post execution when app/channel registry row is READY_PUBLIC_OWNED and content policy passes"
       ],
       "forbidden_actions": [
-        "send/post/write/provider mutation without gate",
-        "paid action",
+        "email send/DM/outreach without SEND_GATE",
+        "paid action without SPEND_GATE",
+        "CRM/analytics/provider mutation without PRODUCTION_GATE",
         "secret exposure"
       ],
-      "required_gate": "SECRET_GATE + action-specific PUBLISH_GATE/SEND_GATE/SPEND_GATE/PRODUCTION_GATE",
+      "required_gate": "SECRET_GATE + READY_PUBLIC_OWNED for owned public organic posts; action-specific SEND_GATE/SPEND_GATE/PRODUCTION_GATE for restricted actions",
       "gate_status": "monitored",
       "required_receipt": "read-only inventory receipt or action-specific approval receipt",
       "receipt_path_pattern": ".tmp/workflow-receipts/composio_*/*.json",
       "rollback_path": "No current external mutation. Disable/reload MCP or revert provider action per app receipt if future approved action fails.",
       "current_status": "monitored",
-      "next_safe_action": "Use read-only inventory before app-specific action.",
+      "next_safe_action": "Use app-specific registry row before any Composio action; owned public organic posts may execute when READY_PUBLIC_OWNED criteria pass.",
       "operator_action_required": "Approve exact app action before write/send/post.",
       "evidence": [
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
-        "agentmemory callscore-canonical-basics.md"
+        "agentmemory callscore-canonical-basics.md",
+        "2026-06-15 revenue activation policy: owned public organic execution allowed by default under READY_PUBLIC_OWNED; restricted actions remain gated."
       ]
     },
     {
@@ -659,34 +697,38 @@
         "artofwar_campaign_gemma_eval",
         "artofwar_campaign_receipt",
         "artofwar_campaign_dossier",
-        "artofwar_campaign_approval_review"
+        "artofwar_campaign_approval_review",
+        "artofwar_owned_public_execution"
       ],
       "allowed_actions_now": [
         "private dry-run",
-        "persona score",
+        "persona score as quality control",
         "Gemma eval",
-        "approval dossier",
-        "receipt generation"
+        "approval dossier for restricted lanes",
+        "owned public canary execution when safe policy passes",
+        "post-execution receipt generation",
+        "read-only monitoring"
       ],
       "forbidden_actions": [
-        "public action without approval",
-        "spend",
-        "provider mutation",
-        "production DB/write impact",
+        "paid spend without SPEND_GATE",
+        "email/DM/outreach without SEND_GATE",
+        "non-owned public posting without explicit approval",
+        "provider/customer/payment/DB/deploy mutation without PRODUCTION_GATE/FINANCIAL_GATE",
         "secret exposure"
       ],
-      "required_gate": "PUBLISH_GATE/SEND_GATE/SPEND_GATE/PRODUCTION_GATE as action-specific + SECRET_GATE",
+      "required_gate": "READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + POST_EXECUTION_RECEIPT + SECRET_GATE for owned organic public posts; SEND_GATE/SPEND_GATE/FINANCIAL_GATE/PRODUCTION_GATE as action-specific for restricted lanes",
       "gate_status": "monitored",
       "required_receipt": "campaign receipt and approval review receipt",
       "receipt_path_pattern": "docs/plans/artifacts/art-of-war/campaign-receipts/<campaign-id>-iter-<n>.json",
       "rollback_path": "No current external action. Delete/replace draft artifacts if wrong; if future live action occurs use channel rollback.",
-      "current_status": "monitored",
-      "next_safe_action": "Run governed preflight/persona/dry-run/Gemma/receipt before any approval packet.",
+      "current_status": "ready_public_owned",
+      "next_safe_action": "Run Art of War selection/persona quality pass, publish safe owned public canary if selected, then receipt and monitor.",
       "operator_action_required": "Approve exact public/spend/provider action separately.",
       "evidence": [
         "/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py",
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/README.md",
-        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts"
+        "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
+        "2026-06-15 revenue activation policy: owned public organic execution allowed by default under READY_PUBLIC_OWNED; restricted actions remain gated."
       ]
     },
     {

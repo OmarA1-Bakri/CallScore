@@ -23,19 +23,19 @@ for (const [name, text] of Object.entries(skillText)) {
     assert.match(text, /CONTROLLED_FULL/);
     assert.match(text, /\/opt\/crypto-tuber-ranked\/docs\/ops\/callscore-gtm-agent-registry\.json/);
     assert.match(text, /Workplane/);
-    assert.match(text, /approval receipt/i);
+    assert.match(text, /approval receipt|post-execution receipt/i);
     assert.match(text, /rollback path/i);
     for (const gate of gates) assert.match(text, new RegExp(gate), `${name} missing ${gate}`);
   });
 }
 
-test("Art of War cannot publish from dry-run alone and requires persona evidence", () => {
+test("Art of War treats persona review as quality control and blocks restricted content", () => {
   const text = skillText["art-of-war-operations"];
-  assert.match(text, /Never publish from dry-run alone/i);
-  assert.match(text, /persona committee evidence/i);
+  assert.match(text, /Do not confuse dry-run with publish/i);
+  assert.match(text, /persona committee quality scoring/i);
+  assert.match(text, /quality control, not a hard blocker/i);
   assert.match(text, /payload hash/i);
-  assert.match(text, /TRUST_GATE/);
-  assert.match(text, /DATA_POLICY_GATE/);
+  assert.match(text, /public messaging policy|PUBLIC_MESSAGING_POLICY/i);
 });
 
 test("CallScore autopilot respects controlled-full and transcript cooldown", () => {
@@ -66,10 +66,10 @@ test("Whop automation requires full mutation gate pack", () => {
 });
 
 test("humanizer and xurl invalidate approvals when payload or URL changes", () => {
-  assert.match(skillText.humanizer, /new payload hash and invalidates prior approval/i);
-  assert.match(skillText.humanizer, /Never convert evidence-safe copy into defamatory claims/i);
-  assert.match(skillText.xurl, /if destination URL changes, invalidate approval/i);
-  assert.match(skillText.xurl, /Do not post, reply, quote, DM, like, repost, follow, upload media, or delete without/i);
+  assert.match(skillText.humanizer, /new payload hash and requires a new receipt/i);
+  assert.match(skillText.humanizer, /defamatory claims/i);
+  assert.match(skillText.xurl, /destination URL changes, generate a new payload hash and receipt/i);
+  assert.match(skillText.xurl, /safe owned public posts/i);
   assert.match(skillText.xurl, /unsafe redirects, non-canonical destinations, secret-bearing URLs/i);
 });
 

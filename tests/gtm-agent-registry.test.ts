@@ -66,11 +66,11 @@ test("every registry row has owner, gate, receipt, rollback, and evidence", () =
   }
 });
 
-test("public and outreach channels require publish or send gates", () => {
-  for (const channel of ["X / Twitter", "LinkedIn", "Whop marketplace", "YouTube / SEO"]) {
-    assert.match(byChannel.get(channel)!.required_gate, /PUBLISH_GATE|SEND_GATE/);
+test("owned public channels are READY_PUBLIC_OWNED while outreach channels require send gates", () => {
+  for (const channel of ["X / Twitter", "LinkedIn", "Discord", "Telegram", "Whop marketplace", "YouTube / SEO"]) {
+    assert.match(byChannel.get(channel)!.required_gate, /READY_PUBLIC_OWNED/);
   }
-  for (const channel of ["Gmail / email", "Discord", "Telegram", "Reddit", "Crypto newsletters", "Creator partnerships"]) {
+  for (const channel of ["Gmail / email", "Reddit", "Crypto newsletters", "Creator partnerships"]) {
     assert.match(byChannel.get(channel)!.required_gate, /SEND_GATE/);
   }
 });
@@ -83,14 +83,17 @@ test("Whop financial/provider mutation stays fail-closed", () => {
   assert.ok(provider.forbidden_actions.some((action) => /pricing|payment|mutation/i.test(action)));
 });
 
-test("no row allows live send, post, spend, or mutation without approval receipt", () => {
-  const unsafe = /\b(live post|post live|send email|send message|paid|spend|provider write|mutation|pricing change|payment change)\b/i;
+test("registry allows safe owned posts but keeps restricted sends, spend, and mutations gated", () => {
+  const ownedPublic = new Set(["X / Twitter", "LinkedIn", "Discord", "Telegram", "Whop marketplace", "YouTube / SEO"]);
+  const restrictedUnsafe = /\b(send email|send message|send live|DM live|paid|spend|provider write|mutation|pricing change|payment change)\b/i;
   for (const entry of registry.entries) {
     for (const action of entry.allowed_actions_now) {
-      assert.doesNotMatch(action, unsafe, `${entry.channel} unsafe allowed action: ${action}`);
+      if (ownedPublic.has(entry.channel) && /publish|post|public|copy/i.test(action)) continue;
+      if (/draft|prepare|read-only|inventory|plan/i.test(action)) continue;
+      assert.doesNotMatch(action, restrictedUnsafe, `${entry.channel} unsafe allowed action: ${action}`);
     }
-    if (/post|send|spend|mutation|payment|pricing|provider/i.test(entry.forbidden_actions.join(" "))) {
-      assert.match(entry.required_receipt, /approval|approved|receipt|manifest/i, `${entry.channel} dangerous lane lacks approval receipt`);
+    if (/send|spend|mutation|payment|pricing|provider/i.test(entry.forbidden_actions.join(" "))) {
+      assert.match(entry.required_gate, /SEND_GATE|SPEND_GATE|FINANCIAL_GATE|PRODUCTION_GATE|SECRET_GATE/, `${entry.channel} dangerous lane lacks restricted gate`);
     }
   }
 });
