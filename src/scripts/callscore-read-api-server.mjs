@@ -263,6 +263,90 @@ async function consensus(url) {
   return result.rows;
 }
 
+function redactArtifactJson(value) {
+  const blocked = new Set(["api_key", "authorization", "cookie", "password", "secret", "token"]);
+  if (Array.isArray(value)) return value.map(redactArtifactJson);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, nested]) => [
+    key,
+    blocked.has(String(key).toLowerCase()) ? "[REDACTED]" : redactArtifactJson(nested),
+  ]));
+}
+
+function redactArtifactRow(row) {
+  return row && row.json && typeof row.json === "object"
+    ? { ...row, json: redactArtifactJson(row.json) }
+    : row;
+}
+
+async function workflows(url) {
+  const limit = parseLimit(url, 50, 100);
+  const [runs, blocked] = await Promise.all([
+    pool.query(`
+      SELECT *
+      FROM workflow_runs
+      ORDER BY created_at DESC
+      LIMIT $1
+    `, [limit]),
+    pool.query(`
+      SELECT 'node' AS kind, id::text, workflow_run_id::text, status, error AS reason, created_at
+      FROM workflow_node_runs
+      WHERE status IN ('blocked', 'awaiting_approval', 'failed')
+      UNION ALL
+      SELECT 'approval_gate' AS kind, id::text, workflow_run_id::text, status, reason, created_at
+      FROM approval_gates
+      WHERE status IN ('blocked', 'awaiting_approval')
+      ORDER BY created_at DESC
+      LIMIT $1
+    `, [limit]),
+  ]);
+  return { ok: true, runs: runs.rows, blockedItems: blocked.rows };
+}
+
+async function workflowDetail(id) {
+  const runResult = await pool.query(`
+    SELECT *
+    FROM workflow_runs
+    WHERE id = $1
+    LIMIT 1
+  `, [id]);
+  const run = runResult.rows[0] || null;
+  if (!run) return null;
+  const [nodes, artifacts, events, approvalGates] = await Promise.all([
+    pool.query(`SELECT * FROM workflow_node_runs WHERE workflow_run_id = $1 ORDER BY created_at ASC`, [id]),
+    pool.query(`SELECT * FROM artifacts WHERE workflow_run_id = $1 ORDER BY created_at ASC`, [id]),
+    pool.query(`SELECT * FROM workflow_events WHERE workflow_run_id = $1 ORDER BY created_at ASC`, [id]),
+    pool.query(`SELECT * FROM approval_gates WHERE workflow_run_id = $1 ORDER BY created_at ASC`, [id]),
+  ]);
+  return {
+    ok: true,
+    run,
+    nodes: nodes.rows,
+    artifacts: artifacts.rows.map(redactArtifactRow),
+    events: events.rows,
+    approvalGates: approvalGates.rows,
+    totals: {
+      nodes: nodes.rows.length,
+      artifacts: artifacts.rows.length,
+      events: events.rows.length,
+      approvalGates: approvalGates.rows.length,
+      totalInputTokens: Number(run.total_input_tokens || 0),
+      totalOutputTokens: Number(run.total_output_tokens || 0),
+      totalCostUsd: Number(run.total_cost_usd || 0),
+    },
+  };
+}
+
+async function callLineage(id) {
+  const result = await pool.query(`
+    SELECT *
+    FROM artifacts
+    WHERE entity_type = 'market_call' AND entity_id = $1
+    ORDER BY created_at ASC
+  `, [id]);
+  return { ok: true, entityType: "market_call", entityId: id, artifacts: result.rows.map(redactArtifactRow) };
+}
+
 async function handle(req, res) {
   const url = new URL(req.url || "/", `http://${req.headers.host || HOST}`);
 
@@ -289,6 +373,23 @@ async function handle(req, res) {
 
     if (url.pathname === "/api/read/consensus") {
       return send(res, 200, { ok: true, signals: await consensus(url) });
+    }
+
+    if (url.pathname === "/api/read/workflows") {
+      return send(res, 200, await workflows(url));
+    }
+
+    if (url.pathname.startsWith("/api/read/workflows/")) {
+      const id = url.pathname.slice("/api/read/workflows/".length);
+      const data = await workflowDetail(id);
+      return data
+        ? send(res, 200, data)
+        : send(res, 404, { ok: false, error: "workflow_not_found" });
+    }
+
+    if (url.pathname.startsWith("/api/read/calls/") && url.pathname.endsWith("/lineage")) {
+      const id = url.pathname.slice("/api/read/calls/".length, -"/lineage".length);
+      return send(res, 200, await callLineage(id));
     }
 
     if (url.pathname === "/api/read/home") {

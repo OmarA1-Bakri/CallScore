@@ -48,13 +48,15 @@ export function getHhOfficialLeaderboardRows<Row>(
   return getOfficialRankedReadApiRows(safeContract) as readonly Row[];
 }
 
-export async function fetchHhHome(period: Period, limit = 100): Promise<HhHomePayload | null> {
+export async function fetchHhReadJson<T>(path: string, init?: { readonly searchParams?: URLSearchParams; readonly revalidate?: number }): Promise<T | null> {
   const base = getHhReadApiBase();
   if (!base) return null;
 
-  const url = new URL(`${base}/home`);
-  url.searchParams.set("period", period);
-  url.searchParams.set("limit", String(limit));
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = new URL(`${base}${normalizedPath}`);
+  if (init?.searchParams) {
+    for (const [key, value] of init.searchParams.entries()) url.searchParams.set(key, value);
+  }
 
   const headers = new Headers({ Accept: "application/json" });
   const readSecret = process.env.HH_READ_SECRET?.trim();
@@ -64,11 +66,18 @@ export async function fetchHhHome(period: Period, limit = 100): Promise<HhHomePa
 
   const response = await fetch(url, {
     headers,
-    next: { revalidate: 60 },
+    next: { revalidate: init?.revalidate ?? 60 },
   });
 
   if (!response.ok) return null;
-  const payload = (await response.json()) as HhHomePayload;
+  return (await response.json()) as T;
+}
+
+export async function fetchHhHome(period: Period, limit = 100): Promise<HhHomePayload | null> {
+  const searchParams = new URLSearchParams();
+  searchParams.set("period", period);
+  searchParams.set("limit", String(limit));
+  const payload = await fetchHhReadJson<HhHomePayload>("/home", { searchParams });
   return payload?.ok === true ? payload : null;
 }
 
