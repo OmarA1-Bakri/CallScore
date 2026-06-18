@@ -339,12 +339,32 @@ async function workflowDetail(id) {
 
 async function callLineage(id) {
   const result = await pool.query(`
-    SELECT *
-    FROM artifacts
-    WHERE entity_type = 'market_call' AND entity_id = $1
-    ORDER BY created_at ASC
+    WITH RECURSIVE seed AS (
+      SELECT *
+      FROM artifacts
+      WHERE entity_type = 'market_call' AND entity_id = $1
+    ), artifact_lineage AS (
+      SELECT s.*, 0::int AS depth, ARRAY[s.id] AS path
+      FROM seed s
+      UNION ALL
+      SELECT parent.*, artifact_lineage.depth + 1 AS depth, artifact_lineage.path || parent.id AS path
+      FROM artifact_lineage
+      JOIN artifact_links link ON link.child_artifact_id = artifact_lineage.id
+      JOIN artifacts parent ON parent.id = link.parent_artifact_id
+      WHERE NOT parent.id = ANY(artifact_lineage.path)
+    )
+    SELECT DISTINCT ON (id) *
+    FROM artifact_lineage
+    ORDER BY id, depth ASC, created_at ASC
   `, [id]);
-  return { ok: true, entityType: "market_call", entityId: id, artifacts: result.rows.map(redactArtifactRow) };
+  return {
+    ok: true,
+    entityType: "market_call",
+    entityId: id,
+    artifacts: result.rows
+      .map(redactArtifactRow)
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at))),
+  };
 }
 
 async function handle(req, res) {

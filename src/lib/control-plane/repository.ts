@@ -42,8 +42,14 @@ async function one<T>(executor: ControlPlaneQueryExecutor, sql: string, params: 
   return row;
 }
 
+function pgParam(value: unknown): unknown {
+  if (Array.isArray(value)) return JSON.stringify(value);
+  if (value && typeof value === "object") return JSON.stringify(value);
+  return value;
+}
+
 const defaultExecutor: ControlPlaneQueryExecutor = async <T>(sql: string, params: readonly unknown[] = []): Promise<T[]> => {
-  return query<T>(sql, [...params]);
+  return query<T>(sql, params.map(pgParam));
 };
 
 export class ControlPlaneRepository {

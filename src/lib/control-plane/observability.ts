@@ -74,7 +74,10 @@ export async function buildWorkflowRunDetail(repository: ControlPlaneRepository,
 
 export async function buildEntityLineage(repository: ControlPlaneRepository, entityType: string, entityId: string): Promise<readonly ArtifactRecord[]> {
   const artifacts = await repository.listArtifactsForEntity(entityType, entityId);
-  return artifacts.map(redactArtifactForObservation);
+  const lineageRows = await Promise.all(artifacts.map((artifact) => repository.listArtifactLineage(artifact.id)));
+  const byId = new Map<string, ArtifactRecord>();
+  for (const artifact of lineageRows.flat()) byId.set(artifact.id, redactArtifactForObservation(artifact));
+  return [...byId.values()].sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
 export function summarizeAgentInvocations(invocations: readonly AgentInvocationRecord[]): { readonly totalInputTokens: number; readonly totalOutputTokens: number; readonly totalCostUsd: number } {
