@@ -2,7 +2,7 @@ import type { ArtifactLinkType } from "./artifacts";
 import type { WorkflowEventType, WorkflowNodeType, WorkflowStatus } from "./status";
 
 export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonValue[] | { readonly [key: string]: JsonValue };
+export type JsonValue = JsonPrimitive | readonly JsonValue[] | { readonly [key: string]: JsonValue };
 export type JsonRecord = { readonly [key: string]: JsonValue };
 
 export interface WorkflowRunRecord {
