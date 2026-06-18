@@ -67,7 +67,8 @@
     "workplane": "node --import tsx src/scripts/workplane.ts",
     "hygiene": "npm run hygiene:secrets",
     "workflow:receipt": "node --import tsx src/scripts/write-workflow-receipt.ts",
-    "control-plane:canary": "node --import tsx src/scripts/run-control-plane-canary.ts"
+    "control-plane:canary": "node --import tsx src/scripts/run-control-plane-canary.ts",
+    "agents:heartbeat": "node --import tsx src/scripts/callscore-agent-heartbeat.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

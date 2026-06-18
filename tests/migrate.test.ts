@@ -34,6 +34,7 @@ test("migration plan applies schema then numbered migrations in order", () => {
     normalize("migrations/021-launch-pipeline-ops.sql"),
     normalize("migrations/022-workflow-control-plane.sql"),
     normalize("migrations/023-artifact-chain.sql"),
+    normalize("migrations/024-agent-autonomy-ledger.sql"),
   ]);
 });
 
