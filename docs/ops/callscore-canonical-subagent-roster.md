@@ -8,6 +8,8 @@ Canonical source roots:
 - `/srv/agents/repos/Claude_Code_Automations/agent_workflows/`
 - `/srv/whop-auto/plugin/agent_workflows/whop_auto/agents/`
 - `/opt/crypto-tuber-ranked/docs/ops/callscore-gtm-agent-registry.json` maps these subagents to channels, providers, gates, receipts, and rollback paths.
+- `/opt/crypto-tuber-ranked/docs/ops/callscore-channel-head-souls.yaml` defines the bounded full-autonomy channel-head souls, authority, cadence, memory, and stop conditions.
+- `/opt/crypto-tuber-ranked/docs/ops/callscore-full-autonomy-heartbeat-contract.md` defines the runtime heartbeat, watchdog, receipt, kill-switch, and promotion contract for independent channel-head operation.
 
 ## Non-negotiable agent model
 
@@ -21,6 +23,21 @@ Every proper autonomous subagent must define six dimensions before live operatio
 6. Taste — what good output looks like and what it refuses.
 
 Cron jobs and one-shot status checks are not canonical autonomous agents. They can support agents, but they are not the agent roster.
+
+## Bounded full-autonomy channel heads
+
+The next autonomy target is `FULL_AUTONOMOUS_BOUNDED_OWNED_GTM`, not unrestricted autonomy. In that mode, independent channel-head agents may act without Hermes prompting only inside their soul/heartbeat contracts and the GTM registry envelope.
+
+| Channel head | Maps to existing specialists | Live autonomy posture |
+|---|---|---|
+| `callscore-artofwar-strategist` | Art of War jobs, `marketing-compliance-linter` | Strategy/dossier/dry-run now; owned-public execution only after full receipt chain + policy pass. |
+| `callscore-x-linkedin-growth-head` | `marketing-channel-growth`, `content_creator`, `marketing-compliance-linter` | Owned X/LinkedIn posts can become bounded autonomous; DMs/spend/profile/provider changes remain gated. |
+| `callscore-community-drops-head` | `marketing-community-drops`, `opportunity_matrix`, `marketing-compliance-linter` | Owned Telegram/Discord can become bounded autonomous; Reddit/non-owned posting and DMs remain gated. |
+| `callscore-whop-commerce-head` | `marketing-whop-marketplace`, `whop_auto` | Copy/assets/read-only health can become autonomous; pricing/product/customer/payment/provider mutation remains gated. |
+| `callscore-email-partnership-drafts-head` | `marketing-channel-growth`, `outlook`, `linkedin`, BD workflows | Draft/approval packet only; live sends/outreach remain gated. |
+| `callscore-opportunity-research-head` | `opportunity_matrix`, `creator-video-swipefile` | Read-only research and briefs can be autonomous; posting/outreach/spend remain gated. |
+| `callscore-compliance-linter-head` | `marketing-compliance-linter` | Autonomous gatekeeper; cannot publish or weaken policy. |
+| `callscore-data-pipeline-sentinel` | Workplane/freshness/pipeline jobs | Autonomous read-only truth sentinel; DB writes/restarts/backfills/promotions remain gated. |
 
 ## Roster
 
