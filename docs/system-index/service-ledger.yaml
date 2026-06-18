@@ -1,0 +1,166 @@
+schema_version: callscore_service_ledger.v1
+generated_at: '2026-06-18T00:00:00Z'
+services:
+  - id: hh-control-bridge
+    unit_or_container: hh-control-bridge.service
+    plane: governance_remote_control
+    status: active_enabled
+    listener: 127.0.0.1:8787
+    role: HH MCP/health bridge
+    entry_points:
+      - /health
+      - /mcp
+    mutation_risk: high_if_write_tools_used
+    secrets_risk: high_if_command_env_logged
+    allowed_actions_now:
+      - health read
+      - MCP initialize/tools list
+      - read-only status tools
+    forbidden_actions_now:
+      - bridge write tools
+      - operator docker compose commands
+      - operator repo commands
+      - service mutation
+    verification:
+      - curl health without printing env
+      - MCP initialize with proper Accept header
+    drift_status: healthy
+    migration_status: inventory_only
+    approved_for_inclusion: false
+
+  - id: callscore-daily-pipeline
+    unit_or_container: callscore-daily-pipeline.timer/service
+    plane: data_pipeline
+    status: active_timer
+    listener: none
+    role: daily slow transcript/data pipeline
+    entry_points:
+      - npm run pipeline:daily -- --write
+    mutation_risk: approved_pipeline_db_writes
+    secrets_risk: high_env_file_loaded_by_systemd
+    allowed_actions_now:
+      - read status
+      - inspect latest non-secret logs
+    forbidden_actions_now:
+      - restart without approval
+      - edit service/env without approval
+    verification:
+      - systemctl status callscore-daily-pipeline.timer
+      - latest daily logs
+      - freshness/public verify
+    drift_status: healthy
+    migration_status: inventory_only
+    approved_for_inclusion: false
+
+  - id: hermes-worker-container
+    unit_or_container: crypto-tuber-ranked-hermes-worker-1
+    plane: workplane_worker
+    status: running
+    listener: none
+    role: HH-side Workplane/Hermes worker container
+    mutation_risk: medium
+    secrets_risk: high_if_inspected_with_env
+    allowed_actions_now:
+      - docker ps status only
+    forbidden_actions_now:
+      - docker inspect env dump
+      - restart/recreate
+      - logs without redaction review
+    verification:
+      - docker ps no-env format
+    drift_status: healthy_running
+    migration_status: inventory_only
+    approved_for_inclusion: false
+
+  - id: ytdlp-pot-provider
+    unit_or_container: crypto-tuber-ranked-ytdlp-pot-provider-1
+    plane: transcript_provider_support
+    status: running_healthy
+    listener: docker_internal
+    role: PO token/provider support for yt-dlp lane
+    mutation_risk: medium
+    secrets_risk: medium
+    allowed_actions_now:
+      - docker ps health status
+    forbidden_actions_now:
+      - restart/reconfigure without approval
+    verification:
+      - docker ps status includes healthy
+    drift_status: healthy_running
+    migration_status: inventory_only
+    approved_for_inclusion: false
+
+  - id: cloudflared-host-token
+    unit_or_container: host cloudflared token-file process
+    plane: ingress_tunnel
+    status: running
+    listener: outbound_tunnel
+    role: Cloudflare tunnel invocation
+    mutation_risk: high_if_changed
+    secrets_risk: very_high_token_args_possible
+    allowed_actions_now:
+      - count process without args
+    forbidden_actions_now:
+      - print token
+      - kill/restart/reconfigure
+    verification:
+      - pgrep count only or sanitized ps
+    drift_status: classify_before_cleanup
+    migration_status: inventory_only
+    approved_for_inclusion: false
+
+  - id: cloudflared-host-config
+    unit_or_container: cloudflared.service
+    plane: ingress_tunnel
+    status: active_enabled
+    listener: outbound_tunnel
+    role: Cloudflare tunnel service invocation
+    mutation_risk: high_if_changed
+    secrets_risk: high
+    allowed_actions_now:
+      - systemctl show ActiveState only
+    forbidden_actions_now:
+      - restart/disable/edit config
+    verification:
+      - systemctl show safe fields
+    drift_status: classify_before_cleanup
+    migration_status: inventory_only
+    approved_for_inclusion: false
+
+  - id: cloudflared-whop-docker
+    unit_or_container: hermes-whop-automation-tunnel
+    plane: commercial_ingress_tunnel
+    status: running
+    listener: outbound_tunnel
+    role: Dockerized Cloudflare tunnel for Whop automation
+    mutation_risk: high_if_changed
+    secrets_risk: high
+    allowed_actions_now:
+      - docker ps status only
+    forbidden_actions_now:
+      - docker inspect env dump
+      - restart/recreate
+    verification:
+      - docker ps no-env format
+    drift_status: classify_before_cleanup
+    migration_status: inventory_only
+    approved_for_inclusion: false
+
+  - id: tailscale
+    unit_or_container: tailscaled.service
+    plane: connectivity
+    status: active_enabled
+    listener: tailscale_overlay
+    role: HH/laptop private network reachability
+    mutation_risk: medium
+    secrets_risk: medium
+    allowed_actions_now:
+      - status read
+    forbidden_actions_now:
+      - auth/logout/reconfigure
+    verification:
+      - systemctl show safe fields
+      - tailscale status if redacted
+    drift_status: healthy
+    migration_status: inventory_only
+    approved_for_inclusion: false

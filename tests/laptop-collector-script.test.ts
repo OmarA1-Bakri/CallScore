@@ -52,6 +52,7 @@ test("laptop collector has impersonation dependency guardrails", () => {
   assert.match(script, /yt-dlp\[default,curl-cffi\]/);
   assert.match(script, /--impersonate/);
   assert.match(script, /impersonation_warning_threshold/);
+  assert.match(script, /if \(\$text -match "\(\?i\)impersonation_warning_threshold"\) \{ return "impersonation_warning_threshold" \}/);
 });
 
 
@@ -60,6 +61,14 @@ test("laptop collector exposes workplane claim, lock, and HH state publication",
   assert.match(script, /\[string\]\$JobId/);
   assert.match(script, /\[int\]\$HhPort = 22/);
   assert.match(script, /\[string\]\$HhIdentityFile = ""/);
+  assert.match(script, /\[ValidateSet\("native", "wsl"\)\]\[string\]\$SshTransport = "native"/);
+  assert.match(script, /\[string\]\$WslDistro = "Ubuntu"/);
+  assert.match(script, /\[string\]\$WslUser = "omar"/);
+  assert.match(script, /function Invoke-TransportCommand/);
+  assert.match(script, /wsl\.exe -d \$WslDistro -u \$WslUser -- \$Program @Args/);
+  assert.match(script, /function Convert-LocalPathForSshTransport/);
+  assert.match(script, /wsl\.exe -d \$WslDistro -u \$WslUser -- wslpath -a \$Path/);
+  assert.match(script, /wslpath_failed transport=\$SshTransport/);
   assert.match(script, /Get-HhSshArgs/);
   assert.match(script, /Get-HhScpArgs/);
   assert.match(script, /Get-HhScpFromArgs/);
@@ -72,9 +81,12 @@ test("laptop collector exposes workplane claim, lock, and HH state publication",
   assert.match(script, /UTF8Encoding\(\$false\)/);
   assert.match(script, /BatchMode=yes/);
   assert.match(script, /StrictHostKeyChecking=accept-new/);
-  assert.match(script, /-i", \$HhIdentityFile/);
+  assert.match(script, /-i", \(Convert-LocalPathForSshTransport \$HhIdentityFile\)/);
   assert.match(script, /-p", \[string\]\$HhPort/);
   assert.match(script, /-P", \[string\]\$HhPort/);
+  assert.match(script, /Convert-LocalPathForSshTransport \$LocalPath/);
+  assert.match(script, /hh_ssh_failed exit=\$LASTEXITCODE transport=\$SshTransport/);
+  assert.match(script, /hh_scp_failed exit=\$LASTEXITCODE transport=\$SshTransport/);
   assert.match(script, /Acquire-CollectorLock/);
   assert.match(script, /workplane -- claim/);
   assert.match(script, /workplane -- complete/);

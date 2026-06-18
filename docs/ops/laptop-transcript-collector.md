@@ -62,6 +62,14 @@ Default small daily batch after a clean canary:
 .\scripts\windows\run-transcript-collector.ps1 -Limit 5 -Browser firefox -SinceDays 45 -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519 -Write
 ```
 
+If the Windows OpenSSH client cannot use the HH key/alias directly, route SSH/SCP through WSL while still running `yt-dlp` on Windows so browser cookies remain laptop-local:
+
+```powershell
+.\scripts\windows\run-transcript-collector.ps1 -SshTransport wsl -WslDistro Ubuntu -WslUser omar -Limit 5 -Browser firefox -SinceDays 45 -HhHost omar@100.107.162.80 -HhPort 2222 -HhIdentityFile $env:USERPROFILE\.ssh\callscore_hh_ed25519 -Write
+```
+
+In WSL transport mode the collector wraps HH `ssh`/`scp` calls with `wsl.exe -d <distro> -u <user> -- ...` and converts local Windows paths passed to `ssh/scp` with `wslpath`. Remote paths such as `/opt/crypto-tuber-ranked/.tmp/...` are not converted.
+
 25-video current-window catch-up is not the default. Use only after clean stability is proven and no cooldown is active:
 
 ```powershell

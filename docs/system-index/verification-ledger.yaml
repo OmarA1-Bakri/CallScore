@@ -1,0 +1,68 @@
+schema_version: callscore_verification_ledger.v1
+generated_at: '2026-06-18T00:00:00Z'
+checks:
+  - id: full-discovered-test-suite
+    command: find tests -name '*.test.ts' -print0 | xargs -0 node --import tsx --test
+    surface: full repository test suite
+    expected: pass
+    last_parent_result: pass_679_tests_0_failures_2_suites
+
+  - id: laptop-collector-static-tests
+    command: node --import tsx --test tests/laptop-collector-script.test.ts
+    surface: scripts/windows/run-transcript-collector.ps1
+    expected: pass
+    last_parent_result: pass_9_tests
+
+  - id: laptop-adjacent-tests
+    command: node --import tsx --test tests/transcript-extraction-methods.test.ts tests/workplane-dispatch.test.ts tests/workplane-jobs.test.ts
+    surface: transcript/workplane integration contracts
+    expected: pass
+    last_parent_result: pass_in_32_test_targeted_run
+
+  - id: typecheck
+    command: npm run typecheck
+    surface: TypeScript project
+    expected: pass
+    last_parent_result: pass
+
+  - id: workplane-status
+    command: npm run workplane:status
+    surface: CallScore readiness model
+    expected: status OK and automation_readiness CONTROLLED_FULL
+    last_parent_result: pass_status_OK_CONTROLLED_FULL
+
+  - id: freshness-check
+    command: npm run freshness:check
+    surface: data freshness
+    expected: PASS or WARN with no blockers; transcript backlog may remain WARN
+    last_parent_result: WARN_no_blockers_transcript_provider_warnings_only
+
+  - id: public-live-verify
+    command: npm run verify:public -- --source live --base-url https://call-score.com
+    surface: public CallScore site and HH Read API
+    expected: ok true
+    last_parent_result: pass_ok_true
+
+  - id: gtm-registry-json
+    command: python3 -m json.tool docs/ops/callscore-gtm-agent-registry.json >/tmp/callscore-gtm-agent-registry.session-final.validated.json
+    surface: GTM registry
+    expected: JSON valid
+    last_parent_result: pass_json_valid
+
+  - id: gtm-registry-tests
+    command: node --import tsx --test tests/gtm-agent-registry.test.ts
+    surface: GTM registry contract
+    expected: pass
+    last_parent_result: pass_6_tests
+
+  - id: system-index-yaml
+    command: python3 - <<'PY' ... yaml.safe_load all docs/system-index/*.yaml ... PY
+    surface: system index ledgers
+    expected: all parse
+    last_parent_result: pass_all_yaml_parse
+
+  - id: docs-secret-scan
+    command: restricted grep for token/db-url/private-key patterns against edited docs only
+    surface: edited docs/receipts
+    expected: no secret-like values
+    last_parent_result: pass_no_secret_like_patterns

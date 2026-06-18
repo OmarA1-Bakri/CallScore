@@ -1,0 +1,80 @@
+schema_version: callscore_migration_ledger.v1
+generated_at: '2026-06-18T00:00:00Z'
+policy:
+  create_new_repo_now: false
+  copy_files_now: false
+  delete_or_cleanup_now: false
+  approval_required_for:
+    - new GitHub repo creation
+    - copying runtime assets
+    - deleting or quarantining files
+    - service restarts
+    - provider/customer/payment mutations
+    - production deploys
+    - DB writes outside approved scripts
+items:
+  - id: active-product-repo
+    source_path: /opt/crypto-tuber-ranked
+    candidate_destination: callscore-workplane/not_yet_created
+    reason_to_include: active product and control contracts source
+    blockers:
+      - component-level ledger incomplete
+      - tests per component not attached
+      - secrets scan required before any copy
+    migration_status: not_copied
+    approved_for_inclusion: false
+
+  - id: whop-auto-plugin
+    source_path: /srv/whop-auto/plugin
+    candidate_destination: callscore-workplane/whop-auto-plugin/not_yet_created
+    reason_to_include: commercial automation/plugin contracts
+    blockers:
+      - compare against uploaded archive first
+      - never copy /srv/whop-auto/secrets
+      - provider mutation gates must be preserved
+    migration_status: not_copied
+    approved_for_inclusion: false
+
+  - id: claude-code-agent-workflows
+    source_path: /srv/agents/repos/Claude_Code_Automations/agent_workflows
+    candidate_destination: callscore-workplane/agent-workflows/not_yet_created
+    reason_to_include: named subagent workforce source
+    blockers:
+      - classify each workflow by authority/memory/cadence/taste
+      - remove non-CallScore unrelated workflows or mark external
+      - verify no credentials in workflow files
+    migration_status: not_copied
+    approved_for_inclusion: false
+
+  - id: hh-control-bridge
+    source_path: /srv/agents/hh-control-bridge
+    candidate_destination: callscore-workplane/hh-control-bridge/not_yet_created
+    reason_to_include: MCP/HH bridge contracts may be relevant
+    blockers:
+      - write-tool gate audit required
+      - service deployment contract required
+      - backup files need classification
+    migration_status: not_copied
+    approved_for_inclusion: false
+
+  - id: runtime-receipts
+    source_path: /opt/crypto-tuber-ranked/.tmp
+    candidate_destination: archive_only_not_repo
+    reason_to_include: evidence and audit receipts
+    blockers:
+      - evidence retention policy required
+      - secret scan required
+      - select referenced latest receipts only
+    migration_status: not_copied
+    approved_for_inclusion: false
+
+  - id: cloudflared-processes
+    source_path: host_and_docker_runtime
+    candidate_destination: none
+    reason_to_include: drift record only
+    blockers:
+      - identify which tunnels are intentional
+      - map token-file vs config service vs Docker tunnel ownership
+      - no kill/restart before approval
+    migration_status: classify_before_cleanup
+    approved_for_inclusion: false

@@ -1,0 +1,159 @@
+schema_version: callscore_directory_ledger.v1
+generated_at: '2026-06-18T00:00:00Z'
+entries:
+  - id: active-product-repo
+    path: /opt/crypto-tuber-ranked
+    plane: website_data_pipeline_ml
+    role: active CallScore product repository and production pipeline code
+    entry_points:
+      - package.json scripts
+      - systemd callscore-daily-pipeline.service
+      - Workplane jobs
+    initiated_by:
+      - systemd timer
+      - Hermes cron/workplane
+      - operator/Hermes parent session
+    connects_to:
+      - HH PostgreSQL
+      - HH Read API
+      - Netlify public surface
+      - Ollama/Gemma
+    reads:
+      - .env.hermes
+      - Postgres tables
+      - workflow receipts
+    writes:
+      - videos
+      - calls
+      - candles
+      - creator_stats
+      - pipeline_jobs
+      - .tmp workflow evidence
+    mutation_risk: production_data_write_when_running_approved_scripts
+    secrets_risk: high_due_to_env_file
+    owner_subagent: orchestrator / pipeline engineer
+    current_status: active_canonical
+    individual_tests:
+      - node --import tsx --test targeted tests
+      - npm run typecheck
+    integration_tests:
+      - npm run workplane:status
+      - npm run freshness:check
+    system_tests:
+      - npm run verify:public -- --source live --base-url https://call-score.com
+    receipt_references:
+      - .tmp/workflow-receipts/
+      - .tmp/callscore-daily/
+    rollback_path: git revert for code/docs; DB rollback only via explicit approved backup/restore plan
+    migration_status: inventory_only_not_copied
+    approved_for_inclusion: false
+
+  - id: whop-auto-root
+    path: /srv/whop-auto
+    plane: commercial_whop
+    role: existing Whop automation root
+    entry_points:
+      - plugin/agent_workflows/whop_auto
+      - state and workspace dirs
+    initiated_by:
+      - Workplane report-only Whop jobs
+      - approved operator/Hermes workflows
+    connects_to:
+      - Whop provider APIs
+      - CallScore commercial gates
+    reads:
+      - plugin config
+      - state
+    writes:
+      - state/workspace when approved
+    mutation_risk: commercial_provider_financial_if_misused
+    secrets_risk: very_high_due_to_secrets_dir
+    owner_subagent: whop_auto
+    current_status: existing_root_do_not_duplicate
+    individual_tests:
+      - read-only provider health jobs
+    integration_tests:
+      - whop_provider_health report-only
+      - whop_plan_inventory_check report-only
+    system_tests:
+      - approval-gated checkout/provider proof only
+    receipt_references:
+      - /opt/crypto-tuber-ranked/.tmp/workflow-receipts/whop*
+    rollback_path: no mutation without gate; provider rollback requires explicit approval receipt
+    migration_status: inventory_only_not_copied
+    approved_for_inclusion: false
+
+  - id: claude-code-automations
+    path: /srv/agents/repos/Claude_Code_Automations
+    plane: gtm_art_of_war_subagents
+    role: canonical source of CallScore specialist workflows/subagents and Art of War assets
+    entry_points:
+      - agent_workflows/
+      - scripts/art_of_war.py
+      - art-of-war/live
+    initiated_by:
+      - Hermes
+      - Workplane report-only jobs
+      - marketing/revenue automation lanes
+    connects_to:
+      - GTM registry
+      - Composio lanes
+      - CallScore public owned channels
+    reads:
+      - campaign state
+      - channel registries
+    writes:
+      - local campaign receipts/state when allowed
+    mutation_risk: public_gtm_if_publishing_enabled
+    secrets_risk: medium
+    owner_subagent: marketing-channel-growth / content_creator / compliance-linter
+    current_status: active_workflow_source
+    individual_tests:
+      - artifact validation
+      - campaign dry-runs
+    integration_tests:
+      - Workplane Art of War report-only jobs
+    system_tests:
+      - owned public GTM receipt plus read-only monitoring
+    receipt_references:
+      - /opt/crypto-tuber-ranked/.tmp/workflow-receipts/artofwar_owned_public_execution/
+    rollback_path: delete/retract owned public post if needed; record rollback receipt
+    migration_status: inventory_only_not_copied
+    approved_for_inclusion: false
+
+  - id: hh-control-bridge
+    path: /srv/agents/hh-control-bridge
+    plane: governance_remote_control
+    role: local HH bridge and MCP endpoint
+    entry_points:
+      - server.py
+      - hh-control-bridge.service
+      - http://127.0.0.1:8787/health
+      - http://127.0.0.1:8787/mcp
+    initiated_by:
+      - systemd
+      - MCP clients
+    connects_to:
+      - /srv filesystem
+      - systemd status
+      - git/docker/operator command surfaces
+    reads:
+      - system status
+      - repo status
+    writes:
+      - possible bridge write tools when enabled; prohibited for this stabilization
+    mutation_risk: high_if_write_tools_used
+    secrets_risk: high_if_logs_or_commands_dump_env
+    owner_subagent: Hermes orchestrator
+    current_status: active_healthy_write_enabled_but_not_used
+    individual_tests:
+      - health GET
+      - MCP initialize/tools/list
+    integration_tests:
+      - read-only bridge tools only
+    system_tests:
+      - parent verification of bridge health
+    receipt_references: []
+    rollback_path: no bridge mutation in this plan
+    migration_status: inventory_only_not_copied
+    approved_for_inclusion: false

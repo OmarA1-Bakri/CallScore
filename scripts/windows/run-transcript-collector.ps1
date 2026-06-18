@@ -8,6 +8,9 @@ param(
   [string]$HhHost = "hermes-agent-box",
   [int]$HhPort = 22,
   [string]$HhIdentityFile = "",
+  [ValidateSet("native", "wsl")][string]$SshTransport = "native",
+  [string]$WslDistro = "Ubuntu",
+  [string]$WslUser = "omar",
   [string]$HhRepo = "/opt/crypto-tuber-ranked",
   [string]$StatePath = "",
   [string]$JobId = "",
@@ -35,9 +38,26 @@ if ($MinGapSeconds -lt 1 -or $MaxGapSeconds -lt $MinGapSeconds) { throw "Gap bou
 if ($CooldownMinHours -lt 1 -or $CooldownMaxHours -lt $CooldownMinHours) { throw "Cooldown bounds must satisfy 1 <= CooldownMinHours <= CooldownMaxHours" }
 if ($HhPort -lt 1 -or $HhPort -gt 65535) { throw "HhPort must be 1..65535" }
 
+function Invoke-TransportCommand([string]$Program, [string[]]$Args) {
+  if ($SshTransport -eq "wsl") {
+    & wsl.exe -d $WslDistro -u $WslUser -- $Program @Args
+    return
+  }
+  & $Program @Args
+}
+
+function Convert-LocalPathForSshTransport([string]$Path) {
+  if ($SshTransport -ne "wsl" -or -not $Path) { return $Path }
+  $converted = (& wsl.exe -d $WslDistro -u $WslUser -- wslpath -a $Path 2>&1 | Out-String).Trim()
+  if ($LASTEXITCODE -ne 0 -or -not $converted) {
+    throw "wslpath_failed transport=$SshTransport"
+  }
+  return $converted
+}
+
 function Get-HhSshArgs([string]$RemoteCommand) {
   $sshArgs = @("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new")
-  if ($HhIdentityFile) { $sshArgs += @("-i", $HhIdentityFile) }
+  if ($HhIdentityFile) { $sshArgs += @("-i", (Convert-LocalPathForSshTransport $HhIdentityFile)) }
   if ($HhPort -ne 22) { $sshArgs += @("-p", [string]$HhPort) }
   $sshArgs += @($HhHost, $RemoteCommand)
   return $sshArgs
@@ -45,36 +65,36 @@ function Get-HhSshArgs([string]$RemoteCommand) {
 
 function Get-HhScpArgs([string]$LocalPath, [string]$RemotePath) {
   $scpArgs = @("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new")
-  if ($HhIdentityFile) { $scpArgs += @("-i", $HhIdentityFile) }
+  if ($HhIdentityFile) { $scpArgs += @("-i", (Convert-LocalPathForSshTransport $HhIdentityFile)) }
   if ($HhPort -ne 22) { $scpArgs += @("-P", [string]$HhPort) }
-  $scpArgs += @($LocalPath, "${HhHost}:$RemotePath")
+  $scpArgs += @((Convert-LocalPathForSshTransport $LocalPath), "${HhHost}:$RemotePath")
   return $scpArgs
 }
 
 function Get-HhScpFromArgs([string]$RemotePath, [string]$LocalPath) {
   $scpArgs = @("-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new")
-  if ($HhIdentityFile) { $scpArgs += @("-i", $HhIdentityFile) }
+  if ($HhIdentityFile) { $scpArgs += @("-i", (Convert-LocalPathForSshTransport $HhIdentityFile)) }
   if ($HhPort -ne 22) { $scpArgs += @("-P", [string]$HhPort) }
-  $scpArgs += @("${HhHost}:$RemotePath", $LocalPath)
+  $scpArgs += @("${HhHost}:$RemotePath", (Convert-LocalPathForSshTransport $LocalPath))
   return $scpArgs
 }
 
 function Invoke-HhSsh([string]$RemoteCommand) {
   $sshArgs = Get-HhSshArgs $RemoteCommand
-  ssh @sshArgs
-  if ($LASTEXITCODE -ne 0) { throw "hh_ssh_failed exit=$LASTEXITCODE host=$HhHost port=$HhPort" }
+  Invoke-TransportCommand "ssh" $sshArgs
+  if ($LASTEXITCODE -ne 0) { throw "hh_ssh_failed exit=$LASTEXITCODE transport=$SshTransport host=$HhHost port=$HhPort" }
 }
 
 function Copy-FileToHH([string]$LocalPath, [string]$RemotePath) {
   $scpArgs = Get-HhScpArgs $LocalPath $RemotePath
-  scp @scpArgs
-  if ($LASTEXITCODE -ne 0) { throw "hh_scp_failed exit=$LASTEXITCODE host=$HhHost port=$HhPort" }
+  Invoke-TransportCommand "scp" $scpArgs
+  if ($LASTEXITCODE -ne 0) { throw "hh_scp_failed exit=$LASTEXITCODE transport=$SshTransport host=$HhHost port=$HhPort" }
 }
 
 function Copy-FileFromHH([string]$RemotePath, [string]$LocalPath) {
   $scpArgs = Get-HhScpFromArgs $RemotePath $LocalPath
-  scp @scpArgs
-  if ($LASTEXITCODE -ne 0) { throw "hh_scp_failed exit=$LASTEXITCODE host=$HhHost port=$HhPort" }
+  Invoke-TransportCommand "scp" $scpArgs
+  if ($LASTEXITCODE -ne 0) { throw "hh_scp_failed exit=$LASTEXITCODE transport=$SshTransport host=$HhHost port=$HhPort" }
 }
 
 function Get-RepoRoot {
@@ -315,6 +335,7 @@ function Start-Cooldown($state, [string]$reason) {
 function Classify-Failure([string]$text) {
   if ($text -match "(?i)(HTTP\s*(Error\s*)?429|429\s*Too\s*Many\s*Requests|Too\s*Many\s*Requests)") { return "rate_limited" }
   if ($text -match "(?i)(bot_verification_required|not a bot|Sign in to confirm|confirm\s+you.?re\s+not\s+a\s+bot)") { return "bot_verification_required" }
+  if ($text -match "(?i)impersonation_warning_threshold") { return "impersonation_warning_threshold" }
   if ($text -match "(?i)(impersonation.*not available|no impersonate target|curl_cffi|requested but no impersonation target)") { return "impersonation_unavailable" }
   if ($text -match "(?i)(no_captions|no subtitles|no automatic captions|There are no subtitles)") { return "no_captions" }
   if ($text -match "(?i)(Premieres|upcoming|live stream|This live event)") { return "live_or_upcoming" }

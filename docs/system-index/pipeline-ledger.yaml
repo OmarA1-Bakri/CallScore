@@ -1,0 +1,153 @@
+schema_version: callscore_pipeline_ledger.v1
+generated_at: '2026-06-18T00:00:00Z'
+pipelines:
+  - id: canonical-production-pipeline
+    plane: data_pipeline
+    role: keep CallScore public data fresh
+    entry_points:
+      - src/scripts/run-daily-pipeline.ts
+      - src/scripts/discover-videos-rss-api.ts
+      - src/scripts/backfill-transcripts.ts
+      - src/scripts/extract-calls-local.ts
+      - src/scripts/match-prices.ts
+      - src/scripts/compute-scores.ts
+      - src/scripts/refresh-candles.ts
+    initiated_by:
+      - callscore-daily-pipeline.timer
+      - Hermes core cron wrappers
+    connects_to:
+      - HH PostgreSQL
+      - HH Read API
+      - Netlify public app
+      - Binance market data
+    writes:
+      - videos
+      - calls
+      - candles
+      - creator_stats
+      - pipeline_jobs
+    current_status: working_core_warn_transcript_backlog
+    evidence:
+      - Workplane status OK CONTROLLED_FULL
+      - public verify live passed
+      - recent candle_refresh succeeded
+      - recent match_prices_batch succeeded
+      - recent compute_scores succeeded
+    mutation_risk: production_data_write
+    rollback_path: explicit DB backup/restore or bounded script rollback only with approval
+    migration_status: inventory_only_not_copied
+    approved_for_inclusion: false
+
+  - id: residential-transcript-acquisition
+    plane: pipeline_transcript
+    role: OmarLaptop residential YouTube caption acquisition
+    entry_points:
+      - scripts/windows/run-transcript-collector.ps1
+      - npm run transcript:worklist
+      - npm run transcript:ingest
+      - Workplane transcript_collect_laptop
+    initiated_by:
+      - OmarLaptop PowerShell
+      - Workplane laptop job claim
+    connects_to:
+      - HH SSH/SCP native transport
+      - HH SSH/SCP WSL transport
+      - HH transcript ingest
+      - Postgres videos.transcript
+    reads:
+      - laptop browser cookies via yt-dlp only
+      - HH worklist JSON
+    writes:
+      - transcript ingest payloads
+      - local collector state
+      - .tmp/laptop-collector/latest-state.json on HH
+    current_status: canonical_near_term_lane_transport_hardened
+    recent_fix:
+      - SshTransport native|wsl added
+      - WSL path conversion via wslpath added
+      - impersonation_warning_threshold classification fixed
+    mutation_risk: production_transcript_write_when_Write_enabled
+    secrets_risk: high_browser_cookies_stay_laptop_local
+    tests:
+      individual:
+        - tests/laptop-collector-script.test.ts
+      integration:
+        - tests/workplane-dispatch.test.ts
+        - tests/workplane-jobs.test.ts
+      system:
+        - workplane status sees mirrored state
+    rollback_path: revert script/test/docs changes; do not delete cooldown state unless reviewed
+    migration_status: inventory_only_not_copied
+    approved_for_inclusion: false
+
+  - id: hh-direct-ytdlp-transcript-fallback
+    plane: pipeline_transcript_fallback
+    role: HH direct yt-dlp daily transcript collection
+    entry_points:
+      - src/scripts/backfill-transcripts.ts
+      - callscore-daily-pipeline.service
+    initiated_by:
+      - systemd daily pipeline
+    connects_to:
+      - local yt-dlp
+      - ytdlp POT provider
+      - HH Postgres
+    writes:
+      - videos.transcript
+      - videos.transcript_status
+    current_status: functioning_but_classified_fallback_diagnostic_until_approved
+    evidence:
+      - latest checked daily run updated 21 and failed 4 no_captions
+    mutation_risk: production_transcript_write
+    secrets_risk: high_cookie_or_provider_config_if_printed
+    rollback_path: revert transcript changes only through explicit approved DB rollback plan
+    migration_status: classify_before_cleanup_or_promotion
+    approved_for_inclusion: false
+
+  - id: gemma-shadow-extraction
+    plane: ml_shadow_extraction
+    role: HH-local Gemma/Ollama shadow extraction and evaluation
+    entry_points:
+      - src/scripts/shadow-extract-transcripts.ts
+      - src/scripts/shadow-diff-extractions.ts
+      - src/scripts/validate-shadow-extractions.ts
+      - src/scripts/ml-idle-improve.ts
+      - Workplane gemma_shadow_extract
+    initiated_by:
+      - Workplane report-only/shadow jobs
+      - Hermes safe ML evaluation lanes
+    connects_to:
+      - Ollama http://127.0.0.1:11434
+      - callscore-gemma4-extractor:latest
+      - .tmp/shadow-extraction artifacts
+    writes:
+      - shadow artifacts only by default
+      - no canonical calls by default
+    current_status: ready_shadow_only
+    mutation_risk: low_until_promotion
+    secrets_risk: low_medium_prompt/artifact_review
+    rollback_path: delete local shadow artifact if needed; no production rollback unless promotion approved
+    migration_status: inventory_only_not_copied
+    approved_for_inclusion: false
+
+  - id: shadow-promotion-pipeline
+    plane: ml_promotion_gate
+    role: reviewed movement of shadow extraction into canonical calls
+    entry_points:
+      - src/scripts/promote-shadow-extractions.ts
+    initiated_by:
+      - explicit operator approval only
+    connects_to:
+      - shadow artifact
+      - diff artifact
+      - reviewed video IDs
+      - calls table
+      - match/score/public verification
+    writes:
+      - canonical calls when --write and exact gates pass
+    current_status: gated_not_approved
+    mutation_risk: high_public_ranking_impact
+    secrets_risk: low
+    rollback_path: rollback snapshot plus match/score/public verify receipt required
+    migration_status: inventory_only_not_copied
+    approved_for_inclusion: false
