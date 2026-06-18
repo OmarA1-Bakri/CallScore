@@ -5,10 +5,14 @@ import type {
   AgentInvocationRecord,
   ApprovalGateRecord,
   ArtifactRecord,
+  ArtifactLinkRecord,
+  ArtifactLineageRecord,
   ControlPlaneQueryExecutor,
   CreateAgentInvocationInput,
   CreateApprovalGateInput,
   CreateArtifactInput,
+  CreateArtifactLinkInput,
+  CreateLinkedArtifactInput,
   CreateWorkflowEventInput,
   CreateWorkflowNodeRunInput,
   CreateWorkflowRunInput,
@@ -260,6 +264,69 @@ export class ControlPlaneRepository {
       detail: { artifact_id: artifact.id, artifact_type: artifact.artifact_type, sha256: artifact.sha256 },
     });
     return artifact;
+  }
+
+  async createArtifactLink(input: CreateArtifactLinkInput): Promise<ArtifactLinkRecord> {
+    if (input.childArtifactId === input.parentArtifactId) throw new Error("artifact_link_cannot_self_reference");
+    return one<ArtifactLinkRecord>(this.executor, `
+      INSERT INTO artifact_links (
+        id,
+        workflow_run_id,
+        child_artifact_id,
+        parent_artifact_id,
+        link_type,
+        metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+      RETURNING *
+    `, [
+      id(input.id),
+      input.workflowRunId,
+      input.childArtifactId,
+      input.parentArtifactId,
+      input.linkType ?? "derived_from",
+      jsonRecord(input.metadata),
+    ]);
+  }
+
+  async createLinkedArtifact(input: CreateLinkedArtifactInput): Promise<ArtifactRecord> {
+    const artifact = await this.createArtifact(input);
+    for (const parentArtifactId of input.parentArtifactIds ?? []) {
+      await this.createArtifactLink({
+        workflowRunId: artifact.workflow_run_id,
+        childArtifactId: artifact.id,
+        parentArtifactId,
+        linkType: input.linkType ?? "derived_from",
+        metadata: input.linkMetadata,
+      });
+    }
+    return artifact;
+  }
+
+  async listArtifactLineage(rootArtifactId: string): Promise<ArtifactLineageRecord[]> {
+    return this.executor<ArtifactLineageRecord>(`
+      WITH RECURSIVE artifact_lineage AS (
+        SELECT
+          a.*,
+          0::int AS depth,
+          ARRAY[a.id] AS path
+        FROM artifacts a
+        WHERE a.id = $1
+
+        UNION ALL
+
+        SELECT
+          parent.*,
+          artifact_lineage.depth + 1 AS depth,
+          artifact_lineage.path || parent.id AS path
+        FROM artifact_lineage
+        JOIN artifact_links link ON link.child_artifact_id = artifact_lineage.id
+        JOIN artifacts parent ON parent.id = link.parent_artifact_id
+        WHERE NOT parent.id = ANY(artifact_lineage.path)
+      )
+      SELECT *
+      FROM artifact_lineage
+      ORDER BY depth ASC, created_at ASC
+    `, [rootArtifactId]);
   }
 
   async recordAgentInvocation(input: CreateAgentInvocationInput): Promise<AgentInvocationRecord> {

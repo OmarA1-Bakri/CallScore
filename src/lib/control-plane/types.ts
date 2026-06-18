@@ -1,3 +1,4 @@
+import type { ArtifactLinkType } from "./artifacts";
 import type { WorkflowEventType, WorkflowNodeType, WorkflowStatus } from "./status";
 
 export type JsonPrimitive = string | number | boolean | null;
@@ -64,6 +65,21 @@ export interface ArtifactRecord {
   readonly json: JsonValue | null;
   readonly sha256: string;
   readonly created_at: string;
+}
+
+export interface ArtifactLinkRecord {
+  readonly id: string;
+  readonly workflow_run_id: string;
+  readonly child_artifact_id: string;
+  readonly parent_artifact_id: string;
+  readonly link_type: ArtifactLinkType;
+  readonly metadata: JsonRecord;
+  readonly created_at: string;
+}
+
+export interface ArtifactLineageRecord extends ArtifactRecord {
+  readonly depth: number;
+  readonly path: readonly string[];
 }
 
 export interface AgentInvocationRecord {
@@ -154,6 +170,21 @@ export interface CreateArtifactInput {
   readonly storageUri?: string | null;
   readonly json?: JsonValue | null;
   readonly sha256?: string;
+}
+
+export interface CreateArtifactLinkInput {
+  readonly id?: string;
+  readonly workflowRunId: string;
+  readonly childArtifactId: string;
+  readonly parentArtifactId: string;
+  readonly linkType?: ArtifactLinkType;
+  readonly metadata?: JsonRecord;
+}
+
+export interface CreateLinkedArtifactInput extends CreateArtifactInput {
+  readonly parentArtifactIds?: readonly string[];
+  readonly linkType?: ArtifactLinkType;
+  readonly linkMetadata?: JsonRecord;
 }
 
 export interface CreateAgentInvocationInput {

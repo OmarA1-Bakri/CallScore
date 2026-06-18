@@ -33,6 +33,7 @@ test("migration plan applies schema then numbered migrations in order", () => {
     normalize("migrations/020-pipeline-job-lease-expiry.sql"),
     normalize("migrations/021-launch-pipeline-ops.sql"),
     normalize("migrations/022-workflow-control-plane.sql"),
+    normalize("migrations/023-artifact-chain.sql"),
   ]);
 });
 
