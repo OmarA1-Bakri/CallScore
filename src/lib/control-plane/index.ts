@@ -1,5 +1,6 @@
 export * from "./artifacts";
 export * from "./checksum";
+export * from "./observability";
 export * from "./repository";
 export * from "./runtime";
 export * from "./status";

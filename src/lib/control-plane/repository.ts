@@ -329,6 +329,84 @@ export class ControlPlaneRepository {
     `, [rootArtifactId]);
   }
 
+  async listWorkflowRuns(limit = 50): Promise<WorkflowRunRecord[]> {
+    return this.executor<WorkflowRunRecord>(`
+      SELECT *
+      FROM workflow_runs
+      ORDER BY created_at DESC
+      LIMIT $1
+    `, [limit]);
+  }
+
+  async getWorkflowRun(workflowRunId: string): Promise<WorkflowRunRecord | null> {
+    const rows = await this.executor<WorkflowRunRecord>(`
+      SELECT *
+      FROM workflow_runs
+      WHERE id = $1
+      LIMIT 1
+    `, [workflowRunId]);
+    return rows[0] ?? null;
+  }
+
+  async listWorkflowNodeRuns(workflowRunId: string): Promise<WorkflowNodeRunRecord[]> {
+    return this.executor<WorkflowNodeRunRecord>(`
+      SELECT *
+      FROM workflow_node_runs
+      WHERE workflow_run_id = $1
+      ORDER BY created_at ASC
+    `, [workflowRunId]);
+  }
+
+  async listWorkflowEvents(workflowRunId: string): Promise<WorkflowEventRecord[]> {
+    return this.executor<WorkflowEventRecord>(`
+      SELECT *
+      FROM workflow_events
+      WHERE workflow_run_id = $1
+      ORDER BY created_at ASC
+    `, [workflowRunId]);
+  }
+
+  async listWorkflowArtifacts(workflowRunId: string): Promise<ArtifactRecord[]> {
+    return this.executor<ArtifactRecord>(`
+      SELECT *
+      FROM artifacts
+      WHERE workflow_run_id = $1
+      ORDER BY created_at ASC
+    `, [workflowRunId]);
+  }
+
+  async listWorkflowApprovalGates(workflowRunId: string): Promise<ApprovalGateRecord[]> {
+    return this.executor<ApprovalGateRecord>(`
+      SELECT *
+      FROM approval_gates
+      WHERE workflow_run_id = $1
+      ORDER BY created_at ASC
+    `, [workflowRunId]);
+  }
+
+  async listArtifactsForEntity(entityType: string, entityId: string): Promise<ArtifactRecord[]> {
+    return this.executor<ArtifactRecord>(`
+      SELECT *
+      FROM artifacts
+      WHERE entity_type = $1 AND entity_id = $2
+      ORDER BY created_at ASC
+    `, [entityType, entityId]);
+  }
+
+  async listBlockedItems(limit = 50): Promise<{ readonly kind: "node" | "approval_gate"; readonly id: string; readonly workflow_run_id: string; readonly status: WorkflowStatus; readonly reason: string | null; readonly created_at: string }[]> {
+    return this.executor(`
+      SELECT 'node' AS kind, id, workflow_run_id, status, error AS reason, created_at
+      FROM workflow_node_runs
+      WHERE status IN ('blocked', 'awaiting_approval', 'failed')
+      UNION ALL
+      SELECT 'approval_gate' AS kind, id, workflow_run_id, status, reason, created_at
+      FROM approval_gates
+      WHERE status IN ('blocked', 'awaiting_approval')
+      ORDER BY created_at DESC
+      LIMIT $1
+    `, [limit]);
+  }
+
   async recordAgentInvocation(input: CreateAgentInvocationInput): Promise<AgentInvocationRecord> {
     const invocation = await one<AgentInvocationRecord>(this.executor, `
       INSERT INTO agent_invocations (
