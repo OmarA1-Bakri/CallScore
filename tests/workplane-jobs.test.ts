@@ -22,6 +22,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
     "ml_extraction_eval",
     "ml_idle_improve",
     "extraction_promotion_review",
+    "loop_engineering_eval",
     "whop_provider_health",
     "whop_plan_inventory_check",
     "whop_entitlement_sync_dry_run",

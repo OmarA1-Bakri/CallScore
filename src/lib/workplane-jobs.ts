@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { buildRunId } from "./shadow-extraction";
 import { writeWorkflowReceipt } from "./workflow-receipts";
+import { buildExtractionLoopReceipt } from "./loop-engineering";
 
 export const WORKPLANE_JOB_TYPES = [
   "transcript_collect_laptop",
@@ -11,6 +12,7 @@ export const WORKPLANE_JOB_TYPES = [
   "ml_extraction_eval",
   "ml_idle_improve",
   "extraction_promotion_review",
+  "loop_engineering_eval",
   "whop_provider_health",
   "whop_plan_inventory_check",
   "whop_entitlement_sync_dry_run",
@@ -91,6 +93,20 @@ const campaignFailures = [
   "no_progress",
   "safety_gate_blocked",
   "approval_missing",
+] as const;
+
+const loopEngineeringFailures = [
+  "missing_fixture",
+  "malformed_artifact",
+  "json_valid_rate_below_threshold",
+  "schema_pass_rate_below_threshold",
+  "parser_errors_present",
+  "unreviewed_high_confidence_diff",
+  "no_accepted_calls",
+  "metric_regression",
+  "approval_missing",
+  "unsafe_mutation_requested",
+  "no_progress",
 ] as const;
 
 export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
@@ -216,6 +232,30 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
     success_criteria: ["promotion evidence summarized", "blocked gates listed", "production default remains unchanged"],
     failure_classification: ["missing_report", "gate_failed", "approval_missing"],
     default_safe_command: "npm run workplane:status",
+  }),
+  loop_engineering_eval: safeReportSpec("loop_engineering_eval", {
+    input_payload: {
+      loop_id: "callscore_extraction_precision_loop",
+      track: "transcript_extraction",
+      target_surface: "extractor",
+      dry_run: true,
+      local_write_only: true,
+      fixtures: "data/eval/call-extraction-fixtures.jsonl",
+      shadow_in: "optional latest .tmp/shadow-extraction/*.jsonl",
+      diff_in: "optional .tmp/shadow-extraction/*.diff.jsonl",
+      ml_report_out: ".tmp/ml-idle-improve/<run-id>.loop-ml-idle.json",
+      receipt_out: ".tmp/loop-engineering/<run-id>.json",
+    },
+    execution_location: "HH",
+    max_batch_size: 1,
+    concurrency: 1,
+    timeout_seconds: 300,
+    retry_policy: "dry-run/local-write only; reuse ML idle eval, compare metrics, and emit LoopReceipt; never auto-promote",
+    cooldown_policy: "stop on repeated same failure class; no blind mutation loop",
+    output_artifact: ".tmp/loop-engineering/<run-id>.json",
+    success_criteria: ["LoopContract encoded", "existing ML idle eval primitive reused", "LoopReceipt records metrics/failure/next action", "no live side effect", "production default remains unchanged"],
+    failure_classification: loopEngineeringFailures,
+    default_safe_command: "npm run ml:idle-improve -- --fixtures data/eval/call-extraction-fixtures.jsonl --out .tmp/ml-idle-improve/<run-id>.loop-ml-idle.json",
   }),
   whop_provider_health: safeReportSpec("whop_provider_health", {
     input_payload: { mode: "read_only", provider_mutation: false },
@@ -711,6 +751,51 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
       public_ranking_impact_allowed: false,
     }, null, 2)}\n`);
     return { mode: "promotion_review_report", execution_location: spec.execution_location, out, production_db_writes_allowed: false, production_call_writes_allowed: false, public_ranking_impact_allowed: false, note: "Promotion review creates evidence only; production default remains unchanged.", receipt_path: writeWorkplaneReceipt(job, spec, runId, "blocked", ["approval_missing"], "collect explicit promotion approval before write canary") };
+  }
+
+  if (job.type === "loop_engineering_eval") {
+    const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("loop-engineering");
+    const fixtures = typeof payload.fixtures === "string" ? payload.fixtures : "data/eval/call-extraction-fixtures.jsonl";
+    const { buildMlIdleImproveReport, latestShadowArtifact } = await import("../scripts/ml-idle-improve");
+    const shadowIn = typeof payload.shadow_in === "string" ? payload.shadow_in : latestShadowArtifact();
+    const diffIn = typeof payload.diff_in === "string" ? payload.diff_in : null;
+    const mlReportOut = typeof payload.ml_report_out === "string" ? payload.ml_report_out : `.tmp/ml-idle-improve/${runId}.loop-ml-idle.json`;
+    const out = typeof payload.out === "string" ? payload.out : `.tmp/loop-engineering/${runId}.json`;
+    const mlReport = buildMlIdleImproveReport({ shadowIn, diffIn, fixtures, out: mlReportOut }, runId);
+    mkdirSync(dirname(mlReportOut), { recursive: true });
+    writeFileSync(mlReportOut, `${JSON.stringify(mlReport, null, 2)}\n`);
+    const loopReceipt = buildExtractionLoopReceipt({
+      runId,
+      loopId: typeof payload.loop_id === "string" ? payload.loop_id : "callscore_extraction_precision_loop",
+      objective: typeof payload.objective === "string" ? payload.objective : undefined,
+      iteration: Number.isFinite(Number(payload.iteration)) ? Number(payload.iteration) : 1,
+      sourceData: [fixtures, ...(shadowIn ? [shadowIn] : []), ...(diffIn ? [diffIn] : [])],
+      mlIdleReport: mlReport,
+      artifacts: { ml_report_out: mlReportOut, loop_receipt_out: out },
+    });
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, `${JSON.stringify(loopReceipt, null, 2)}\n`);
+    const receiptPath = writeWorkplaneReceipt(job, spec, runId, "passed", [], "review LoopReceipt; promotion still requires explicit extraction_promotion_review approval");
+    return {
+      mode: "loop_engineering_dry_run",
+      execution_location: spec.execution_location,
+      run_id: runId,
+      out,
+      ml_report_out: mlReportOut,
+      receipt_path: receiptPath,
+      decision: loopReceipt.decision,
+      failure_class: loopReceipt.failure_class,
+      public_action_performed: false,
+      external_mutation_performed: false,
+      provider_mutation_performed: false,
+      whop_mutation_performed: false,
+      production_mutation_performed: false,
+      production_default_changed: false,
+      production_db_writes_allowed: false,
+      production_call_writes_allowed: false,
+      public_ranking_impact_allowed: false,
+      next_safe_action: loopReceipt.next_safe_action,
+    };
   }
 
   return writeReportOnlyArtifact(job, spec);

@@ -7,6 +7,7 @@ import {
   latestGemmaShadowArtifact,
   latestWorkflowReceipt,
   latestMlEvalArtifact,
+  latestLoopEngineeringReceipt,
   readCollectorCooldownState,
   rootHygieneAudit,
   workplaneJobModelForStatus,
@@ -93,6 +94,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
   const latestGemmaShadow = latestGemmaShadowArtifact();
   const latestMlEval = latestMlEvalArtifact();
   const latestArtOfWarCampaignLoop = latestArtOfWarCampaignReceipt();
+  const latestLoopEngineeringEval = latestLoopEngineeringReceipt();
   const latestTranscriptCadenceReceipt = latestWorkflowReceipt("transcript_laptop_cadence");
   const latestTranscriptCadencePassed = latestTranscriptCadenceReceipt.exists
     && !latestTranscriptCadenceReceipt.malformed
@@ -175,6 +177,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     whop_provider_readiness: readiness_domains.whop_auto,
     art_of_war_activation_gate_status: readiness_domains.art_of_war,
     latest_artofwar_campaign_loop_run: latestArtOfWarCampaignLoop,
+    latest_loop_engineering_eval_run: latestLoopEngineeringEval,
     automation_registry_status: readiness_domains.claude_code_automations,
     approval_required_for_next_risky_action: readiness_domains.activation_gates.required_approvals,
     next_approval_gated_action: "operator approval required before public marketing/outreach/spend, Whop live mutation, Gemma write-canary, or production extractor default change",
@@ -186,6 +189,10 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
       "ingest_transcript_results",
       "run_gemma_shadow_extract_artifact_only",
       "run_ml_idle_improve_artifact_only",
+      "run_loop_engineering_eval_dry_run",
+      "write_loop_receipt_public_action_false",
+      "compare_loop_iteration_metrics",
+      "block_loop_on_repeated_failure_class",
       "run_whop_read_only_dry_runs",
       "run_artofwar_private_dry_runs",
       "run_artofwar_campaign_contract_preflight",

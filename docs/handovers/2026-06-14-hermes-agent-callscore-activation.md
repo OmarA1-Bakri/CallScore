@@ -461,3 +461,14 @@ Current classification:
 - Composio MCP config is present in `/opt/crypto-tuber-ranked/.env.hermes` through redacted key names `COMPOSIO_API_KEY` and `COMPOSIO_MCP_URL`.
 - Read-only Composio connection listing reports Attio, Gmail, Twitter/X, PostHog, Hugging Face, LinkedIn, and Discord as active.
 - Hermes should still use the GTM registry before action execution. Active connection does not grant permission for sends, DMs, paid actions, CRM/analytics writes, Whop/provider mutations, or restricted claims.
+
+## 2026-06-15 canonical future-session startup update
+
+- Standard interactive startup bundle created: `/callscore-standard`.
+- Bundle file: `/srv/agents/hermes/skill-bundles/callscore-standard.yaml`.
+- Bundle loads `callscore-autopilot`, `workplane-status`, `task-router`, `headroom`, `agent-memory-vault`, `github-operations`, and `committing-user-work-safely`.
+- Alias bundle created: `/agentmemory`, loading `agent-memory-vault` for operator requests that refer to `/agentmemory`.
+- Canonical startup protocol created: `/opt/crypto-tuber-ranked/docs/ops/callscore-canonical-session-startup.md`.
+- Future CallScore sessions should read `AGENTS.md`, `README.md`, this handover, the GTM registry JSON/MD/diagram, canonical skill register, canonical subagent roster, and redacted env manifest before reporting readiness or mutating state.
+- `headroom` is now standard support for large-output/context-pressure work, with secret-compression and exact-claim guardrails.
+- `agent-memory-vault` is now standard support for durable memory, handover, convention capture, and end-of-session consolidation, with no secrets/customer/payment data stored.

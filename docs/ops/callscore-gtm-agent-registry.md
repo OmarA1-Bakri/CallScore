@@ -54,3 +54,7 @@ Canonical owner map for CallScore GTM, marketing, commercial, connected-app, and
 ## Hermes skill enforcement
 
 The following Hermes skills enforce default-public owned GTM plus restricted-lane gates: `art-of-war-operations`, `callscore-autopilot`, `workplane-status`, `whop-automation`, `humanizer`, and `xurl`. Audit details: [`docs/ops/hermes-skill-canonicalization-audit.md`](./hermes-skill-canonicalization-audit.md).
+
+The canonical skill register for the HH Hermes CallScore operating profile is [`docs/ops/callscore-canonical-skill-register.md`](./callscore-canonical-skill-register.md). It records the installed CallScore skill surface, including 2026-06-15 hub additions for FastMCP, watchers, Docker ops, PostHog, Sentry, Stripe best-practices, decision packets, and concept diagrams.
+
+The canonical future-session startup protocol is [`docs/ops/callscore-canonical-session-startup.md`](./callscore-canonical-session-startup.md). Start interactive CallScore sessions with `/callscore-standard`; load `headroom` and `/agentmemory` (`agent-memory-vault`) as standard support skills before large-output, context-compression, memory, handover, or durable-convention work.

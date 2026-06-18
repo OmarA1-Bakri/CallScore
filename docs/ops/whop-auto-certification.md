@@ -258,6 +258,6 @@ Expected:
 
 - Live Whop dashboard settings are provider-certified for the public app and webhook target after 2026-06-11 correction.
 - Live checkout routes are publicly verified from `https://call-score.com`, and provider inventory matches the four checkout resources.
-- Persistent revenue/event logging is not implemented in the current webhook route; live Whop product access checks are sufficient for current entitlement certification, while revenue-event persistence remains a follow-up for autonomous revenue analytics.
+- Whop remains the entitlement source of truth for current CONTROLLED_FULL. The webhook route is an intentional signed-event acknowledgement target for provider delivery health; local revenue-event mirroring is outside the current contract and not required for entitlement certification.
 - Live paid-purchase proof was not performed.
 - Art of War autonomous growth work may move to planning/controlled execution after the remaining YouTube transcript cookie gate is handled; no paid ads or external spend are authorized by this certification.

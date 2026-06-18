@@ -220,10 +220,8 @@ export default async function CreatorPage({ params }: PageProps) {
       </EditorialSection>
 
       {/* 02 — headline metrics
-          Approach: reuse <AlphaScoreBadge> for the alpha tile and render
-          three sibling tiles using the same hairline-bordered numeric chip
-          pattern (border + bg-ink-50 + 2px radius). Phase 4 may extract
-          this into a shared <MetricTile> primitive — see plan Step 4 TODO. */}
+          The local <MetricTile> primitive below is the canonical shared pattern
+          for this page's non-alpha numeric chips (border + bg-ink-50 + 2px radius). */}
       <EditorialSection index="02" title={<>Headline <em className="italic text-accent">metrics</em>.</>}>
         <div className="grid grid-cols-2 tab:grid-cols-4 gap-4">
           <AlphaScoreBadge score={alphaScore} size="lg" />

@@ -68,8 +68,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   if (!body) return NextResponse.json({ error: "invalid_json" }, { status: 400 });
 
-  // Whop remains source of truth via getUserTier on login/API access. This
-  // endpoint acknowledges membership events so the dashboard webhook has a
-  // concrete target; persistent entitlement mirroring can be added here later.
+  // Whop remains the entitlement source of truth via getUserTier on login/API
+  // access. This endpoint is intentionally an idempotent signed-event ack for
+  // Whop dashboard delivery health; local entitlement mirroring is not part of
+  // the current CONTROLLED_FULL contract.
   return NextResponse.json({ ok: true });
 }

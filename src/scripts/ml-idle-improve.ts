@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { buildRunId, type ShadowDiffRecord, type ShadowExtractedCallRecord } from "../lib/shadow-extraction";
 import { timestamp } from "./script-helpers";
@@ -54,9 +54,10 @@ export function latestShadowArtifact(root = ".tmp/shadow-extraction"): string | 
   if (!existsSync(root)) return null;
   const candidates = readdirSync(root)
     .filter((name) => name.endsWith(".jsonl") && !name.includes(".diff"))
-    .map((name) => join(root, name));
+    .map((name) => join(root, name))
+    .map((filePath) => ({ filePath, mtimeMs: statSync(filePath).mtimeMs }));
   if (candidates.length === 0) return null;
-  return candidates.sort((a, b) => b.localeCompare(a))[0] ?? null;
+  return candidates.sort((a, b) => b.mtimeMs - a.mtimeMs || b.filePath.localeCompare(a.filePath))[0]?.filePath ?? null;
 }
 
 export function parseMlIdleImproveArgs(argv = process.argv.slice(2)): Args {

@@ -9,6 +9,7 @@ CallScore ranks crypto creators by evidence-backed prediction quality. It ingest
 - **Canonical app repo:** `/opt/crypto-tuber-ranked` on branch `master`
 - **Current readiness:** `CONTROLLED_FULL`
 - **Latest canonical gate model:** [`docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md`](docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md)
+- **Canonical session startup:** [`docs/ops/callscore-canonical-session-startup.md`](docs/ops/callscore-canonical-session-startup.md) — standard docs/skills for future Hermes sessions, including `/callscore-standard`, `headroom`, and `/agentmemory`.
 
 ## Executive summary
 

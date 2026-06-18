@@ -365,24 +365,16 @@ export default async function CallDetailPage({ params }: PageProps) {
       </EditorialSection>
 
       {/* 04 — recompute log
-          NOTE: pending real call_audit_log integration. Until then, show ONLY
-          the deterministic extraction confidence (no synthesized timestamps).
-          Do NOT use new Date() to fake "score computed at" timestamps — that
-          would lie about provenance on every render. (round2-006) */}
+          Canonical source is deterministic extraction provenance. The UI shows
+          the call's extraction confidence and validation state only; it never
+          synthesizes score-computed timestamps from request time. */}
       <EditorialSection
         index="04"
         title={<>Recompute <em className="italic text-accent">log</em>.</>}
         meta={<>extraction provenance<br />reproduce with: npm run audit:recompute</>}
       >
         {serializedCall.extraction_confidence !== null ? (
-          <table className="w-full font-mono text-[12px]">
-            <thead>
-              <tr className="border-b border-ink-250">
-                <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 w-32">When</th>
-                <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 w-24">Stage</th>
-                <th className="text-left text-[11px] text-ink-500 tracking-caps uppercase font-normal py-2 pl-4">Output</th>
-              </tr>
-            </thead>
+          <table className="w-full text-left text-[12px] font-mono">
             <tbody>
               <tr className="border-b border-ink-150">
                 <td className="py-2.5 text-ink-600 tabular-nums">
@@ -411,8 +403,6 @@ export default async function CallDetailPage({ params }: PageProps) {
             No recompute history yet. This call was scored once at extraction.
           </p>
         )}
-        {/* TODO: when call_audit_log table lands, query it for this call.id and
-            render real rows. Drop the single-row fallback above. */}
       </EditorialSection>
     </div>
   );

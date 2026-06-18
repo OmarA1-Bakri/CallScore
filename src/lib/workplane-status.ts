@@ -257,6 +257,36 @@ export function latestArtOfWarCampaignReceipt(root: string | readonly string[] =
   }
 }
 
+export function latestLoopEngineeringReceipt(root: string | readonly string[] = [".tmp/loop-engineering"]): ArtifactSummary {
+  const path = latestFile(root, (name) => name.endsWith(".json"));
+  if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
+  try {
+    const json = readJsonObject(path);
+    return {
+      path,
+      exists: true,
+      modified_at: statSync(path).mtime.toISOString(),
+      malformed: false,
+      summary: {
+        loop_id: json.loop_id ?? null,
+        track: json.track ?? null,
+        target_surface: json.target_surface ?? null,
+        decision: json.decision ?? null,
+        failure_class: json.failure_class ?? null,
+        next_safe_action: json.next_safe_action ?? null,
+        public_action_performed: json.public_action_performed ?? null,
+        external_mutation_performed: json.external_mutation_performed ?? null,
+        provider_mutation_performed: json.provider_mutation_performed ?? null,
+        whop_mutation_performed: json.whop_mutation_performed ?? null,
+        production_mutation_performed: json.production_mutation_performed ?? null,
+        production_default_changed: json.production_default_changed ?? null,
+      },
+    };
+  } catch (error) {
+    return { path, exists: true, modified_at: statSync(path).mtime.toISOString(), malformed: true, summary: { error: error instanceof Error ? error.message : String(error) } };
+  }
+}
+
 export function decideNextAutonomousAction(input: WorkplaneDecisionInput): WorkplaneDecision {
   if (input.unsafeSourceRanks > 0 || input.apiUnsafeOfficialCount > 0) {
     return { action: "hold_investigate_public_safety", reason: "unsafe source/ranking state detected", job_type: null, allowed: false };
@@ -484,6 +514,7 @@ export function buildReadinessDomains(input: {
   const shadowMetrics = input.latestGemmaShadow.summary;
   const mlGate = (input.latestMlEval.summary.promotion_gate ?? {}) as Record<string, unknown>;
   const external = externalReadinessSnapshot(repoRoot, now);
+  const latestLoopEngineering = latestLoopEngineeringReceipt(join(repoRoot, ".tmp", "loop-engineering"));
   const publicSafe = input.unsafeSourceRanks === 0 && input.apiUnsafeOfficialCount === 0;
   const transcriptCadenceReceipt = latestWorkflowReceipt("transcript_laptop_cadence", repoRoot);
   const transcriptCadencePassed = transcriptCadenceReceipt.exists
@@ -628,6 +659,25 @@ export function buildReadinessDomains(input: {
       required_approvals: ["promotion to write-canary", "production default change"],
       relevant_commands: ["npm run ml:idle-improve"],
       relevant_jobs: ["ml_extraction_eval", "ml_idle_improve", "extraction_promotion_review"],
+      dry_run_available: true,
+      canary_available: false,
+    }, now),
+    loop_engineering_kernel: domain({
+      status: "MONITORED",
+      evidence: [
+        existsEvidence(join(repoRoot, "docs/ops/callscore-loop-engineering-contract.md"), "contract doc") ?? "contract doc missing",
+        existsEvidence(join(repoRoot, "docs/ops/callscore-loop-failure-taxonomy.md"), "failure taxonomy doc") ?? "failure taxonomy doc missing",
+        latestLoopEngineering.path ? `latest_loop_receipt=${latestLoopEngineering.path}` : "latest_loop_receipt=missing",
+        "loop_engineering_eval reuses ML idle/eval primitives and writes local LoopReceipt only",
+      ],
+      blockers: [],
+      safe_next_action: latestLoopEngineering.exists
+        ? "review latest LoopReceipt and keep any promotion behind extraction_promotion_review approval"
+        : "run loop_engineering_eval dry-run against extraction fixtures; write LoopReceipt; do not promote production default",
+      risky_actions_blocked: ["live surface action", "provider mutation", "Whop mutation", "production DB write", "production extractor promotion", "billable operation", "secret change"],
+      required_approvals: ["production extractor promotion", "provider/Whop/DB/deploy mutation", "public/send/spend action"],
+      relevant_commands: ["npm run ml:idle-improve", "npm run workplane:status"],
+      relevant_jobs: ["loop_engineering_eval", "ml_extraction_eval", "ml_idle_improve", "extraction_promotion_review"],
       dry_run_available: true,
       canary_available: false,
     }, now),
