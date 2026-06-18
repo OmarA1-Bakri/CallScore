@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/**/*.test.ts",
+    "test": "find tests -name '*.test.ts' -print0 | sort -z | xargs -0 node --import tsx --test",
     "test:settings": "node --import tsx --test tests/pages-cross-cutting.test.ts tests/components-no-rounded.test.ts tests/components-no-lucide-decoration.test.ts tests/api-routes.test.ts tests/alerts.test.ts",
     "seed": "node --import tsx src/scripts/seed-creators.ts",
     "scrape": "node --import tsx src/scripts/scrape-transcripts-v2.ts",
