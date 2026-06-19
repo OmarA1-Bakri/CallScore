@@ -128,6 +128,7 @@ agents:
         can_do_independently:
           - draft_x_posts_and_linkedin_posts
           - maintain_public_content_queue
+          - use_last30days_for_recent_objections_language_and_angle_selection
           - publish_owned_zero_cost_posts_within_caps
           - monitor_read_only_metrics
         gated_actions:
@@ -164,6 +165,7 @@ agents:
         - compliance_decisions
         - prior_publication_receipts
         - public_verify
+        - research_last30days_recent_social_discourse_for_angle_selection
       independent_outputs:
         - drafts
         - published_owned_post_receipts
@@ -222,6 +224,7 @@ agents:
         - gtm_registry_discord_telegram_reddit
         - community_rule_notes
         - compliance_decisions
+        - research_last30days_reddit_and_community_discourse_for_non_spam_angles
       independent_outputs:
         - owned_community_post_receipts
         - reddit_draft_packets
