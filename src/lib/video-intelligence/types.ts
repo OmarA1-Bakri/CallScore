@@ -67,10 +67,22 @@ export interface EvidenceValidationIssue {
   readonly message: string;
 }
 
+export type PublicationDecisionType = "publish" | "suppress" | "review";
+
+export interface PublicationDecision {
+  readonly decision: PublicationDecisionType;
+  readonly confidence: number;
+  readonly suppression_required: boolean;
+  readonly non_founder_review_required: boolean;
+  readonly reason_codes: readonly string[];
+  readonly summary: string;
+}
+
 export interface EvidenceValidationReport {
   readonly valid: boolean;
   readonly requiresApproval: boolean;
   readonly acceptedCallCount: number;
+  readonly publicationDecision: PublicationDecision;
   readonly issues: readonly EvidenceValidationIssue[];
   readonly metadata: JsonRecord;
 }

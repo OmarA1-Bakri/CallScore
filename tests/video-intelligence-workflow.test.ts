@@ -91,6 +91,8 @@ test("video_intelligence_workflow creates evidence-linked call artifacts for hig
 
   assert.equal(result.status, "completed");
   assert.equal(result.state.validationReport?.requiresApproval, false);
+  assert.equal(result.state.validationReport?.publicationDecision.decision, "publish");
+  assert.equal(result.state.validationReport?.publicationDecision.suppression_required, false);
   assert.equal(result.state.normalizedCalls[0]?.marketSymbol, "BTCUSDT");
   assert.equal(result.state.normalizedCalls[0]?.status, "accepted_call");
   assert.deepEqual([...db.artifacts.values()].map((artifact) => artifact.artifact_type), [
@@ -100,13 +102,17 @@ test("video_intelligence_workflow creates evidence-linked call artifacts for hig
     "candidate_calls",
     "normalized_calls",
     "validation_report",
+    "publication_decision",
   ]);
-  assert.equal(db.links.length, 5);
+  const publicationArtifact = [...db.artifacts.values()].find((artifact) => artifact.artifact_type === "publication_decision");
+  assert.ok(publicationArtifact);
+  assert.equal((publicationArtifact.json as JsonRecord).decision, "publish");
+  assert.equal(db.links.length, 6);
   assert.equal(db.gates.size, 0);
   assert.ok([...db.invocations.values()].some((invocation) => invocation.role === "video_intelligence_candidate_extractor"));
 });
 
-test("video_intelligence_workflow pauses on low-confidence or rejected call artifacts", async () => {
+test("video_intelligence_workflow suppresses low-confidence or rejected call artifacts without founder approval", async () => {
   const { db, repo } = repoWithDb();
   const result = await runVideoIntelligenceWorkflow({
     videoId: "fixture-video-2",
@@ -114,10 +120,12 @@ test("video_intelligence_workflow pauses on low-confidence or rejected call arti
     transcript: "My guest says SOL can double next month. I am only reporting what he said.",
   }, { repository: repo });
 
-  assert.equal(result.status, "awaiting_approval");
-  assert.equal(result.state.validationReport?.requiresApproval, true);
-  assert.equal(db.gates.size, 1);
-  assert.equal([...db.gates.values()][0].gate_type, "video_intelligence_review");
+  assert.equal(result.status, "completed");
+  assert.equal(result.state.validationReport?.requiresApproval, false);
+  assert.equal(result.state.validationReport?.publicationDecision.decision, "suppress");
+  assert.equal(result.state.validationReport?.publicationDecision.suppression_required, true);
+  assert.equal(result.state.validationReport?.publicationDecision.non_founder_review_required, false);
+  assert.equal(db.gates.size, 0);
   assert.deepEqual([...db.nodeRuns.values()].map((node) => node.node_id), [
     "fetch_video_metadata",
     "load_transcript",
@@ -125,7 +133,30 @@ test("video_intelligence_workflow pauses on low-confidence or rejected call arti
     "extract_candidate_calls",
     "normalize_calls",
     "validate_evidence",
-    "approval_gate_if_required",
+    "decide_publication",
+    "non_founder_review_if_required",
   ]);
-  assert.ok(db.events.some((event) => event.event_type === "approval.requested"));
+  const publicationArtifact = [...db.artifacts.values()].find((artifact) => artifact.artifact_type === "publication_decision");
+  assert.ok(publicationArtifact);
+  assert.deepEqual((publicationArtifact.json as JsonRecord).reason_codes, ["rejected_not_creator_owned"]);
+  assert.equal(db.events.some((event) => event.event_type === "approval.requested"), false);
+});
+
+test("video_intelligence_workflow routes medium-confidence accepted calls to non-founder review", async () => {
+  const { db, repo } = repoWithDb();
+  const result = await runVideoIntelligenceWorkflow({
+    videoId: "fixture-video-3",
+    title: "Conditional ETH setup",
+    transcript: "I think ETH might break out next month if the ETF flows continue.",
+  }, { repository: repo });
+
+  assert.equal(result.status, "awaiting_approval");
+  assert.equal(result.state.validationReport?.requiresApproval, true);
+  assert.equal(result.state.validationReport?.publicationDecision.decision, "review");
+  assert.equal(result.state.validationReport?.publicationDecision.non_founder_review_required, true);
+  assert.equal(db.gates.size, 1);
+  assert.equal([...db.gates.values()][0].gate_type, "non_founder_trust_review");
+  const publicationArtifact = [...db.artifacts.values()].find((artifact) => artifact.artifact_type === "publication_decision");
+  assert.ok(publicationArtifact);
+  assert.equal((publicationArtifact.json as JsonRecord).decision, "review");
 });

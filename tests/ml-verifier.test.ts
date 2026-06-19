@@ -17,6 +17,7 @@ import {
   DEFAULT_ML_VERIFIER_BATCH_SIZE,
   DEFAULT_ML_VERIFIER_ATTEMPT_TIMEOUTS_MS,
   verifyCandidateWithOllama,
+  deriveMlVerifierTrustDecision,
 } from "../src/lib/ml-verifier";
 import type { MlVerifierCandidate, ParsedVerifierOutput, MlVerifierConfig } from "../src/lib/ml-verifier";
 
@@ -190,6 +191,87 @@ test("parseVerifierOutput: throws on invalid reason_code", () => {
 test("parseVerifierOutput: throws on confidence out of range", () => {
   const raw = JSON.stringify({ decision: "approve", reason_code: "valid_call", confidence: 1.5, evidence_span: "x", recommended_extraction_confidence: 0.5, reason: "ok" });
   assert.throws(() => parseVerifierOutput(raw), /confidence must be a number from 0 to 1/);
+});
+
+// ──────────────────────────
+// trust decision mapping
+// ──────────────────────────
+
+test("deriveMlVerifierTrustDecision: high-confidence approval is publish-ready without founder review", () => {
+  const decision = deriveMlVerifierTrustDecision(makeValidOutput({
+    decision: "approve",
+    reason_code: "valid_call",
+    confidence: 0.91,
+    recommended_extraction_confidence: 0.9,
+  }));
+
+  assert.equal(decision.publication_decision, "publish");
+  assert.equal(decision.low_confidence_validation_decision, "PROMOTE");
+  assert.equal(decision.suppress_from_public_scoring, false);
+  assert.equal(decision.non_founder_review_required, false);
+  assert.equal(decision.founder_review_required, false);
+});
+
+test("deriveMlVerifierTrustDecision: rejected or missing evidence suppresses without founder review", () => {
+  const decision = deriveMlVerifierTrustDecision(makeValidOutput({
+    decision: "review",
+    reason_code: "missing_evidence",
+    confidence: 0,
+    evidence_span: "",
+    recommended_extraction_confidence: 0,
+  }));
+
+  assert.equal(decision.publication_decision, "suppress");
+  assert.equal(decision.low_confidence_validation_decision, "REJECT");
+  assert.equal(decision.suppress_from_public_scoring, true);
+  assert.equal(decision.non_founder_review_required, false);
+  assert.equal(decision.founder_review_required, false);
+});
+
+test("deriveMlVerifierTrustDecision: unclear review routes only to non-founder trust review", () => {
+  const decision = deriveMlVerifierTrustDecision(makeValidOutput({
+    decision: "review",
+    reason_code: "unclear",
+    confidence: 0.62,
+    evidence_span: "Bitcoin could keep moving if liquidity improves",
+    recommended_extraction_confidence: 0.61,
+  }));
+
+  assert.equal(decision.publication_decision, "review");
+  assert.equal(decision.low_confidence_validation_decision, "NEEDS_HUMAN_REVIEW");
+  assert.equal(decision.suppress_from_public_scoring, true);
+  assert.equal(decision.non_founder_review_required, true);
+  assert.equal(decision.founder_review_required, false);
+});
+
+test("deriveMlVerifierTrustDecision: low-confidence approvals suppress instead of review escalation", () => {
+  const decision = deriveMlVerifierTrustDecision(makeValidOutput({
+    decision: "approve",
+    reason_code: "valid_call",
+    confidence: 0.52,
+    evidence_span: "Bitcoin could move higher",
+    recommended_extraction_confidence: 0.52,
+  }));
+
+  assert.equal(decision.publication_decision, "suppress");
+  assert.equal(decision.low_confidence_validation_decision, "REJECT");
+  assert.equal(decision.non_founder_review_required, false);
+  assert.equal(decision.founder_review_required, false);
+});
+
+test("deriveMlVerifierTrustDecision: terminal invalid review reasons suppress automatically", () => {
+  const decision = deriveMlVerifierTrustDecision(makeValidOutput({
+    decision: "review",
+    reason_code: "non_actionable",
+    confidence: 0.82,
+    evidence_span: "Bitcoin is interesting to watch",
+    recommended_extraction_confidence: 0.82,
+  }));
+
+  assert.equal(decision.publication_decision, "suppress");
+  assert.equal(decision.low_confidence_validation_decision, "REJECT");
+  assert.equal(decision.non_founder_review_required, false);
+  assert.equal(decision.founder_review_required, false);
 });
 
 // ──────────────────────────
@@ -442,7 +524,9 @@ test("runMlVerifierBatch: full flow with pre-check skipping LLM", async () => {
 
   assert.equal(metrics.selected, 1);
   assert.equal(metrics.processed, 1);
-  assert.equal(metrics.review, 1); // pre-check → review
+  assert.equal(metrics.review, 1); // pre-check → review, then suppresses from public scoring
+  assert.equal(metrics.suppressed, 1);
+  assert.equal(metrics.non_founder_review, 0);
   assert.equal(metrics.approved, 0);
   assert.equal(metrics.rejected, 0);
   assert.ok(events.some(e => e.eventType === "ml_verifier_preflight"));
@@ -481,6 +565,8 @@ test("runMlVerifierBatch: graceful degradation on LLM error", async () => {
   assert.equal(metrics.selected, 1);
   assert.equal(metrics.processed, 1);
   assert.equal(metrics.review, 1); // degraded to review
+  assert.equal(metrics.suppressed, 1); // provider failures fail closed instead of founder escalation
+  assert.equal(metrics.founder_review_required, 0);
   assert.equal(runs.length, 1);
   assert.equal(runs[0].reasonCode, "model_provider_error");
 });
@@ -510,6 +596,9 @@ test("runMlVerifierBatch: success path with LLM approval", async () => {
   assert.equal(metrics.selected, 1);
   assert.equal(metrics.processed, 1);
   assert.equal(metrics.approved, 1);
+  assert.equal(metrics.publish_ready, 1);
+  assert.equal(metrics.suppressed, 0);
+  assert.equal(metrics.founder_review_required, 0);
   assert.equal(runs.length, 1);
   assert.equal(runs[0].decision, "approve");
 });

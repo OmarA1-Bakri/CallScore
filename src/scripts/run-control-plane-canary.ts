@@ -32,6 +32,10 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const artifacts = await controlPlane.listWorkflowArtifacts(workflow.workflowRun.id);
   const normalizedArtifact = artifacts.find((artifact) => artifact.artifact_type === "normalized_calls");
   if (!normalizedArtifact) throw new Error("canary_missing_normalized_calls_artifact");
+  const publicationDecisionArtifact = artifacts.find((artifact) => artifact.artifact_type === "publication_decision");
+  if (!publicationDecisionArtifact) throw new Error("canary_missing_publication_decision_artifact");
+  const publicationDecision = publicationDecisionArtifact.json as Record<string, unknown> | null;
+  if (publicationDecision?.decision !== "publish") throw new Error(`canary_unexpected_publication_decision:${String(publicationDecision?.decision ?? "missing")}`);
 
   const scoring = skipScoring ? null : await createScoreBoundaryArtifacts({
     repository: controlPlane,
@@ -62,6 +66,10 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     call_id: callId,
     output_artifact_ids: workflow.outputArtifactIds,
     normalized_artifact_id: normalizedArtifact.id,
+    publication_decision_artifact_id: publicationDecisionArtifact.id,
+    publication_decision: publicationDecision?.decision ?? null,
+    suppression_required: publicationDecision?.suppression_required ?? null,
+    non_founder_review_required: publicationDecision?.non_founder_review_required ?? null,
     score_evaluation_artifact_id: scoring?.scoreEvaluationArtifact.id ?? null,
     price_resolution_artifact_id: scoring?.priceResolutionArtifact.id ?? null,
     score: scoring?.evaluation.score ?? null,

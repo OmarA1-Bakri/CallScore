@@ -60,6 +60,20 @@ export interface MlVerifierCandidate {
   readonly candidate_priority: number;
 }
 
+export type MlVerifierPublicationDecision = "publish" | "suppress" | "review";
+export type MlVerifierValidationDecision = "PROMOTE" | "REJECT" | "NEEDS_HUMAN_REVIEW";
+
+export interface MlVerifierTrustDecision {
+  readonly publication_decision: MlVerifierPublicationDecision;
+  readonly low_confidence_validation_decision: MlVerifierValidationDecision;
+  readonly suppress_from_public_scoring: boolean;
+  readonly non_founder_review_required: boolean;
+  readonly founder_review_required: false;
+  readonly confidence: number;
+  readonly reason_codes: readonly string[];
+  readonly summary: string;
+}
+
 export interface ParsedVerifierOutput {
   readonly decision: MlVerifierDecision;
   readonly reason_code: MlVerifierReasonCode;
@@ -86,6 +100,10 @@ export interface MlVerifierMetrics extends Record<string, unknown> {
   readonly approved: number;
   readonly rejected: number;
   readonly review: number;
+  readonly publish_ready: number;
+  readonly suppressed: number;
+  readonly non_founder_review: number;
+  readonly founder_review_required: 0;
   readonly prompt_version: string;
   readonly provider: string;
   readonly model: string;
@@ -243,6 +261,70 @@ export function parseVerifierOutput(text: string, rawResponse?: string): ParsedV
     reason: typeof record.reason === "string" ? record.reason : "",
     parse_strategy: strategy,
     raw_llm_response: rawResponse ?? json,
+  };
+}
+
+const SUPPRESS_REVIEW_REASON_CODES: ReadonlySet<MlVerifierReasonCode> = new Set([
+  "missing_evidence",
+  "quote_not_in_transcript",
+  "generic_word",
+  "asset_not_supported",
+  "direction_not_supported",
+  "non_actionable",
+  "model_timeout",
+  "malformed_model_output",
+  "model_provider_error",
+]);
+const ML_TRUST_REVIEW_CONFIDENCE_FLOOR = 0.6;
+
+export function deriveMlVerifierTrustDecision(output: ParsedVerifierOutput): MlVerifierTrustDecision {
+  const reasonCodes = [output.reason_code];
+  const effectiveConfidence = Math.min(output.confidence, output.recommended_extraction_confidence);
+  if (
+    output.decision === "approve" &&
+    output.reason_code === "valid_call" &&
+    output.confidence >= 0.85 &&
+    output.recommended_extraction_confidence >= EXTRACTION_CONFIDENCE_THRESHOLD &&
+    output.evidence_span.trim().length > 0
+  ) {
+    return {
+      publication_decision: "publish",
+      low_confidence_validation_decision: "PROMOTE",
+      suppress_from_public_scoring: false,
+      non_founder_review_required: false,
+      founder_review_required: false,
+      confidence: Number(effectiveConfidence.toFixed(2)),
+      reason_codes: ["ml_verifier_publish_ready", ...reasonCodes],
+      summary: "Verifier approved a transcript-supported call at promotion confidence; no founder gate required.",
+    };
+  }
+
+  if (
+    output.decision === "reject" ||
+    SUPPRESS_REVIEW_REASON_CODES.has(output.reason_code) ||
+    effectiveConfidence < ML_TRUST_REVIEW_CONFIDENCE_FLOOR
+  ) {
+    return {
+      publication_decision: "suppress",
+      low_confidence_validation_decision: "REJECT",
+      suppress_from_public_scoring: true,
+      non_founder_review_required: false,
+      founder_review_required: false,
+      confidence: Number(effectiveConfidence.toFixed(2)),
+      reason_codes: ["ml_verifier_suppress", ...reasonCodes],
+      summary: "Verifier found missing/invalid/unsafe evidence; suppress from public scoring without founder involvement.",
+    };
+  }
+
+  return {
+    publication_decision: "review",
+    low_confidence_validation_decision: "NEEDS_HUMAN_REVIEW",
+    suppress_from_public_scoring: true,
+    non_founder_review_required: true,
+    founder_review_required: false,
+    confidence: Number(effectiveConfidence.toFixed(2)),
+    reason_codes: ["ml_verifier_non_founder_review", ...reasonCodes],
+    summary: "Verifier returned mixed or insufficient evidence; route to non-founder trust review, never founder review.",
   };
 }
 
@@ -778,7 +860,10 @@ async function insertVerificationRun(input: {
         extraction_confidence: input.candidate.extraction_confidence,
         prompt_version: input.config.promptVersion,
       }),
-      JSON.stringify(input.output),
+      JSON.stringify({
+        ...input.output,
+        trust_decision: deriveMlVerifierTrustDecision(input.output),
+      }),
     ],
   );
 }
@@ -871,6 +956,19 @@ export async function runMlVerifierBatch(
   let approved = 0;
   let rejected = 0;
   let review = 0;
+  let publishReady = 0;
+  let suppressed = 0;
+  let nonFounderReview = 0;
+
+  const countOutput = (output: ParsedVerifierOutput): void => {
+    if (output.decision === "approve") approved += 1;
+    if (output.decision === "reject") rejected += 1;
+    if (output.decision === "review") review += 1;
+    const trustDecision = deriveMlVerifierTrustDecision(output);
+    if (trustDecision.publication_decision === "publish") publishReady += 1;
+    if (trustDecision.publication_decision === "suppress") suppressed += 1;
+    if (trustDecision.publication_decision === "review") nonFounderReview += 1;
+  };
 
   for (const candidate of candidates) {
     let output: ParsedVerifierOutput;
@@ -881,7 +979,7 @@ export async function runMlVerifierBatch(
       output = preCheck.output;
       await insertVerificationRun({ job, candidate, config, output, queryFn });
       processed += 1;
-      if (output.decision === "review") review += 1;
+      countOutput(output);
       continue;
     }
 
@@ -909,7 +1007,7 @@ export async function runMlVerifierBatch(
             : "model_provider_error",
         message: `LLM verifier error: ${message.slice(0, 200)}`,
       });
-      review += 1;
+      countOutput(output);
       processed += 1;
       await insertVerificationRun({ job, candidate, config, output, queryFn });
       continue;
@@ -918,9 +1016,7 @@ export async function runMlVerifierBatch(
     await insertVerificationRun({ job, candidate, config, output, queryFn });
 
     processed += 1;
-    if (output.decision === "approve") approved += 1;
-    if (output.decision === "reject") rejected += 1;
-    if (output.decision === "review") review += 1;
+    countOutput(output);
   }
 
   const metrics: MlVerifierMetrics = {
@@ -929,6 +1025,10 @@ export async function runMlVerifierBatch(
     approved,
     rejected,
     review,
+    publish_ready: publishReady,
+    suppressed,
+    non_founder_review: nonFounderReview,
+    founder_review_required: 0,
     prompt_version: config.promptVersion,
     provider: config.provider,
     model: config.model,

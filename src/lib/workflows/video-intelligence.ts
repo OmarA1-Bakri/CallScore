@@ -145,22 +145,51 @@ export function createVideoIntelligenceWorkflow(
         },
       },
       {
-        id: "approval_gate_if_required",
-        type: "approval",
+        id: "decide_publication",
+        type: "deterministic",
         dependsOn: ["validate_evidence"],
+        run: () => {
+          if (!state.validationReport) throw new Error("validation_report_missing");
+          return {
+            outputArtifact: {
+              artifactType: "publication_decision",
+              schemaVersion: "callscore.publication_decision.v1",
+              json: toJsonValue({
+                video_id: input.videoId,
+                workflow_name: "video_intelligence_workflow",
+                ...state.validationReport.publicationDecision,
+              }),
+            },
+            metadata: toJsonRecord({
+              decision: state.validationReport.publicationDecision.decision,
+              suppression_required: state.validationReport.publicationDecision.suppression_required,
+              non_founder_review_required: state.validationReport.publicationDecision.non_founder_review_required,
+            }),
+          };
+        },
+      },
+      {
+        id: "non_founder_review_if_required",
+        type: "approval",
+        dependsOn: ["decide_publication"],
         run: async (ctx) => {
-          if (!state.validationReport?.requiresApproval) return { status: "completed", reason: "no_approval_required" };
+          const decision = state.validationReport?.publicationDecision;
+          if (!decision?.non_founder_review_required) {
+            return { status: "completed", reason: decision?.suppression_required ? "suppressed_without_founder_review" : "no_review_required" };
+          }
           await ctx.repository.requestApprovalGate({
             workflowRunId: ctx.workflowRun.id,
             nodeRunId: ctx.nodeRun.id,
-            gateType: "video_intelligence_review",
-            reason: "low_confidence_or_evidence_issue",
+            gateType: "non_founder_trust_review",
+            reason: "medium_confidence_call_requires_non_founder_review",
             metadata: toJsonRecord({
               video_id: input.videoId,
-              issues: state.validationReport.issues,
+              decision,
+              issues: state.validationReport?.issues ?? [],
+              founder_review_required: false,
             }),
           });
-          return { status: "awaiting_approval", reason: "video_intelligence_review_required" };
+          return { status: "awaiting_approval", reason: "non_founder_trust_review_required" };
         },
       },
     ],
