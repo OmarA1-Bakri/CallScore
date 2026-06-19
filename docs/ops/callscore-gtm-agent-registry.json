@@ -40,7 +40,7 @@
       ],
       "allowed_actions_now": [
         "generate owned public X post",
-        "publish owned zero-cost X post when safe content policy passes",
+        "publish owned zero-cost X post with generated image card when safe content policy passes",
         "generate UTM link",
         "record post-execution receipt",
         "monitor read-only results"
@@ -87,7 +87,7 @@
       ],
       "allowed_actions_now": [
         "generate owned public LinkedIn post",
-        "publish owned zero-cost LinkedIn post when safe content policy passes",
+        "publish owned zero-cost LinkedIn post with generated image card when safe content policy passes",
         "record post-execution receipt",
         "monitor read-only results"
       ],
@@ -267,7 +267,7 @@
       ],
       "allowed_actions_now": [
         "generate owned Reddit profile build-log/product post",
-        "publish zero-cost aggregate/product post to owned Reddit profile u_Crush1nator when Reddit profile rules and public messaging policy pass",
+        "publish zero-cost aggregate/product post with generated image card to owned Reddit profile u_Crush1nator when Reddit profile rules and public messaging policy pass",
         "record post-execution receipt",
         "monitor read-only results",
         "research non-owned subreddit rules and draft only"

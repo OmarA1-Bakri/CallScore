@@ -129,7 +129,7 @@ agents:
           - draft_x_posts_and_linkedin_posts
           - maintain_public_content_queue
           - use_last30days_for_recent_objections_language_and_angle_selection
-          - publish_owned_zero_cost_posts_within_caps
+          - publish_owned_zero_cost_posts_within_caps_with_generated_image_card
           - monitor_read_only_metrics
         gated_actions:
           - DMs
@@ -167,8 +167,8 @@ agents:
         - public_verify
         - research_last30days_recent_social_discourse_for_angle_selection
       independent_outputs:
-        - drafts
-        - published_owned_post_receipts
+        - drafts_with_required_image_card
+        - published_owned_post_receipts_with_media_id_or_image_url
         - monitoring_receipts
       stop_conditions:
         - post_cap_reached
@@ -192,7 +192,7 @@ agents:
       bounded_authority:
         can_do_independently:
           - draft_community_posts
-          - publish_owned_or_managed_telegram_discord_when_safe
+          - publish_owned_or_managed_telegram_discord_when_safe_with_generated_image_card
           - maintain_rule_context
           - monitor_reactions_read_only
         gated_actions:
@@ -226,8 +226,8 @@ agents:
         - compliance_decisions
         - research_last30days_reddit_and_community_discourse_for_non_spam_angles
       independent_outputs:
-        - owned_community_post_receipts
-        - reddit_draft_packets
+        - owned_community_post_receipts_with_media_id_or_image_url
+        - reddit_draft_packets_with_image_card
       stop_conditions:
         - destination_not_owned_or_managed
         - unknown_rule_context
