@@ -253,41 +253,49 @@
       "primary_owner_agent": "marketing-community-drops",
       "supporting_agents": [
         "opportunity_matrix",
-        "marketing-compliance-linter"
+        "marketing-compliance-linter",
+        "Composio Reddit"
       ],
       "canonical_repo_or_path": "/srv/agents/repos/Claude_Code_Automations",
-      "connected_app_or_provider": "Reddit/community surface",
+      "connected_app_or_provider": "Composio Reddit / owned profile u_Crush1nator; non-owned subreddits remain gated",
       "workplane_jobs": [
         "artofwar_audience_research_dry_run",
+        "artofwar_content_queue_dry_run",
         "artofwar_campaign_dossier",
-        "artofwar_campaign_approval_review"
+        "artofwar_campaign_approval_review",
+        "artofwar_owned_public_execution"
       ],
       "allowed_actions_now": [
-        "draft transparent discussion/comment",
-        "record subreddit rule assumptions",
-        "prepare approval packet"
+        "generate owned Reddit profile build-log/product post",
+        "publish zero-cost aggregate/product post to owned Reddit profile u_Crush1nator when Reddit profile rules and public messaging policy pass",
+        "record post-execution receipt",
+        "monitor read-only results",
+        "research non-owned subreddit rules and draft only"
       ],
       "forbidden_actions": [
-        "post/comment without SEND_GATE receipt",
-        "promotional spam",
-        "skip subreddit rule check",
+        "post/comment to non-owned subreddits without exact subreddit target, rule checklist, SEND_GATE/TRUST/DATA_POLICY approval receipt, and rollback path",
+        "promotional spam or repeated duplicate posts",
+        "skip subreddit rule check for non-owned communities",
+        "DMs/outreach without SEND_GATE",
+        "paid promotion without SPEND_GATE",
         "secret exposure"
       ],
-      "required_gate": "SEND_GATE + TRUST_GATE + DATA_POLICY_GATE + SECRET_GATE",
-      "gate_status": "fail_closed",
-      "required_receipt": "approved subreddit send receipt",
-      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_campaign_approval_review/<run-id>.json",
-      "rollback_path": "No current external action. If future approved post/comment occurs, delete/retract and record receipt.",
-      "current_status": "gated",
-      "next_safe_action": "Research rules and draft only.",
-      "operator_action_required": "Approve exact subreddit, rule checklist, and payload before live post/comment.",
+      "required_gate": "READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + Reddit owned-profile rules check + POST_EXECUTION_RECEIPT + SECRET_GATE for u_Crush1nator owned profile; SEND_GATE + TRUST_GATE + DATA_POLICY_GATE for non-owned subreddits/comments/outreach",
+      "gate_status": "ready_public_owned_for_owned_profile; fail_closed_for_non_owned_subreddits",
+      "required_receipt": "post-execution owned Reddit profile receipt with payload hash, post URL/fullname, rollback path, and monitoring plan; approved subreddit send receipt for non-owned communities",
+      "receipt_path_pattern": ".tmp/workflow-receipts/artofwar_owned_public_execution/<run-id>.json",
+      "rollback_path": "Delete/retract owned profile post if needed and record rollback receipt. For non-owned subreddit posts, do not publish without exact approval and rollback plan.",
+      "current_status": "ready_public_owned_for_owned_profile",
+      "next_safe_action": "Publish safe aggregate/product build-log to owned Reddit profile u_Crush1nator; keep non-owned subreddit posting in research/draft mode.",
+      "operator_action_required": "None for safe owned profile aggregate/product post; explicit approval required for non-owned subreddit posts/comments, DMs/outreach, paid promotion, named accusations, or investment claims.",
       "evidence": [
         "/srv/agents/repos/Claude_Code_Automations/docs/marketing/CHANNEL_PLAN.md",
         "/srv/agents/repos/Claude_Code_Automations/docs/callscore-growth-os/GATES.md",
         "/opt/crypto-tuber-ranked/src/lib/workplane-jobs.ts",
         "/opt/crypto-tuber-ranked/docs/ops/2026-06-14-full-system-live-canary-gate-decisions.md",
         "/srv/agents/repos/Claude_Code_Automations/agent_workflows/opportunity_matrix/SKILL.md",
-        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action."
+        "2026-06-15 restricted lane unchanged: explicit gate still required for sends/outreach/CRM/analytics/provider/financial/paid/non-owned action.",
+        "2026-06-19 Omar requested Reddit coverage; Composio Reddit account Crush1nator active; u_Crush1nator profile rules checked; owned profile safe aggregate build-log posts allowed under READY_PUBLIC_OWNED while non-owned subreddits remain gated."
       ]
     },
     {
