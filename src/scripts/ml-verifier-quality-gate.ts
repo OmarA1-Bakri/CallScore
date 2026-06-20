@@ -17,6 +17,8 @@ export interface MlVerifierQualityGateArgs {
   readonly minimumAgreementRate: number;
   readonly maxModelFailureRate: number;
   readonly workerId: string;
+  readonly model?: string;
+  readonly ollamaHost?: string;
 }
 
 export interface MlVerifierQualityGateReceipt {
@@ -95,6 +97,8 @@ export function parseMlVerifierQualityGateArgs(argv = process.argv.slice(2)): Ml
     minimumAgreementRate: clampRate(argValue(argv, "--minimum-agreement-rate"), 0.9, "minimum-agreement-rate"),
     maxModelFailureRate: clampRate(argValue(argv, "--max-model-failure-rate"), 0.1, "max-model-failure-rate"),
     workerId: argValue(argv, "--worker-id") ?? "ml-verifier-quality-gate",
+    model: argValue(argv, "--model"),
+    ollamaHost: argValue(argv, "--ollama-host"),
   };
 }
 
@@ -241,7 +245,19 @@ export async function runMlVerifierQualityGate(
     counter.observeSql(sql, params);
     return queryFn<T>(sql, params);
   };
-  const metrics = await runMlVerifierBatch(job, { queryFn: capturedQuery });
+  const previousModel = process.env.ML_VERIFIER_MODEL;
+  const previousOllamaHost = process.env.OLLAMA_HOST;
+  if (args.model) process.env.ML_VERIFIER_MODEL = args.model;
+  if (args.ollamaHost) process.env.OLLAMA_HOST = args.ollamaHost;
+  let metrics: MlVerifierMetrics;
+  try {
+    metrics = await runMlVerifierBatch(job, { queryFn: capturedQuery });
+  } finally {
+    if (previousModel === undefined) delete process.env.ML_VERIFIER_MODEL;
+    else process.env.ML_VERIFIER_MODEL = previousModel;
+    if (previousOllamaHost === undefined) delete process.env.OLLAMA_HOST;
+    else process.env.OLLAMA_HOST = previousOllamaHost;
+  }
   const receipt = buildMlVerifierQualityGateReceipt({
     runId,
     metrics,

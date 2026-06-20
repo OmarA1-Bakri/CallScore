@@ -8,6 +8,7 @@ import {
   latestWorkflowReceipt,
   latestMlEvalArtifact,
   latestMlVerifierQualityGateArtifact,
+  latestGemmaCapacityPreflightArtifact,
   latestLoopEngineeringReceipt,
   readCollectorCooldownState,
   rootHygieneAudit,
@@ -95,6 +96,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
   const latestGemmaShadow = latestGemmaShadowArtifact();
   const latestMlEval = latestMlEvalArtifact();
   const latestMlVerifierQualityGate = latestMlVerifierQualityGateArtifact();
+  const latestGemmaCapacityPreflight = latestGemmaCapacityPreflightArtifact();
   const latestArtOfWarCampaignLoop = latestArtOfWarCampaignReceipt();
   const latestLoopEngineeringEval = latestLoopEngineeringReceipt();
   const latestTranscriptCadenceReceipt = latestWorkflowReceipt("transcript_laptop_cadence");
@@ -169,6 +171,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
       recent_failure_reasons: collectorCooldown.recent_failure_reasons,
     },
     latest_gemma_shadow_extraction_run: latestGemmaShadow,
+    latest_gemma_capacity_preflight_run: latestGemmaCapacityPreflight,
     latest_ml_eval_run: latestMlEval,
     latest_ml_verifier_quality_gate_run: latestMlVerifierQualityGate,
     model_currently_recommended: latestMlEval.exists && latestMlGate.eligible_for_write_canary !== true

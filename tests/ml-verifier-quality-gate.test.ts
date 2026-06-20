@@ -70,12 +70,14 @@ test("quality gate defers verifier activation on provider failure or insufficien
 });
 
 test("quality gate argument parser clamps unsafe broad sample sizes", () => {
-  assert.deepEqual(parseMlVerifierQualityGateArgs(["--sample-size", "25", "--min-sample-size", "20"]), {
+  assert.deepEqual(parseMlVerifierQualityGateArgs(["--sample-size", "25", "--min-sample-size", "20", "--model", "qwen2.5:3b", "--ollama-host", "http://127.0.0.1:11434"]), {
     sampleSize: 25,
     minSampleSize: 20,
     minimumAgreementRate: 0.9,
     maxModelFailureRate: 0.1,
     workerId: "ml-verifier-quality-gate",
+    model: "qwen2.5:3b",
+    ollamaHost: "http://127.0.0.1:11434",
   });
   assert.throws(() => parseMlVerifierQualityGateArgs(["--sample-size", "0"]), /sample-size must be/);
   assert.throws(() => parseMlVerifierQualityGateArgs(["--sample-size", "51"]), /sample-size must be/);

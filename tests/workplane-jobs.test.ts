@@ -9,6 +9,7 @@ import {
   decideNextAutonomousAction,
   latestArtOfWarCampaignReceipt,
   latestGemmaShadowArtifact,
+  latestGemmaCapacityPreflightArtifact,
   latestMlEvalArtifact,
   latestMlVerifierQualityGateArtifact,
   readCollectorCooldownState,
@@ -168,6 +169,46 @@ test("Gemma readiness trusts bounded shadow sample receipts and clean artifacts"
   assert.ok(domains.gemma_shadow_extraction.evidence.some((item) => item.includes("latest_gemma_shadow_sample_receipt=")));
 });
 
+test("Gemma runtime capacity preflight blocks Gemma4 scheduling when host memory is insufficient", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-gemma-capacity-"));
+  const receiptDir = join(root, ".tmp", "workflow-receipts", "gemma_capacity_preflight");
+  mkdirSync(receiptDir, { recursive: true });
+  writeFileSync(join(receiptDir, "gemma-capacity.json"), JSON.stringify({
+    workflow_name: "gemma_capacity_preflight",
+    run_id: "gemma-capacity-test",
+    result: "blocked",
+    model: "callscore-gemma4-extractor:latest",
+    can_load: false,
+    available_memory_gib: 8.2,
+    required_memory_gib: 9.8,
+    blockers: ["insufficient_system_memory"],
+  }));
+
+  const artifact = latestGemmaCapacityPreflightArtifact(root);
+  assert.equal(artifact.exists, true);
+  assert.equal(artifact.summary.result, "blocked");
+  assert.equal(artifact.summary.can_load, false);
+  assert.equal(artifact.summary.required_memory_gib, 9.8);
+
+  const domains = buildReadinessDomains({
+    repoRoot: root,
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: { state_path: null, status: "clear", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, latest_job_id: null, last_run_utc: null, last_attempted_count: 0, last_success_count: 0, last_failure_count: 0, last_success_rate: null, recent_failure_reasons: {}, checked_at: "now" },
+    latestGemmaShadow: { path: ".tmp/shadow-extraction/gemma-laptop-batch3.jsonl", exists: true, modified_at: "now", malformed: false, summary: { rows: 5, accepted_calls: 1, errors: { none: 5 } } },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 0,
+    dailyPipelineActive: true,
+    nextAction: { action: "none", reason: "test", job_type: "gemma_shadow_extract", allowed: true },
+    now: new Date("2026-06-20T12:00:00.000Z"),
+  });
+
+  assert.equal(domains.gemma_runtime_capacity.status, "BLOCKED");
+  assert.ok(domains.gemma_runtime_capacity.blockers.includes("insufficient_system_memory"));
+  assert.match(String(domains.gemma_runtime_capacity.safe_next_action), /free memory|smaller model|laptop/i);
+  assert.equal(domains.gemma_runtime_capacity.canary_available, false);
+});
+
 test("ML verifier quality gate receipt exposes audit-only activation status", () => {
   const dir = mkdtempSync(join(tmpdir(), "callscore-ml-verifier-gate-"));
   const receiptDir = join(dir, ".tmp", "workflow-receipts", "ml_verifier_quality_gate");
@@ -232,6 +273,45 @@ test("ML verifier readiness stays deferred until bounded audit-only quality gate
   assert.ok(domains.ml_verifier_quality_gate.evidence.some((item) => item.includes("eligible_for_activation=false")));
   assert.ok(domains.ml_verifier_quality_gate.blockers.includes("agreement_rate_below_threshold"));
   assert.match(String(domains.ml_verifier_quality_gate.safe_next_action), /run bounded audit-only ML verifier quality gate/);
+});
+
+test("ML verifier readiness becomes READY for recurring audit-only canary after bounded gate passes", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-ml-verifier-ready-"));
+  const receiptDir = join(root, ".tmp", "workflow-receipts", "ml_verifier_quality_gate");
+  mkdirSync(receiptDir, { recursive: true });
+  writeFileSync(join(receiptDir, "ml-verifier-quality-gate.json"), JSON.stringify({
+    workflow_name: "ml_verifier_quality_gate",
+    run_id: "ml-verifier-quality-gate-passed-test",
+    result: "passed",
+    sample_size: 20,
+    eligible_for_activation: true,
+    audit_only: true,
+    agreement_rate: 1,
+    minimum_agreement_rate: 0.9,
+    public_ranking_impact_allowed: false,
+    production_mutation_performed: false,
+    blockers: [],
+  }));
+
+  const domains = buildReadinessDomains({
+    repoRoot: root,
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: { state_path: null, status: "clear", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, latest_job_id: null, last_run_utc: null, last_attempted_count: 0, last_success_count: 0, last_failure_count: 0, last_success_rate: null, recent_failure_reasons: {}, checked_at: "now" },
+    latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 0,
+    dailyPipelineActive: true,
+    nextAction: { action: "none", reason: "test", job_type: null, allowed: true },
+    now: new Date("2026-06-20T12:00:00.000Z"),
+  });
+
+  assert.equal(domains.ml_verifier_quality_gate.status, "READY");
+  assert.equal(domains.ml_verifier_quality_gate.canary_available, true);
+  assert.equal(domains.ml_verifier_quality_gate.production_mutation_allowed, false);
+  assert.deepEqual(domains.ml_verifier_quality_gate.blockers, []);
+  assert.match(String(domains.ml_verifier_quality_gate.safe_next_action), /recurring audit-only ML verifier canary/);
+  assert.ok(domains.ml_verifier_quality_gate.risky_actions_blocked.includes("public ranking mutation"));
 });
 
 test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe work", () => {

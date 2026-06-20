@@ -222,6 +222,33 @@ export function latestMlVerifierQualityGateArtifact(repoRoot = process.cwd()): A
   }
 }
 
+export function latestGemmaCapacityPreflightArtifact(repoRoot = process.cwd()): ArtifactSummary {
+  const path = latestFile(join(repoRoot, ".tmp", "workflow-receipts", "gemma_capacity_preflight"), (name) => name.endsWith(".json"));
+  if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
+  try {
+    const json = readJsonObject(path);
+    return {
+      path,
+      exists: true,
+      modified_at: statSync(path).mtime.toISOString(),
+      malformed: false,
+      summary: {
+        workflow_name: json.workflow_name ?? null,
+        run_id: json.run_id ?? null,
+        result: json.result ?? null,
+        model: json.model ?? null,
+        can_load: json.can_load === true,
+        available_memory_gib: numberOrNull(json.available_memory_gib),
+        required_memory_gib: numberOrNull(json.required_memory_gib),
+        blockers: Array.isArray(json.blockers) ? json.blockers : [],
+        artifact_path: json.artifact_path ?? json.artifact ?? null,
+      },
+    };
+  } catch (error) {
+    return { path, exists: true, modified_at: statSync(path).mtime.toISOString(), malformed: true, summary: { error: error instanceof Error ? error.message : String(error) } };
+  }
+}
+
 export function latestWorkflowReceipt(workflow: string, repoRoot = process.cwd()): ArtifactSummary {
   const dir = join(repoRoot, ".tmp", "workflow-receipts", workflow);
   const path = latestFile(dir, (name) => name.endsWith(".json"));
@@ -558,6 +585,15 @@ export function buildReadinessDomains(input: {
     && !pipelineScoreCanaryReceipt.malformed
     && pipelineScoreCanaryReceipt.summary.result === "passed";
   const gemmaShadowSampleReceipt = latestWorkflowReceipt("gemma_shadow_sample", repoRoot);
+  const gemmaCapacityPreflight = latestGemmaCapacityPreflightArtifact(repoRoot);
+  const gemmaCapacitySummary = gemmaCapacityPreflight.summary;
+  const gemmaCapacityBlockers = Array.isArray(gemmaCapacitySummary.blockers)
+    ? gemmaCapacitySummary.blockers.map(String)
+    : [];
+  const gemmaCapacityCanLoad = gemmaCapacityPreflight.exists
+    && !gemmaCapacityPreflight.malformed
+    && gemmaCapacitySummary.can_load === true
+    && gemmaCapacitySummary.result === "passed";
   const gemmaDiffClassificationReceipt = latestWorkflowReceipt("gemma_diff_classification", repoRoot);
   const gemmaShadowSamplePassed = gemmaShadowSampleReceipt.exists
     && !gemmaShadowSampleReceipt.malformed
@@ -673,6 +709,28 @@ export function buildReadinessDomains(input: {
       dry_run_available: true,
       canary_available: true,
     }, now),
+    gemma_runtime_capacity: domain({
+      status: gemmaCapacityCanLoad ? "READY" : (gemmaCapacityPreflight.exists ? "BLOCKED" : "PARTIAL"),
+      evidence: [
+        gemmaCapacityPreflight.path ? `latest_gemma_capacity_preflight=${gemmaCapacityPreflight.path}` : "latest_gemma_capacity_preflight=missing",
+        `model=${gemmaCapacitySummary.model ?? "callscore-gemma4-extractor:latest"}`,
+        `can_load=${gemmaCapacitySummary.can_load === true}`,
+        `available_memory_gib=${gemmaCapacitySummary.available_memory_gib ?? "unknown"}`,
+        `required_memory_gib=${gemmaCapacitySummary.required_memory_gib ?? "unknown"}`,
+      ],
+      blockers: gemmaCapacityCanLoad
+        ? []
+        : (gemmaCapacityBlockers.length > 0 ? gemmaCapacityBlockers : [gemmaCapacityPreflight.exists ? "gemma_capacity_preflight_failed" : "gemma_capacity_preflight_missing"]),
+      safe_next_action: gemmaCapacityCanLoad
+        ? "schedule bounded Gemma4 shadow/eval jobs when higher-value than lightweight Qwen verifier"
+        : "free memory, configure a smaller Gemma4 quant/model, or route Gemma4 jobs to the laptop/GPU side before scheduling always-on Gemma4 work",
+      risky_actions_blocked: ["always-on Gemma4 jobs without capacity proof", "production extractor default switch", "public ranking impact"],
+      required_approvals: ["production extractor default change", "host memory/swap/service configuration change"],
+      relevant_commands: ["npm run gemma:capacity-preflight"],
+      relevant_jobs: ["gemma_shadow_extract", "artofwar_campaign_gemma_eval", "ml_extraction_eval"],
+      dry_run_available: true,
+      canary_available: gemmaCapacityCanLoad,
+    }, now),
     gemma_shadow_extraction: domain({
       status: gemmaShadowCanaryPassed ? "READY" : "PARTIAL",
       evidence: [
@@ -704,7 +762,7 @@ export function buildReadinessDomains(input: {
       canary_available: false,
     }, now),
     ml_verifier_quality_gate: domain({
-      status: mlVerifierEligible ? "MONITORED" : "PARTIAL",
+      status: mlVerifierEligible ? "READY" : "PARTIAL",
       evidence: [
         mlVerifierQualityGate.path ? `latest_ml_verifier_quality_gate_receipt=${mlVerifierQualityGate.path}` : "latest_ml_verifier_quality_gate_receipt=missing",
         `result=${mlVerifierGateSummary.result ?? "missing"}`,
@@ -722,7 +780,7 @@ export function buildReadinessDomains(input: {
           ? mlVerifierGateBlockers
           : [mlVerifierQualityGate.exists ? "bounded ML verifier quality gate has not passed" : "bounded ML verifier quality gate receipt missing"]),
       safe_next_action: mlVerifierEligible
-        ? "ML verifier may be scheduled audit-only; keep public ranking mutation disabled until explicit promotion approval"
+        ? "schedule recurring audit-only ML verifier canary; keep public ranking mutation disabled unless a separate production scoring approval passes"
         : "run bounded audit-only ML verifier quality gate before recurring activation",
       risky_actions_blocked: ["public ranking mutation", "automatic promotion", "founder-review bypass", "production methodology change"],
       required_approvals: ["production scoring/methodology mutation", "public ranking impact", "non-audit-only verifier activation"],
