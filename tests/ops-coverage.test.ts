@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseHermesWorkerArgs } from "../src/scripts/hermes-worker";
+import { UPSERT_NEXT_CHANNEL_TASK_SQL } from "../src/scripts/callscore-agent-heartbeat";
 import {
   compareEvalMetrics,
   parseMlAutoresearchArgs,
@@ -82,6 +83,41 @@ test("Hermes worker args are bounded and explicit", () => {
   assert.equal(args.workerId, "unit-worker");
   assert.equal(args.pollMs, 500);
   assert.equal(args.maxJobs, 2);
+  assert.equal(args.pipelineJobs, true);
+  assert.ok(args.channelTaskTypes.length > 0);
+});
+
+test("Hermes worker can run dedicated channel-agent task workers", () => {
+  const args = parseHermesWorkerArgs([
+    "--no-pipeline-jobs",
+    "--channel-task-types",
+    "owned_social_draft_and_monitor,compliance_lint_gate",
+    "--worker-id",
+    "channel-agent-owned-social-1",
+  ]);
+
+  assert.equal(args.pipelineJobs, false);
+  assert.deepEqual(args.channelTaskTypes, ["owned_social_draft_and_monitor", "compliance_lint_gate"]);
+  assert.equal(args.workerId, "channel-agent-owned-social-1");
+});
+
+test("Docker compose runs pipeline and channel-agent workers as separate services", () => {
+  const compose = read("docker-compose.yml");
+  const hermesWorker = compose.match(/  hermes-worker:\n[\s\S]*?(?=\n  [a-zA-Z0-9_-]+:)/)?.[0] ?? "";
+  const channelWorker = compose.match(/  channel-agent-worker:\n[\s\S]*?(?=\n  [a-zA-Z0-9_-]+:)/)?.[0] ?? "";
+  assert.match(hermesWorker, /--worker-id", "data-pipeline-worker/);
+  assert.match(hermesWorker, /--no-channel-tasks/);
+  assert.doesNotMatch(hermesWorker, /--no-pipeline-jobs/);
+  assert.match(channelWorker, /--worker-id", "channel-agent-worker/);
+  assert.match(channelWorker, /--no-pipeline-jobs/);
+  assert.doesNotMatch(channelWorker, /pipeline:data:continuous/);
+});
+
+test("agent heartbeat does not enqueue duplicate open channel tasks", () => {
+  assert.match(UPSERT_NEXT_CHANNEL_TASK_SQL, /existing_open/i);
+  assert.match(UPSERT_NEXT_CHANNEL_TASK_SQL, /status IN \('pending','running'\)/i);
+  assert.match(UPSERT_NEXT_CHANNEL_TASK_SQL, /WHERE NOT EXISTS \(SELECT 1 FROM existing_open\)/i);
+  assert.match(UPSERT_NEXT_CHANNEL_TASK_SQL, /'existing_open' AS source/i);
 });
 
 test("ML autoresearch parser and gates reject precision regressions", () => {

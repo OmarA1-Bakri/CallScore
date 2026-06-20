@@ -27,6 +27,12 @@ import {
   runCandidateAdmissionJob,
 } from "../lib/candidate-admission";
 import { getWorkplaneJobSpec, runWorkplaneJob, WORKPLANE_JOB_TYPES } from "../lib/workplane-jobs";
+import {
+  CHANNEL_AGENT_TASK_TYPES,
+  claimNextChannelTask,
+  failChannelTask,
+  runChannelTask,
+} from "../lib/channel-agent-tasks";
 import { query } from "../lib/db";
 import { createLogger } from "../lib/logger";
 import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
@@ -44,6 +50,7 @@ export const SUPPORTED_JOB_TYPES = [
   CREATOR_CANDIDATE_ADMISSION_JOB_TYPE,
   ...HERMES_WORKPLANE_JOB_TYPES,
 ] as const;
+export const SUPPORTED_CHANNEL_TASK_TYPES = CHANNEL_AGENT_TASK_TYPES;
 const DEFAULT_POLL_MS = 15_000;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
@@ -53,6 +60,8 @@ interface WorkerArgs {
   readonly workerId: string;
   readonly pollMs: number;
   readonly maxJobs: number;
+  readonly pipelineJobs: boolean;
+  readonly channelTaskTypes: readonly string[];
 }
 
 function argValue(argv: readonly string[], flag: string): string | null {
@@ -66,6 +75,12 @@ function positiveInt(value: string | null, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
+function csvValues(value: string | null, fallback: readonly string[]): readonly string[] {
+  if (!value) return fallback;
+  const values = value.split(",").map((item) => item.trim()).filter(Boolean);
+  return values.length > 0 ? values : fallback;
+}
+
 export function parseHermesWorkerArgs(argv = process.argv.slice(2)): WorkerArgs {
   const workerId = argValue(argv, "--worker-id")
     ?? process.env.HERMES_WORKER_ID
@@ -76,6 +91,10 @@ export function parseHermesWorkerArgs(argv = process.argv.slice(2)): WorkerArgs 
     workerId,
     pollMs: positiveInt(argValue(argv, "--poll-ms"), DEFAULT_POLL_MS),
     maxJobs: positiveInt(argValue(argv, "--max-jobs"), Number.MAX_SAFE_INTEGER),
+    pipelineJobs: !argv.includes("--no-pipeline-jobs"),
+    channelTaskTypes: argv.includes("--no-channel-tasks")
+      ? []
+      : csvValues(argValue(argv, "--channel-task-types"), SUPPORTED_CHANNEL_TASK_TYPES),
   };
 }
 
@@ -183,7 +202,12 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   process.once("SIGTERM", () => { stopping = true; });
 
   await initMonitoring({ serviceName: "hermes-worker" });
-  logger.info("worker_start", { poll_ms: args.pollMs, max_jobs: args.maxJobs });
+  logger.info("worker_start", {
+    poll_ms: args.pollMs,
+    max_jobs: args.maxJobs,
+    pipeline_jobs: args.pipelineJobs,
+    channel_task_types: args.channelTaskTypes,
+  });
   await checkDatabaseConnection();
   logger.info("database_ok");
 
@@ -193,18 +217,75 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   while (!stopping && processed < args.maxJobs) {
-    const resetJobs = await resetStalePipelineJobs({ workerId: args.workerId });
-    if (resetJobs.length > 0) {
-      logger.warn("stale_jobs_reset", {
-        job_ids: resetJobs.map((job) => job.id),
-        count: resetJobs.length,
-      });
+    if (args.pipelineJobs) {
+      const resetJobs = await resetStalePipelineJobs({ workerId: args.workerId });
+      if (resetJobs.length > 0) {
+        logger.warn("stale_jobs_reset", {
+          job_ids: resetJobs.map((job) => job.id),
+          count: resetJobs.length,
+        });
+      }
     }
 
-    const job = await claimNextPipelineJob({ workerId: args.workerId, types: claimTypes });
+    const job = args.pipelineJobs
+      ? await claimNextPipelineJob({ workerId: args.workerId, types: claimTypes })
+      : null;
     if (!job) {
+      const channelTask = args.dryRun
+        ? null
+        : args.channelTaskTypes.length === 0
+          ? null
+          : await claimNextChannelTask({ workerId: args.workerId, types: args.channelTaskTypes });
+      if (channelTask) {
+        logger.info("channel_task_claimed", {
+          task_id: channelTask.id,
+          agent_id: channelTask.agent_id,
+          channel_id: channelTask.channel_id,
+          task_type: channelTask.task_type,
+          attempt: channelTask.attempts,
+          max_attempts: channelTask.max_attempts,
+        });
+        try {
+          const metrics = await runChannelTask(channelTask, args.workerId);
+          logger.info("channel_task_completed", {
+            task_id: channelTask.id,
+            agent_id: channelTask.agent_id,
+            channel_id: channelTask.channel_id,
+            task_type: channelTask.task_type,
+            receipt: metrics.receipt,
+          });
+        } catch (error) {
+          await failChannelTask(channelTask, error);
+          const message = error instanceof Error ? error.message : String(error);
+          await captureException(error, {
+            serviceName: "hermes-worker",
+            tags: {
+              component: "hermes-worker",
+              channel_task_type: channelTask.task_type,
+              agent_id: channelTask.agent_id,
+            },
+            extra: {
+              task_id: channelTask.id,
+              channel_id: channelTask.channel_id,
+              attempt: channelTask.attempts,
+              max_attempts: channelTask.max_attempts,
+            },
+          });
+          logger.error("channel_task_failed", {
+            task_id: channelTask.id,
+            agent_id: channelTask.agent_id,
+            channel_id: channelTask.channel_id,
+            task_type: channelTask.task_type,
+            error: message,
+          });
+        }
+        processed += 1;
+        if (args.once) break;
+        continue;
+      }
+
       if (args.once) {
-        logger.info("no_pending_jobs", { claim_types: claimTypes });
+        logger.info("no_pending_jobs", { claim_types: args.pipelineJobs ? claimTypes : [], channel_task_types: args.channelTaskTypes });
         break;
       }
       await sleep(args.pollMs);

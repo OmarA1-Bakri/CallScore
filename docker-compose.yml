@@ -34,7 +34,30 @@ services:
       YTDLP_REMOTE_COMPONENTS: "1"
     volumes:
       - /opt/callscore/secrets/youtube-cookies.txt:/run/secrets/youtube-cookies.txt:ro
-    command: ["npm", "run", "pipeline:worker", "--", "--poll-ms", "15000"]
+    command: ["npm", "run", "pipeline:worker", "--", "--worker-id", "data-pipeline-worker", "--poll-ms", "15000", "--no-channel-tasks"]
+
+  channel-agent-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.hermes
+    image: crypto-tuber-ranked-hermes-worker:latest
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - ytdlp-pot-provider
+    env_file:
+      - .env.hermes
+    environment:
+      ML_VERIFIER_PROVIDER: ollama
+      OLLAMA_HOST: http://127.0.0.1:11434
+      ML_VERIFIER_MODEL: qwen2.5:3b
+      YTDLP_BIN: yt-dlp
+      YTDLP_PO_TOKEN_PROVIDER: wpc
+      YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
+      YTDLP_PLAYER_CLIENT: web
+      YTDLP_JS_RUNTIMES: node
+      YTDLP_REMOTE_COMPONENTS: "1"
+    command: ["npm", "run", "pipeline:worker", "--", "--worker-id", "channel-agent-worker", "--poll-ms", "15000", "--no-pipeline-jobs"]
 
   hermes-worker-once:
     build:

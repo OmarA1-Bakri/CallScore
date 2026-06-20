@@ -12,6 +12,30 @@ const HEARTBEAT_SCHEMA = "callscore_agent_heartbeat.v1";
 const LEASE_SECONDS = 2 * 60 * 60;
 const WAKE_SECONDS = 60 * 60;
 
+export const UPSERT_NEXT_CHANNEL_TASK_SQL = `
+WITH existing_open AS (
+  SELECT id
+  FROM channel_tasks
+  WHERE agent_id = $2
+    AND task_type = $4
+    AND status IN ('pending','running')
+  ORDER BY updated_at DESC
+  LIMIT 1
+), inserted AS (
+  INSERT INTO channel_tasks (
+    id, agent_id, channel_id, task_type, status, priority, run_after, max_attempts,
+    idempotency_key, payload_hash, payload
+  )
+  SELECT $1,$2,$3,$4,'pending',50,NOW(),1,$5,$6,$7::jsonb
+  WHERE NOT EXISTS (SELECT 1 FROM existing_open)
+  ON CONFLICT (idempotency_key) DO UPDATE SET updated_at = NOW()
+  RETURNING id
+)
+SELECT id, 'inserted' AS source FROM inserted
+UNION ALL
+SELECT id, 'existing_open' AS source FROM existing_open
+LIMIT 1`;
+
 type AgentSeed = {
   readonly agentId: string;
   readonly className: string;
@@ -82,6 +106,7 @@ async function main() {
 
   const heartbeatIds: string[] = [];
   const taskIds: string[] = [];
+  const existingOpenTaskIds: string[] = [];
 
   for (const agent of agents) {
     const channelId = channelFor(agent.agentId);
@@ -151,16 +176,14 @@ async function main() {
       allowed_external_mutation: false,
     };
     const payloadHash = `sha256:${sha256(JSON.stringify(taskPayload))}`;
-    const [task] = await query<{ id: string }>(
-      `INSERT INTO channel_tasks (
-         id, agent_id, channel_id, task_type, status, priority, run_after, max_attempts,
-         idempotency_key, payload_hash, payload
-       ) VALUES ($1,$2,$3,$4,'pending',50,NOW(),1,$5,$6,$7::jsonb)
-       ON CONFLICT (idempotency_key) DO UPDATE SET updated_at = NOW()
-       RETURNING id`,
+    const [task] = await query<{ id: string; source: "inserted" | "existing_open" }>(
+      UPSERT_NEXT_CHANNEL_TASK_SQL,
       [randomUUID(), agent.agentId, channelId, taskType, taskKey, payloadHash, jsonb(taskPayload)],
     );
-    if (task?.id) taskIds.push(task.id);
+    if (task?.id) {
+      if (task.source === "existing_open") existingOpenTaskIds.push(task.id);
+      else taskIds.push(task.id);
+    }
 
     await query(
       `INSERT INTO autonomy_events (id, agent_id, event_type, detail)
@@ -180,17 +203,30 @@ async function main() {
     soul_hash: soulHash,
     agent_count: agents.length,
     heartbeat_count: heartbeatIds.length,
-    task_count: taskIds.length,
+    task_count: taskIds.length + existingOpenTaskIds.length,
+    new_task_count: taskIds.length,
+    existing_open_task_count: existingOpenTaskIds.length,
     heartbeat_ids: heartbeatIds,
     task_ids: taskIds,
+    existing_open_task_ids: existingOpenTaskIds,
     external_mutation_performed: false,
     restricted_lanes_fail_closed: true,
   };
   writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
-  console.log(JSON.stringify({ ok: true, receipt: receiptPath, agent_count: agents.length, heartbeat_count: heartbeatIds.length, task_count: taskIds.length }, null, 2));
+  console.log(JSON.stringify({
+    ok: true,
+    receipt: receiptPath,
+    agent_count: agents.length,
+    heartbeat_count: heartbeatIds.length,
+    task_count: taskIds.length + existingOpenTaskIds.length,
+    new_task_count: taskIds.length,
+    existing_open_task_count: existingOpenTaskIds.length,
+  }, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}
