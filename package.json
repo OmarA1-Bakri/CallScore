@@ -62,13 +62,15 @@
     "transcript:media-fallback": "node --import tsx src/scripts/transcribe-media-fallback.ts",
     "benchmark:extractors": "node --import tsx src/scripts/benchmark-local-extractors.ts",
     "ml:idle-improve": "node --import tsx src/scripts/ml-idle-improve.ts",
+    "ml:verifier:quality-gate": "node --import tsx src/scripts/ml-verifier-quality-gate.ts",
     "workplane:status": "node --import tsx src/scripts/workplane-status.ts",
     "workplane:laptop-job": "node --import tsx src/scripts/workplane-laptop-job.ts",
     "workplane": "node --import tsx src/scripts/workplane.ts",
     "hygiene": "npm run hygiene:secrets",
     "workflow:receipt": "node --import tsx src/scripts/write-workflow-receipt.ts",
     "control-plane:canary": "node --import tsx src/scripts/run-control-plane-canary.ts",
-    "agents:heartbeat": "node --import tsx src/scripts/callscore-agent-heartbeat.ts"
+    "agents:heartbeat": "node --import tsx src/scripts/callscore-agent-heartbeat.ts",
+    "cmo:response-monitor": "node --import tsx src/scripts/callscore-cmo-response-monitor.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

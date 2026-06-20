@@ -7,6 +7,7 @@ import {
   latestGemmaShadowArtifact,
   latestWorkflowReceipt,
   latestMlEvalArtifact,
+  latestMlVerifierQualityGateArtifact,
   latestLoopEngineeringReceipt,
   readCollectorCooldownState,
   rootHygieneAudit,
@@ -93,6 +94,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
   const collectorCooldown = readCollectorCooldownState(args.collectorStatePath);
   const latestGemmaShadow = latestGemmaShadowArtifact();
   const latestMlEval = latestMlEvalArtifact();
+  const latestMlVerifierQualityGate = latestMlVerifierQualityGateArtifact();
   const latestArtOfWarCampaignLoop = latestArtOfWarCampaignReceipt();
   const latestLoopEngineeringEval = latestLoopEngineeringReceipt();
   const latestTranscriptCadenceReceipt = latestWorkflowReceipt("transcript_laptop_cadence");
@@ -151,6 +153,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     root_hygiene: readiness_domains.root_hygiene,
     unused_file_audit: rootAudit,
     freshness_warnings: freshness.warnings ?? [],
+    fresh_call_inflow: freshness.freshCallInflow ?? null,
     transcript_collector_backlog: freshness.transcriptBacklog ?? [],
     transcript_cooldown_state: collectorCooldown,
     latest_transcript_attempt: (freshness.timestamps as Record<string, unknown> | undefined)?.latestTranscriptAttempt ?? null,
@@ -167,6 +170,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     },
     latest_gemma_shadow_extraction_run: latestGemmaShadow,
     latest_ml_eval_run: latestMlEval,
+    latest_ml_verifier_quality_gate_run: latestMlVerifierQualityGate,
     model_currently_recommended: latestMlEval.exists && latestMlGate.eligible_for_write_canary !== true
       ? "rule_extractor_safe_fallback"
       : "callscore-gemma4-extractor:shadow_only",

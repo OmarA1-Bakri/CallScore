@@ -7,7 +7,9 @@ import {
   parseCandidateAdmissionPolicy,
   runCandidateAdmissionJob,
   summarizeCandidateAdmissionRecords,
+  summarizeCreatorDiscoveryStatus,
 } from "../src/lib/candidate-admission";
+import { summarizeFreshCallInflow } from "../src/scripts/callscore-freshness-check";
 import type { GlobalCreatorCandidateWithSource } from "../src/lib/global-creator-candidates";
 
 type CandidateOverride = Partial<GlobalCreatorCandidateWithSource>;
@@ -90,7 +92,51 @@ test("candidate admission job is record-only and requires operator export before
   assert.equal(metrics.safety.mutates_creator_database, false);
   assert.equal(metrics.safety.publishes_buyer_facing_rankings, false);
   assert.equal(metrics.safety.operator_export_required, true);
+  assert.ok(metrics.discovery_status.unique_candidate_count >= metrics.selected);
+  assert.equal(metrics.discovery_status.writes_tracked_creators, false);
+  assert.match(metrics.discovery_status.safe_next_action, /operator export/i);
   assert.ok(metrics.decisions.every((record) => record.schema_version === 1));
+});
+
+test("creator discovery status surfaces stagnant discovery without mutating tracked creators", () => {
+  const status = summarizeCreatorDiscoveryStatus({
+    sourceCount: 2,
+    candidateCount: 12,
+    uniqueCandidateCount: 10,
+    approvedDecisionCount: 0,
+    needsReviewDecisionCount: 3,
+    newTrackedCreatorsLast7d: 0,
+  });
+
+  assert.equal(status.status, "STAGNANT");
+  assert.equal(status.new_tracked_creators_last_7d, 0);
+  assert.equal(status.writes_tracked_creators, false);
+  assert.match(status.safe_next_action, /review approved\/needs-review candidate export/i);
+});
+
+test("fresh-call inflow sentinel classifies stagnant call ingestion without public mutation", () => {
+  const stagnant = summarizeFreshCallInflow({
+    latestCallInserted: "2026-06-10T00:00:00.000Z",
+    generatedAt: "2026-06-20T00:00:00.000Z",
+    callsLast24h: 0,
+    callsLast7d: 0,
+    videosLast7d: 14,
+    transcriptsAvailableLast7d: 5,
+  });
+
+  assert.equal(stagnant.status, "STAGNANT");
+  assert.equal(stagnant.public_mutation_allowed, false);
+  assert.match(stagnant.safe_next_action, /run bounded transcript\/extraction/i);
+
+  const healthy = summarizeFreshCallInflow({
+    latestCallInserted: "2026-06-19T12:00:00.000Z",
+    generatedAt: "2026-06-20T00:00:00.000Z",
+    callsLast24h: 2,
+    callsLast7d: 9,
+    videosLast7d: 10,
+    transcriptsAvailableLast7d: 3,
+  });
+  assert.equal(healthy.status, "ACTIVE");
 });
 
 test("single candidate decisions preserve explicit approved rejected quarantine and review states", () => {

@@ -14,6 +14,58 @@ interface Args {
   readonly readApiBase: string | null;
 }
 
+export interface FreshCallInflowInput {
+  readonly latestCallInserted: string | null;
+  readonly generatedAt?: string;
+  readonly callsLast24h: number;
+  readonly callsLast7d: number;
+  readonly videosLast7d: number;
+  readonly transcriptsAvailableLast7d: number;
+}
+
+export interface FreshCallInflowStatus {
+  readonly status: "ACTIVE" | "WATCH" | "STAGNANT";
+  readonly latest_call_inserted: string | null;
+  readonly latest_call_age_hours: number | null;
+  readonly calls_last_24h: number;
+  readonly calls_last_7d: number;
+  readonly videos_last_7d: number;
+  readonly transcripts_available_last_7d: number;
+  readonly public_mutation_allowed: false;
+  readonly production_call_writes_allowed: false;
+  readonly safe_next_action: string;
+}
+
+export function summarizeFreshCallInflow(input: FreshCallInflowInput): FreshCallInflowStatus {
+  const generatedAt = Date.parse(input.generatedAt ?? new Date().toISOString());
+  const latestMs = input.latestCallInserted ? Date.parse(input.latestCallInserted) : NaN;
+  const age = Number.isFinite(generatedAt) && Number.isFinite(latestMs)
+    ? Math.round(((generatedAt - latestMs) / 3_600_000) * 10) / 10
+    : null;
+  const status: FreshCallInflowStatus["status"] = input.callsLast24h > 0 || input.callsLast7d > 0
+    ? "ACTIVE"
+    : input.videosLast7d > 0 || input.transcriptsAvailableLast7d > 0
+      ? "STAGNANT"
+      : "WATCH";
+  const safeNextAction = status === "ACTIVE"
+    ? "monitor fresh-call inflow and keep normal bounded pipeline cadence"
+    : status === "STAGNANT"
+      ? "run bounded transcript/extraction workplane jobs, then match prices and recompute scores after audit-only verification"
+      : "run creator/video discovery and transcript worklist checks before broad extraction";
+  return {
+    status,
+    latest_call_inserted: input.latestCallInserted,
+    latest_call_age_hours: age,
+    calls_last_24h: input.callsLast24h,
+    calls_last_7d: input.callsLast7d,
+    videos_last_7d: input.videosLast7d,
+    transcripts_available_last_7d: input.transcriptsAvailableLast7d,
+    public_mutation_allowed: false,
+    production_call_writes_allowed: false,
+    safe_next_action: safeNextAction,
+  };
+}
+
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
   if (index < 0 || argv[index + 1] === undefined) return null;
@@ -197,6 +249,13 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
      GROUP BY period
      ORDER BY period`,
   );
+  const [freshCallInflowRow] = await query<{ calls_last_24h: string; calls_last_7d: string; videos_last_7d: string; transcripts_available_last_7d: string }>(
+    `SELECT
+       (SELECT COUNT(*)::text FROM calls WHERE created_at >= NOW() - INTERVAL '24 hours') AS calls_last_24h,
+       (SELECT COUNT(*)::text FROM calls WHERE created_at >= NOW() - INTERVAL '7 days') AS calls_last_7d,
+       (SELECT COUNT(*)::text FROM videos WHERE created_at >= NOW() - INTERVAL '7 days') AS videos_last_7d,
+       (SELECT COUNT(*)::text FROM videos WHERE transcript_status = 'available' AND NULLIF(BTRIM(transcript), '') IS NOT NULL AND COALESCE(transcript_last_attempt_at, created_at) >= NOW() - INTERVAL '7 days') AS transcripts_available_last_7d`,
+  );
   const dailyTimer = await systemdTimerStatus();
   const ytdlpCookieState = {
     YTDLP_COOKIES_PATH: Boolean(process.env.YTDLP_COOKIES_PATH),
@@ -224,7 +283,16 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     latestScoringUpdate: freshness?.latest_scoring_update ?? null,
     latestCreatorStatsUpdate: freshness?.latest_creator_stats_update ?? null,
   };
+  const generatedAt = new Date().toISOString();
   const ages = Object.fromEntries(Object.entries(timestamps).map(([key, value]) => [key, ageHours(value)]));
+  const freshCallInflow = summarizeFreshCallInflow({
+    latestCallInserted: timestamps.latestCallInserted,
+    generatedAt,
+    callsLast24h: Number(freshCallInflowRow?.calls_last_24h ?? 0),
+    callsLast7d: Number(freshCallInflowRow?.calls_last_7d ?? 0),
+    videosLast7d: Number(freshCallInflowRow?.videos_last_7d ?? 0),
+    transcriptsAvailableLast7d: Number(freshCallInflowRow?.transcripts_available_last_7d ?? 0),
+  });
   const readApi = await fetchReadApi(args.readApiBase);
   const unsafeRankCount = Number(unsafeSourceRanks?.unsafe_ranked_rows ?? 0);
   const transcriptProviderMissingFailures = Number(freshness?.transcript_provider_missing_failures ?? 0);
@@ -282,7 +350,7 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
   ];
 
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     status: blockers.length > 0 ? "FAIL" : warnings.length > 0 ? "WARN" : "PASS",
     blockers,
     warnings,
@@ -303,6 +371,7 @@ export async function runFreshnessCheck(args = parseFreshnessCheckArgs()): Promi
     ytdlpPoTokenState,
     timestamps,
     ageHours: ages,
+    freshCallInflow,
     unsafeSourceRanks: unsafeRankCount,
     transcriptProviderMissingFailures,
     transcriptBotVerificationFailures,

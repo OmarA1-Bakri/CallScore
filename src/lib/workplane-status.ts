@@ -192,6 +192,35 @@ export function latestMlEvalArtifact(root: string | readonly string[] = ["/tmp/c
   }
 }
 
+export function latestMlVerifierQualityGateArtifact(repoRoot = process.cwd()): ArtifactSummary {
+  const path = latestFile(join(repoRoot, ".tmp", "workflow-receipts", "ml_verifier_quality_gate"), (name) => name.endsWith(".json"));
+  if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
+  try {
+    const json = readJsonObject(path);
+    return {
+      path,
+      exists: true,
+      modified_at: statSync(path).mtime.toISOString(),
+      malformed: false,
+      summary: {
+        workflow_name: json.workflow_name ?? null,
+        run_id: json.run_id ?? null,
+        result: json.result ?? null,
+        sample_size: numberOrNull(json.sample_size),
+        agreement_rate: numberOrNull(json.agreement_rate),
+        minimum_agreement_rate: numberOrNull(json.minimum_agreement_rate),
+        eligible_for_activation: json.eligible_for_activation === true,
+        audit_only: json.audit_only !== false,
+        public_ranking_impact_allowed: json.public_ranking_impact_allowed === true,
+        production_mutation_performed: json.production_mutation_performed === true,
+        blockers: Array.isArray(json.blockers) ? json.blockers : [],
+        artifact_path: json.artifact_path ?? json.artifact ?? null,
+      },
+    };
+  } catch (error) {
+    return { path, exists: true, modified_at: statSync(path).mtime.toISOString(), malformed: true, summary: { error: error instanceof Error ? error.message : String(error) } };
+  }
+}
 
 export function latestWorkflowReceipt(workflow: string, repoRoot = process.cwd()): ArtifactSummary {
   const dir = join(repoRoot, ".tmp", "workflow-receipts", workflow);
@@ -549,6 +578,18 @@ export function buildReadinessDomains(input: {
     && !transcriptCadenceReceipt.malformed
     && typeof transcriptCadenceReceipt.summary.result === "string"
     && transcriptCadenceReceipt.summary.result.includes("rate_limited");
+  const mlVerifierQualityGate = latestMlVerifierQualityGateArtifact(repoRoot);
+  const mlVerifierGateSummary = mlVerifierQualityGate.summary;
+  const mlVerifierGateBlockers = Array.isArray(mlVerifierGateSummary.blockers)
+    ? mlVerifierGateSummary.blockers.map(String)
+    : [];
+  const mlVerifierEligible = mlVerifierQualityGate.exists
+    && !mlVerifierQualityGate.malformed
+    && mlVerifierGateSummary.result === "passed"
+    && mlVerifierGateSummary.eligible_for_activation === true
+    && mlVerifierGateSummary.audit_only === true
+    && mlVerifierGateSummary.production_mutation_performed === false
+    && mlVerifierGateSummary.public_ranking_impact_allowed === false;
 
   return {
     root_hygiene: domain({
@@ -661,6 +702,34 @@ export function buildReadinessDomains(input: {
       relevant_jobs: ["ml_extraction_eval", "ml_idle_improve", "extraction_promotion_review"],
       dry_run_available: true,
       canary_available: false,
+    }, now),
+    ml_verifier_quality_gate: domain({
+      status: mlVerifierEligible ? "MONITORED" : "PARTIAL",
+      evidence: [
+        mlVerifierQualityGate.path ? `latest_ml_verifier_quality_gate_receipt=${mlVerifierQualityGate.path}` : "latest_ml_verifier_quality_gate_receipt=missing",
+        `result=${mlVerifierGateSummary.result ?? "missing"}`,
+        `sample_size=${mlVerifierGateSummary.sample_size ?? "unknown"}`,
+        `agreement_rate=${mlVerifierGateSummary.agreement_rate ?? "unknown"}`,
+        `minimum_agreement_rate=${mlVerifierGateSummary.minimum_agreement_rate ?? "unknown"}`,
+        `eligible_for_activation=${mlVerifierGateSummary.eligible_for_activation === true}`,
+        `audit_only=${mlVerifierGateSummary.audit_only !== false}`,
+        `production_mutation_performed=${mlVerifierGateSummary.production_mutation_performed === true}`,
+        `public_ranking_impact_allowed=${mlVerifierGateSummary.public_ranking_impact_allowed === true}`,
+      ],
+      blockers: mlVerifierEligible
+        ? []
+        : (mlVerifierGateBlockers.length > 0
+          ? mlVerifierGateBlockers
+          : [mlVerifierQualityGate.exists ? "bounded ML verifier quality gate has not passed" : "bounded ML verifier quality gate receipt missing"]),
+      safe_next_action: mlVerifierEligible
+        ? "ML verifier may be scheduled audit-only; keep public ranking mutation disabled until explicit promotion approval"
+        : "run bounded audit-only ML verifier quality gate before recurring activation",
+      risky_actions_blocked: ["public ranking mutation", "automatic promotion", "founder-review bypass", "production methodology change"],
+      required_approvals: ["production scoring/methodology mutation", "public ranking impact", "non-audit-only verifier activation"],
+      relevant_commands: ["npm run ml:verifier:quality-gate -- --sample-size 20"],
+      relevant_jobs: ["ml_verifier_batch"],
+      dry_run_available: true,
+      canary_available: mlVerifierEligible,
     }, now),
     loop_engineering_kernel: domain({
       status: "MONITORED",

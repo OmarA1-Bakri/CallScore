@@ -10,6 +10,7 @@ import {
   latestArtOfWarCampaignReceipt,
   latestGemmaShadowArtifact,
   latestMlEvalArtifact,
+  latestMlVerifierQualityGateArtifact,
   readCollectorCooldownState,
   workplaneJobModelForStatus,
 } from "../src/lib/workplane-status";
@@ -165,6 +166,72 @@ test("Gemma readiness trusts bounded shadow sample receipts and clean artifacts"
   assert.equal(domains.gemma_shadow_extraction.canary_available, true);
   assert.match(String(domains.gemma_shadow_extraction.safe_next_action), /shadow diff/);
   assert.ok(domains.gemma_shadow_extraction.evidence.some((item) => item.includes("latest_gemma_shadow_sample_receipt=")));
+});
+
+test("ML verifier quality gate receipt exposes audit-only activation status", () => {
+  const dir = mkdtempSync(join(tmpdir(), "callscore-ml-verifier-gate-"));
+  const receiptDir = join(dir, ".tmp", "workflow-receipts", "ml_verifier_quality_gate");
+  mkdirSync(receiptDir, { recursive: true });
+  writeFileSync(join(receiptDir, "ml-verifier-quality-gate.json"), JSON.stringify({
+    workflow_name: "ml_verifier_quality_gate",
+    run_id: "ml-verifier-quality-gate-test",
+    result: "deferred",
+    sample_size: 24,
+    eligible_for_activation: false,
+    audit_only: true,
+    agreement_rate: 0.79,
+    minimum_agreement_rate: 0.9,
+    public_ranking_impact_allowed: false,
+    production_mutation_performed: false,
+    blockers: ["agreement_rate_below_threshold"],
+  }));
+
+  const artifact = latestMlVerifierQualityGateArtifact(dir);
+  assert.equal(artifact.exists, true);
+  assert.equal(artifact.summary.result, "deferred");
+  assert.equal(artifact.summary.sample_size, 24);
+  assert.equal(artifact.summary.eligible_for_activation, false);
+  assert.equal(artifact.summary.audit_only, true);
+  assert.equal(artifact.summary.production_mutation_performed, false);
+});
+
+test("ML verifier readiness stays deferred until bounded audit-only quality gate passes", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-ml-verifier-domain-"));
+  const receiptDir = join(root, ".tmp", "workflow-receipts", "ml_verifier_quality_gate");
+  mkdirSync(receiptDir, { recursive: true });
+  writeFileSync(join(receiptDir, "ml-verifier-quality-gate.json"), JSON.stringify({
+    workflow_name: "ml_verifier_quality_gate",
+    run_id: "ml-verifier-quality-gate-test",
+    result: "deferred",
+    sample_size: 20,
+    eligible_for_activation: false,
+    audit_only: true,
+    agreement_rate: 0.75,
+    minimum_agreement_rate: 0.9,
+    public_ranking_impact_allowed: false,
+    production_mutation_performed: false,
+    blockers: ["agreement_rate_below_threshold"],
+  }));
+
+  const domains = buildReadinessDomains({
+    repoRoot: root,
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: { state_path: null, status: "clear", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, latest_job_id: null, last_run_utc: null, last_attempted_count: 0, last_success_count: 0, last_failure_count: 0, last_success_rate: null, recent_failure_reasons: {}, checked_at: "now" },
+    latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 0,
+    dailyPipelineActive: true,
+    nextAction: { action: "none", reason: "test", job_type: null, allowed: true },
+    now: new Date("2026-06-20T12:00:00.000Z"),
+  });
+
+  assert.equal(domains.ml_verifier_quality_gate.status, "PARTIAL");
+  assert.equal(domains.ml_verifier_quality_gate.canary_available, false);
+  assert.equal(domains.ml_verifier_quality_gate.production_mutation_allowed, false);
+  assert.ok(domains.ml_verifier_quality_gate.evidence.some((item) => item.includes("eligible_for_activation=false")));
+  assert.ok(domains.ml_verifier_quality_gate.blockers.includes("agreement_rate_below_threshold"));
+  assert.match(String(domains.ml_verifier_quality_gate.safe_next_action), /run bounded audit-only ML verifier quality gate/);
 });
 
 test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe work", () => {

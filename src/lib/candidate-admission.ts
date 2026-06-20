@@ -2,6 +2,7 @@ import {
   dedupeGlobalCreatorCandidates,
   getGlobalCreatorCandidates,
   normalizeCreatorHandle,
+  summarizeGlobalCreatorCandidates,
   type GlobalCreatorCandidateWithSource,
 } from "./global-creator-candidates";
 import { TRACKED_CREATORS } from "./tracked-creators";
@@ -43,6 +44,19 @@ export interface CandidateAdmissionRecord {
   readonly region: string;
 }
 
+export interface CreatorDiscoveryStatus {
+  readonly status: "ACTIVE" | "REVIEW_QUEUE" | "STAGNANT" | "EMPTY";
+  readonly source_count: number;
+  readonly candidate_count: number;
+  readonly unique_candidate_count: number;
+  readonly approved_decision_count: number;
+  readonly needs_review_decision_count: number;
+  readonly new_tracked_creators_last_7d: number | null;
+  readonly writes_tracked_creators: false;
+  readonly public_ranking_impact_allowed: false;
+  readonly safe_next_action: string;
+}
+
 export interface CandidateAdmissionMetrics extends Record<string, unknown> {
   readonly schema_version: typeof CANDIDATE_ADMISSION_SCHEMA_VERSION;
   readonly job_type: typeof CREATOR_CANDIDATE_ADMISSION_JOB_TYPE;
@@ -52,6 +66,7 @@ export interface CandidateAdmissionMetrics extends Record<string, unknown> {
   readonly max_records: number;
   readonly decision_counts: Record<CandidateAdmissionDecision, number>;
   readonly decisions: readonly CandidateAdmissionRecord[];
+  readonly discovery_status: CreatorDiscoveryStatus;
   readonly safety: {
     readonly writes_tracked_creators: false;
     readonly mutates_creator_database: false;
@@ -224,12 +239,59 @@ export function summarizeCandidateAdmissionRecords(
   return counts;
 }
 
+export function summarizeCreatorDiscoveryStatus(input: {
+  readonly sourceCount: number;
+  readonly candidateCount: number;
+  readonly uniqueCandidateCount: number;
+  readonly approvedDecisionCount: number;
+  readonly needsReviewDecisionCount: number;
+  readonly newTrackedCreatorsLast7d?: number | null;
+}): CreatorDiscoveryStatus {
+  const newTracked = input.newTrackedCreatorsLast7d ?? null;
+  const status: CreatorDiscoveryStatus["status"] = input.uniqueCandidateCount === 0
+    ? "EMPTY"
+    : (newTracked !== null && newTracked > 0)
+      ? "ACTIVE"
+      : input.approvedDecisionCount > 0
+        ? "REVIEW_QUEUE"
+        : "STAGNANT";
+  const safeNextAction = status === "ACTIVE"
+    ? "monitor creator admission receipts and keep automatic tracked-creator writes disabled"
+    : status === "REVIEW_QUEUE"
+      ? "operator export approved candidate decisions before any tracked creator mutation"
+      : status === "EMPTY"
+        ? "refresh global creator source inventory before admission"
+        : "operator export: review approved/needs-review candidate export and run creator_candidate_admission before adding new creator sources";
+  return {
+    status,
+    source_count: input.sourceCount,
+    candidate_count: input.candidateCount,
+    unique_candidate_count: input.uniqueCandidateCount,
+    approved_decision_count: input.approvedDecisionCount,
+    needs_review_decision_count: input.needsReviewDecisionCount,
+    new_tracked_creators_last_7d: newTracked,
+    writes_tracked_creators: false,
+    public_ranking_impact_allowed: false,
+    safe_next_action: safeNextAction,
+  };
+}
+
 export function runCandidateAdmissionJob(
   job: MinimalPipelineJob,
   now = new Date(),
 ): CandidateAdmissionMetrics {
   const policy = parseCandidateAdmissionPolicy(job.payload);
   const decisions = buildCandidateAdmissionRecords({ policy });
+  const decisionCounts = summarizeCandidateAdmissionRecords(decisions);
+  const globalSummary = summarizeGlobalCreatorCandidates();
+  const discoveryStatus = summarizeCreatorDiscoveryStatus({
+    sourceCount: globalSummary.sourceCount,
+    candidateCount: globalSummary.candidateCount,
+    uniqueCandidateCount: globalSummary.uniqueCandidateCount,
+    approvedDecisionCount: decisionCounts.approved,
+    needsReviewDecisionCount: decisionCounts.needs_review,
+    newTrackedCreatorsLast7d: null,
+  });
   return {
     schema_version: CANDIDATE_ADMISSION_SCHEMA_VERSION,
     job_type: CREATOR_CANDIDATE_ADMISSION_JOB_TYPE,
@@ -237,8 +299,9 @@ export function runCandidateAdmissionJob(
     generated_at: now.toISOString(),
     selected: decisions.length,
     max_records: policy.maxRecords,
-    decision_counts: summarizeCandidateAdmissionRecords(decisions),
+    decision_counts: decisionCounts,
     decisions,
+    discovery_status: discoveryStatus,
     safety: {
       writes_tracked_creators: false,
       mutates_creator_database: false,
