@@ -57,3 +57,22 @@ Canonical prompt plan: `/srv/agents/repos/callscore-workplane/docs/refactor/herm
 - Tests: `node --import tsx --test tests/video-automation-schemas.test.ts tests/video-automation-data-planning.test.ts` → 7/7 passed.
 - Typecheck: `npm run typecheck` completed with no reported errors.
 
+
+| Prompt 6 — Kokoro TTS, Audio Normalization, Captions, and SRT | complete | Kokoro.js primary path implemented; HH smoke test hit model/tokenizer load error, so FFmpeg flite fallback is implemented and tested; captions/SRT implemented. |
+| Prompt 7 — Remotion Compositions and Rendering | complete | Remotion dependencies installed; four compositions registered; render pipeline uses bundle/getCompositions/renderMedia with selected composition object. |
+| Prompt 8 — Deterministic Thumbnail Generation | complete | SVG + Sharp thumbnail generator writes PNG/JPG for vertical and horizontal formats; tests pass. |
+| Prompt 9 — Composio YouTube Discovery and Publisher Interface | blocked | Publisher interface and mocked tests implemented; generic Hermes Composio MCP connection verified; exact YouTube tool schema discovery blocked by Hermes provider HTTP 429 before Composio schema tool execution. |
+
+## Prompt 6–9 run summary
+
+- Installed runtime packages: `kokoro-js`, `remotion`, `@remotion/renderer`, `@remotion/bundler`, `sharp`.
+- FFmpeg and ffprobe already exist on HH.
+- Kokoro.js is the primary TTS path. In this HH run, live Kokoro model/tokenizer loading failed; fallback uses FFmpeg flite so the automated pipeline can still generate valid WAV artifacts.
+- Captions and SRT generation are implemented from scene timings.
+- Remotion surface is implemented with four registered CallScore compositions and reusable product-led data components.
+- Deterministic thumbnails use SVG + Sharp and do not require AI image generation.
+- Composio publisher interface is implemented with mocked upload/thumbnail tests.
+- Real exact YouTube schema discovery did not complete because Hermes one-shot hit provider HTTP 429 before tool execution.
+- Tests: `node --import tsx --test tests/video-automation-media.test.ts tests/video-automation-publisher.test.ts tests/video-automation-schemas.test.ts tests/video-automation-data-planning.test.ts` → 11/11 passed.
+- Typecheck: `npm run typecheck` completed with no reported errors.
+
