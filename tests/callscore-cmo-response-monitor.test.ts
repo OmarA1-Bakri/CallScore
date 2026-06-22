@@ -11,15 +11,21 @@ test("CMO response monitor summarizes owned public receipts without side effects
     { channel: "linkedin", status: "published", post_url: "https://linkedin.com/feed/update/1", created_at_utc: "2026-06-20T08:01:00Z", provider_response: { urn: "urn:li:share:1" } },
     { channel: "x", status: "cooldown_skipped", created_at_utc: "2026-06-20T16:00:00Z", provider_response: { not_called: true } },
     { channel: "reddit_owned_profile", status: "blocked_no_text_only", created_at_utc: "2026-06-20T16:00:00Z" },
+    { channel: "linkedin", status: "ready_to_publish", created_at_utc: "2026-06-20T17:00:00Z" },
+    { channel: "reddit_owned_profile", status: "evaluated", created_at_utc: "2026-06-20T17:00:00Z" },
   ]);
 
-  assert.equal(summary.total_receipts, 4);
+  assert.equal(summary.total_receipts, 6);
   assert.equal(summary.published_count, 2);
   assert.equal(summary.cooldown_skipped_count, 1);
   assert.equal(summary.blocked_count, 1);
+  assert.equal(summary.ready_to_publish_count, 1);
+  assert.equal(summary.evaluated_count, 1);
   assert.equal(summary.channels.x.published, 1);
   assert.equal(summary.channels.linkedin.published, 1);
+  assert.equal(summary.channels.linkedin.ready_to_publish, 1);
   assert.equal(summary.channels.reddit_owned_profile.blocked, 1);
+  assert.equal(summary.channels.reddit_owned_profile.evaluated, 1);
 });
 
 test("CMO response monitor receipt is monitor-only and never replies, spends, or mutates providers", () => {

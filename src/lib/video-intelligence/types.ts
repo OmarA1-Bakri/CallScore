@@ -74,6 +74,11 @@ export interface PublicationDecision {
   readonly confidence: number;
   readonly suppression_required: boolean;
   readonly non_founder_review_required: boolean;
+  readonly public_impact_allowed: boolean;
+  readonly public_scoring_allowed: boolean;
+  readonly reviewer_required: boolean;
+  readonly founder_required: false;
+  readonly evidence_refs: readonly string[];
   readonly reason_codes: readonly string[];
   readonly summary: string;
 }

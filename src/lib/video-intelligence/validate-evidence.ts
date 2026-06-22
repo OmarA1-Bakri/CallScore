@@ -20,6 +20,7 @@ function decidePublication(input: {
   const issueCodes = unique(input.issues.map((issue) => issue.code));
   const hardIssueCodes = issueCodes.filter((code) => code !== "accepted_low_confidence");
   const reasonCodes = unique([...issueCodes, ...rejectionReasonCodes(input.normalizedCalls)]);
+  const evidenceRefs = unique(input.normalizedCalls.map((call) => call.evidenceSegmentId));
   const minAcceptedConfidence = acceptedCalls.reduce(
     (min, call) => Math.min(min, call.confidence),
     acceptedCalls.length > 0 ? 1 : 0,
@@ -31,6 +32,11 @@ function decidePublication(input: {
       confidence: 0.95,
       suppression_required: true,
       non_founder_review_required: false,
+      public_impact_allowed: false,
+      public_scoring_allowed: false,
+      reviewer_required: false,
+      founder_required: false,
+      evidence_refs: evidenceRefs,
       reason_codes: reasonCodes.length > 0 ? reasonCodes : ["no_accepted_creator_owned_call"],
       summary: "No creator-owned accepted call met the minimum evidence requirements; suppress without founder involvement.",
     };
@@ -42,6 +48,11 @@ function decidePublication(input: {
       confidence: 0.9,
       suppression_required: true,
       non_founder_review_required: false,
+      public_impact_allowed: false,
+      public_scoring_allowed: false,
+      reviewer_required: false,
+      founder_required: false,
+      evidence_refs: evidenceRefs,
       reason_codes: unique([...hardIssueCodes, ...reasonCodes]),
       summary: "Accepted call has a hard evidence or market-support issue; suppress until data is repaired.",
     };
@@ -54,6 +65,11 @@ function decidePublication(input: {
       confidence: Number(minAcceptedConfidence.toFixed(2)),
       suppression_required: !reviewable,
       non_founder_review_required: reviewable,
+      public_impact_allowed: false,
+      public_scoring_allowed: false,
+      reviewer_required: reviewable,
+      founder_required: false,
+      evidence_refs: evidenceRefs,
       reason_codes: unique(["medium_confidence_accepted_call", ...reasonCodes]),
       summary: reviewable
         ? "Accepted call is evidence-backed but below public-autopublish confidence; route to non-founder trust review."
@@ -66,6 +82,11 @@ function decidePublication(input: {
     confidence: Number(minAcceptedConfidence.toFixed(2)),
     suppression_required: false,
     non_founder_review_required: false,
+    public_impact_allowed: true,
+    public_scoring_allowed: true,
+    reviewer_required: false,
+    founder_required: false,
+    evidence_refs: evidenceRefs,
     reason_codes: ["high_confidence_creator_owned_call"],
     summary: "High-confidence creator-owned call has supported evidence and can proceed to downstream scoring/publication gates.",
   };

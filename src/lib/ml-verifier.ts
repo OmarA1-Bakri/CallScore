@@ -67,11 +67,18 @@ export interface MlVerifierTrustDecision {
   readonly publication_decision: MlVerifierPublicationDecision;
   readonly low_confidence_validation_decision: MlVerifierValidationDecision;
   readonly suppress_from_public_scoring: boolean;
+  readonly public_impact_allowed: boolean;
+  readonly public_scoring_allowed: boolean;
+  readonly reviewer_required: boolean;
+  readonly reviewer_queue: "non_founder_trust_review" | null;
   readonly non_founder_review_required: boolean;
+  readonly founder_required: false;
   readonly founder_review_required: false;
   readonly confidence: number;
+  readonly evidence_refs: readonly string[];
   readonly reason_codes: readonly string[];
   readonly summary: string;
+  readonly safety_notes: readonly string[];
 }
 
 export interface ParsedVerifierOutput {
@@ -280,6 +287,7 @@ const ML_TRUST_REVIEW_CONFIDENCE_FLOOR = 0.6;
 export function deriveMlVerifierTrustDecision(output: ParsedVerifierOutput): MlVerifierTrustDecision {
   const reasonCodes = [output.reason_code];
   const effectiveConfidence = Math.min(output.confidence, output.recommended_extraction_confidence);
+  const evidenceRefs = output.evidence_span.trim().length > 0 ? ["ml_verifier:evidence_span"] : [];
   if (
     output.decision === "approve" &&
     output.reason_code === "valid_call" &&
@@ -291,11 +299,21 @@ export function deriveMlVerifierTrustDecision(output: ParsedVerifierOutput): MlV
       publication_decision: "publish",
       low_confidence_validation_decision: "PROMOTE",
       suppress_from_public_scoring: false,
+      public_impact_allowed: false,
+      public_scoring_allowed: false,
+      reviewer_required: false,
+      reviewer_queue: null,
       non_founder_review_required: false,
+      founder_required: false,
       founder_review_required: false,
       confidence: Number(effectiveConfidence.toFixed(2)),
+      evidence_refs: evidenceRefs,
       reason_codes: ["ml_verifier_publish_ready", ...reasonCodes],
       summary: "Verifier approved a transcript-supported call at promotion confidence; no founder gate required.",
+      safety_notes: [
+        "ML verifier is audit-only and does not mutate public ranking state without explicit promotion gate evidence.",
+        "founder_required=false for routine verifier decisions.",
+      ],
     };
   }
 
@@ -308,11 +326,21 @@ export function deriveMlVerifierTrustDecision(output: ParsedVerifierOutput): MlV
       publication_decision: "suppress",
       low_confidence_validation_decision: "REJECT",
       suppress_from_public_scoring: true,
+      public_impact_allowed: false,
+      public_scoring_allowed: false,
+      reviewer_required: false,
+      reviewer_queue: null,
       non_founder_review_required: false,
+      founder_required: false,
       founder_review_required: false,
       confidence: Number(effectiveConfidence.toFixed(2)),
+      evidence_refs: evidenceRefs,
       reason_codes: ["ml_verifier_suppress", ...reasonCodes],
       summary: "Verifier found missing/invalid/unsafe evidence; suppress from public scoring without founder involvement.",
+      safety_notes: [
+        "Suppressed verifier outputs cannot reach public scoring.",
+        "founder_required=false; fail closed instead of founder escalation.",
+      ],
     };
   }
 
@@ -320,11 +348,21 @@ export function deriveMlVerifierTrustDecision(output: ParsedVerifierOutput): MlV
     publication_decision: "review",
     low_confidence_validation_decision: "NEEDS_HUMAN_REVIEW",
     suppress_from_public_scoring: true,
+    public_impact_allowed: false,
+    public_scoring_allowed: false,
+    reviewer_required: true,
+    reviewer_queue: "non_founder_trust_review",
     non_founder_review_required: true,
+    founder_required: false,
     founder_review_required: false,
     confidence: Number(effectiveConfidence.toFixed(2)),
+    evidence_refs: evidenceRefs,
     reason_codes: ["ml_verifier_non_founder_review", ...reasonCodes],
     summary: "Verifier returned mixed or insufficient evidence; route to non-founder trust review, never founder review.",
+    safety_notes: [
+      "Review decisions remain suppressed from public scoring until non-founder trust review resolves them.",
+      "founder_required=false for routine verifier review.",
+    ],
   };
 }
 

@@ -13,14 +13,18 @@ export interface OwnedPublicExecutionReceiptLike {
 
 export interface ChannelExecutionSummary {
   readonly total: number;
+  readonly evaluated: number;
   readonly published: number;
+  readonly ready_to_publish: number;
   readonly cooldown_skipped: number;
   readonly blocked: number;
 }
 
 export interface OwnedPublicExecutionSummary {
   readonly total_receipts: number;
+  readonly evaluated_count: number;
   readonly published_count: number;
+  readonly ready_to_publish_count: number;
   readonly cooldown_skipped_count: number;
   readonly blocked_count: number;
   readonly latest_public_post_url: string | null;
@@ -62,6 +66,14 @@ function isPublished(status: string): boolean {
   return status === "published" || status.includes("published");
 }
 
+function isReadyToPublish(status: string): boolean {
+  return status === "ready_to_publish" || status.includes("ready_to_publish");
+}
+
+function isEvaluated(status: string): boolean {
+  return status === "evaluated" || status.includes("evaluated");
+}
+
 function isCooldown(status: string): boolean {
   return status.includes("cooldown") || status.includes("skipped");
 }
@@ -70,15 +82,17 @@ function isBlocked(status: string): boolean {
   return status.includes("blocked") || status.includes("failed");
 }
 
-function newChannelSummary(): { total: number; published: number; cooldown_skipped: number; blocked: number } {
-  return { total: 0, published: 0, cooldown_skipped: 0, blocked: 0 };
+function newChannelSummary(): { total: number; evaluated: number; published: number; ready_to_publish: number; cooldown_skipped: number; blocked: number } {
+  return { total: 0, evaluated: 0, published: 0, ready_to_publish: 0, cooldown_skipped: 0, blocked: 0 };
 }
 
 export function summarizeOwnedPublicExecutionReceipts(
   receipts: readonly OwnedPublicExecutionReceiptLike[],
 ): OwnedPublicExecutionSummary {
-  const channels: Record<string, { total: number; published: number; cooldown_skipped: number; blocked: number }> = {};
+  const channels: Record<string, { total: number; evaluated: number; published: number; ready_to_publish: number; cooldown_skipped: number; blocked: number }> = {};
+  let evaluatedCount = 0;
   let publishedCount = 0;
+  let readyToPublishCount = 0;
   let cooldownSkippedCount = 0;
   let blockedCount = 0;
   let latestPostUrl: string | null = null;
@@ -100,6 +114,12 @@ export function summarizeOwnedPublicExecutionReceipts(
         latestPostAt = created;
         latestPostUrl = typeof receipt.post_url === "string" ? receipt.post_url : null;
       }
+    } else if (isReadyToPublish(status)) {
+      summary.ready_to_publish += 1;
+      readyToPublishCount += 1;
+    } else if (isEvaluated(status)) {
+      summary.evaluated += 1;
+      evaluatedCount += 1;
     } else if (isCooldown(status)) {
       summary.cooldown_skipped += 1;
       cooldownSkippedCount += 1;
@@ -112,7 +132,9 @@ export function summarizeOwnedPublicExecutionReceipts(
 
   return {
     total_receipts: receipts.length,
+    evaluated_count: evaluatedCount,
     published_count: publishedCount,
+    ready_to_publish_count: readyToPublishCount,
     cooldown_skipped_count: cooldownSkippedCount,
     blocked_count: blockedCount,
     latest_public_post_url: latestPostUrl,
@@ -147,7 +169,9 @@ export function buildCmoResponseLearningReceipt(input: {
   const summary = summarizeOwnedPublicExecutionReceipts(input.receipts);
   const sources = metricSources(input.receipts);
   const learningSignals = [
+    `evaluated_count=${summary.evaluated_count}`,
     `published_count=${summary.published_count}`,
+    `ready_to_publish_count=${summary.ready_to_publish_count}`,
     `cooldown_skipped_count=${summary.cooldown_skipped_count}`,
     `blocked_count=${summary.blocked_count}`,
     `channels=${Object.keys(summary.channels).sort().join(",") || "none"}`,

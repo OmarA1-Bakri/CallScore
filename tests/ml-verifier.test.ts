@@ -208,6 +208,11 @@ test("deriveMlVerifierTrustDecision: high-confidence approval is publish-ready w
   assert.equal(decision.publication_decision, "publish");
   assert.equal(decision.low_confidence_validation_decision, "PROMOTE");
   assert.equal(decision.suppress_from_public_scoring, false);
+  assert.equal(decision.public_impact_allowed, false);
+  assert.equal(decision.public_scoring_allowed, false);
+  assert.equal(decision.reviewer_required, false);
+  assert.equal(decision.founder_required, false);
+  assert.deepEqual(decision.evidence_refs, ["ml_verifier:evidence_span"]);
   assert.equal(decision.non_founder_review_required, false);
   assert.equal(decision.founder_review_required, false);
 });

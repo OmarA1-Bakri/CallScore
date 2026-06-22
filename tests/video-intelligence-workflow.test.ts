@@ -107,6 +107,9 @@ test("video_intelligence_workflow creates evidence-linked call artifacts for hig
   const publicationArtifact = [...db.artifacts.values()].find((artifact) => artifact.artifact_type === "publication_decision");
   assert.ok(publicationArtifact);
   assert.equal((publicationArtifact.json as JsonRecord).decision, "publish");
+  assert.equal((publicationArtifact.json as JsonRecord).public_impact_allowed, true);
+  assert.equal((publicationArtifact.json as JsonRecord).reviewer_required, false);
+  assert.equal((publicationArtifact.json as JsonRecord).founder_required, false);
   assert.equal(db.links.length, 6);
   assert.equal(db.gates.size, 0);
   assert.ok([...db.invocations.values()].some((invocation) => invocation.role === "video_intelligence_candidate_extractor"));
@@ -139,6 +142,9 @@ test("video_intelligence_workflow suppresses low-confidence or rejected call art
   const publicationArtifact = [...db.artifacts.values()].find((artifact) => artifact.artifact_type === "publication_decision");
   assert.ok(publicationArtifact);
   assert.deepEqual((publicationArtifact.json as JsonRecord).reason_codes, ["rejected_not_creator_owned"]);
+  assert.equal((publicationArtifact.json as JsonRecord).public_impact_allowed, false);
+  assert.equal((publicationArtifact.json as JsonRecord).reviewer_required, false);
+  assert.equal((publicationArtifact.json as JsonRecord).founder_required, false);
   assert.equal(db.events.some((event) => event.event_type === "approval.requested"), false);
 });
 
@@ -159,4 +165,7 @@ test("video_intelligence_workflow routes medium-confidence accepted calls to non
   const publicationArtifact = [...db.artifacts.values()].find((artifact) => artifact.artifact_type === "publication_decision");
   assert.ok(publicationArtifact);
   assert.equal((publicationArtifact.json as JsonRecord).decision, "review");
+  assert.equal((publicationArtifact.json as JsonRecord).public_impact_allowed, false);
+  assert.equal((publicationArtifact.json as JsonRecord).reviewer_required, true);
+  assert.equal((publicationArtifact.json as JsonRecord).founder_required, false);
 });
