@@ -39,3 +39,21 @@ Canonical prompt plan: `/srv/agents/repos/callscore-workplane/docs/refactor/herm
 - Decision: use existing Hermes/Workplane/DB queue rails first; BullMQ only if later justified.
 - Decision: LangGraph remains spike-only unless explicitly proven necessary.
 
+
+| Prompt 2 — Canonical Video Domain Skeleton and Zod State Model | complete | `src/video/schemas/video.schemas.ts`, `src/video/schemas/youtube.schemas.ts`; targeted tests pass. |
+| Prompt 3 — Artifact Paths and State Store | complete | `src/video/artifacts/artifact-paths.ts`, `src/video/artifacts/state-store.ts`; overwrite protection implemented; `artifacts/` already gitignored. |
+| Prompt 4 — Real CallScore Candidate Loader and Ranking | complete | `src/video/data/load-callscore-video-candidates.ts`, `rank-video-candidates.ts`, mock fixtures; deterministic ranking and query mapping tested. |
+| Prompt 5 — Automated Planner, Script, Scene Plan, Metadata, and Claim Validation | complete | deterministic planner, prompts, script validator, claim validator; schema/claim/script tests pass. |
+
+## Prompt 2–5 implementation summary
+
+- Added canonical Zod schemas for CallScore video job state, creator/call records, scenes, script packages, YouTube metadata, QA reports, and Composio publish result.
+- Added deterministic artifact path builder and state store with overwrite protection unless `force` is passed.
+- Added real provider-portable DB candidate loader using existing `query<T>` and `creators`, `creator_stats`, `calls` tables.
+- Added deterministic candidate ranking using the uploaded content score formula.
+- Added deterministic automated planner with no manual approval gate.
+- Added script and claim validation to block unsafe phrases and unsupported numeric claims while allowing the required “not financial advice” disclaimer.
+- Added prompt text modules for the four planned content formats and scene/metadata generation.
+- Tests: `node --import tsx --test tests/video-automation-schemas.test.ts tests/video-automation-data-planning.test.ts` → 7/7 passed.
+- Typecheck: `npm run typecheck` completed with no reported errors.
+
