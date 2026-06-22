@@ -76,3 +76,20 @@ Canonical prompt plan: `/srv/agents/repos/callscore-workplane/docs/refactor/herm
 - Tests: `node --import tsx --test tests/video-automation-media.test.ts tests/video-automation-publisher.test.ts tests/video-automation-schemas.test.ts tests/video-automation-data-planning.test.ts` → 11/11 passed.
 - Typecheck: `npm run typecheck` completed with no reported errors.
 
+
+## Prompt 9 completion update
+
+Prompt 9 is now complete after retrying schema discovery through Hermes MCP internals instead of Hermes LLM one-shot.
+
+Evidence:
+
+- Composio YouTube search artifact: `.tmp/workflow-receipts/youtube_automation/composio-youtube-tool-search.json`
+- Exact schema artifact: `.tmp/workflow-receipts/youtube_automation/composio-youtube-tool-schemas.json`
+- Committed summary: `docs/youtube-automation/composio-youtube-tool-schema-summary.json`
+- Active YouTube connection was reported by Composio search for toolkit `youtube`.
+- Exact tool slugs captured: `YOUTUBE_UPLOAD_VIDEO`, `YOUTUBE_MULTIPART_UPLOAD_VIDEO`, `YOUTUBE_UPDATE_THUMBNAIL`, `YOUTUBE_UPDATE_VIDEO`, `YOUTUBE_LIST_CHANNELS`, `YOUTUBE_GET_VIDEO_DETAILS_BATCH`, `YOUTUBE_LIST_CHANNEL_VIDEOS`, `YOUTUBE_GET_CHANNEL_STATISTICS`, `YOUTUBE_LIST_VIDEO_CATEGORIES`.
+- Publisher arguments updated to exact schema names.
+- Important limitation: YouTube upload tools require a Composio file object (`name`, `mimetype`, `s3key`), not a raw HH local file path. Thumbnail update requires `thumbnailUrl`, not a raw local image path. This is now enforced in code.
+- Tests: `node --import tsx --test tests/video-automation-publisher.test.ts tests/video-automation-media.test.ts tests/video-automation-schemas.test.ts tests/video-automation-data-planning.test.ts` → 12/12 passed.
+- Typecheck: `npm run typecheck` completed with no reported errors.
+

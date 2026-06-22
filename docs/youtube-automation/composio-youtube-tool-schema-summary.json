@@ -1,0 +1,4024 @@
+{
+  "generated_from": [
+    ".tmp/workflow-receipts/youtube_automation/composio-youtube-tool-search.json",
+    ".tmp/workflow-receipts/youtube_automation/composio-youtube-tool-schemas.json"
+  ],
+  "youtube_connection_statuses": [
+    {
+      "toolkit": "youtube",
+      "description": "YouTube is a video-sharing platform with user-generated content, live streaming, and monetization opportunities, widely used for marketing, education, and entertainment",
+      "has_active_connection": true,
+      "accounts": [
+        {
+          "id": "youtube_gali-peruke",
+          "user_info": {
+            "kind": "youtube#channelListResponse",
+            "etag": "RuuXzTIr0OoDqI4S0RU6n4FqKEM",
+            "pageInfo": {
+              "totalResults": 0,
+              "resultsPerPage": 5
+            }
+          },
+          "status": "ACTIVE",
+          "created_at": "2026-06-21T02:14:48.580Z",
+          "is_default": true,
+          "account_type": "PRIVATE"
+        }
+      ],
+      "status_message": "Connection is active and ready to use"
+    }
+  ],
+  "tool_slugs": [
+    "YOUTUBE_GET_CHANNEL_STATISTICS",
+    "YOUTUBE_GET_VIDEO_DETAILS_BATCH",
+    "YOUTUBE_LIST_CHANNELS",
+    "YOUTUBE_LIST_CHANNEL_VIDEOS",
+    "YOUTUBE_LIST_VIDEO_CATEGORIES",
+    "YOUTUBE_MULTIPART_UPLOAD_VIDEO",
+    "YOUTUBE_UPDATE_THUMBNAIL",
+    "YOUTUBE_UPDATE_VIDEO",
+    "YOUTUBE_UPLOAD_VIDEO"
+  ],
+  "schemas_by_slug": {
+    "YOUTUBE_GET_CHANNEL_STATISTICS": {
+      "description": "Gets detailed statistics for YouTube channels including subscriber counts, view counts, and video counts. Channels can be identified using their ID, handle (e.g., @Google), or username.",
+      "required": [],
+      "properties": [
+        "id",
+        "mine",
+        "part",
+        "forHandle",
+        "forUsername"
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "examples": [
+              "UCddiUEpeqJcYeBxX1IVBKvQ",
+              "UCddiUEpeqJcYeBxX1IVBKvQ,UCK8sQmJBp8GCxrOtXWBpyEA"
+            ],
+            "description": "Comma-separated list of YouTube channel IDs (e.g., 'UCddiUEpeqJcYeBxX1IVBKvQ'). Channel IDs typically start with 'UC'. The YouTube Data API v3 supports up to 50 channel IDs per request; if more than 50 IDs are provided, they will be automatically split into multiple batches and the results will be merged. At least one of 'id', 'forHandle', 'forUsername', or 'mine' must be provided. Do NOT pass 'mine' as the value for this parameter - use the 'mine' boolean parameter instead to fetch the authenticated user's channel."
+          },
+          "mine": {
+            "type": "boolean",
+            "examples": [
+              true
+            ],
+            "description": "Set to true to retrieve the channel owned by the authenticated user. This is a boolean filter parameter. At least one of 'id', 'forHandle', 'forUsername', or 'mine' must be provided. Cannot be combined with other filter parameters."
+          },
+          "part": {
+            "type": "string",
+            "default": "statistics",
+            "examples": [
+              "statistics",
+              "snippet,statistics"
+            ],
+            "description": "Comma-separated list of channel resource properties to include. Use 'statistics' for subscriber count."
+          },
+          "forHandle": {
+            "type": "string",
+            "examples": [
+              "@Google",
+              "GoogleDevelopers"
+            ],
+            "description": "YouTube channel handle (e.g., '@Google' or 'GoogleDevelopers'). The '@' symbol is optional. Use this parameter when you know the channel's handle but not its ID. At least one of 'id', 'forHandle', 'forUsername', or 'mine' must be provided."
+          },
+          "forUsername": {
+            "type": "string",
+            "examples": [
+              "Google"
+            ],
+            "description": "YouTube username to identify the channel. Use this parameter when you know the channel's legacy username but not its ID. At least one of 'id', 'forHandle', 'forUsername', or 'mine' must be provided."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "PageInfo": {
+            "type": "object",
+            "properties": {
+              "totalResults": {
+                "type": "integer"
+              },
+              "resultsPerPage": {
+                "type": "integer"
+              }
+            }
+          },
+          "Localized": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "Thumbnail": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "Thumbnails": {
+            "type": "object",
+            "properties": {
+              "high": {
+                "$ref": "#/$defs/Thumbnail"
+              },
+              "medium": {
+                "$ref": "#/$defs/Thumbnail"
+              },
+              "default": {
+                "$ref": "#/$defs/Thumbnail"
+              }
+            }
+          },
+          "ChannelItem": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "snippet": {
+                "$ref": "#/$defs/ChannelSnippet"
+              },
+              "statistics": {
+                "$ref": "#/$defs/ChannelStatistics"
+              }
+            }
+          },
+          "ChannelSnippet": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "customUrl": {
+                "type": "string"
+              },
+              "localized": {
+                "$ref": "#/$defs/Localized"
+              },
+              "thumbnails": {
+                "$ref": "#/$defs/Thumbnails"
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string"
+              },
+              "defaultLanguage": {
+                "type": "string"
+              }
+            }
+          },
+          "ChannelStatistics": {
+            "type": "object",
+            "properties": {
+              "viewCount": {
+                "type": "string"
+              },
+              "videoCount": {
+                "type": "string"
+              },
+              "commentCount": {
+                "type": "string"
+              },
+              "subscriberCount": {
+                "type": "string"
+              },
+              "hiddenSubscriberCount": {
+                "type": "boolean"
+              }
+            }
+          },
+          "ConvenienceChannel": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "snippet": {
+                "$ref": "#/$defs/ChannelSnippet"
+              },
+              "statistics": {
+                "$ref": "#/$defs/ChannelStatistics"
+              }
+            }
+          },
+          "GetChannelStatisticsResponse": {
+            "type": "object",
+            "properties": {
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ChannelItem"
+                }
+              },
+              "channels": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ConvenienceChannel"
+                }
+              },
+              "pageInfo": {
+                "$ref": "#/$defs/PageInfo"
+              },
+              "nextPageToken": {
+                "type": "string"
+              },
+              "prevPageToken": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/GetChannelStatisticsResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "YOUTUBE_GET_VIDEO_DETAILS_BATCH": {
+      "description": "Retrieves multiple YouTube video resource parts in a single batch call. Use when you need cohort-level metrics for many videos to reduce quota usage and latency.",
+      "required": [
+        "id"
+      ],
+      "properties": [
+        "hl",
+        "id",
+        "parts"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "hl": {
+            "type": "string",
+            "examples": [
+              "en"
+            ],
+            "description": "Language for localized metadata (snippet.localized); IETF language tag, e.g., 'en'."
+          },
+          "id": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "dQw4w9WgXcQ",
+                "eX2qFMC8cFo"
+              ]
+            ],
+            "minItems": 1,
+            "description": "List of YouTube video IDs to retrieve. At least one video ID is required. Accepts a list or comma-separated string. Also accepts 'videoIds' as an alias. The YouTube API limits each request to 50 video IDs; if more are provided, they will be automatically split into multiple requests and the results merged."
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "contentDetails",
+                "fileDetails",
+                "id",
+                "liveStreamingDetails",
+                "localizations",
+                "paidProductPlacementDetails",
+                "player",
+                "processingDetails",
+                "recordingDetails",
+                "snippet",
+                "statistics",
+                "status",
+                "suggestions",
+                "topicDetails"
+              ],
+              "type": "string"
+            },
+            "default": [
+              "snippet",
+              "statistics"
+            ],
+            "examples": [
+              [
+                "snippet",
+                "statistics"
+              ],
+              [
+                "snippet",
+                "contentDetails",
+                "statistics"
+              ]
+            ],
+            "minItems": 1,
+            "description": "Video resource properties to include. At least one part is required. Accepts a list of parts or a comma-separated string. Also accepts 'part' (singular) as an alias. Valid parts: snippet, contentDetails, statistics, status, player, topicDetails, recordingDetails, fileDetails, processingDetails, suggestions, liveStreamingDetails, localizations, paidProductPlacementDetails, id. Defaults to ['snippet', 'statistics'] if not specified."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "Video": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "player": {
+                "$ref": "#/$defs/Player"
+              },
+              "status": {
+                "$ref": "#/$defs/Status"
+              },
+              "snippet": {
+                "$ref": "#/$defs/Snippet"
+              },
+              "statistics": {
+                "$ref": "#/$defs/Statistics"
+              },
+              "fileDetails": {
+                "$ref": "#/$defs/FileDetails"
+              },
+              "suggestions": {
+                "$ref": "#/$defs/Suggestions"
+              },
+              "topicDetails": {
+                "$ref": "#/$defs/TopicDetails"
+              },
+              "localizations": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/LocalizedText"
+                }
+              },
+              "contentDetails": {
+                "$ref": "#/$defs/ContentDetails"
+              },
+              "recordingDetails": {
+                "$ref": "#/$defs/RecordingDetails"
+              },
+              "processingDetails": {
+                "$ref": "#/$defs/ProcessingDetails"
+              },
+              "liveStreamingDetails": {
+                "$ref": "#/$defs/LiveStreamingDetails"
+              }
+            }
+          },
+          "Player": {
+            "type": "object",
+            "required": [
+              "embedHtml"
+            ],
+            "properties": {
+              "embedHtml": {
+                "type": "string"
+              },
+              "embedWidth": {
+                "type": "integer"
+              },
+              "embedHeight": {
+                "type": "integer"
+              }
+            }
+          },
+          "Status": {
+            "type": "object",
+            "required": [
+              "uploadStatus",
+              "privacyStatus",
+              "license",
+              "embeddable",
+              "publicStatsViewable"
+            ],
+            "properties": {
+              "license": {
+                "type": "string"
+              },
+              "publishAt": {
+                "type": "string"
+              },
+              "embeddable": {
+                "type": "boolean"
+              },
+              "madeForKids": {
+                "type": "boolean"
+              },
+              "uploadStatus": {
+                "type": "string"
+              },
+              "failureReason": {
+                "type": "string"
+              },
+              "privacyStatus": {
+                "type": "string"
+              },
+              "rejectionReason": {
+                "type": "string"
+              },
+              "publicStatsViewable": {
+                "type": "boolean"
+              },
+              "containsSyntheticMedia": {
+                "type": "boolean"
+              },
+              "selfDeclaredMadeForKids": {
+                "type": "boolean"
+              }
+            }
+          },
+          "Snippet": {
+            "type": "object",
+            "required": [
+              "publishedAt",
+              "channelId",
+              "title",
+              "description",
+              "thumbnails",
+              "channelTitle",
+              "categoryId",
+              "liveBroadcastContent"
+            ],
+            "properties": {
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "title": {
+                "type": "string"
+              },
+              "channelId": {
+                "type": "string"
+              },
+              "localized": {
+                "$ref": "#/$defs/LocalizedText"
+              },
+              "categoryId": {
+                "type": "string"
+              },
+              "thumbnails": {
+                "$ref": "#/$defs/Thumbnails"
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string"
+              },
+              "channelTitle": {
+                "type": "string"
+              },
+              "defaultLanguage": {
+                "type": "string"
+              },
+              "defaultAudioLanguage": {
+                "type": "string"
+              },
+              "liveBroadcastContent": {
+                "type": "string"
+              }
+            }
+          },
+          "PageInfo": {
+            "type": "object",
+            "required": [
+              "totalResults",
+              "resultsPerPage"
+            ],
+            "properties": {
+              "totalResults": {
+                "type": "integer"
+              },
+              "resultsPerPage": {
+                "type": "integer"
+              }
+            }
+          },
+          "Statistics": {
+            "type": "object",
+            "properties": {
+              "likeCount": {
+                "type": "string"
+              },
+              "viewCount": {
+                "type": "string"
+              },
+              "commentCount": {
+                "type": "string"
+              },
+              "dislikeCount": {
+                "type": "string"
+              },
+              "favoriteCount": {
+                "type": "string"
+              }
+            }
+          },
+          "Thumbnails": {
+            "type": "object",
+            "properties": {
+              "high": {
+                "$ref": "#/$defs/ThumbnailImage"
+              },
+              "maxres": {
+                "$ref": "#/$defs/ThumbnailImage"
+              },
+              "medium": {
+                "$ref": "#/$defs/ThumbnailImage"
+              },
+              "default": {
+                "$ref": "#/$defs/ThumbnailImage"
+              },
+              "standard": {
+                "$ref": "#/$defs/ThumbnailImage"
+              }
+            }
+          },
+          "AudioStream": {
+            "type": "object",
+            "required": [
+              "channelCount",
+              "codec",
+              "bitrateBps"
+            ],
+            "properties": {
+              "codec": {
+                "type": "string"
+              },
+              "vendor": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "channelCount": {
+                "type": "integer"
+              }
+            }
+          },
+          "FileDetails": {
+            "type": "object",
+            "required": [
+              "fileName",
+              "fileSize",
+              "fileType",
+              "container",
+              "durationMs",
+              "bitrateBps"
+            ],
+            "properties": {
+              "fileName": {
+                "type": "string"
+              },
+              "fileSize": {
+                "type": "string"
+              },
+              "fileType": {
+                "type": "string"
+              },
+              "container": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "durationMs": {
+                "type": "string"
+              },
+              "audioStreams": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/AudioStream"
+                }
+              },
+              "creationTime": {
+                "type": "string"
+              },
+              "videoStreams": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/VideoStream"
+                }
+              }
+            }
+          },
+          "Suggestions": {
+            "type": "object",
+            "properties": {
+              "tagSuggestions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/TagSuggestion"
+                }
+              },
+              "processingHints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "processingErrors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "editorSuggestions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "processingWarnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "VideoStream": {
+            "type": "object",
+            "required": [
+              "widthPixels",
+              "heightPixels",
+              "frameRateFps",
+              "aspectRatio",
+              "codec",
+              "bitrateBps"
+            ],
+            "properties": {
+              "codec": {
+                "type": "string"
+              },
+              "vendor": {
+                "type": "string"
+              },
+              "rotation": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "aspectRatio": {
+                "type": "number"
+              },
+              "widthPixels": {
+                "type": "integer"
+              },
+              "frameRateFps": {
+                "type": "number"
+              },
+              "heightPixels": {
+                "type": "integer"
+              }
+            }
+          },
+          "TopicDetails": {
+            "type": "object",
+            "properties": {
+              "topicIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "topicCategories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "relevantTopicIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "ContentRating": {
+            "type": "object",
+            "properties": {
+              "fskRating": {
+                "type": "string"
+              },
+              "bbfcRating": {
+                "type": "string"
+              },
+              "cbfcRating": {
+                "type": "string"
+              },
+              "mpaaRating": {
+                "type": "string"
+              }
+            }
+          },
+          "LocalizedText": {
+            "type": "object",
+            "required": [
+              "title",
+              "description"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "TagSuggestion": {
+            "type": "object",
+            "required": [
+              "tag"
+            ],
+            "properties": {
+              "tag": {
+                "type": "string"
+              },
+              "categoryRestricts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "ContentDetails": {
+            "type": "object",
+            "required": [
+              "duration",
+              "dimension",
+              "definition",
+              "caption",
+              "licensedContent",
+              "projection"
+            ],
+            "properties": {
+              "caption": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "string"
+              },
+              "dimension": {
+                "type": "string"
+              },
+              "definition": {
+                "type": "string"
+              },
+              "projection": {
+                "type": "string"
+              },
+              "contentRating": {
+                "$ref": "#/$defs/ContentRating"
+              },
+              "licensedContent": {
+                "type": "boolean"
+              },
+              "regionRestriction": {
+                "$ref": "#/$defs/RegionRestriction"
+              },
+              "hasCustomThumbnail": {
+                "type": "boolean"
+              }
+            }
+          },
+          "GeoCoordinates": {
+            "type": "object",
+            "required": [
+              "latitude",
+              "longitude"
+            ],
+            "properties": {
+              "altitude": {
+                "type": "number"
+              },
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              }
+            }
+          },
+          "ThumbnailImage": {
+            "type": "object",
+            "required": [
+              "url",
+              "width",
+              "height"
+            ],
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "RecordingDetails": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "$ref": "#/$defs/GeoCoordinates"
+              },
+              "recordingDate": {
+                "type": "string"
+              },
+              "locationDescription": {
+                "type": "string"
+              }
+            }
+          },
+          "ProcessingDetails": {
+            "type": "object",
+            "required": [
+              "processingStatus",
+              "fileDetailsAvailability",
+              "processingIssuesAvailability",
+              "tagSuggestionsAvailability",
+              "editorSuggestionsAvailability",
+              "thumbnailsAvailability"
+            ],
+            "properties": {
+              "processingStatus": {
+                "type": "string"
+              },
+              "processingProgress": {
+                "$ref": "#/$defs/ProcessingProgress"
+              },
+              "thumbnailsAvailability": {
+                "type": "string"
+              },
+              "fileDetailsAvailability": {
+                "type": "string"
+              },
+              "processingFailureReason": {
+                "type": "string"
+              },
+              "tagSuggestionsAvailability": {
+                "type": "string"
+              },
+              "processingIssuesAvailability": {
+                "type": "string"
+              },
+              "editorSuggestionsAvailability": {
+                "type": "string"
+              }
+            }
+          },
+          "RegionRestriction": {
+            "type": "object",
+            "properties": {
+              "allowed": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "blocked": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "ProcessingProgress": {
+            "type": "object",
+            "required": [
+              "partsTotal",
+              "partsProcessed",
+              "timeLeftMs"
+            ],
+            "properties": {
+              "partsTotal": {
+                "type": "string"
+              },
+              "timeLeftMs": {
+                "type": "string"
+              },
+              "partsProcessed": {
+                "type": "string"
+              }
+            }
+          },
+          "LiveStreamingDetails": {
+            "type": "object",
+            "required": [
+              "scheduledStartTime"
+            ],
+            "properties": {
+              "actualEndTime": {
+                "type": "string"
+              },
+              "actualStartTime": {
+                "type": "string"
+              },
+              "activeLiveChatId": {
+                "type": "string"
+              },
+              "scheduledEndTime": {
+                "type": "string"
+              },
+              "concurrentViewers": {
+                "type": "string"
+              },
+              "scheduledStartTime": {
+                "type": "string"
+              }
+            }
+          },
+          "VideoDetailsBatchResponse": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "pageInfo",
+              "items"
+            ],
+            "properties": {
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Video"
+                }
+              },
+              "pageInfo": {
+                "$ref": "#/$defs/PageInfo"
+              },
+              "found_count": {
+                "type": "integer"
+              },
+              "nextPageToken": {
+                "type": "string"
+              },
+              "prevPageToken": {
+                "type": "string"
+              },
+              "not_found_count": {
+                "type": "integer"
+              },
+              "partial_failure": {
+                "type": "boolean"
+              },
+              "requested_count": {
+                "type": "integer"
+              },
+              "not_found_video_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "requested_video_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "composio_execution_message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/VideoDetailsBatchResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "YOUTUBE_LIST_CHANNELS": {
+      "description": "Lists YouTube channels by ID, handle, username, or ownership status, returning detailed channel information including metadata, statistics, and content details. Use this action when you need to retrieve comprehensive channel information by channel ID, handle (e.g., @username), or to list channels owned by or managed by the authenticated user. For finding channels by search query, use the search action instead.",
+      "required": [],
+      "properties": [
+        "hl",
+        "id",
+        "mine",
+        "part",
+        "forHandle",
+        "pageToken",
+        "maxResults",
+        "forUsername",
+        "managedByMe",
+        "onBehalfOfContentOwner"
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "hl": {
+            "type": "string",
+            "examples": [
+              "en_US",
+              "es",
+              "fr"
+            ],
+            "description": "Language code (BCP-47) for localized channel metadata. Instructs the API to return localized resource metadata for the specified language when available."
+          },
+          "id": {
+            "type": "string",
+            "examples": [
+              "UCddiUEpeqJcYeBxX1IVBKvQ",
+              "UCddiUEpeqJcYeBxX1IVBKvQ,UCK8sQmJBp8GCxrOtXWBpyEA"
+            ],
+            "description": "Comma-separated list of YouTube channel IDs to retrieve (e.g., 'UCddiUEpeqJcYeBxX1IVBKvQ'). Channel IDs typically start with 'UC'. At least one filter parameter (id, forHandle, forUsername, mine, or managedByMe) must be provided. Do NOT pass 'mine' as a value here - use the 'mine' boolean parameter instead."
+          },
+          "mine": {
+            "type": "boolean",
+            "examples": [
+              true
+            ],
+            "description": "Set to true to retrieve channels owned by the authenticated user. This is a boolean filter parameter. At least one filter parameter must be provided. Cannot be combined with other filter parameters."
+          },
+          "part": {
+            "type": "string",
+            "default": "snippet,contentDetails,statistics",
+            "examples": [
+              "snippet,statistics",
+              "snippet,contentDetails,statistics"
+            ],
+            "description": "Comma-separated list of channel resource properties to include in the response. Valid values: auditDetails, brandingSettings, contentDetails, contentOwnerDetails, id, localizations, snippet, statistics, status, topicDetails. Multiple parts can be requested (e.g., 'snippet,statistics')."
+          },
+          "forHandle": {
+            "type": "string",
+            "examples": [
+              "@Google",
+              "GoogleDevelopers"
+            ],
+            "description": "YouTube channel handle to retrieve (e.g., '@Google' or 'GoogleDevelopers'). The '@' symbol is optional. Use this when you know the channel's handle but not its ID. At least one filter parameter must be provided."
+          },
+          "pageToken": {
+            "type": "string",
+            "examples": [
+              "CAUQAA"
+            ],
+            "description": "Token for retrieving a specific page of results. Use the nextPageToken or prevPageToken from a previous response."
+          },
+          "maxResults": {
+            "type": "integer",
+            "maximum": 50,
+            "minimum": 0,
+            "examples": [
+              25
+            ],
+            "description": "Maximum number of channels to return per page. Acceptable values are 0 to 50, inclusive. Default is 5."
+          },
+          "forUsername": {
+            "type": "string",
+            "examples": [
+              "Google"
+            ],
+            "description": "YouTube username to identify the channel. Use this for legacy usernames. At least one filter parameter must be provided."
+          },
+          "managedByMe": {
+            "type": "boolean",
+            "examples": [
+              true
+            ],
+            "description": "Set to true to retrieve channels managed by the authenticated user (YouTube content partners only). At least one filter parameter must be provided."
+          },
+          "onBehalfOfContentOwner": {
+            "type": "string",
+            "description": "For YouTube content partners only. Indicates that the request is being made on behalf of the specified content owner."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "PageInfo": {
+            "type": "object",
+            "properties": {
+              "totalResults": {
+                "type": "integer"
+              },
+              "resultsPerPage": {
+                "type": "integer"
+              }
+            }
+          },
+          "Localized": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "Thumbnail": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "Thumbnails": {
+            "type": "object",
+            "properties": {
+              "high": {
+                "$ref": "#/$defs/Thumbnail"
+              },
+              "maxres": {
+                "$ref": "#/$defs/Thumbnail"
+              },
+              "medium": {
+                "$ref": "#/$defs/Thumbnail"
+              },
+              "default": {
+                "$ref": "#/$defs/Thumbnail"
+              },
+              "standard": {
+                "$ref": "#/$defs/Thumbnail"
+              }
+            }
+          },
+          "ChannelItem": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/$defs/ChannelStatus"
+              },
+              "snippet": {
+                "$ref": "#/$defs/ChannelSnippet"
+              },
+              "statistics": {
+                "$ref": "#/$defs/ChannelStatistics"
+              },
+              "auditDetails": {
+                "$ref": "#/$defs/AuditDetails"
+              },
+              "topicDetails": {
+                "$ref": "#/$defs/TopicDetails"
+              },
+              "localizations": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/LocalizationDetails"
+                }
+              },
+              "contentDetails": {
+                "$ref": "#/$defs/ChannelContentDetails"
+              },
+              "brandingSettings": {
+                "$ref": "#/$defs/BrandingSettings"
+              },
+              "contentOwnerDetails": {
+                "$ref": "#/$defs/ContentOwnerDetails"
+              }
+            }
+          },
+          "AuditDetails": {
+            "type": "object",
+            "properties": {
+              "overallGoodStanding": {
+                "type": "boolean"
+              },
+              "contentIdClaimsGoodStanding": {
+                "type": "boolean"
+              },
+              "copyrightStrikesGoodStanding": {
+                "type": "boolean"
+              },
+              "communityGuidelinesGoodStanding": {
+                "type": "boolean"
+              }
+            }
+          },
+          "TopicDetails": {
+            "type": "object",
+            "properties": {
+              "topicIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "topicCategories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "ChannelStatus": {
+            "type": "object",
+            "properties": {
+              "isLinked": {
+                "type": "boolean"
+              },
+              "madeForKids": {
+                "type": "boolean"
+              },
+              "privacyStatus": {
+                "type": "string"
+              },
+              "longUploadsStatus": {
+                "type": "string"
+              },
+              "selfDeclaredMadeForKids": {
+                "type": "boolean"
+              }
+            }
+          },
+          "ChannelSnippet": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "customUrl": {
+                "type": "string"
+              },
+              "localized": {
+                "$ref": "#/$defs/Localized"
+              },
+              "thumbnails": {
+                "$ref": "#/$defs/Thumbnails"
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string"
+              },
+              "defaultLanguage": {
+                "type": "string"
+              }
+            }
+          },
+          "BrandingSettings": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "$ref": "#/$defs/ChannelBrandingChannel"
+              }
+            }
+          },
+          "RelatedPlaylists": {
+            "type": "object",
+            "properties": {
+              "likes": {
+                "type": "string"
+              },
+              "uploads": {
+                "type": "string"
+              },
+              "favorites": {
+                "type": "string"
+              }
+            }
+          },
+          "ChannelStatistics": {
+            "type": "object",
+            "properties": {
+              "viewCount": {
+                "type": "string"
+              },
+              "videoCount": {
+                "type": "string"
+              },
+              "subscriberCount": {
+                "type": "string"
+              },
+              "hiddenSubscriberCount": {
+                "type": "boolean"
+              }
+            }
+          },
+          "ContentOwnerDetails": {
+            "type": "object",
+            "properties": {
+              "timeLinked": {
+                "type": "string"
+              },
+              "contentOwner": {
+                "type": "string"
+              }
+            }
+          },
+          "LocalizationDetails": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "ListChannelsResponse": {
+            "type": "object",
+            "properties": {
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/ChannelItem"
+                }
+              },
+              "pageInfo": {
+                "$ref": "#/$defs/PageInfo"
+              },
+              "nextPageToken": {
+                "type": "string"
+              },
+              "prevPageToken": {
+                "type": "string"
+              }
+            }
+          },
+          "ChannelContentDetails": {
+            "type": "object",
+            "properties": {
+              "relatedPlaylists": {
+                "$ref": "#/$defs/RelatedPlaylists"
+              }
+            }
+          },
+          "ChannelBrandingChannel": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "keywords": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "defaultLanguage": {
+                "type": "string"
+              },
+              "unsubscribedTrailer": {
+                "type": "string"
+              },
+              "trackingAnalyticsAccountId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ListChannelsResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "YOUTUBE_LIST_CHANNEL_VIDEOS": {
+      "description": "Lists videos from a specified YouTube channel. This action primarily uses the playlistItems.list endpoint with the channel's uploads playlist, which is the recommended approach by YouTube. The uploads playlist ID is obtained by fetching the channel resource via the Channels API and extracting the playlist ID from contentDetails.relatedPlaylists.uploads field. If the uploads playlist returns a 404 error (which can happen due to a known YouTube API bug where the returned playlist ID doesn't actually exist), the action automatically falls back to the search.list endpoint to retrieve channel videos. Note that the search fallback has higher quota cost (100 units vs 1 unit) and is limited to 500 results. If a channel exists but has no uploads playlist (e.g., brand accounts, channels with all videos deleted, or channels that haven't uploaded any public content), an empty result set is returned instead of an error.",
+      "required": [],
+      "properties": [
+        "mine",
+        "part",
+        "channelId",
+        "pageToken",
+        "maxResults"
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "mine": {
+            "type": "boolean",
+            "description": "Set to true to list videos from the authenticated user's channel. When true, channelId is automatically set to 'me'. Either channelId or mine must be provided."
+          },
+          "part": {
+            "type": "string",
+            "default": "snippet",
+            "examples": [
+              "snippet"
+            ],
+            "description": "This parameter specifies which parts of the playlist item resource to return. The snippet includes basic video details like ID, title, description, and thumbnails."
+          },
+          "channelId": {
+            "type": "string",
+            "examples": [
+              "UC_x5XG1OV2P6uZZ5FSM9Ttw",
+              "@Google",
+              "me",
+              "https://www.youtube.com/@Google"
+            ],
+            "maxLength": 2048,
+            "minLength": 1,
+            "description": "The YouTube channel identifier (exactly 24 characters for UC IDs). Accepts: (1) channel ID starting with 'UC' followed by 22 characters (e.g., 'UC_x5XG1OV2P6uZZ5FSM9Ttw'), (2) channel handle starting with '@' (e.g., '@Google'), (3) 'me' for the authenticated user's channel, or (4) YouTube channel URLs with /@handle or /channel/UC... format. Do NOT pass OAuth tokens, API keys, or other credentials here - only channel identifiers. Legacy /user/username URLs are supported but legacy /c/ custom URLs are not. Either channelId or mine must be provided."
+          },
+          "pageToken": {
+            "type": "string",
+            "examples": [
+              "CAUQAA"
+            ],
+            "description": "Token for pagination; use `nextPageToken` from a previous response for the next page, or `prevPageToken` for the previous page. Page tokens are opaque, ephemeral values that must come directly from a previous LIST_CHANNEL_VIDEOS response and cannot be constructed or reused across different queries."
+          },
+          "maxResults": {
+            "type": "integer",
+            "default": 5,
+            "maximum": 50,
+            "minimum": 1,
+            "examples": [
+              "5"
+            ],
+            "description": "The maximum number of videos to return per page."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "PlaylistItem": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/$defs/_PlaylistItemStatus"
+              },
+              "snippet": {
+                "$ref": "#/$defs/_PlaylistItemSnippet"
+              },
+              "contentDetails": {
+                "$ref": "#/$defs/_PlaylistItemContentDetails"
+              }
+            }
+          },
+          "SearchResult": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "id",
+              "snippet"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/_SearchResultId"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "snippet": {
+                "$ref": "#/$defs/_SearchResultSnippet"
+              }
+            }
+          },
+          "_SearchResultId": {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "videoId": {
+                "type": "string"
+              },
+              "channelId": {
+                "type": "string"
+              },
+              "playlistId": {
+                "type": "string"
+              }
+            }
+          },
+          "_YouTubePageInfo": {
+            "type": "object",
+            "required": [
+              "totalResults",
+              "resultsPerPage"
+            ],
+            "properties": {
+              "totalResults": {
+                "type": "integer"
+              },
+              "resultsPerPage": {
+                "type": "integer"
+              }
+            }
+          },
+          "_ThumbnailResource": {
+            "type": "object",
+            "required": [
+              "url",
+              "width",
+              "height"
+            ],
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "_PlaylistItemStatus": {
+            "type": "object",
+            "required": [
+              "privacyStatus"
+            ],
+            "properties": {
+              "privacyStatus": {
+                "type": "string"
+              }
+            }
+          },
+          "_PlaylistItemSnippet": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "position": {
+                "type": "integer"
+              },
+              "channelId": {
+                "type": "string"
+              },
+              "playlistId": {
+                "type": "string"
+              },
+              "resourceId": {
+                "$ref": "#/$defs/_PlaylistItemResourceId"
+              },
+              "thumbnails": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/_ThumbnailResource"
+                }
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string"
+              },
+              "channelTitle": {
+                "type": "string"
+              },
+              "videoOwnerChannelId": {
+                "type": "string"
+              },
+              "videoOwnerChannelTitle": {
+                "type": "string"
+              }
+            }
+          },
+          "_SearchResultSnippet": {
+            "type": "object",
+            "required": [
+              "publishedAt",
+              "channelId",
+              "title",
+              "description",
+              "thumbnails",
+              "channelTitle",
+              "liveBroadcastContent"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "channelId": {
+                "type": "string"
+              },
+              "thumbnails": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/_ThumbnailResource"
+                }
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string"
+              },
+              "channelTitle": {
+                "type": "string"
+              },
+              "liveBroadcastContent": {
+                "type": "string"
+              }
+            }
+          },
+          "_PlaylistItemResourceId": {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "videoId": {
+                "type": "string"
+              }
+            }
+          },
+          "ListChannelVideosResponse": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "pageInfo",
+              "items"
+            ],
+            "properties": {
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/PlaylistItem"
+                    },
+                    {
+                      "$ref": "#/$defs/SearchResult"
+                    }
+                  ]
+                }
+              },
+              "pageInfo": {
+                "$ref": "#/$defs/_YouTubePageInfo"
+              },
+              "regionCode": {
+                "type": "string"
+              },
+              "nextPageToken": {
+                "type": "string"
+              },
+              "prevPageToken": {
+                "type": "string"
+              }
+            }
+          },
+          "_PlaylistItemContentDetails": {
+            "type": "object",
+            "properties": {
+              "note": {
+                "type": "string"
+              },
+              "endAt": {
+                "type": "string"
+              },
+              "startAt": {
+                "type": "string"
+              },
+              "videoId": {
+                "type": "string"
+              },
+              "videoPublishedAt": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ListChannelVideosResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "YOUTUBE_LIST_VIDEO_CATEGORIES": {
+      "description": "Tool to list YouTube video categories that can be associated with videos. Use when you need to retrieve available video categories for a specific region or get details about specific category IDs.",
+      "required": [],
+      "properties": [
+        "hl",
+        "id",
+        "part",
+        "regionCode"
+      ],
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "hl": {
+            "type": "string",
+            "examples": [
+              "en_US",
+              "es_ES",
+              "fr_FR",
+              "ja_JP"
+            ],
+            "description": "Language code for text values in the API response (e.g., 'en_US', 'es_ES'). Defaults to 'en_US' if not specified."
+          },
+          "id": {
+            "type": "string",
+            "examples": [
+              "10",
+              "20,24",
+              "1,10,20"
+            ],
+            "description": "Comma-separated list of video category IDs for the resources being retrieved. Returns only the specified categories."
+          },
+          "part": {
+            "type": "string",
+            "default": "snippet",
+            "examples": [
+              "snippet"
+            ],
+            "description": "The part parameter specifies the videoCategory resource properties that the API response will include. Set the parameter value to 'snippet'."
+          },
+          "regionCode": {
+            "type": "string",
+            "examples": [
+              "US",
+              "GB",
+              "JP",
+              "IN"
+            ],
+            "description": "ISO 3166-1 alpha-2 country code (e.g., 'US', 'GB', 'JP') to return categories available in that region. Either 'id' or 'regionCode' must be specified."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "PageInfo": {
+            "type": "object",
+            "required": [
+              "totalResults",
+              "resultsPerPage"
+            ],
+            "properties": {
+              "totalResults": {
+                "type": "integer"
+              },
+              "resultsPerPage": {
+                "type": "integer"
+              }
+            }
+          },
+          "VideoCategoryItem": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "snippet": {
+                "$ref": "#/$defs/VideoCategorySnippet"
+              }
+            }
+          },
+          "VideoCategorySnippet": {
+            "type": "object",
+            "required": [
+              "channelId",
+              "title"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "channelId": {
+                "type": "string"
+              },
+              "assignable": {
+                "type": "boolean"
+              }
+            }
+          },
+          "ListVideoCategoriesResponse": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "items"
+            ],
+            "properties": {
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/VideoCategoryItem"
+                }
+              },
+              "pageInfo": {
+                "$ref": "#/$defs/PageInfo"
+              },
+              "nextPageToken": {
+                "type": "string"
+              },
+              "prevPageToken": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/ListVideoCategoriesResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "YOUTUBE_MULTIPART_UPLOAD_VIDEO": {
+      "description": "Uploads a video to YouTube using multipart upload in a single request. Use when you want to upload both metadata and video file together. This action uploads the video file and metadata in one request, unlike resumable upload which requires two steps.",
+      "required": [
+        "title",
+        "description",
+        "categoryId",
+        "privacyStatus",
+        "videoFile"
+      ],
+      "properties": [
+        "tags",
+        "title",
+        "videoFile",
+        "categoryId",
+        "description",
+        "privacyStatus"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "categoryId",
+          "privacyStatus",
+          "videoFile"
+        ],
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "educational",
+                "python",
+                "coding tutorial"
+              ]
+            ],
+            "description": "List of keyword tags (strings) for the video, used to improve discoverability."
+          },
+          "title": {
+            "type": "string",
+            "examples": [
+              "My Awesome Video"
+            ],
+            "description": "The title for the video."
+          },
+          "videoFile": {
+            "type": "object",
+            "required": [
+              "name",
+              "mimetype",
+              "s3key"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "examples": [
+                  "document.pdf",
+                  "image.jpg",
+                  "report.docx"
+                ],
+                "description": "The filename that will be used when uploading the file to the destination service"
+              },
+              "s3key": {
+                "type": "string",
+                "examples": [
+                  "47563/gmail/GET_ATTACHMENT/response/12345"
+                ],
+                "description": "The S3 key of a publicly accessible file, typically returned from a previous download action that stored the file in S3. This key references an existing file that can be uploaded to another service."
+              },
+              "mimetype": {
+                "type": "string",
+                "examples": [
+                  "application/pdf",
+                  "image/jpeg",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ],
+                "description": "The MIME type of the file"
+              }
+            },
+            "description": "Video file to upload to YouTube.",
+            "file_uploadable": true,
+            "additionalProperties": false
+          },
+          "categoryId": {
+            "type": "string",
+            "examples": [
+              "22"
+            ],
+            "description": "YouTube category ID (e.g., '22' for People & Blogs). Can be provided as a string or integer."
+          },
+          "description": {
+            "type": "string",
+            "examples": [
+              "A detailed walkthrough of my latest project."
+            ],
+            "description": "Detailed description of the video content."
+          },
+          "privacyStatus": {
+            "type": "string",
+            "examples": [
+              "public",
+              "private",
+              "unlisted"
+            ],
+            "description": "Privacy status: 'public', 'private' (uploader/specified users only), or 'unlisted' (link accessible, not publicly listed)."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "_Status": {
+            "type": "object",
+            "properties": {
+              "license": {
+                "type": "string"
+              },
+              "publishAt": {
+                "type": "string"
+              },
+              "embeddable": {
+                "type": "boolean"
+              },
+              "madeForKids": {
+                "type": "boolean"
+              },
+              "uploadStatus": {
+                "type": "string"
+              },
+              "failureReason": {
+                "type": "string"
+              },
+              "privacyStatus": {
+                "type": "string"
+              },
+              "rejectionReason": {
+                "type": "string"
+              },
+              "publicStatsViewable": {
+                "type": "boolean"
+              },
+              "containsSyntheticMedia": {
+                "type": "boolean"
+              },
+              "selfDeclaredMadeForKids": {
+                "type": "boolean"
+              }
+            }
+          },
+          "_Snippet": {
+            "type": "object",
+            "properties": {
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "title": {
+                "type": "string"
+              },
+              "channelId": {
+                "type": "string"
+              },
+              "localized": {
+                "$ref": "#/$defs/_Localized"
+              },
+              "categoryId": {
+                "type": "string"
+              },
+              "thumbnails": {
+                "$ref": "#/$defs/_Thumbnails"
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string"
+              },
+              "channelTitle": {
+                "type": "string"
+              },
+              "defaultLanguage": {
+                "type": "string"
+              },
+              "defaultAudioLanguage": {
+                "type": "string"
+              },
+              "liveBroadcastContent": {
+                "type": "string"
+              }
+            }
+          },
+          "_Localized": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "_Thumbnail": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "_Statistics": {
+            "type": "object",
+            "properties": {
+              "likeCount": {
+                "type": "string"
+              },
+              "viewCount": {
+                "type": "string"
+              },
+              "commentCount": {
+                "type": "string"
+              },
+              "dislikeCount": {
+                "type": "string"
+              },
+              "favoriteCount": {
+                "type": "string"
+              }
+            }
+          },
+          "_Thumbnails": {
+            "type": "object",
+            "properties": {
+              "high": {
+                "$ref": "#/$defs/_Thumbnail"
+              },
+              "maxres": {
+                "$ref": "#/$defs/_Thumbnail"
+              },
+              "medium": {
+                "$ref": "#/$defs/_Thumbnail"
+              },
+              "default": {
+                "$ref": "#/$defs/_Thumbnail"
+              },
+              "standard": {
+                "$ref": "#/$defs/_Thumbnail"
+              }
+            }
+          },
+          "_ContentDetails": {
+            "type": "object",
+            "properties": {
+              "caption": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "string"
+              },
+              "dimension": {
+                "type": "string"
+              },
+              "definition": {
+                "type": "string"
+              },
+              "projection": {
+                "type": "string"
+              },
+              "licensedContent": {
+                "type": "boolean"
+              },
+              "hasCustomThumbnail": {
+                "type": "boolean"
+              }
+            }
+          },
+          "YouTubeVideoResource": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "id",
+              "snippet",
+              "status"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/$defs/_Status"
+              },
+              "snippet": {
+                "$ref": "#/$defs/_Snippet"
+              },
+              "statistics": {
+                "$ref": "#/$defs/_Statistics"
+              },
+              "contentDetails": {
+                "$ref": "#/$defs/_ContentDetails"
+              }
+            }
+          },
+          "MultipartUploadVideoResponse": {
+            "type": "object",
+            "required": [
+              "video"
+            ],
+            "properties": {
+              "video": {
+                "$ref": "#/$defs/YouTubeVideoResource"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/MultipartUploadVideoResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "YOUTUBE_UPDATE_THUMBNAIL": {
+      "description": "Sets the custom thumbnail for a YouTube video using an image from a URL. Requirements: - The authenticated user must own the video or have permission to edit it - The YouTube channel must be verified (phone verification required) to upload custom thumbnails - Image must be JPG, PNG, or GIF; under 2MB; recommended 1280x720 resolution (16:9 aspect ratio)",
+      "required": [
+        "videoId",
+        "thumbnailUrl"
+      ],
+      "properties": [
+        "videoId",
+        "thumbnailUrl"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "videoId",
+          "thumbnailUrl"
+        ],
+        "properties": {
+          "videoId": {
+            "type": "string",
+            "examples": [
+              "dQw4w9WgXcQ"
+            ],
+            "description": "Identifier of the YouTube video for which to update the thumbnail."
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "format": "uri",
+            "examples": [
+              "https://example.com/thumbnail.jpg"
+            ],
+            "minLength": 1,
+            "description": "Publicly accessible URL of the new thumbnail image. Must be JPG, GIF, or PNG; under 2MB. Recommended: 16:9 aspect ratio, 1280x720 resolution (minimum 640px width)."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "YouTubeThumbnail": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "UpdateThumbnailResponse": {
+            "type": "object",
+            "properties": {
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/YouTubeThumbnailDetails"
+                }
+              },
+              "eventId": {
+                "type": "string"
+              },
+              "visitorId": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubeThumbnailDetails": {
+            "type": "object",
+            "properties": {
+              "high": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              },
+              "maxres": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              },
+              "medium": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              },
+              "default": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              },
+              "standard": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/UpdateThumbnailResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "YOUTUBE_UPDATE_VIDEO": {
+      "description": "Updates metadata for a YouTube video identified by videoId, which must exist; an empty list for tags removes all existing tags.",
+      "required": [
+        "video_id"
+      ],
+      "properties": [
+        "tags",
+        "title",
+        "video_id",
+        "category_id",
+        "description",
+        "privacy_status",
+        "composio_execution_message"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "video_id"
+        ],
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              [
+                "updatedTag1",
+                "updatedTag2"
+              ]
+            ],
+            "description": "New tags as a list of strings. Must be an actual list/array like ['tag1', 'tag2'], NOT a JSON string. Replaces all existing tags. An empty list removes all tags. No change if omitted or `None`. YouTube restrictions: (1) Angle brackets < > are forbidden and will be removed automatically. (2) Total characters across all tags must not exceed 500 (spaces in tags add 2 extra characters due to internal quoting, and commas between tags count toward the limit)."
+          },
+          "title": {
+            "type": "string",
+            "examples": [
+              "My Updated Awesome Video"
+            ],
+            "description": "New video title as a string. Must be a text string, not a number. Maximum 100 characters. No change if omitted or `None`."
+          },
+          "video_id": {
+            "type": "string",
+            "examples": [
+              "dQw4w9WgXcQ"
+            ],
+            "description": "The video's unique YouTube ID (string). Typically an 11-character alphanumeric string found in the video URL (e.g., 'dQw4w9WgXcQ')."
+          },
+          "category_id": {
+            "type": "string",
+            "examples": [
+              "22"
+            ],
+            "description": "New YouTube category ID as a string. No change if omitted or `None`. Numeric values will be converted to strings."
+          },
+          "description": {
+            "type": "string",
+            "examples": [
+              "This is an updated description of my awesome video."
+            ],
+            "description": "New video description as a string. Maximum 5000 bytes (not characters). Multibyte UTF-8 characters like emojis (4 bytes each) and accented letters (2 bytes each) count more than ASCII characters. No change if omitted or `None`."
+          },
+          "privacy_status": {
+            "enum": [
+              "public",
+              "private",
+              "unlisted"
+            ],
+            "type": "string",
+            "examples": [
+              "public"
+            ],
+            "description": "New privacy status. No change if omitted or `None`."
+          },
+          "composio_execution_message": {
+            "type": "string",
+            "description": "Internal field for execution messages about input processing."
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "YouTubePlayer": {
+            "type": "object",
+            "properties": {
+              "embedHtml": {
+                "type": "string"
+              },
+              "embedWidth": {
+                "type": "integer"
+              },
+              "embedHeight": {
+                "type": "integer"
+              }
+            }
+          },
+          "YouTubeLocalized": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubeThumbnail": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "YouTubeThumbnails": {
+            "type": "object",
+            "properties": {
+              "high": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              },
+              "maxres": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              },
+              "medium": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              },
+              "default": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              },
+              "standard": {
+                "$ref": "#/$defs/YouTubeThumbnail"
+              }
+            }
+          },
+          "YouTubeFileDetails": {
+            "type": "object",
+            "properties": {
+              "fileName": {
+                "type": "string"
+              },
+              "fileSize": {
+                "type": "string"
+              },
+              "fileType": {
+                "type": "string"
+              },
+              "container": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "durationMs": {
+                "type": "string"
+              },
+              "audioStreams": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/YouTubeFileAudioStream"
+                }
+              },
+              "creationTime": {
+                "type": "string"
+              },
+              "videoStreams": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/YouTubeFileVideoStream"
+                }
+              }
+            }
+          },
+          "YouTubeSuggestions": {
+            "type": "object",
+            "properties": {
+              "tagSuggestions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/YouTubeTagSuggestion"
+                }
+              },
+              "processingHints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "processingErrors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "editorSuggestions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "processingWarnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "YouTubeVideoStatus": {
+            "type": "object",
+            "properties": {
+              "license": {
+                "type": "string"
+              },
+              "publishAt": {
+                "type": "string"
+              },
+              "embeddable": {
+                "type": "boolean"
+              },
+              "madeForKids": {
+                "type": "boolean"
+              },
+              "uploadStatus": {
+                "type": "string"
+              },
+              "failureReason": {
+                "type": "string"
+              },
+              "privacyStatus": {
+                "type": "string"
+              },
+              "rejectionReason": {
+                "type": "string"
+              },
+              "publicStatsViewable": {
+                "type": "boolean"
+              },
+              "containsSyntheticMedia": {
+                "type": "boolean"
+              },
+              "selfDeclaredMadeForKids": {
+                "type": "boolean"
+              }
+            }
+          },
+          "UpdateVideoResponse": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "player": {
+                "$ref": "#/$defs/YouTubePlayer"
+              },
+              "status": {
+                "$ref": "#/$defs/YouTubeVideoStatus"
+              },
+              "snippet": {
+                "$ref": "#/$defs/YouTubeVideoSnippet"
+              },
+              "statistics": {
+                "$ref": "#/$defs/YouTubeVideoStatistics"
+              },
+              "fileDetails": {
+                "$ref": "#/$defs/YouTubeFileDetails"
+              },
+              "suggestions": {
+                "$ref": "#/$defs/YouTubeSuggestions"
+              },
+              "topicDetails": {
+                "$ref": "#/$defs/YouTubeTopicDetails"
+              },
+              "localizations": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/YouTubeLocalized"
+                }
+              },
+              "contentDetails": {
+                "$ref": "#/$defs/YouTubeVideoContentDetails"
+              },
+              "recordingDetails": {
+                "$ref": "#/$defs/YouTubeRecordingDetails"
+              },
+              "processingDetails": {
+                "$ref": "#/$defs/YouTubeProcessingDetails"
+              },
+              "liveStreamingDetails": {
+                "$ref": "#/$defs/YouTubeLiveStreamingDetails"
+              },
+              "paidProductPlacementDetails": {
+                "$ref": "#/$defs/YouTubePaidProductPlacementDetails"
+              }
+            }
+          },
+          "YouTubeTopicDetails": {
+            "type": "object",
+            "properties": {
+              "topicIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "topicCategories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "relevantTopicIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "YouTubeVideoSnippet": {
+            "type": "object",
+            "properties": {
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "title": {
+                "type": "string"
+              },
+              "channelId": {
+                "type": "string"
+              },
+              "localized": {
+                "$ref": "#/$defs/YouTubeLocalized"
+              },
+              "categoryId": {
+                "type": "string"
+              },
+              "thumbnails": {
+                "$ref": "#/$defs/YouTubeThumbnails"
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string"
+              },
+              "channelTitle": {
+                "type": "string"
+              },
+              "defaultLanguage": {
+                "type": "string"
+              },
+              "defaultAudioLanguage": {
+                "type": "string"
+              },
+              "liveBroadcastContent": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubeContentRating": {
+            "type": "object",
+            "properties": {
+              "ytRating": {
+                "type": "string"
+              },
+              "mpaaRating": {
+                "type": "string"
+              },
+              "tvpgRating": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubeTagSuggestion": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string"
+              },
+              "categoryRestricts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "YouTubeFileAudioStream": {
+            "type": "object",
+            "properties": {
+              "codec": {
+                "type": "string"
+              },
+              "vendor": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "channelCount": {
+                "type": "integer"
+              }
+            }
+          },
+          "YouTubeFileVideoStream": {
+            "type": "object",
+            "properties": {
+              "codec": {
+                "type": "string"
+              },
+              "vendor": {
+                "type": "string"
+              },
+              "rotation": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "aspectRatio": {
+                "type": "number"
+              },
+              "widthPixels": {
+                "type": "integer"
+              },
+              "frameRateFps": {
+                "type": "number"
+              },
+              "heightPixels": {
+                "type": "integer"
+              }
+            }
+          },
+          "YouTubeVideoStatistics": {
+            "type": "object",
+            "properties": {
+              "likeCount": {
+                "type": "string"
+              },
+              "viewCount": {
+                "type": "string"
+              },
+              "commentCount": {
+                "type": "string"
+              },
+              "dislikeCount": {
+                "type": "string"
+              },
+              "favoriteCount": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubeRecordingDetails": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "$ref": "#/$defs/YouTubeRecordingLocation"
+              },
+              "recordingDate": {
+                "type": "string"
+              },
+              "locationDescription": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubeProcessingDetails": {
+            "type": "object",
+            "properties": {
+              "processingStatus": {
+                "type": "string"
+              },
+              "processingProgress": {
+                "$ref": "#/$defs/YouTubeProcessingProgress"
+              },
+              "thumbnailsAvailability": {
+                "type": "string"
+              },
+              "fileDetailsAvailability": {
+                "type": "string"
+              },
+              "processingFailureReason": {
+                "type": "string"
+              },
+              "tagSuggestionsAvailability": {
+                "type": "string"
+              },
+              "processingIssuesAvailability": {
+                "type": "string"
+              },
+              "editorSuggestionsAvailability": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubeRecordingLocation": {
+            "type": "object",
+            "properties": {
+              "altitude": {
+                "type": "number"
+              },
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              }
+            }
+          },
+          "YouTubeRegionRestriction": {
+            "type": "object",
+            "properties": {
+              "allowed": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "blocked": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "YouTubeProcessingProgress": {
+            "type": "object",
+            "properties": {
+              "partsTotal": {
+                "type": "string"
+              },
+              "timeLeftMs": {
+                "type": "string"
+              },
+              "partsProcessed": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubeVideoContentDetails": {
+            "type": "object",
+            "properties": {
+              "caption": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "string"
+              },
+              "dimension": {
+                "type": "string"
+              },
+              "definition": {
+                "type": "string"
+              },
+              "projection": {
+                "type": "string"
+              },
+              "contentRating": {
+                "$ref": "#/$defs/YouTubeContentRating"
+              },
+              "licensedContent": {
+                "type": "boolean"
+              },
+              "regionRestriction": {
+                "$ref": "#/$defs/YouTubeRegionRestriction"
+              },
+              "hasCustomThumbnail": {
+                "type": "boolean"
+              }
+            }
+          },
+          "YouTubeLiveStreamingDetails": {
+            "type": "object",
+            "properties": {
+              "actualEndTime": {
+                "type": "string"
+              },
+              "actualStartTime": {
+                "type": "string"
+              },
+              "activeLiveChatId": {
+                "type": "string"
+              },
+              "scheduledEndTime": {
+                "type": "string"
+              },
+              "concurrentViewers": {
+                "type": "string"
+              },
+              "scheduledStartTime": {
+                "type": "string"
+              }
+            }
+          },
+          "YouTubePaidProductPlacementDetails": {
+            "type": "object",
+            "properties": {
+              "hasPaidProductPlacement": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/UpdateVideoResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "YOUTUBE_UPLOAD_VIDEO": {
+      "description": "Uploads a video from a local file path to a YouTube channel; the video file must be in a YouTube-supported format.",
+      "required": [
+        "title",
+        "description",
+        "tags",
+        "categoryId",
+        "privacyStatus",
+        "videoFilePath"
+      ],
+      "properties": [
+        "tags",
+        "title",
+        "categoryId",
+        "description",
+        "privacyStatus",
+        "videoFilePath"
+      ],
+      "input_schema": {
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "tags",
+          "categoryId",
+          "privacyStatus",
+          "videoFilePath"
+        ],
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "examples": [
+              "['educational', 'python', 'coding tutorial']"
+            ],
+            "description": "List of keyword tags (strings) for the video, used to improve discoverability."
+          },
+          "title": {
+            "type": "string",
+            "examples": [
+              "My Awesome Video Adventure"
+            ],
+            "description": "The title for the video."
+          },
+          "categoryId": {
+            "type": "string",
+            "examples": [
+              "22"
+            ],
+            "description": "YouTube category ID (e.g., '22' for People & Blogs). Can be provided as a string or integer. See YouTube Data API docs for a full list of category IDs."
+          },
+          "description": {
+            "type": "string",
+            "examples": [
+              "A detailed walkthrough of my latest project, showcasing all its features."
+            ],
+            "description": "Detailed description of the video content, optionally including keywords and context."
+          },
+          "privacyStatus": {
+            "enum": [
+              "public",
+              "private",
+              "unlisted"
+            ],
+            "type": "string",
+            "examples": [
+              "public"
+            ],
+            "description": "Privacy status."
+          },
+          "videoFilePath": {
+            "type": "object",
+            "required": [
+              "name",
+              "mimetype",
+              "s3key"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "examples": [
+                  "document.pdf",
+                  "image.jpg",
+                  "report.docx"
+                ],
+                "description": "The filename that will be used when uploading the file to the destination service"
+              },
+              "s3key": {
+                "type": "string",
+                "examples": [
+                  "47563/gmail/GET_ATTACHMENT/response/12345"
+                ],
+                "description": "The S3 key of a publicly accessible file, typically returned from a previous download action that stored the file in S3. This key references an existing file that can be uploaded to another service."
+              },
+              "mimetype": {
+                "type": "string",
+                "examples": [
+                  "application/pdf",
+                  "image/jpeg",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ],
+                "description": "The MIME type of the file"
+              }
+            },
+            "description": "Video file to upload to YouTube.",
+            "file_uploadable": true,
+            "additionalProperties": false
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "$defs": {
+          "_Player": {
+            "type": "object",
+            "properties": {
+              "embedHtml": {
+                "type": "string"
+              },
+              "embedWidth": {
+                "type": "integer"
+              },
+              "embedHeight": {
+                "type": "integer"
+              }
+            }
+          },
+          "_Status": {
+            "type": "object",
+            "properties": {
+              "license": {
+                "type": "string"
+              },
+              "publishAt": {
+                "type": "string"
+              },
+              "embeddable": {
+                "type": "boolean"
+              },
+              "madeForKids": {
+                "type": "boolean"
+              },
+              "uploadStatus": {
+                "type": "string"
+              },
+              "failureReason": {
+                "type": "string"
+              },
+              "privacyStatus": {
+                "type": "string"
+              },
+              "rejectionReason": {
+                "type": "string"
+              },
+              "publicStatsViewable": {
+                "type": "boolean"
+              },
+              "containsSyntheticMedia": {
+                "type": "boolean"
+              },
+              "selfDeclaredMadeForKids": {
+                "type": "boolean"
+              }
+            }
+          },
+          "_Snippet": {
+            "type": "object",
+            "properties": {
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "title": {
+                "type": "string"
+              },
+              "channelId": {
+                "type": "string"
+              },
+              "localized": {
+                "$ref": "#/$defs/_Localized"
+              },
+              "categoryId": {
+                "type": "string"
+              },
+              "thumbnails": {
+                "$ref": "#/$defs/_Thumbnails"
+              },
+              "description": {
+                "type": "string"
+              },
+              "publishedAt": {
+                "type": "string"
+              },
+              "channelTitle": {
+                "type": "string"
+              },
+              "defaultLanguage": {
+                "type": "string"
+              },
+              "defaultAudioLanguage": {
+                "type": "string"
+              },
+              "liveBroadcastContent": {
+                "type": "string"
+              }
+            }
+          },
+          "_Localized": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "_Thumbnail": {
+            "type": "object",
+            "required": [
+              "url"
+            ],
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "width": {
+                "type": "integer"
+              },
+              "height": {
+                "type": "integer"
+              }
+            }
+          },
+          "_Statistics": {
+            "type": "object",
+            "properties": {
+              "likeCount": {
+                "type": "string"
+              },
+              "viewCount": {
+                "type": "string"
+              },
+              "commentCount": {
+                "type": "string"
+              },
+              "dislikeCount": {
+                "type": "string"
+              },
+              "favoriteCount": {
+                "type": "string"
+              }
+            }
+          },
+          "_Thumbnails": {
+            "type": "object",
+            "properties": {
+              "high": {
+                "$ref": "#/$defs/_Thumbnail"
+              },
+              "maxres": {
+                "$ref": "#/$defs/_Thumbnail"
+              },
+              "medium": {
+                "$ref": "#/$defs/_Thumbnail"
+              },
+              "default": {
+                "$ref": "#/$defs/_Thumbnail"
+              },
+              "standard": {
+                "$ref": "#/$defs/_Thumbnail"
+              }
+            }
+          },
+          "YouTubeVideo": {
+            "type": "object",
+            "required": [
+              "kind",
+              "etag",
+              "id",
+              "snippet",
+              "status"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "etag": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "player": {
+                "$ref": "#/$defs/_Player"
+              },
+              "status": {
+                "$ref": "#/$defs/_Status"
+              },
+              "snippet": {
+                "$ref": "#/$defs/_Snippet"
+              },
+              "statistics": {
+                "$ref": "#/$defs/_Statistics"
+              },
+              "fileDetails": {
+                "$ref": "#/$defs/_FileDetails"
+              },
+              "suggestions": {
+                "$ref": "#/$defs/_Suggestions"
+              },
+              "topicDetails": {
+                "$ref": "#/$defs/_TopicDetails"
+              },
+              "localizations": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/$defs/_LocalizationEntry"
+                }
+              },
+              "contentDetails": {
+                "$ref": "#/$defs/_ContentDetails"
+              },
+              "recordingDetails": {
+                "$ref": "#/$defs/_RecordingDetails"
+              },
+              "processingDetails": {
+                "$ref": "#/$defs/_ProcessingDetails"
+              },
+              "liveStreamingDetails": {
+                "$ref": "#/$defs/_LiveStreamingDetails"
+              },
+              "paidProductPlacementDetails": {
+                "$ref": "#/$defs/_PaidProductPlacementDetails"
+              }
+            }
+          },
+          "_AudioStream": {
+            "type": "object",
+            "properties": {
+              "codec": {
+                "type": "string"
+              },
+              "vendor": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "channelCount": {
+                "type": "integer"
+              }
+            }
+          },
+          "_FileDetails": {
+            "type": "object",
+            "properties": {
+              "fileName": {
+                "type": "string"
+              },
+              "fileSize": {
+                "type": "string"
+              },
+              "fileType": {
+                "type": "string"
+              },
+              "container": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "durationMs": {
+                "type": "string"
+              },
+              "audioStreams": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/_AudioStream"
+                }
+              },
+              "creationTime": {
+                "type": "string"
+              },
+              "videoStreams": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/_VideoStream"
+                }
+              }
+            }
+          },
+          "_Suggestions": {
+            "type": "object",
+            "properties": {
+              "tagSuggestions": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/_TagSuggestion"
+                }
+              },
+              "processingHints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "processingErrors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "editorSuggestions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "processingWarnings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "_VideoStream": {
+            "type": "object",
+            "properties": {
+              "codec": {
+                "type": "string"
+              },
+              "vendor": {
+                "type": "string"
+              },
+              "rotation": {
+                "type": "string"
+              },
+              "bitrateBps": {
+                "type": "string"
+              },
+              "aspectRatio": {
+                "type": "number"
+              },
+              "widthPixels": {
+                "type": "integer"
+              },
+              "frameRateFps": {
+                "type": "number"
+              },
+              "heightPixels": {
+                "type": "integer"
+              }
+            }
+          },
+          "_TopicDetails": {
+            "type": "object",
+            "properties": {
+              "topicIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "topicCategories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "relevantTopicIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "_ContentRating": {
+            "type": "object",
+            "properties": {
+              "ytRating": {
+                "type": "string"
+              },
+              "acbRating": {
+                "type": "string"
+              },
+              "cccRating": {
+                "type": "string"
+              },
+              "cceRating": {
+                "type": "string"
+              },
+              "cnaRating": {
+                "type": "string"
+              },
+              "cncRating": {
+                "type": "string"
+              },
+              "csaRating": {
+                "type": "string"
+              },
+              "fcoRating": {
+                "type": "string"
+              },
+              "fpbRating": {
+                "type": "string"
+              },
+              "fskRating": {
+                "type": "string"
+              },
+              "lsfRating": {
+                "type": "string"
+              },
+              "mdaRating": {
+                "type": "string"
+              },
+              "mocRating": {
+                "type": "string"
+              },
+              "nbcRating": {
+                "type": "string"
+              },
+              "nmcRating": {
+                "type": "string"
+              },
+              "rtcRating": {
+                "type": "string"
+              },
+              "rteRating": {
+                "type": "string"
+              },
+              "bbfcRating": {
+                "type": "string"
+              },
+              "bfvcRating": {
+                "type": "string"
+              },
+              "catvRating": {
+                "type": "string"
+              },
+              "cbfcRating": {
+                "type": "string"
+              },
+              "cicfRating": {
+                "type": "string"
+              },
+              "cscfRating": {
+                "type": "string"
+              },
+              "fcbmRating": {
+                "type": "string"
+              },
+              "fmocRating": {
+                "type": "string"
+              },
+              "icaaRating": {
+                "type": "string"
+              },
+              "ifcoRating": {
+                "type": "string"
+              },
+              "kfcbRating": {
+                "type": "string"
+              },
+              "kmrbRating": {
+                "type": "string"
+              },
+              "mcstRating": {
+                "type": "string"
+              },
+              "mekuRating": {
+                "type": "string"
+              },
+              "mpaaRating": {
+                "type": "string"
+              },
+              "nfrcRating": {
+                "type": "string"
+              },
+              "oflcRating": {
+                "type": "string"
+              },
+              "smsaRating": {
+                "type": "string"
+              },
+              "tvpgRating": {
+                "type": "string"
+              },
+              "agcomRating": {
+                "type": "string"
+              },
+              "bmukkRating": {
+                "type": "string"
+              },
+              "chvrsRating": {
+                "type": "string"
+              },
+              "djctqRating": {
+                "type": "string"
+              },
+              "eirinRating": {
+                "type": "string"
+              },
+              "incaaRating": {
+                "type": "string"
+              },
+              "mccaaRating": {
+                "type": "string"
+              },
+              "mccypRating": {
+                "type": "string"
+              },
+              "mibacRating": {
+                "type": "string"
+              },
+              "moctwRating": {
+                "type": "string"
+              },
+              "mpaatRating": {
+                "type": "string"
+              },
+              "mtrcbRating": {
+                "type": "string"
+              },
+              "nbcplRating": {
+                "type": "string"
+              },
+              "nfvcbRating": {
+                "type": "string"
+              },
+              "nkclvRating": {
+                "type": "string"
+              },
+              "rcnofRating": {
+                "type": "string"
+              },
+              "smaisRating": {
+                "type": "string"
+              },
+              "anatelRating": {
+                "type": "string"
+              },
+              "catvfrRating": {
+                "type": "string"
+              },
+              "chfilmRating": {
+                "type": "string"
+              },
+              "czfilmRating": {
+                "type": "string"
+              },
+              "ecbmctRating": {
+                "type": "string"
+              },
+              "eefilmRating": {
+                "type": "string"
+              },
+              "egfilmRating": {
+                "type": "string"
+              },
+              "grfilmRating": {
+                "type": "string"
+              },
+              "ilfilmRating": {
+                "type": "string"
+              },
+              "pefilmRating": {
+                "type": "string"
+              },
+              "russiaRating": {
+                "type": "string"
+              },
+              "skfilmRating": {
+                "type": "string"
+              },
+              "menaMpaaRating": {
+                "type": "string"
+              },
+              "fpbRatingReasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kijkwijzerRating": {
+                "type": "string"
+              },
+              "djctqRatingReasons": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "medietilsynetRating": {
+                "type": "string"
+              },
+              "resorteviolenciaRating": {
+                "type": "string"
+              }
+            }
+          },
+          "_TagSuggestion": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string"
+              },
+              "categoryRestricts": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "_ContentDetails": {
+            "type": "object",
+            "properties": {
+              "caption": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "string"
+              },
+              "dimension": {
+                "type": "string"
+              },
+              "definition": {
+                "type": "string"
+              },
+              "projection": {
+                "type": "string"
+              },
+              "contentRating": {
+                "$ref": "#/$defs/_ContentRating"
+              },
+              "licensedContent": {
+                "type": "boolean"
+              },
+              "regionRestriction": {
+                "$ref": "#/$defs/_RegionRestriction"
+              },
+              "hasCustomThumbnail": {
+                "type": "boolean"
+              }
+            }
+          },
+          "_RecordingDetails": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "$ref": "#/$defs/_RecordingLocation"
+              },
+              "recordingDate": {
+                "type": "string"
+              },
+              "locationDescription": {
+                "type": "string"
+              }
+            }
+          },
+          "_LocalizationEntry": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "_ProcessingDetails": {
+            "type": "object",
+            "properties": {
+              "processingStatus": {
+                "type": "string"
+              },
+              "processingProgress": {
+                "$ref": "#/$defs/_ProcessingProgress"
+              },
+              "thumbnailsAvailability": {
+                "type": "string"
+              },
+              "fileDetailsAvailability": {
+                "type": "string"
+              },
+              "processingFailureReason": {
+                "type": "string"
+              },
+              "tagSuggestionsAvailability": {
+                "type": "string"
+              },
+              "processingIssuesAvailability": {
+                "type": "string"
+              },
+              "editorSuggestionsAvailability": {
+                "type": "string"
+              }
+            }
+          },
+          "_RecordingLocation": {
+            "type": "object",
+            "properties": {
+              "altitude": {
+                "type": "number"
+              },
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              }
+            }
+          },
+          "_RegionRestriction": {
+            "type": "object",
+            "properties": {
+              "allowed": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "blocked": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "UploadVideoResponse": {
+            "type": "object",
+            "required": [
+              "response_data"
+            ],
+            "properties": {
+              "response_data": {
+                "$ref": "#/$defs/YouTubeVideo"
+              }
+            }
+          },
+          "_ProcessingProgress": {
+            "type": "object",
+            "properties": {
+              "partsTotal": {
+                "type": "string"
+              },
+              "timeLeftMs": {
+                "type": "string"
+              },
+              "partsProcessed": {
+                "type": "string"
+              }
+            }
+          },
+          "_LiveStreamingDetails": {
+            "type": "object",
+            "properties": {
+              "actualEndTime": {
+                "type": "string"
+              },
+              "actualStartTime": {
+                "type": "string"
+              },
+              "activeLiveChatId": {
+                "type": "string"
+              },
+              "scheduledEndTime": {
+                "type": "string"
+              },
+              "concurrentViewers": {
+                "type": "string"
+              },
+              "scheduledStartTime": {
+                "type": "string"
+              }
+            }
+          },
+          "_PaidProductPlacementDetails": {
+            "type": "object",
+            "properties": {
+              "containsPaidPromotion": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "data",
+          "successful"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/$defs/UploadVideoResponse"
+          },
+          "error": {
+            "type": "string"
+          },
+          "successful": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "production_mapping": {
+    "upload_primary": "YOUTUBE_UPLOAD_VIDEO uses title, description, tags, categoryId, privacyStatus, videoFilePath{name,mimetype,s3key}",
+    "upload_multipart": "YOUTUBE_MULTIPART_UPLOAD_VIDEO uses title, description, categoryId, privacyStatus, optional tags, videoFile{name,mimetype,s3key}",
+    "metadata_update": "YOUTUBE_UPDATE_VIDEO uses video_id, title, description, tags, category_id, privacy_status",
+    "thumbnail": "YOUTUBE_UPDATE_THUMBNAIL uses videoId and thumbnailUrl",
+    "read_validation": "YOUTUBE_LIST_CHANNELS and YOUTUBE_GET_CHANNEL_STATISTICS accept mine=true"
+  }
+}
