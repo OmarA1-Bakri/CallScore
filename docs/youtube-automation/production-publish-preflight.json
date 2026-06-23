@@ -1,0 +1,29 @@
+{
+  "timestamp_utc": "2026-06-23T09:08:43Z",
+  "phase": "youtube_automation_prompt_16_production_composio_publish_validation",
+  "status": "complete_no_publish_by_config",
+  "artifact_dir": "artifacts/video-jobs/daily_short-2026-06-23T09-04-49-194Z",
+  "state_status": "qa_passed",
+  "qa_ok": true,
+  "publish_result": {
+    "ok": true,
+    "published": false,
+    "reason": "auto_publish_disabled"
+  },
+  "config": {
+    "VIDEO_AUTO_PUBLISH": "false",
+    "VIDEO_YOUTUBE_PRIVACY": "private",
+    "VIDEO_PUBLISH_MODE": "immediate"
+  },
+  "composio_youtube_connection_active": true,
+  "required_tools_missing": [],
+  "upload_tool": "YOUTUBE_UPLOAD_VIDEO",
+  "thumbnail_tool": "YOUTUBE_UPDATE_THUMBNAIL",
+  "update_tool": "YOUTUBE_UPDATE_VIDEO",
+  "schema_validated": true,
+  "live_upload_attempted": false,
+  "reason_no_live_upload": "VIDEO_AUTO_PUBLISH is false and publish-result.json says auto_publish_disabled.",
+  "known_live_upload_prerequisite": "Composio YouTube upload requires file object {name,mimetype,s3key}; thumbnail update requires thumbnailUrl. Local HH paths must be bridged/uploaded before live upload.",
+  "youtube_video_id": null,
+  "publish_url": null
+}

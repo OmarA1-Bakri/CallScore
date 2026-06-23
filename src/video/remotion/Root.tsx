@@ -1,5 +1,5 @@
 import React from "react";
-import { Composition } from "remotion";
+import { Composition, registerRoot } from "remotion";
 import { CallScoreShortVertical, type CallScoreVideoProps } from "./compositions/CallScoreShortVertical";
 import { CallScoreInvestigationHorizontal } from "./compositions/CallScoreInvestigationHorizontal";
 import { CallScoreLeaderboardVertical } from "./compositions/CallScoreLeaderboardVertical";
@@ -19,3 +19,5 @@ export function RemotionRoot() {
     <Composition id="CallScoreCreatorBreakdownVertical" component={Breakdown} durationInFrames={3600} fps={30} width={1080} height={1920} defaultProps={emptyProps as unknown as Record<string, unknown>} />
   </>;
 }
+
+registerRoot(RemotionRoot);

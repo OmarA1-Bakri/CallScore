@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { bundle } from "@remotion/bundler";
 import { getCompositions, renderMedia } from "@remotion/renderer";
@@ -21,10 +22,17 @@ export interface RenderVideoInput {
   readonly outputPath: string;
 }
 
+async function toAudioSrc(audioSrc: string | undefined): Promise<string | undefined> {
+  if (!audioSrc) return undefined;
+  if (/^(https?:|data:)/i.test(audioSrc)) return audioSrc;
+  const buffer = await fs.readFile(audioSrc);
+  return `data:audio/wav;base64,${buffer.toString("base64")}`;
+}
+
 export async function renderCallScoreVideo(input: RenderVideoInput): Promise<string> {
   const entryPoint = path.join(process.cwd(), "src/video/remotion/Root.tsx");
   const serveUrl = await bundle({ entryPoint });
-  const inputProps = { creator: input.creator, creators: input.creators, scenes: input.scenes, captions: input.captions, audioSrc: input.audioSrc };
+  const inputProps = { creator: input.creator, creators: input.creators, scenes: input.scenes, captions: input.captions, audioSrc: await toAudioSrc(input.audioSrc) };
   const compositions = await getCompositions(serveUrl, { inputProps });
   const composition = compositions.find((item) => item.id === compositionByFormat[input.format]);
   if (!composition) throw new Error(`Missing Remotion composition for format ${input.format}`);
