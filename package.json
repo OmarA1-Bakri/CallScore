@@ -77,8 +77,7 @@
     "video:daily": "node --import tsx src/video/cli/video-daily.ts",
     "video:publish": "node --import tsx src/video/cli/video-publish.ts",
     "video:worker": "node --import tsx src/video/cli/video-worker.ts",
-    "video:backfill": "node --import tsx src/video/cli/video-backfill.ts",
-    "video:bridge": "node --import tsx src/video/cli/video-bridge.ts"
+    "video:backfill": "node --import tsx src/video/cli/video-backfill.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -134,7 +134,7 @@ Publish URL: not created.
 
 ## Known limitations
 
-1. Video file bridge is now implemented for local `video.mp4` to Composio file object `{ name, mimetype, s3key }`.
+1. Live YouTube upload still needs a file bridge from local generated media to Composio file storage so upload receives `{ name, mimetype, s3key }`.
 2. Thumbnail publishing needs a public or Composio-hosted `thumbnailUrl`.
 3. Kokoro.js is implemented as primary TTS, but HH model/tokenizer loading failed during smoke tests; FFmpeg flite fallback generated valid WAV audio.
 4. Queue is file-backed in `src/video/queues`; it is not yet bridged into `pipeline_jobs` live worker to avoid DB migration/live worker mutation during this sequence.
@@ -142,16 +142,8 @@ Publish URL: not created.
 
 ## Next revenue-focused improvements
 
-1. Composio video file bridge has now been added. Remaining bridge gap: thumbnail requires `thumbnailUrl`, not just an uploaded file object.
+1. Add a Composio file bridge/upload helper so generated `video.mp4` and `thumbnail.jpg` become Composio uploadable file object / thumbnail URL.
 2. Run one private YouTube upload canary with `VIDEO_AUTO_PUBLISH=true` and `VIDEO_YOUTUBE_PRIVACY=private` after file bridge is available.
 3. Add a weekly public Shorts cadence once private upload canary is proven.
 4. Add analytics feedback into candidate ranking using view/engagement deltas.
 5. Add product dashboard screenshots or animated score-card renders once the video lane is stable.
-
-## Post-review remediation update
-
-- Added Composio video file bridge.
-- Added `video:bridge` CLI.
-- Added private-upload canary runbook.
-- Expanded tests to 19/19 passing.
-- Live private canary remains pending because execution needs a valid Composio credential path available to the CLI or a Hermes MCP executor adapter.
