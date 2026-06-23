@@ -147,3 +147,24 @@ Publish URL: not created.
 3. Add a weekly public Shorts cadence once private upload canary is proven.
 4. Add analytics feedback into candidate ranking using view/engagement deltas.
 5. Add product dashboard screenshots or animated score-card renders once the video lane is stable.
+
+## MCP-only private upload promotion
+
+Timestamp: 2026-06-23T21:31:09Z
+
+The MCP-only route has been promoted into canonical runtime code.
+
+Canonical command:
+
+```bash
+npm run video:mcp-proof -- artifacts/video-jobs/<jobId>/state.json
+```
+
+Validated result:
+
+- Privacy: private
+- Video ID: `cTTR3HIQavo`
+- URL: `https://youtu.be/cTTR3HIQavo`
+- Result artifact: `artifacts/video-jobs/daily_short-2026-06-23T09-04-49-194Z/mcp-youtube-publish-result.json`
+
+The implementation uses the Hermes → Composio MCP route and does not use a direct Composio HTTP API bridge.

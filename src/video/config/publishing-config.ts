@@ -5,6 +5,9 @@ import { YoutubePrivacyStatusSchema } from "../schemas/youtube.schemas";
 export const VideoPublishModeSchema = z.enum(["immediate", "scheduled"]);
 export type VideoPublishMode = z.infer<typeof VideoPublishModeSchema>;
 
+export const VideoPublishProviderSchema = z.enum(["mocked_composio", "hermes_mcp_composio"]);
+export type VideoPublishProvider = z.infer<typeof VideoPublishProviderSchema>;
+
 export const VideoAutomationConfigSchema = z.object({
   enabled: z.boolean(),
   autoPublish: z.boolean(),
@@ -24,6 +27,8 @@ export const VideoAutomationConfigSchema = z.object({
   composioMultipartUploadTool: z.string().min(1),
   composioThumbnailTool: z.string().min(1),
   composioUpdateVideoTool: z.string().min(1),
+  publishProvider: VideoPublishProviderSchema,
+  privateCanaryOnly: z.boolean(),
 });
 export type VideoAutomationConfig = z.infer<typeof VideoAutomationConfigSchema>;
 
@@ -57,6 +62,8 @@ export function loadVideoAutomationConfig(env: NodeJS.ProcessEnv = process.env):
     composioMultipartUploadTool: env.VIDEO_COMPOSIO_MULTIPART_UPLOAD_TOOL ?? "YOUTUBE_MULTIPART_UPLOAD_VIDEO",
     composioThumbnailTool: env.VIDEO_COMPOSIO_THUMBNAIL_TOOL ?? "YOUTUBE_UPDATE_THUMBNAIL",
     composioUpdateVideoTool: env.VIDEO_COMPOSIO_UPDATE_VIDEO_TOOL ?? "YOUTUBE_UPDATE_VIDEO",
+    publishProvider: env.VIDEO_PUBLISH_PROVIDER ?? "hermes_mcp_composio",
+    privateCanaryOnly: boolEnv(env.VIDEO_PRIVATE_CANARY_ONLY, true),
   });
 }
 

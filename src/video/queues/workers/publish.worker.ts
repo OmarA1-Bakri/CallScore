@@ -4,6 +4,7 @@ import { loadVideoAutomationConfig, computePublishAt } from "../../config/publis
 import { decidePublish } from "../../qa/publish-decision";
 import { VideoJobStateSchema } from "../../schemas/video.schemas";
 import { ComposioHttpClient } from "../../composio/composio-client";
+import { McpYoutubePublisher } from "../../composio/mcp-youtube-publisher";
 import { ComposioYoutubePublisher, type VideoPublisher } from "../../composio/youtube-publisher";
 
 export async function runPublishStage(statePath: string, options: { readonly publisher?: VideoPublisher; readonly env?: NodeJS.ProcessEnv } = {}): Promise<string> {
@@ -17,7 +18,9 @@ export async function runPublishStage(statePath: string, options: { readonly pub
     return paths.stateJson;
   }
   if (!state.videoPath || !state.thumbnailPath || !state.metadata) throw new Error("publish inputs missing");
-  const publisher = options.publisher ?? new ComposioYoutubePublisher(new ComposioHttpClient());
+  const publisher = options.publisher ?? (config.publishProvider === "hermes_mcp_composio"
+    ? new McpYoutubePublisher({ artifactDir: paths.artifactDir })
+    : new ComposioYoutubePublisher(new ComposioHttpClient()));
   const result = await publisher.publishVideo({
     jobId: state.jobId,
     videoPath: state.videoPath,

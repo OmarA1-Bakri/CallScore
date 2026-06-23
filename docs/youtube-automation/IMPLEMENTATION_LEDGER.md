@@ -125,3 +125,15 @@ Evidence:
 - Prompt 16: production Composio YouTube preflight completed without live upload because auto-publish is disabled. Exact schemas and active YouTube connection are already captured.
 - Prompt 17: final report written and final state prepared for commit.
 
+
+## MCP-only private provider promotion
+
+- Timestamp: 2026-06-23T21:31:09Z
+- Added canonical MCP-only private provider helper and publisher wrapper.
+- Added `video:mcp-proof` CLI.
+- Wired publish worker to `VIDEO_PUBLISH_PROVIDER=hermes_mcp_composio`.
+- Private canonical proof succeeded from runtime code.
+- Private video ID: `cTTR3HIQavo`.
+- Result artifact: `artifacts/video-jobs/daily_short-2026-06-23T09-04-49-194Z/mcp-youtube-publish-result.json`.
+- Tests: video automation suite 19/19 passed.
+- Typecheck: completed with no error output.
