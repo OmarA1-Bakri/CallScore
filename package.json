@@ -72,7 +72,12 @@
     "control-plane:canary": "node --import tsx src/scripts/run-control-plane-canary.ts",
     "agents:heartbeat": "node --import tsx src/scripts/callscore-agent-heartbeat.ts",
     "cmo:response-monitor": "node --import tsx src/scripts/callscore-cmo-response-monitor.ts",
-    "sentinel:fresh-calls": "node --import tsx src/scripts/callscore-fresh-call-sentinel.ts"
+    "sentinel:fresh-calls": "node --import tsx src/scripts/callscore-fresh-call-sentinel.ts",
+    "video:discover": "tsx src/video/cli/video-discover-composio.ts",
+    "video:daily": "tsx src/video/cli/video-daily.ts",
+    "video:publish": "tsx src/video/cli/video-publish.ts",
+    "video:worker": "tsx src/video/cli/video-worker.ts",
+    "video:backfill": "tsx src/video/cli/video-backfill.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

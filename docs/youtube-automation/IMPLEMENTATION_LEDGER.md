@@ -93,3 +93,22 @@ Evidence:
 - Tests: `node --import tsx --test tests/video-automation-publisher.test.ts tests/video-automation-media.test.ts tests/video-automation-schemas.test.ts tests/video-automation-data-planning.test.ts` → 12/12 passed.
 - Typecheck: `npm run typecheck` completed with no reported errors.
 
+
+| Prompt 10 — Publishing Config and Mechanical QA | complete | `src/video/config/publishing-config.ts`, `src/video/qa/*`; timezone-correct scheduled publishing; deterministic QA and publish decision tests pass. |
+| Prompt 11 — Queue Workers and Scheduler | complete | file-backed video queue and stage workers implemented under `src/video/queues`; scheduler enqueues daily/weekly jobs without DB migration. |
+| Prompt 12 — CLI Commands and Env Example | complete | package scripts added for video discover/daily/publish/worker/backfill; env example added at `docs/youtube-automation/env.example`. |
+| Prompt 13 — Analytics Ingestion and Topic Feedback | complete | non-blocking YouTube analytics ingestion surface implemented and tested with mocked Composio executor. |
+
+## Prompt 10–13 implementation summary
+
+- Added publishing config loader and scheduled publish time calculation using configured timezone, default `Asia/Jakarta`.
+- Added deterministic QA modules for video, audio, thumbnail, metadata, and claim validation.
+- Added publish decision logic: QA must pass; auto-publish must be enabled; no human approval gate is introduced.
+- Added file-backed video queue and worker stages for plan, audio, captions, render, thumbnail, QA, publish, and analytics.
+- Added scheduler entrypoint for daily short, weekly investigation, and weekly leaderboard update cadence.
+- Added CLI scripts and package scripts: `video:discover`, `video:daily`, `video:publish`, `video:worker`, `video:backfill`.
+- Added non-secret env example under docs.
+- Added non-blocking YouTube analytics ingestion via Composio executor abstraction.
+- Tests: full local YouTube automation targeted suite → 17/17 passed.
+- Typecheck: `tsc --noEmit` completed with no reported errors.
+
