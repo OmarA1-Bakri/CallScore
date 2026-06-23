@@ -4,6 +4,7 @@ import { loadVideoAutomationConfig, computePublishAt } from "../../config/publis
 import { decidePublish } from "../../qa/publish-decision";
 import { VideoJobStateSchema } from "../../schemas/video.schemas";
 import { ComposioHttpClient } from "../../composio/composio-client";
+import { localVideoPathToComposioReference } from "../../composio/file-bridge";
 import { ComposioYoutubePublisher, type VideoPublisher } from "../../composio/youtube-publisher";
 
 export async function runPublishStage(statePath: string, options: { readonly publisher?: VideoPublisher; readonly env?: NodeJS.ProcessEnv } = {}): Promise<string> {
@@ -18,9 +19,11 @@ export async function runPublishStage(statePath: string, options: { readonly pub
   }
   if (!state.videoPath || !state.thumbnailPath || !state.metadata) throw new Error("publish inputs missing");
   const publisher = options.publisher ?? new ComposioYoutubePublisher(new ComposioHttpClient());
+  const bridge = await localVideoPathToComposioReference(state.videoPath);
+  if (bridge.bridgeResult) await writeJsonArtifact(`${paths.artifactDir}/composio-file-bridge.json`, bridge.bridgeResult as never, { force: true });
   const result = await publisher.publishVideo({
     jobId: state.jobId,
-    videoPath: state.videoPath,
+    videoPath: bridge.bridgedVideoPath,
     thumbnailPath: state.thumbnailPath,
     metadata: state.metadata,
     privacyStatus: config.privacyStatus,

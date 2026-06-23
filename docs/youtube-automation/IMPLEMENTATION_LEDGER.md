@@ -125,3 +125,15 @@ Evidence:
 - Prompt 16: production Composio YouTube preflight completed without live upload because auto-publish is disabled. Exact schemas and active YouTube connection are already captured.
 - Prompt 17: final report written and final state prepared for commit.
 
+
+## Post-review remediation: file bridge
+
+- Added `src/video/composio/file-bridge.ts`.
+- Added `src/video/cli/video-bridge.ts`.
+- Integrated bridge into `runPublishStage()` before `ComposioYoutubePublisher`.
+- Added `tests/video-automation-file-bridge.test.ts`.
+- Added `docs/youtube-automation/private-upload-canary-runbook.md`.
+- Added `docs/youtube-automation/FILE_BRIDGE_REMEDIATION_REPORT.md`.
+- Expanded local video automation tests: 19/19 passed.
+- Typecheck completed with no error output.
+- Live private YouTube canary remains pending because direct env-backed execution was blocked by the platform safety layer and requires a valid Composio execution credential path.
