@@ -50,6 +50,7 @@ Read these in order before reporting readiness, running GTM, changing registry s
 7. `docs/ops/callscore-canonical-skill-register.md`
 8. `docs/ops/callscore-canonical-subagent-roster.md`
 9. `docs/ops/callscore-canonical-env-manifest.md` — redacted manifest only; never treat it as a secret source.
+10. `docs/youtube-automation/FINAL_COMPLETION_REPORT.md` and `docs/youtube-automation/IMPLEMENTATION_LEDGER.md` when the task touches YouTube/video automation.
 
 If a task is specifically visual/architecture-facing, also read:
 
@@ -89,6 +90,7 @@ Never print env values, DB URLs, auth headers, tokens, cookies, private keys, cr
 - Transcript lane: Omar laptop over Tailscale with laptop-side browser cookies and laptop-side `yt-dlp`; HH direct `yt-dlp`/ASR/VPN lanes are diagnostic/future fallback only.
 - GTM registry JSON is source of truth for channel, owner, supporting agents, provider, allowed actions, forbidden actions, gate, receipt, rollback, readiness, and next safe action.
 - Canonical subagents/workflow agents are first-class workforce; cron/status checks/registries are control rails, not agents.
+- Canonical YouTube private publishing command: `npm run video:mcp-proof -- artifacts/video-jobs/<jobId>/state.json`. This uses Hermes MCP → Composio MCP through `src/video/composio/private_provider_helper.py` and writes `mcp-youtube-publish-result.json` in the job artifact directory.
 
 ## Gate posture
 
