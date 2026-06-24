@@ -55,3 +55,14 @@ npm run transition:report -- --period monthly --from 2017-11-25 --to 2026-06-24 
 ```
 
 The report uses raw `calls` plus creator eligibility policy. It does not use `creator_stats.30d`, raw verifier labels, stale daily closes, DB writes, public UI, or publishing.
+
+
+## STORM evidence packs
+
+Read-only STORM evidence packs run with:
+
+```bash
+npm run storm:evidence -- --transition-artifact .tmp/transition/latest/states.json --out .tmp/storm/latest
+```
+
+The pack uses transition artifacts plus raw `calls`/`videos`. It does not score creators, publish, call providers, use external web, or mutate DB. News/media remains context-only and unsupported/predictive claims are blocked in `claim_map.json` and `youtube_context.json`.
