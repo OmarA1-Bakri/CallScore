@@ -30,3 +30,11 @@ test("explicit DB-style ineligible fields override focus text", () => {
   assert.equal(isEligibleCreatorForIntelligence({ id: 13, focus: "creator calls", eligible_for_creator_scoring: false }), false);
   assert.equal(isNewsOrMediaCreator({ id: 14, focus: "creator calls", is_news_channel: true }), true);
 });
+
+
+test("reviewed news/media exclusions remove Altcoin Daily from creator measurement", () => {
+  const creator = { id: 2, name: "Altcoin Daily", youtube_handle: "@AltcoinDaily", focus: "EN / Global / creator calls" };
+  assert.equal(isNewsOrMediaCreator(creator), true);
+  assert.equal(isEligibleCreatorForIntelligence(creator), false);
+  assert.equal(creatorEligibilityReason(creator), "news_or_media_context_only");
+});

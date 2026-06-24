@@ -35,4 +35,12 @@ export const CREATOR_CALL_FOCUS_PATTERNS: readonly RegExp[] = [
   /\bbuy\/sell calls?\b/i,
 ];
 
-export const REVIEWED_CREATOR_EXCLUSIONS: readonly ReviewedCreatorExclusion[] = [];
+export const REVIEWED_CREATOR_EXCLUSIONS: readonly ReviewedCreatorExclusion[] = [
+  {
+    creator_id: 2,
+    youtube_handle: "@AltcoinDaily",
+    name: "Altcoin Daily",
+    reason: "news_media",
+    reviewed: true,
+  },
+];
