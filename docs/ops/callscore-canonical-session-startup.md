@@ -70,6 +70,8 @@ git branch --show-current
 git diff --check
 npm run workplane:status || npm run workplane
 npm run pipeline:guard -- --out .tmp/callscore-pipeline/session-start-pipeline-guard.json
+npm run transition:report -- --period monthly --from 2017-11-25 --to 2026-06-24 --out .tmp/transition/latest
+npm run storm:evidence -- --transition-artifact .tmp/transition/latest/states.json --out .tmp/storm/latest
 python3 -m json.tool docs/ops/callscore-gtm-agent-registry.json >/tmp/callscore-gtm-agent-registry.session-start.validated.json
 node --import tsx --test tests/gtm-agent-registry.test.ts
 ```
@@ -153,3 +155,4 @@ git diff --check
 ```
 
 For documentation-only changes, also scan edited docs for obvious secret-like strings before final response.
+- Canonical creator transition/STORM tools: `npm run transition:report -- --period monthly --from 2017-11-25 --to 2026-06-24 --out .tmp/transition/latest` and `npm run storm:evidence -- --transition-artifact .tmp/transition/latest/states.json --out .tmp/storm/latest`; artifact-only/read-only. Altcoin Daily is news/media context only and must not be measured as a creator.
