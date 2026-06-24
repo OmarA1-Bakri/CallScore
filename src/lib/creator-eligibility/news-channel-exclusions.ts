@@ -20,10 +20,9 @@ export const NEWS_MEDIA_FOCUS_PATTERNS: readonly RegExp[] = [
 export const HYBRID_OR_CONTEXT_FOCUS_PATTERNS: readonly RegExp[] = [
   /\beducation\b/i,
   /\breviews?\b/i,
-  /\bcommentary\b/i,
-  /\bmacro\b/i,
-  /\bpolicy\b/i,
-  /\bcontext\b/i,
+  /\bonboarding\b/i,
+  /\bbeginner-focused\b/i,
+  /\bexplainers?\b/i,
 ];
 
 export const CREATOR_CALL_FOCUS_PATTERNS: readonly RegExp[] = [

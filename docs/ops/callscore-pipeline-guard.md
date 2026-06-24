@@ -44,3 +44,14 @@ The guard is read-only. It does not enqueue jobs, mutate pgsql, run migrations, 
 - `public_publish_readiness` — stricter; public publish remains gated by evidence, provider, and safety requirements.
 
 A warning is not a stop sign. It is a constraint to route around. A block is a stop sign.
+
+
+## Creator transition intelligence
+
+Read-only transition reports run with:
+
+```bash
+npm run transition:report -- --period monthly --from 2017-11-25 --to 2026-06-24 --out .tmp/transition/latest
+```
+
+The report uses raw `calls` plus creator eligibility policy. It does not use `creator_stats.30d`, raw verifier labels, stale daily closes, DB writes, public UI, or publishing.
