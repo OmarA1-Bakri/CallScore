@@ -1,0 +1,28 @@
+# CallScore Pipeline Guard
+
+Status: canonical pre-transition / pre-STORM / pre-Markov read-only guard.
+
+Run from the runtime repo:
+
+```bash
+npm run pipeline:guard -- --out .tmp/callscore-pipeline/pipeline-guard-audit.json
+```
+
+The guard is read-only. It does not enqueue jobs, mutate pgsql, run migrations, call providers, or update public surfaces.
+
+## Checks
+
+- `creator_stats_30d`: flags the known trap where `creator_stats.30d` can be structurally empty because 30-day outcomes have not matured inside the same call-date window.
+- `ml_promotion_state`: confirms whether ML verifier promotion has gone beyond dry-run.
+- `transcript_collect_laptop`: keeps the laptop transcript lane separate from core score/candle health.
+- `pending_candle_refresh`: detects queued candle refresh jobs.
+- `daily_closes_lag`: compares `candle_daily_closes` freshness with the 1-minute candle lake.
+- `ml_verifier_label_integrity`: flags verifier approvals whose reason code is not `valid_call`.
+- `creator_news_channel_exclusion`: checks whether news/media channels are formally excluded from creator modelling.
+
+## Rules
+
+- Markov/trajectory work must not use `creator_stats.30d` blindly.
+- `ml_verification_runs` are audit/eval evidence unless gated promotion evidence exists.
+- News/media channels are context sources, not creator-reliability population members.
+- Use raw calls/candles or refreshed derived closes before daily-regime modelling.

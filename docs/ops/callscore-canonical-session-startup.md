@@ -69,6 +69,7 @@ git rev-parse --short HEAD
 git branch --show-current
 git diff --check
 npm run workplane:status || npm run workplane
+npm run pipeline:guard -- --out .tmp/callscore-pipeline/session-start-pipeline-guard.json
 python3 -m json.tool docs/ops/callscore-gtm-agent-registry.json >/tmp/callscore-gtm-agent-registry.session-start.validated.json
 node --import tsx --test tests/gtm-agent-registry.test.ts
 ```
