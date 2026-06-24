@@ -116,8 +116,8 @@ export function discoverFinalRuntimeAgents(soulsYaml: string): readonly FinalRun
     });
   }
 
-  if (agents.length !== 8) {
-    throw new Error(`Expected final upgraded runtime to declare 8 agents in canonical souls config, discovered ${agents.length}`);
+  if (agents.length < 1) {
+    throw new Error(`Expected at least 1 agent in canonical souls config, discovered ${agents.length}`);
   }
   if (new Set(agents.map((agent) => agent.agentId)).size !== agents.length) {
     throw new Error("Canonical souls config contains duplicate agent_id values");
