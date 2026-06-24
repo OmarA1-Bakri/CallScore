@@ -1,6 +1,7 @@
 import { query as defaultQuery } from "./db";
 
 export type HardeningStatus = "pass" | "warn" | "block";
+export type ReadinessStatus = "green" | "warn" | "blocked";
 
 type QueryFn = <T>(text: string, params?: unknown[]) => Promise<T[]>;
 
@@ -16,12 +17,36 @@ export interface PipelineGuardAudit {
   readonly generated_at: string;
   readonly checks: readonly HardeningCheck[];
   readonly overall_status: HardeningStatus;
+  readonly core_pipeline_status: ReadinessStatus;
+  readonly transition_readiness: ReadinessStatus;
+  readonly storm_readiness: ReadinessStatus;
+  readonly public_publish_readiness: ReadinessStatus;
 }
 
 function maxStatus(statuses: readonly HardeningStatus[]): HardeningStatus {
   if (statuses.includes("block")) return "block";
   if (statuses.includes("warn")) return "warn";
   return "pass";
+}
+
+
+function statusFor(checks: readonly HardeningCheck[], id: string): HardeningStatus | null {
+  return checks.find((check) => check.id === id)?.status ?? null;
+}
+
+function readinessFromChecks(checks: readonly HardeningCheck[], warnIds: readonly string[], blockIds: readonly string[] = []): ReadinessStatus {
+  if (blockIds.some((id) => statusFor(checks, id) === "block")) return "blocked";
+  if (warnIds.some((id) => statusFor(checks, id) !== "pass")) return "warn";
+  return "green";
+}
+
+export function derivePipelineReadinessClasses(checks: readonly HardeningCheck[]): Pick<PipelineGuardAudit, "core_pipeline_status" | "transition_readiness" | "storm_readiness" | "public_publish_readiness"> {
+  return {
+    core_pipeline_status: readinessFromChecks(checks, ["pending_candle_refresh"]),
+    transition_readiness: readinessFromChecks(checks, ["creator_stats_30d", "ml_verifier_label_integrity", "daily_closes_lag", "creator_news_channel_exclusion"]),
+    storm_readiness: readinessFromChecks(checks, ["ml_verifier_label_integrity", "creator_news_channel_exclusion", "transcript_collect_laptop"]),
+    public_publish_readiness: readinessFromChecks(checks, ["creator_stats_30d", "ml_promotion_state", "transcript_collect_laptop", "daily_closes_lag", "ml_verifier_label_integrity", "creator_news_channel_exclusion", "pending_candle_refresh"]),
+  };
 }
 
 function num(value: unknown): number {
@@ -297,9 +322,11 @@ export async function runPipelineGuardAudit(
   checks.push(...await auditCandleRefreshAndDailyCloses(queryFn));
   checks.push(await auditMlVerifierAnomalies(queryFn));
   checks.push(await auditCreatorEligibilityTaxonomy(queryFn));
+  const readiness = derivePipelineReadinessClasses(checks);
   return {
     generated_at: now.toISOString(),
     checks,
     overall_status: maxStatus(checks.map((check) => check.status)),
+    ...readiness,
   };
 }

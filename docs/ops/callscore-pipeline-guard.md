@@ -26,3 +26,21 @@ The guard is read-only. It does not enqueue jobs, mutate pgsql, run migrations, 
 - `ml_verification_runs` are audit/eval evidence unless gated promotion evidence exists.
 - News/media channels are context sources, not creator-reliability population members.
 - Use raw calls/candles or refreshed derived closes before daily-regime modelling.
+
+
+## Lean P0 policy modules
+
+- Creator eligibility: `src/lib/creator-eligibility/creator-eligibility.ts` and `src/lib/creator-eligibility/news-channel-exclusions.ts`.
+- Verifier label policy: `src/lib/ml-verifier-label-policy.ts`.
+- Transition data policy: `src/lib/transition/transition-data-policy.ts`.
+
+## Readiness classes
+
+`pipeline:guard` emits four simple readiness classes:
+
+- `core_pipeline_status` — whether the existing worker/data loop is healthy enough to operate.
+- `transition_readiness` — whether trajectory work can proceed with explicit routing around warnings.
+- `storm_readiness` — whether evidence-pack work can proceed with explicit routing around warnings.
+- `public_publish_readiness` — stricter; public publish remains gated by evidence, provider, and safety requirements.
+
+A warning is not a stop sign. It is a constraint to route around. A block is a stop sign.
