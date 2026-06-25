@@ -13,7 +13,7 @@ import { trustReviewGoalLoopNode } from "./trust-review-nodes";
 export { videoGoalLoopNode } from "./video-pipeline-nodes";
 
 const DOMAIN_ARTIFACT_DIR = ".tmp/workflow-receipts/callscore_operating_graph/domain";
-const DEFAULT_CREATOR_GROWTH_SCOUT_COMMAND = "/srv/agents/hermes/scripts/callscore-creator-growth-scout.sh";
+const DEFAULT_CREATOR_GROWTH_SCOUT_COMMAND = "/srv/agents/hermes/scripts/callscore-creator-growth-scout-impl.sh";
 
 type ChildProcessExecution = { stdout: string; stderr: string; exitCode: number | null };
 
