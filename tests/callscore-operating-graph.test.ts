@@ -1,0 +1,117 @@
+import * as assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { describe, test } from "node:test";
+
+import {
+  buildInitialOperatingState,
+  createCallscoreOperatingGraph,
+} from "../src/lib/workplane/callscore-operating-graph";
+
+describe("callscore operating graph", () => {
+  test("boots and routes monitor goal to monitoring loop", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const result = await graph.invoke(
+      buildInitialOperatingState({ goal: "monitor", testFixtures: true }),
+      { configurable: { thread_id: "operating-monitor-test" } },
+    );
+
+    assert.equal(result.config.goal, "monitor");
+    assert.equal(result.node_results.some((item) => item.node_id === "boot_context"), true);
+    assert.equal(result.node_results.some((item) => item.node_id === "hard_gate_preflight"), true);
+    assert.equal(result.node_results.some((item) => item.node_id === "monitoring_goal_loop"), true);
+    assert.equal(result.node_results.some((item) => item.node_id === "operating_summary"), true);
+    assert.equal(result.mutation_flags.external_mutation_performed, false);
+  });
+
+  test("revenue_now dry-run routes to revenue loop without mutation", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const result = await graph.invoke(
+      buildInitialOperatingState({ goal: "revenue_now", mode: "draft_only", testFixtures: true, campaignId: "campaign-operating-test" }),
+      { configurable: { thread_id: "operating-revenue-test" } },
+    );
+
+    const revenueNode = result.node_results.find((item) => item.node_id === "revenue_goal_loop");
+    assert.equal(Boolean(revenueNode), true);
+    assert.equal(revenueNode?.detail.review_packet_schema_version, "callscore_cmo_revenue_review_packet.v1");
+    assert.equal(revenueNode?.detail.channel_publish_readiness_count, 3);
+    assert.equal(revenueNode?.detail.campaign_receipt_id, "campaign-rec-campaign-operating-test");
+    assert.ok(revenueNode?.artifact_path);
+    assert.equal(existsSync(revenueNode!.artifact_path!), true);
+    const packet = JSON.parse(readFileSync(revenueNode!.artifact_path!, "utf8")) as Record<string, unknown>;
+    assert.equal(packet.schema_version, "callscore_cmo_revenue_review_packet.v1");
+    assert.equal((packet.channel_publish_readiness as unknown[]).length, 3);
+    assert.equal((packet.cmo_campaign_receipt as { receipt_id: string }).receipt_id, "campaign-rec-campaign-operating-test");
+    assert.equal(result.mutation_flags.public_publish_performed, false);
+  });
+
+  test("approved revenue publish with approval but no provider proof blocks instead of faking success", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const result = await graph.invoke(
+      buildInitialOperatingState({
+        goal: "revenue_now",
+        mode: "approved_publish",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "approval-revenue-1",
+        testFixtures: true,
+        campaignId: "campaign-approved-provider-block",
+      }),
+      {
+        configurable: {
+          thread_id: "operating-revenue-provider-block-test",
+          workplaneStatus: { status: "OK", automation_readiness: "CONTROLLED_FULL", autonomous_revenue_status: "YES" },
+        },
+      },
+    );
+
+    const revenueNode = result.node_results.find((item) => item.node_id === "revenue_goal_loop");
+    assert.equal(revenueNode?.status, "blocked");
+    assert.equal(revenueNode?.blockers.includes("provider_proof_missing"), true);
+    assert.equal(result.blockers.includes("provider_proof_missing"), true);
+    assert.equal(result.mutation_flags.public_publish_performed, false);
+    assert.equal(result.mutation_flags.provider_mutation_performed, false);
+  });
+
+  test("every non-revenue operating goal reaches a concrete wrapper node with no mutation", async () => {
+    const cases = [
+      { goal: "refresh_data", nodeId: "data_goal_loop", key: "data_pipeline_stage_count", predicate: (value: unknown) => Number(value) >= 18 },
+      { goal: "dispatch_worker_once", nodeId: "worker_dispatch_goal_loop", key: "supported_job_type_count", predicate: (value: unknown) => Number(value) >= 20 },
+      { goal: "produce_video", nodeId: "video_goal_loop", key: "broll_dispatcher_wired", predicate: (value: unknown) => value === true },
+      { goal: "monitor", nodeId: "monitoring_goal_loop", key: "sentinel_schema_version", predicate: (value: unknown) => value === "callscore_sentinel_run_receipt.v1" },
+      { goal: "trust_review", nodeId: "trust_goal_loop", key: "trust_decision", predicate: (value: unknown) => value === "review" },
+      { goal: "alerts", nodeId: "alert_goal_loop", key: "send_wrapper", predicate: (value: unknown) => value === "runAlertSend" },
+      { goal: "evidence_research", nodeId: "evidence_goal_loop", key: "wrapper_count", predicate: (value: unknown) => Number(value) >= 5 },
+    ] as const;
+
+    for (const item of cases) {
+      const graph = createCallscoreOperatingGraph();
+      const result = await graph.invoke(
+        buildInitialOperatingState({ goal: item.goal, testFixtures: true, maxItems: 1 }),
+        { configurable: { thread_id: `operating-${item.goal}-wrapper-test` } },
+      );
+      const node = result.node_results.find((candidate) => candidate.node_id === item.nodeId);
+      assert.equal(Boolean(node), true, `${item.nodeId} should execute`);
+      assert.equal(node?.status, "ok", `${item.nodeId} should pass`);
+      assert.equal(item.predicate(node?.detail[item.key]), true, `${item.nodeId}.${item.key} should satisfy wrapper expectation`);
+      assert.equal(Boolean(node?.artifact_path), true, `${item.nodeId} should write artifact`);
+      assert.equal(existsSync(node!.artifact_path!), true, `${item.nodeId} artifact should exist`);
+      assert.equal(result.mutation_flags.external_mutation_performed, false);
+      assert.equal(result.mutation_flags.public_publish_performed, false);
+    }
+  });
+
+  test("missing approval blocks approved publish before goal loop executes", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const result = await graph.invoke(
+      buildInitialOperatingState({ goal: "revenue_now", mode: "approved_publish", dryRun: false, approved: false, testFixtures: true }),
+      { configurable: { thread_id: "operating-approval-block-test" } },
+    );
+
+    assert.equal(result.blockers.includes("approval_missing"), true);
+    assert.equal(result.node_results.some((item) => item.node_id === "revenue_goal_loop"), false);
+  });
+
+  test("unknown goals fail closed before graph invocation", () => {
+    assert.throws(() => buildInitialOperatingState({ goal: "unknown" as never }), /Invalid|Unsupported|expected/);
+  });
+});
