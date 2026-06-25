@@ -10,6 +10,7 @@ import {
 } from "./contracts";
 import type { ChannelHeadDecisionContext, RestrictedGate } from "./channel-head-context";
 import { scoreChannelHeadCandidate } from "./channel-head-scoring";
+import { evaluateGates } from "./decision-gates";
 
 export type { ChannelHeadDecisionContext } from "./channel-head-context";
 
@@ -67,58 +68,6 @@ function cooldownBlockers(context: ChannelHeadDecisionContext): string[] {
   return blockers;
 }
 
-function suppressionBlockers(context: ChannelHeadDecisionContext): string[] {
-  const blockers: string[] = [];
-  if (context.qualitySignal.status === "fail" || context.qualitySignal.score < 0.5) blockers.push("quality_signal_failed");
-  if (context.targetActionType === "publish_owned_public") {
-    if (context.gtmRegistryState.currentStatus !== "ready_public_owned") blockers.push("registry_not_ready");
-    if (!context.gtmRegistryState.ownedOrManaged) blockers.push("not_owned_or_managed", "registry_not_owned_or_managed");
-    if (!context.gtmRegistryState.zeroSpendRequired) blockers.push("non_zero_spend");
-    if (!context.gtmRegistryState.allowedActions.includes(context.targetActionType)) blockers.push("action_not_allowed", "target_action_not_allowed");
-    if (context.gtmRegistryState.forbiddenActions.includes(context.targetActionType)) blockers.push("action_forbidden", "target_action_forbidden");
-    if (!context.channelPolicy.safeOwnedPublicAllowed) blockers.push("policy_disallows_safe_owned_public", "safe_owned_public_policy_disabled");
-    if (context.mediaGate.status === "missing") blockers.push("media_gate_missing");
-    else if (context.mediaGate.status === "fail") blockers.push("media_gate_failed");
-    if (context.originalityGate.status === "fail") blockers.push("originality_gate_failed");
-    else if (context.originalityGate.status === "missing") blockers.push("originality_gate_missing");
-  }
-  if (context.evidence.evidenceLevel === "E0" || !context.evidence.evidenceHash || context.evidence.sourceArtifactIds.length === 0) blockers.push("missing_evidence_hash", "evidence_incomplete");
-  if (!context.channelPolicy.claimBearingAllowed) blockers.push("claim_bearing_not_allowed");
-  if (!context.channelPolicy.publicClaimsSupported) blockers.push("public_claims_not_supported");
-  if (context.caps.channelPostsToday >= context.caps.maxChannelPostsPerDay) blockers.push("channel_daily_cap_reached");
-  if (context.caps.totalPostsToday >= context.caps.maxTotalPostsPerDay) blockers.push("global_daily_cap_reached");
-  return [...new Set(blockers)];
-}
-
-function reviewBlockers(context: ChannelHeadDecisionContext): string[] {
-  const blockers: string[] = [];
-  if (context.qualitySignal.status === "ambiguous" || context.qualitySignal.status === "unknown") blockers.push("quality_signal_ambiguous");
-  if (context.qualitySignal.score < context.channelPolicy.requiresNonFounderReviewBelowConfidence) blockers.push("confidence_below_non_founder_review_threshold");
-  if (context.mediaGate.status === "unknown") blockers.push("media_gate_unknown");
-  if (context.originalityGate.status === "unknown") blockers.push("originality_gate_unknown");
-  if (context.workplane.status === "WARN" || context.workplane.status === "UNKNOWN") blockers.push("workplane_not_fully_ok");
-  return [...new Set(blockers)];
-}
-
-function preflightWaitBlockers(context: ChannelHeadDecisionContext): string[] {
-  const blockers: string[] = [];
-  if (context.killSwitch.global_active) blockers.push("global_kill_switch_active");
-  if (context.killSwitch.channel_active) blockers.push("channel_kill_switch_active");
-  if (context.killSwitch.agent_paused) blockers.push("agent_paused");
-  if (!context.heartbeat.heartbeat_id) blockers.push("heartbeat_missing");
-  else if (!context.heartbeat.fresh) blockers.push("heartbeat_stale");
-  if (!context.heartbeat.lease_expires_at) blockers.push("heartbeat_lease_missing");
-  else if (new Date(context.heartbeat.lease_expires_at).getTime() <= new Date(context.now).getTime()) blockers.push("heartbeat_lease_expired");
-  return [...new Set(blockers)];
-}
-
-function publicVerifyBlockers(context: ChannelHeadDecisionContext): string[] {
-  if (context.publicVerify.status === "fail") return ["public_verify_failed"];
-  if (context.publicVerify.status === "unknown") return ["public_verify_unknown"];
-  if (!context.publicVerify.checked_at) return ["public_verify_missing_checked_at"];
-  return [];
-}
-
 function actionFor(context: ChannelHeadDecisionContext, decisionId: string, actionType = context.targetActionType): ChannelHeadAction {
   const evidenceHash = joinedHash(context) ?? sha256(decisionId);
   return {
@@ -171,59 +120,101 @@ function explanationFor(decision: ChannelHeadDecision["decision"], blockers: rea
   return `Ambiguous safe-owned-public item routed to non-founder review: ${blockers.join(", ")}.`;
 }
 
+function coerceGateDecision(gateDecision: string): ChannelHeadDecision["decision"] {
+  // Legacy mapping — gate decision values map 1:1 except "review" → "escalate_non_founder_review"
+  if (gateDecision === "review") return "escalate_non_founder_review";
+  return gateDecision as ChannelHeadDecision["decision"];
+}
+
 export function decideChannelHeadAction(context: ChannelHeadDecisionContext): ChannelHeadDecisionResult {
-  const cooldowns = cooldownBlockers(context);
   const score = scoreChannelHeadCandidate(context);
   const decisionId = idFor("decision", [context.now, context.taskId, context.channelHeadSoul.agentId, context.payloadHash, context.riskClass, context.targetActionType]);
   const receiptId = idFor("receipt", [decisionId, context.channelHeadSoul.agentId]);
   const inputSnapshotId = idFor("snapshot", [context.now, context.channelHeadSoul.agentId, context.gtmRegistryState.laneId]);
   const nextWakeAt = context.cooldown.waitUntil ?? addMinutes(context.now, 60);
 
-  let decision: ChannelHeadDecision["decision"] = "act";
-  let blockers: string[] = [];
-  let reasonCodes: string[] = ["safe_owned_public_evidence_complete", ...score.reason_codes];
-  let proposedAction: ChannelHeadAction | null = null;
-  let nonFounderReviewRequired = false;
-  let waitUntil: string | null = null;
-  let suppressUntil: string | null = null;
-  const waitPreflightBlockers = preflightWaitBlockers(context);
-  const suppressPreflightBlockers = publicVerifyBlockers(context);
+  // Phase 1: Run the extracted gate chain (priority-ordered)
+  const gateResult = evaluateGates(context);
 
-  if (waitPreflightBlockers.length > 0) {
-    decision = "wait";
-    blockers = waitPreflightBlockers;
-    reasonCodes = waitPreflightBlockers;
-    waitUntil = addMinutes(context.now, 15);
-  } else if (suppressPreflightBlockers.length > 0) {
-    decision = "suppress";
-    blockers = suppressPreflightBlockers;
-    reasonCodes = suppressPreflightBlockers;
-    suppressUntil = addMinutes(context.now, 24 * 60);
-  } else if (score.decision === "wait") {
-    decision = "wait";
-    blockers = [...cooldowns, ...context.workplane.blockers, ...(context.workplane.status === "BLOCKED" ? ["workplane_blocked"] : [])];
-    reasonCodes = blockers.length ? blockers : ["cooldown_active", ...score.reason_codes];
-    waitUntil = context.cooldown.waitUntil ?? addMinutes(context.now, 60);
-  } else if (score.decision === "request_gate") {
-    decision = "request_gate";
-    blockers = [...score.reason_codes];
-    reasonCodes = [...score.reason_codes, "restricted_risk_requires_gate"];
-  } else if (score.decision === "suppress") {
-    decision = "suppress";
-    blockers = [...score.reason_codes];
-    reasonCodes = [...score.reason_codes];
-    suppressUntil = addMinutes(context.now, 24 * 60);
-  } else if (score.decision === "review") {
-    decision = "escalate_non_founder_review";
-    blockers = [...score.reason_codes];
-    reasonCodes = [...score.reason_codes];
-    nonFounderReviewRequired = true;
-    proposedAction = actionFor(context, decisionId, "create_non_founder_review_item");
-  } else {
-    proposedAction = actionFor(context, decisionId);
+  if (gateResult) {
+    const decision = coerceGateDecision(gateResult.decision);
+    const reasonCodes = [...new Set([...gateResult.reason_codes, ...score.reason_codes])];
+    let proposedAction: ChannelHeadAction | null = null;
+    let nonFounderReviewRequired = false;
+
+    if (gateResult.decision === "escalate_non_founder_review") {
+      nonFounderReviewRequired = true;
+      proposedAction = actionFor(context, decisionId, "create_non_founder_review_item");
+    }
+
+    const parsedDecision = ChannelHeadDecisionSchema.parse({
+      schema_version: "callscore_channel_head_decision.v1",
+      decision_id: decisionId,
+      created_at: context.now,
+      agent_id: context.channelHeadSoul.agentId,
+      channel_id: context.channelHeadSoul.channelId,
+      task_id: context.taskId,
+      input_snapshot_id: inputSnapshotId,
+      risk_class: context.riskClass,
+      decision,
+      confidence: Math.max(0, Math.min(1, score.total_score)),
+      reason_codes: reasonCodes,
+      explanation: explanationFor(decision, gateResult.reason_codes),
+      proposed_action: proposedAction,
+      gate_required: gateResult.gate_required ?? null,
+      gate_receipt_id: context.gtmRegistryState.requiredReceipt ?? null,
+      non_founder_review_required: nonFounderReviewRequired,
+      suppress_until: gateResult.suppress_until ?? null,
+      wait_until: gateResult.wait_until ?? null,
+      blockers: [...new Set(gateResult.reason_codes)],
+      receipts_to_write: [receiptId],
+      next_wake_at: nextWakeAt,
+    });
+
+    const parsedReceipt = AutonomyReceiptSchema.parse({
+      schema_version: "callscore_autonomy_receipt.v1",
+      receipt_id: receiptId,
+      created_at: context.now,
+      agent_id: context.channelHeadSoul.agentId,
+      channel_id: context.channelHeadSoul.channelId,
+      run_id: null,
+      task_id: context.taskId,
+      receipt_type: "decision",
+      status: receiptStatus(parsedDecision.decision),
+      risk_class: context.riskClass,
+      payload_hash: context.payloadHash,
+      evidence_hash: joinedHash(context),
+      policy_version: context.channelPolicy.policyVersion,
+      soul_version: context.channelHeadSoul.soulVersion,
+      dry_run: parsedDecision.decision !== "act",
+      external_mutation_performed: false,
+      provider_mutation_performed: false,
+      whop_mutation_performed: false,
+      production_mutation_performed: false,
+      send_or_outreach_performed: false,
+      gate_required: parsedDecision.gate_required,
+      gate_receipt_id: parsedDecision.gate_receipt_id,
+      idempotency_key: receiptId,
+      parent_receipt_ids: [...context.recentReceipts],
+      artifact_path: `.tmp/workflow-receipts/channel_head_decisions/${receiptId}.json`,
+      rollback_path: context.gtmRegistryState.rollbackPath ?? null,
+      summary: explanationFor(parsedDecision.decision, gateResult.reason_codes),
+      detail: {
+        decision_id: parsedDecision.decision_id,
+        input_snapshot_id: parsedDecision.input_snapshot_id,
+        reason_codes: parsedDecision.reason_codes,
+        target_action_type: context.targetActionType,
+        restricted_lanes_fail_closed: true,
+      },
+    });
+
+    return { input: context, decision: parsedDecision, receipt: parsedReceipt };
   }
 
-  const receiptPath = `.tmp/workflow-receipts/channel_head_decisions/${receiptId}.json`;
+  // Phase 2: All gates pass — propose action
+  const proposedAction = actionFor(context, decisionId);
+  const proposalReasonCodes = [...new Set(["safe_owned_public_evidence_complete", ...score.reason_codes])];
+
   const parsedDecision = ChannelHeadDecisionSchema.parse({
     schema_version: "callscore_channel_head_decision.v1",
     decision_id: decisionId,
@@ -233,17 +224,17 @@ export function decideChannelHeadAction(context: ChannelHeadDecisionContext): Ch
     task_id: context.taskId,
     input_snapshot_id: inputSnapshotId,
     risk_class: context.riskClass,
-    decision,
+    decision: "act",
     confidence: Math.max(0, Math.min(1, score.total_score)),
-    reason_codes: [...new Set(reasonCodes)],
-    explanation: explanationFor(decision, blockers),
+    reason_codes: proposalReasonCodes,
+    explanation: explanationFor("act", []),
     proposed_action: proposedAction,
-    gate_required: decision === "request_gate" ? score.gate_required : null,
+    gate_required: null,
     gate_receipt_id: context.gtmRegistryState.requiredReceipt ?? null,
-    non_founder_review_required: nonFounderReviewRequired,
-    suppress_until: suppressUntil,
-    wait_until: waitUntil,
-    blockers: [...new Set(blockers)],
+    non_founder_review_required: false,
+    suppress_until: null,
+    wait_until: null,
+    blockers: [],
     receipts_to_write: [receiptId],
     next_wake_at: nextWakeAt,
   });
@@ -257,25 +248,25 @@ export function decideChannelHeadAction(context: ChannelHeadDecisionContext): Ch
     run_id: null,
     task_id: context.taskId,
     receipt_type: "decision",
-    status: receiptStatus(parsedDecision.decision),
+    status: "succeeded",
     risk_class: context.riskClass,
     payload_hash: context.payloadHash,
     evidence_hash: joinedHash(context),
     policy_version: context.channelPolicy.policyVersion,
     soul_version: context.channelHeadSoul.soulVersion,
-    dry_run: parsedDecision.decision !== "act",
+    dry_run: true,
     external_mutation_performed: false,
     provider_mutation_performed: false,
     whop_mutation_performed: false,
     production_mutation_performed: false,
     send_or_outreach_performed: false,
-    gate_required: parsedDecision.gate_required,
-    gate_receipt_id: parsedDecision.gate_receipt_id,
+    gate_required: null,
+    gate_receipt_id: null,
     idempotency_key: receiptId,
     parent_receipt_ids: [...context.recentReceipts],
-    artifact_path: receiptPath,
+    artifact_path: `.tmp/workflow-receipts/channel_head_decisions/${receiptId}.json`,
     rollback_path: context.gtmRegistryState.rollbackPath ?? null,
-    summary: explanationFor(parsedDecision.decision, blockers),
+    summary: "Safe owned-public action has complete evidence, media, originality, policy, and Workplane signals.",
     detail: {
       decision_id: parsedDecision.decision_id,
       input_snapshot_id: parsedDecision.input_snapshot_id,

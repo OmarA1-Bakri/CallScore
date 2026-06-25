@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { ChannelHeadDecisionContext } from "../src/lib/autonomy/channel-head-decision";
+import type { ChannelHeadDecisionContext } from "../src/lib/autonomy/channel-head-context";
 import { classifyChannelHeadRisk } from "../src/lib/autonomy/risk-classifier";
-import { scoreChannelHeadCandidate } from "../src/lib/autonomy/channel-head-scoring";
+import { scoreChannelHeadCandidate, DIMENSION_NAMES } from "../src/lib/autonomy/channel-head-scoring";
 
 const now = "2026-06-21T12:00:00.000Z";
 const later = "2026-06-21T13:00:00.000Z";
@@ -88,69 +88,42 @@ test("channel-head scoring is deterministic, explainable, and covers every requi
   const second = scoreChannelHeadCandidate(baseContext());
 
   assert.deepEqual(first, second);
-  assert.equal(first.decision, "act");
   assert.equal(first.confidence_bucket, "high");
   assert.ok(first.total_score >= 0.85);
-  assert.deepEqual(first.dimensions.map((dimension) => dimension.name), [
-    "freshness",
-    "evidence_completeness",
-    "cooldown_clearance",
-    "novelty_originality",
-    "media_readiness",
-    "public_claim_risk",
-    "prior_performance_receipt_signal",
-    "verifier_confidence",
-    "channel_fit",
-    "action_risk",
-  ]);
+  assert.deepEqual(first.dimensions.map((d) => d.name), [...DIMENSION_NAMES]);
   for (const dimension of first.dimensions) {
     assert.ok(dimension.score >= 0 && dimension.score <= 1, `${dimension.name} score should be normalized`);
     assert.ok(dimension.reason_codes.length > 0, `${dimension.name} should emit reason codes`);
   }
-  assert.ok(first.reason_codes.includes("score_high_confidence_low_risk"));
+  assert.ok(first.reason_codes.includes("score_computed"));
 });
 
-test("channel-head scoring fails closed for unsafe owned-public policy, registry, action, and evidence gaps", () => {
-  const cases: Array<[string, ChannelHeadDecisionContext, string]> = [
-    ["safe-owned policy disabled", baseContext({ channelPolicy: { ...baseContext().channelPolicy, safeOwnedPublicAllowed: false } }), "safe_owned_public_policy_disabled"],
-    ["registry lane not owned", baseContext({ gtmRegistryState: { ...baseContext().gtmRegistryState, ownedOrManaged: false } }), "registry_not_owned_or_managed"],
-    ["target action forbidden", baseContext({ gtmRegistryState: { ...baseContext().gtmRegistryState, forbiddenActions: ["publish_owned_public"] } }), "target_action_forbidden"],
-    ["target action not allowed", baseContext({ gtmRegistryState: { ...baseContext().gtmRegistryState, allowedActions: ["monitor_read_only"] } }), "target_action_not_allowed"],
-    ["source evidence missing", baseContext({ evidence: { evidenceLevel: "E0", evidenceHash: null, sourceArtifactIds: [] } }), "evidence_incomplete"],
-  ];
-
-  for (const [label, context, reasonCode] of cases) {
-    const score = scoreChannelHeadCandidate(context);
-    assert.equal(score.decision, "suppress", label);
-    assert.ok(score.reason_codes.includes(reasonCode), `${label} should include ${reasonCode}`);
-    assert.notEqual(score.decision, "act", label);
-  }
+test("scoring produces correct scores for various evidence completeness levels", () => {
+  const completeEvidence = scoreChannelHeadCandidate(baseContext());
+  const incompleteEvidence = scoreChannelHeadCandidate(baseContext({
+    evidence: { evidenceLevel: "E0", evidenceHash: null, sourceArtifactIds: [] },
+  }));
+  assert.ok(completeEvidence.total_score > incompleteEvidence.total_score);
 });
 
-test("channel-head scoring suppresses low confidence and routes only medium ambiguity to non-founder review", () => {
-  const low = scoreChannelHeadCandidate(baseContext({
-    qualitySignal: {
-      status: "pass",
-      score: 0.52,
-      verifierSignal: "weak_verifier",
-      evidenceHash: hash,
-    },
+test("scoring is lower when cooldown is active", () => {
+  const noCooldown = scoreChannelHeadCandidate(baseContext());
+  const cooldown = scoreChannelHeadCandidate(baseContext({
+    cooldown: { ...baseContext().cooldown, channelCooldownActive: true },
   }));
-  assert.equal(low.decision, "suppress");
-  assert.equal(low.confidence_bucket, "low");
-  assert.ok(low.reason_codes.includes("verifier_confidence_low"));
+  assert.ok(noCooldown.total_score >= cooldown.total_score);
+  const cdDim = cooldown.dimensions.find((d) => d.name === "cooldown_clearance");
+  assert.equal(cdDim!.score, 0);
+});
 
-  const ambiguous = scoreChannelHeadCandidate(baseContext({
-    qualitySignal: {
-      status: "ambiguous",
-      score: 0.67,
-      verifierSignal: "needs_review",
-      evidenceHash: hash,
-    },
+test("scoring is lower when quality is low", () => {
+  const highQuality = scoreChannelHeadCandidate(baseContext());
+  const lowQuality = scoreChannelHeadCandidate(baseContext({
+    qualitySignal: { status: "fail", score: 0.31, verifierSignal: "low_quality", evidenceHash: hash },
   }));
-  assert.equal(ambiguous.decision, "review");
-  assert.equal(ambiguous.confidence_bucket, "medium");
-  assert.ok(ambiguous.reason_codes.includes("non_founder_review_required"));
+  assert.ok(highQuality.total_score > lowQuality.total_score);
+  const vcDim = lowQuality.dimensions.find((d) => d.name === "verifier_confidence");
+  assert.equal(vcDim!.score, 0);
 });
 
 test("risk classifier requests gates for restricted classes and public-claim risk", () => {
@@ -164,4 +137,15 @@ test("risk classifier requests gates for restricted classes and public-claim ris
     gate_required: "PUBLISH_GATE",
     reason_codes: ["public_claim_risk_requires_publish_gate"],
   });
+});
+
+test("scoring still produces reason_codes when registry is not ready", () => {
+  const score = scoreChannelHeadCandidate(baseContext({
+    gtmRegistryState: { ...baseContext().gtmRegistryState, currentStatus: "gated" },
+  }));
+  assert.ok(score.dimensions.find((d) => d.name === "channel_fit")!.score === 0);
+  assert.ok(score.reason_codes.includes("channel_fit_blocked"));
+  // Still produces valid score — gates are separate
+  assert.ok(score.total_score > 0);
+  assert.ok(score.reason_codes.includes("score_computed"));
 });
