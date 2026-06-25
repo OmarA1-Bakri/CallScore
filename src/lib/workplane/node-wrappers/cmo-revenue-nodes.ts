@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { wrapDirectFunctionNode } from "../operating-node-utils";
 import { DEFAULT_OPERATING_MUTATION_FLAGS } from "../operating-graph-schemas";
+import { readArtOfWarCampaignContext } from "./art-of-war-nodes";
 
 const SAFE_CHANNELS = ["x", "linkedin", "reddit"] as const;
 const REVENUE_ARTIFACT_DIR = ".tmp/workflow-receipts/callscore_operating_graph/revenue";
@@ -28,6 +29,25 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
     const campaignId = state.config.campaignId ?? `campaign-${state.config.goal}`;
     const approvedLive = !state.config.dryRun && state.config.mode === "approved_publish";
     const providerProof = cfg.providerPublicationProof;
+    const artOfWarRuntimeRoot = typeof cfg.artOfWarRuntimeRoot === "string" ? cfg.artOfWarRuntimeRoot : undefined;
+    const artOfWarContext = readArtOfWarCampaignContext({ runtimeRoot: artOfWarRuntimeRoot });
+
+    if (artOfWarContext.blockers.length > 0) {
+      return {
+        status: "blocked" as const,
+        summary: "Revenue campaign blocked by Art of War campaign/control context.",
+        blockers: [...artOfWarContext.blockers],
+        warnings: [...artOfWarContext.warnings],
+        detail: {
+          campaign_id: campaignId,
+          art_of_war_context_available: artOfWarContext.available,
+          art_of_war_context: artOfWarContext.context,
+          art_of_war_blockers: artOfWarContext.blockers,
+          art_of_war_warnings: artOfWarContext.warnings,
+        },
+        mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+      };
+    }
 
     if (approvedLive && !providerProof) {
       return {
@@ -61,6 +81,9 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
       created_at: nowIso(),
       channel_publish_readiness: SAFE_CHANNELS.map((channel) => ({ channel, ready: true, mode: "dry_run" })),
       cmo_campaign_receipt: campaignReceipt,
+      art_of_war_context: artOfWarContext.context,
+      art_of_war_blockers: [...artOfWarContext.blockers],
+      art_of_war_warnings: [...artOfWarContext.warnings],
       mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
     };
     const artifactPath = writeRevenueArtifact(campaignId, packet);
@@ -75,6 +98,11 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
         channel_publish_readiness_count: packet.channel_publish_readiness.length,
         channel_count: SAFE_CHANNELS.length,
         provider_proof_present: Boolean(providerProof),
+        art_of_war_context_available: artOfWarContext.available,
+        art_of_war_kill_switch_engaged: artOfWarContext.context?.kill_switch_engaged ?? null,
+        art_of_war_preflight_ok: artOfWarContext.context?.preflight_ok ?? null,
+        art_of_war_active_channels: artOfWarContext.context?.active_channels ?? [],
+        art_of_war_blockers: [...artOfWarContext.blockers],
       },
       mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
     };
