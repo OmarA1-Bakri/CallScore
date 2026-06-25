@@ -23,13 +23,14 @@ test("pipeline guard audit warns on known pre-transition risks", async () => {
     "decision = 'approve' AND reason_code <> 'valid_call' GROUP BY reason_code": [{ reason_code: "asset_not_supported", count: "22" }],
     "information_schema.columns": [],
     "candidate_news_channels": [{ candidate_news_channels: "4", with_calls: "3", ranked_snapshot: "1" }],
+    "transition_state_records": [{ transition_creators: "50", total_observations: "60", sparse_rows: "5" }],
   }), new Date("2026-06-24T00:00:00.000Z"));
   assert.equal(audit.overall_status, "warn");
   assert.equal(audit.core_pipeline_status, "warn");
   assert.equal(audit.transition_readiness, "warn");
   assert.equal(audit.storm_readiness, "warn");
   assert.equal(audit.public_publish_readiness, "warn");
-  assert.equal(audit.checks.length, 7);
+  assert.equal(audit.checks.length, 8);
   assert.equal(audit.checks.find((check) => check.id === "creator_stats_30d")?.status, "warn");
   assert.equal(audit.checks.find((check) => check.id === "ml_verifier_label_integrity")?.status, "warn");
 });

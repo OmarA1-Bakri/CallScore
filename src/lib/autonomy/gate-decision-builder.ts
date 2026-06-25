@@ -20,9 +20,9 @@ export function makeDecisionFromGates(context: ChannelHeadDecisionContext, gate:
 
   let proposedAction: ChannelHeadAction | null = null;
   let nonFounderReviewRequired = false;
-  const gatedDecision = gate.decision === "review" ? "escalate_non_founder_review" as const : gate.decision as ChannelHeadDecision["decision"];
+  const gatedDecision = gate.decision as ChannelHeadDecision["decision"];
 
-  if (gate.decision === "escalate_non_founder_review" || gate.decision === "review") {
+  if (gate.decision === "escalate_non_founder_review") {
     nonFounderReviewRequired = true;
     proposedAction = actionFor(context, decisionId, "create_non_founder_review_item");
   }

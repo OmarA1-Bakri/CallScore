@@ -314,7 +314,8 @@ export async function auditCreatorEligibilityTaxonomy(queryFn: QueryFn): Promise
 }
 
 export async function auditMarkovReadiness(queryFn: QueryFn): Promise<HardeningCheck> {
-  const [row] = await queryFn<{ transition_creators: string | number; total_observations: string | number; sparse_rows: string | number }>(`
+  try {
+    const [row] = await queryFn<{ transition_creators: string | number; total_observations: string | number; sparse_rows: string | number }>(`
     WITH counted AS (
       SELECT creator_id, COUNT(*) AS obs
       FROM transition_state_records
@@ -331,41 +332,54 @@ export async function auditMarkovReadiness(queryFn: QueryFn): Promise<HardeningC
       (SELECT COUNT(*) FROM sparse)::text AS sparse_rows
     FROM transition_state_records
   `);
-  const totalObs = num(row?.total_observations);
-  const sparseRowCount = num(row?.sparse_rows);
-  const creatorCount = num(row?.transition_creators);
+    const totalObs = num(row?.total_observations);
+    const sparseRowCount = num(row?.sparse_rows);
+    const creatorCount = num(row?.transition_creators);
 
-  let status: HardeningStatus = "block";
-  let summary = "No transition state records found — cannot build Markov matrix.";
-  let nextAction = "Run transition-state-classifier first to produce transition state records.";
+    let status: HardeningStatus = "block";
+    let summary = "No transition state records found — cannot build Markov matrix.";
+    let nextAction = "Run transition-state-classifier first to produce transition state records.";
 
-  if (totalObs >= 200 && sparseRowCount === 0) {
-    status = "pass";
-    summary = `Markov readiness: ${totalObs} observations across ${creatorCount} creators, no sparse rows.`;
-    nextAction = "Markov matrix can be built reliably. Run markov-head for trajectory predictions.";
-  } else if (totalObs >= 50) {
-    status = "warn";
-    summary = `Markov readiness: ${totalObs} observations, ${sparseRowCount} sparse states — treat predictions as preliminary.`;
-    nextAction = sparseRowCount > 0
-      ? "Increase transition snapshot cadence to fill sparse states before relying on Markov predictions."
-      : "Continue monitoring; more observations improve prediction accuracy.";
-  } else if (totalObs > 0) {
-    status = "warn";
-    summary = `Markov readiness: only ${totalObs} observations — insufficient for reliable transition matrix.`;
-    nextAction = "Run more transition snapshots (weekly/monthly) until 50+ observations accumulate.";
+    if (totalObs >= 200 && sparseRowCount === 0) {
+      status = "pass";
+      summary = `Markov readiness: ${totalObs} observations across ${creatorCount} creators, no sparse rows.`;
+      nextAction = "Markov matrix can be built reliably. Run markov-head for trajectory predictions.";
+    } else if (totalObs >= 50) {
+      status = "warn";
+      summary = `Markov readiness: ${totalObs} observations, ${sparseRowCount} sparse states — treat predictions as preliminary.`;
+      nextAction = sparseRowCount > 0
+        ? "Increase transition snapshot cadence to fill sparse states before relying on Markov predictions."
+        : "Continue monitoring; more observations improve prediction accuracy.";
+    } else if (totalObs > 0) {
+      status = "warn";
+      summary = `Markov readiness: only ${totalObs} observations — insufficient for reliable transition matrix.`;
+      nextAction = "Run more transition snapshots (weekly/monthly) until 50+ observations accumulate.";
+    }
+
+    return {
+      id: "transition_state_coverage",
+      status,
+      summary,
+      metrics: {
+        total_observations: totalObs,
+        creator_count: creatorCount,
+        sparse_state_rows: sparseRowCount,
+      },
+      next_action: nextAction,
+    };
+  } catch {
+    return {
+      id: "transition_state_coverage",
+      status: "block",
+      summary: "transition_state_records table does not exist — cannot build Markov matrix.",
+      metrics: {
+        total_observations: 0,
+        creator_count: 0,
+        sparse_state_rows: null,
+      },
+      next_action: "Run transition state classifier first to create the transition_state_records table and seed initial data.",
+    };
   }
-
-  return {
-    id: "transition_state_coverage",
-    status,
-    summary,
-    metrics: {
-      total_observations: totalObs,
-      creator_count: creatorCount,
-      sparse_state_rows: sparseRowCount,
-    },
-    next_action: nextAction,
-  };
 }
 
 export async function runPipelineGuardAudit(

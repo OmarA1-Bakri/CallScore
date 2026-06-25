@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { ChannelHeadDecisionContext } from "./channel-head-context";
+import type { ChannelHeadDecisionContext, RestrictedGate } from "./channel-head-context";
 import type { ChannelHeadAction } from "./contracts";
 
 function sha256(value: string): string {
@@ -15,7 +15,7 @@ export function addMinutes(iso: string, minutes: number): string {
   return new Date(new Date(iso).getTime() + minutes * 60 * 1000).toISOString();
 }
 
-export function gateForRiskClass(riskClass: string, requiredGate: string | undefined): string | null {
+export function gateForRiskClass(riskClass: string, requiredGate: RestrictedGate | "NONE" | undefined): RestrictedGate | null {
   if (requiredGate && requiredGate !== "NONE") return requiredGate;
   switch (riskClass) {
     case "restricted_provider":
