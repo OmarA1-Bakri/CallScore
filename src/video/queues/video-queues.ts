@@ -33,6 +33,7 @@ export function createVideoJobState(input: { readonly jobId: string; readonly fo
     normalizedAudioPath: null,
     captionsPath: null,
     srtPath: null,
+    brollManifestPath: null,
     videoPath: null,
     thumbnailPath: null,
     metadata: null,
