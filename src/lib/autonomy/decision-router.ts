@@ -5,6 +5,9 @@ import { handleOwnedPublicPublish } from "./decision-handlers/owned-public-publi
 import { handleReadOnlyObserve } from "./decision-handlers/read-only-observe";
 import { handleHardGate } from "./decision-handlers/hard-gate";
 import { handleDraftArtifact } from "./decision-handlers/draft-artifact";
+import { handleInternalEnqueue } from "./decision-handlers/internal-enqueue";
+import { handleInternalStateMutation } from "./decision-handlers/internal-state-mutation";
+import { handleGatedExternalSend } from "./decision-handlers/gated-external-send";
 import { decideChannelHeadAction } from "./channel-head-decision";
 
 type DecisionHandler = (context: ChannelHeadDecisionContext) => ChannelHeadDecisionResult;
@@ -14,6 +17,9 @@ const HANDLER_REGISTRY: Partial<Record<ActionAuthorityType, DecisionHandler>> = 
   read_only_observe: handleReadOnlyObserve,
   hard_gate: handleHardGate,
   draft_artifact: handleDraftArtifact,
+  internal_enqueue: handleInternalEnqueue,
+  internal_state_mutation: handleInternalStateMutation,
+  gated_external_send: handleGatedExternalSend,
 };
 
 /**

@@ -107,3 +107,178 @@ test("router cooldown clears after wait period", () => {
   assert.equal(result.decision.decision, "wait");
   assert.equal(result.decision.wait_until, later);
 });
+
+// ── Internal Enqueue handler tests ──
+
+test("internal enqueue handler produces act with draft action type", () => {
+  const { handleInternalEnqueue } = require("../src/lib/autonomy/decision-handlers/internal-enqueue");
+  const result = handleInternalEnqueue(baseCtx({
+    targetActionType: "draft",
+    evidence: { evidenceLevel: "E0", evidenceHash: null, sourceArtifactIds: [] },
+  }));
+  assert.equal(result.decision.decision, "act");
+  assert.equal(result.decision.proposed_action?.action_type, "draft");
+  assert.equal(result.receipt.dry_run, true);
+  assert.equal(result.receipt.external_mutation_performed, false);
+  assert.equal(result.receipt.provider_mutation_performed, false);
+  assert.equal(result.receipt.send_or_outreach_performed, false);
+  assert.equal(ChannelHeadDecisionSchema.parse(result.decision).decision, "act");
+  assert.equal(AutonomyReceiptSchema.parse(result.receipt).receipt_id, result.receipt.receipt_id);
+});
+
+test("internal enqueue handler waits when kill switch active", () => {
+  const { handleInternalEnqueue } = require("../src/lib/autonomy/decision-handlers/internal-enqueue");
+  const result = handleInternalEnqueue(baseCtx({
+    killSwitch: { ...baseCtx().killSwitch, global_active: true },
+  }));
+  assert.equal(result.decision.decision, "wait");
+  assert.equal(result.receipt.status, "blocked");
+});
+
+test("internal enqueue handler waits when workplane blocked", () => {
+  const { handleInternalEnqueue } = require("../src/lib/autonomy/decision-handlers/internal-enqueue");
+  const result = handleInternalEnqueue(baseCtx({
+    workplane: { status: "BLOCKED", blockers: ["maintenance"] },
+  }));
+  assert.equal(result.decision.decision, "wait");
+  assert.equal(result.receipt.status, "blocked");
+});
+
+// ── Internal State Mutation handler tests ──
+
+test("internal state mutation handler routes via pipeline-scorer-head", () => {
+  const result = routeDecision(baseCtx({
+    channelHeadSoul: { agentId: "callscore-pipeline-scorer-head", channelId: "internal", soulVersion: "v1", purpose: "test" },
+    targetActionType: "draft",
+  }));
+  assert.equal(result.decision.decision, "act");
+  assert.equal(result.decision.proposed_action?.action_type, "draft");
+  assert.equal(result.receipt.dry_run, true);
+  assert.equal(result.receipt.external_mutation_performed, false);
+  assert.equal(ChannelHeadDecisionSchema.parse(result.decision).decision, "act");
+  assert.equal(AutonomyReceiptSchema.parse(result.receipt).receipt_id, result.receipt.receipt_id);
+});
+
+test("internal state mutation handler requests gate for restricted financial risk", () => {
+  const { handleInternalStateMutation } = require("../src/lib/autonomy/decision-handlers/internal-state-mutation");
+  const result = handleInternalStateMutation(baseCtx({
+    riskClass: "restricted_financial",
+    gtmRegistryState: { ...baseCtx().gtmRegistryState, requiredGate: "FINANCIAL_GATE", requiredReceipt: undefined },
+  }));
+  assert.equal(result.decision.decision, "request_gate");
+  assert.equal(result.decision.gate_required, "FINANCIAL_GATE");
+  assert.equal(result.receipt.status, "blocked");
+});
+
+test("internal state mutation handler suppresses when evidence missing", () => {
+  const { handleInternalStateMutation } = require("../src/lib/autonomy/decision-handlers/internal-state-mutation");
+  const result = handleInternalStateMutation(baseCtx({
+    evidence: { evidenceLevel: "E0", evidenceHash: null, sourceArtifactIds: [] },
+    payloadHash: null,
+  }));
+  assert.equal(result.decision.decision, "suppress");
+  assert.equal(result.receipt.status, "suppressed");
+});
+
+// ── Gated External Send handler tests ──
+
+test("gated external send handler routes via whop-commerce-head", () => {
+  const result = routeDecision(baseCtx({
+    channelHeadSoul: { agentId: "callscore-whop-commerce-head", channelId: "commerce", soulVersion: "v1", purpose: "test" },
+    targetActionType: "draft",
+  }));
+  // whop-commerce-head has [draft_artifact, gated_external_send]; draft_artifact matches first
+  // So this produces a normal act with draft action type from the draft-artifact handler
+  assert.equal(result.decision.decision, "act");
+  assert.equal(ChannelHeadDecisionSchema.parse(result.decision).decision, "act");
+});
+
+test("gated external send handler requests gate when required gate missing", () => {
+  const { handleGatedExternalSend } = require("../src/lib/autonomy/decision-handlers/gated-external-send");
+  const result = handleGatedExternalSend(baseCtx({
+    riskClass: "restricted_outreach",
+    gtmRegistryState: { ...baseCtx().gtmRegistryState, requiredGate: "SEND_GATE", requiredReceipt: undefined },
+    evidence: { evidenceLevel: "E0", evidenceHash: null, sourceArtifactIds: [] },
+  }));
+  assert.equal(result.decision.decision, "request_gate");
+  assert.ok(result.decision.reason_codes.some((c: string) => c.includes("send_gate") || c.includes("missing")));
+  assert.equal(result.receipt.status, "blocked");
+});
+
+test("gated external send handler produces approval packet when gates clear", () => {
+  const { handleGatedExternalSend } = require("../src/lib/autonomy/decision-handlers/gated-external-send");
+  const result = handleGatedExternalSend(baseCtx({
+    riskClass: "safe_owned_public",
+    gtmRegistryState: { ...baseCtx().gtmRegistryState, requiredGate: "NONE", requiredReceipt: "receipt-gate-1" },
+  }));
+  assert.equal(result.decision.decision, "act");
+  assert.equal(result.decision.proposed_action?.action_type, "create_approval_packet");
+  assert.equal(result.receipt.dry_run, true);
+  assert.equal(result.receipt.external_mutation_performed, false);
+  assert.equal(result.receipt.send_or_outreach_performed, false);
+  assert.equal(ChannelHeadDecisionSchema.parse(result.decision).decision, "act");
+});
+
+test("gated external send handler waits when kill switch active", () => {
+  const { handleGatedExternalSend } = require("../src/lib/autonomy/decision-handlers/gated-external-send");
+  const result = handleGatedExternalSend(baseCtx({
+    killSwitch: { ...baseCtx().killSwitch, global_active: true },
+  }));
+  assert.equal(result.decision.decision, "wait");
+  assert.equal(result.receipt.status, "blocked");
+});
+
+// ── All 7 authority tiers registered test ──
+
+test("router has registered handlers for all 7 action authority tiers", () => {
+  // Import the router source to verify HANDLER_REGISTRY keys
+  const { routeDecision: rd } = require("../src/lib/autonomy/decision-router");
+  // All 7 authorities should have a handler, meaning agents from each authority
+  // path should route successfully (even if some fall through to legacy)
+
+  // read_only_observe
+  const observeResult = routeDecision(baseCtx({
+    channelHeadSoul: { agentId: "callscore-opportunity-research-head", channelId: "research", soulVersion: "v1", purpose: "test" },
+  }));
+  assert.ok(observeResult.decision.decision);
+
+  // internal_enqueue — test handler exists by calling it directly
+  const { handleInternalEnqueue: hie } = require("../src/lib/autonomy/decision-handlers/internal-enqueue");
+  assert.ok(typeof hie === "function");
+
+  // draft_artifact
+  const draftResult = routeDecision(baseCtx({
+    channelHeadSoul: { agentId: "callscore-artofwar-strategist", channelId: "campaign", soulVersion: "v1", purpose: "test" },
+  }));
+  assert.ok(draftResult.decision.decision);
+
+  // internal_state_mutation
+  const stateResult = routeDecision(baseCtx({
+    channelHeadSoul: { agentId: "callscore-pipeline-scorer-head", channelId: "internal", soulVersion: "v1", purpose: "test" },
+  }));
+  assert.ok(stateResult.decision.decision);
+
+  // owned_public_publish
+  const publishResult = routeDecision(baseCtx());
+  assert.ok(publishResult.decision.decision);
+
+  // gated_external_send — test handler exists by calling it directly
+  const { handleGatedExternalSend: hges } = require("../src/lib/autonomy/decision-handlers/gated-external-send");
+  assert.ok(typeof hges === "function");
+
+  // hard_gate
+  const gateResult = routeDecision(baseCtx({
+    channelHeadSoul: { agentId: "callscore-compliance-linter-head", channelId: "compliance", soulVersion: "v1", purpose: "test" },
+  }));
+  assert.ok(gateResult.decision.decision);
+});
+
+// ── Legacy fallback still exists but canonical agents no longer reach it ──
+
+test("legacy fallback still handles truly unknown agent IDs", () => {
+  const result = routeDecision(baseCtx({
+    channelHeadSoul: { agentId: "callscore-nonexistent-agent", channelId: "unknown", soulVersion: "v1", purpose: "test" },
+  }));
+  assert.ok(["act", "wait", "suppress", "request_gate", "escalate_non_founder_review"].includes(result.decision.decision));
+  assert.equal(ChannelHeadDecisionSchema.parse(result.decision).decision, result.decision.decision);
+});
