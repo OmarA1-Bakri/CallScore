@@ -79,22 +79,54 @@ export const CreatorScoreSchema = z.object({
 });
 export type CreatorScore = z.infer<typeof CreatorScoreSchema>;
 
+export const VisualTypeSchema = z.enum([
+  "hook",
+  "creator_card",
+  "score_reveal",
+  "stat_reveal",
+  "leaderboard",
+  "comparison_card",
+  "call_timeline",
+  "progress_bar",
+  "methodology",
+  "hero_title",
+  "section_title",
+  "text_card",
+  "particle_overlay",
+  "verdict",
+  "cta",
+  "end_tag",
+]);
+export type VisualType = z.infer<typeof VisualTypeSchema>;
+
+export const OpenMontageVisualTypeSchema = z.enum([
+  "hero_title",
+  "stat_reveal",
+  "stat_card",
+  "comparison_card",
+  "end_tag",
+  "particle_overlay",
+  "progress_bar",
+  "section_title",
+  "text_card",
+]);
+export type OpenMontageVisualType = z.infer<typeof OpenMontageVisualTypeSchema>;
+
+export const ThemeNameSchema = z.enum([
+  "clean-professional",
+  "flat-motion-graphics",
+  "minimalist-diagram",
+  "anime-ghibli",
+]);
+export type ThemeName = z.infer<typeof ThemeNameSchema>;
+
 export const ScenePlanSchema = z.object({
   sceneId: z.string().min(1),
   order: z.number().int().nonnegative(),
   title: z.string().min(1),
   narration: z.string().min(1),
   durationSeconds: z.number().positive(),
-  visualType: z.enum([
-    "hook",
-    "creator_card",
-    "score_reveal",
-    "leaderboard",
-    "call_timeline",
-    "methodology",
-    "verdict",
-    "cta",
-  ]),
+  visualType: VisualTypeSchema,
   dataRefs: z.array(z.string()),
 });
 export type ScenePlan = z.infer<typeof ScenePlanSchema>;
@@ -142,6 +174,7 @@ export const VideoJobStateSchema = z.object({
   runDate: IsoDateStringSchema,
   format: VideoFormatSchema,
   status: VideoJobStatusSchema,
+  theme: ThemeNameSchema.optional(),
   selectedCreator: CreatorScoreSchema.nullable(),
   creators: z.array(CreatorScoreSchema),
   scriptPackage: ScriptPackageSchema.nullable(),
