@@ -87,6 +87,25 @@ export const OperatingReceiptSchema = z.object({
 
 export type OperatingReceipt = z.infer<typeof OperatingReceiptSchema>;
 
+export const OperatingSummarySchema = z.object({
+  schema_version: z.literal("callscore_operating_summary.v1"),
+  goal: OperatingGoalSchema,
+  status: OperatingNodeStatusSchema,
+  child_receipt_ids: z.array(NonEmptyStringSchema).default([]),
+  mutation_flags: MutationFlagsSchema.default(DEFAULT_OPERATING_MUTATION_FLAGS),
+  blockers_by_domain: z.record(z.string(), z.array(NonEmptyStringSchema)).default({}),
+  warnings_by_domain: z.record(z.string(), z.array(NonEmptyStringSchema)).default({}),
+  node_status_counts: z.record(z.string(), z.number().int().nonnegative()).default({}),
+  node_count: z.number().int().nonnegative(),
+  receipt_count: z.number().int().nonnegative(),
+  artifact_paths: z.array(NonEmptyStringSchema).default([]),
+  audit_blockers: z.array(NonEmptyStringSchema).default([]),
+  secret_redaction_applied: z.literal(true),
+  created_at: IsoTimestampSchema,
+}).strict();
+
+export type OperatingSummary = z.infer<typeof OperatingSummarySchema>;
+
 export const OperatingGraphStateSchema = z.object({
   config: OperatingGoalConfigSchema,
   node_results: z.array(OperatingNodeResultSchema).default([]),

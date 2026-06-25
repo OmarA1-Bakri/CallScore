@@ -51,6 +51,7 @@ test("callscore-operating-goal CLI refresh_data bounded dry-run writes a real re
     status: string;
     receipt_count: number;
     latest_receipt_path: string;
+    latest_summary_path: string;
     blockers: string[];
     mutation_flags: { db_write_performed: boolean; provider_mutation_performed: boolean };
   };
@@ -61,6 +62,20 @@ test("callscore-operating-goal CLI refresh_data bounded dry-run writes a real re
   assert.equal(parsed.mutation_flags.provider_mutation_performed, false);
   assert.ok(parsed.receipt_count >= 1);
   assert.equal(existsSync(parsed.latest_receipt_path), true);
+  assert.equal(existsSync(parsed.latest_summary_path), true);
+
+  const summary = JSON.parse(readFileSync(parsed.latest_summary_path, "utf8")) as {
+    schema_version: string;
+    child_receipt_ids: string[];
+    blockers_by_domain: Record<string, string[]>;
+    mutation_flags: { db_write_performed: boolean };
+    secret_redaction_applied: boolean;
+  };
+  assert.equal(summary.schema_version, "callscore_operating_summary.v1");
+  assert.equal(summary.child_receipt_ids.length >= 3, true);
+  assert.deepEqual(summary.blockers_by_domain, {});
+  assert.equal(summary.mutation_flags.db_write_performed, false);
+  assert.equal(summary.secret_redaction_applied, true);
 
   const receipt = JSON.parse(readFileSync(parsed.latest_receipt_path, "utf8")) as {
     goal: string;

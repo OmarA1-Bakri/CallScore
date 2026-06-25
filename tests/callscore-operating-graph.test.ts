@@ -4,8 +4,36 @@ import { describe, test } from "node:test";
 
 import {
   buildInitialOperatingState,
+  collectReceiptsNode,
   createCallscoreOperatingGraph,
 } from "../src/lib/workplane/callscore-operating-graph";
+import {
+  DEFAULT_OPERATING_MUTATION_FLAGS,
+  type OperatingGraphState,
+  type OperatingNodeResult,
+} from "../src/lib/workplane/operating-graph-schemas";
+
+const nodeStartedAt = "2026-06-25T12:00:00.000Z";
+const nodeFinishedAt = "2026-06-25T12:00:01.000Z";
+
+function fixtureNode(overrides: Partial<OperatingNodeResult>): OperatingNodeResult {
+  return {
+    node_id: "fixture_node",
+    domain: "monitoring",
+    status: "ok",
+    receipt_id: "receipt-fixture-node",
+    artifact_path: null,
+    blockers: [],
+    warnings: [],
+    started_at: nodeStartedAt,
+    finished_at: nodeFinishedAt,
+    duration_ms: 1000,
+    mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS },
+    summary: "fixture node completed",
+    detail: {},
+    ...overrides,
+  };
+}
 
 describe("callscore operating graph", () => {
   test("boots and routes monitor goal to monitoring loop", async () => {
@@ -113,5 +141,86 @@ describe("callscore operating graph", () => {
 
   test("unknown goals fail closed before graph invocation", () => {
     assert.throws(() => buildInitialOperatingState({ goal: "unknown" as never }), /Invalid|Unsupported|expected/);
+  });
+
+  test("collect_receipts aggregates child receipt IDs, mutation flags, and blockers by domain", async () => {
+    const state: OperatingGraphState = {
+      ...buildInitialOperatingState({ goal: "alerts", mode: "bounded_write", dryRun: false, approved: true, approvalReceiptId: "approval-collect-1" }),
+      node_results: [
+        fixtureNode({
+          node_id: "data_goal_loop",
+          domain: "data",
+          receipt_id: "receipt-data-1",
+          mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS, db_write_performed: true },
+          summary: "data write completed",
+        }),
+        fixtureNode({
+          node_id: "alert_goal_loop",
+          domain: "alerts",
+          status: "blocked",
+          receipt_id: "receipt-alert-1",
+          blockers: ["send_gate_required"],
+          summary: "alert send blocked",
+        }),
+      ],
+      blockers: ["send_gate_required"],
+      mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS, db_write_performed: true },
+    };
+
+    const patch = await collectReceiptsNode(state);
+    const collectResult = patch.node_results?.at(-1);
+    const receipt = patch.receipts?.at(-1);
+
+    assert.equal(collectResult?.status, "blocked");
+    assert.deepEqual(collectResult?.detail.child_receipt_ids, ["receipt-data-1", "receipt-alert-1"]);
+    assert.deepEqual(collectResult?.detail.blockers_by_domain, { alerts: ["send_gate_required"] });
+    assert.equal(collectResult?.mutation_flags.db_write_performed, true);
+    assert.equal(receipt?.mutation_flags.db_write_performed, true);
+    assert.deepEqual(receipt?.parent_receipt_ids, ["receipt-data-1", "receipt-alert-1"]);
+  });
+
+  test("collect_receipts fails closed on inconsistent mutation flag aggregation", async () => {
+    const state: OperatingGraphState = {
+      ...buildInitialOperatingState({ goal: "alerts", mode: "bounded_write", dryRun: false, approved: true, approvalReceiptId: "approval-collect-2" }),
+      node_results: [fixtureNode({
+        node_id: "alert_goal_loop",
+        domain: "alerts",
+        receipt_id: "receipt-alert-mutating",
+        mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS, public_publish_performed: true },
+      })],
+      mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS },
+    };
+
+    const patch = await collectReceiptsNode(state);
+    const collectResult = patch.node_results?.at(-1);
+
+    assert.equal(collectResult?.status, "failed");
+    assert.equal((collectResult?.blockers ?? []).some((item) => item.includes("mutation_flags_inconsistent")), true);
+    assert.equal(collectResult?.mutation_flags.public_publish_performed, true);
+  });
+
+  test("collect_receipts redacts secret-looking child details from written artifact", async () => {
+    const state: OperatingGraphState = {
+      ...buildInitialOperatingState({ goal: "monitor" }),
+      node_results: [fixtureNode({
+        node_id: "monitoring_goal_loop",
+        domain: "monitoring",
+        receipt_id: "receipt-monitor-secret",
+        detail: {
+          command_output: "DATABASE_URL=postgres://user:pass@example/db\nAuthorization: Bearer abc.def",
+          nested: { api_key: "secret-value" },
+        },
+      })],
+    };
+
+    const patch = await collectReceiptsNode(state);
+    const collectResult = patch.node_results?.at(-1);
+    assert.ok(collectResult?.artifact_path);
+    const artifact = readFileSync(collectResult!.artifact_path!, "utf8");
+
+    assert.doesNotMatch(artifact, /postgres:\/\/user:pass@example\/db/);
+    assert.doesNotMatch(artifact, /abc\.def/);
+    assert.doesNotMatch(artifact, /secret-value/);
+    assert.match(artifact, /\[REDACTED\]/);
   });
 });

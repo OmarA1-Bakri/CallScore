@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { OperatingDomain, OperatingGoal } from "./operating-goals";
-import { OperatingReceiptSchema, type OperatingReceipt } from "./operating-graph-schemas";
+import { OperatingReceiptSchema, OperatingSummarySchema, type OperatingReceipt, type OperatingSummary } from "./operating-graph-schemas";
 
 const DEFAULT_RECEIPT_ROOT = ".tmp/workflow-receipts/callscore_operating_graph";
 
@@ -16,6 +16,10 @@ export function buildOperatingReceiptPath(input: { receiptId: string; artifactDi
   return join(input.artifactDir ?? DEFAULT_RECEIPT_ROOT, `${input.receiptId}.json`);
 }
 
+export function buildOperatingSummaryPath(input: { receiptId: string; artifactDir?: string }): string {
+  return join(input.artifactDir ?? DEFAULT_RECEIPT_ROOT, `${input.receiptId}.summary.json`);
+}
+
 export function redactCommandOutput(output: string): string {
   return output
     .replace(/\b([A-Z0-9_]*(?:TOKEN|SECRET|API_KEY|ACCESS_KEY|PRIVATE_KEY|COOKIE|DATABASE_URL|DATABASE_URI|DB_URL|CONNECTION_STRING)[A-Z0-9_]*)\s*=\s*[^\s\n]+/gi, "$1=[REDACTED]")
@@ -24,14 +28,14 @@ export function redactCommandOutput(output: string): string {
     .replace(/Bearer\s+[A-Za-z0-9._~+\-/]+=*/gi, "Bearer [REDACTED]");
 }
 
-function redactUnknown(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redactUnknown);
+export function redactOperatingValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactOperatingValue);
   if (value && typeof value === "object") {
     return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, inner]) => {
-      if (/(token|secret|password|passwd|api[_-]?key|cookie|private[_-]?key)/i.test(key)) {
+      if (key !== "secret_redaction_applied" && /(token|secret|password|passwd|api[_-]?key|cookie|private[_-]?key)/i.test(key)) {
         return [key, "[REDACTED]"];
       }
-      return [key, redactUnknown(inner)];
+      return [key, redactOperatingValue(inner)];
     }));
   }
   if (typeof value === "string") return redactCommandOutput(value);
@@ -41,7 +45,14 @@ function redactUnknown(value: unknown): unknown {
 export function writeOperatingReceipt(input: { path: string; receipt: OperatingReceipt }): string {
   const parsed = OperatingReceiptSchema.parse(input.receipt);
   mkdirSync(dirname(input.path), { recursive: true });
-  writeFileSync(input.path, `${JSON.stringify(redactUnknown(parsed), null, 2)}\n`);
+  writeFileSync(input.path, `${JSON.stringify(redactOperatingValue(parsed), null, 2)}\n`);
+  return input.path;
+}
+
+export function writeOperatingSummary(input: { path: string; summary: OperatingSummary }): string {
+  const parsed = OperatingSummarySchema.parse(input.summary);
+  mkdirSync(dirname(input.path), { recursive: true });
+  writeFileSync(input.path, `${JSON.stringify(redactOperatingValue(parsed), null, 2)}\n`, { mode: 0o600 });
   return input.path;
 }
 

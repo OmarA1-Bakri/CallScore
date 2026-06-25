@@ -58,6 +58,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     mutation_flags: result.mutation_flags,
     latest_receipt_id: result.receipts.at(-1)?.receipt_id ?? null,
     latest_receipt_path: result.node_results.find((item) => item.node_id === "collect_receipts")?.artifact_path ?? null,
+    latest_summary_path: typeof result.artifacts.operating_summary_path === "string" ? result.artifacts.operating_summary_path : null,
     latest_artifact_path: result.node_results.at(-1)?.artifact_path ?? null,
   };
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
