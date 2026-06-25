@@ -162,6 +162,31 @@ describe("operating video pipeline nodes", () => {
     assert.equal(result.mutation_flags.provider_mutation_performed, false);
   });
 
+  test("produce_video read-live empty queue does not fabricate fixture video jobs", async () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), "operating-video-empty-artifacts-"));
+    const queueRoot = mkdtempSync(join(tmpdir(), "operating-video-empty-queue-"));
+    const graph = createCallscoreOperatingGraph();
+
+    const result = await graph.invoke(
+      buildInitialOperatingState({ goal: "produce_video", mode: "read_live", dryRun: false, maxItems: 1 }),
+      {
+        configurable: {
+          thread_id: "operating-video-empty-queue-test",
+          ...liveGateContext(),
+          videoArtifactRoot: artifactRoot,
+          videoQueueRoot: queueRoot,
+        },
+      },
+    );
+
+    const videoNode = result.node_results.find((item) => item.node_id === "video_goal_loop");
+    assert.equal(videoNode?.status, "ok");
+    assert.equal(videoNode?.detail.queue_empty, true);
+    assert.equal(videoNode?.detail.executed_stages, 0);
+    assert.equal(readdirSync(artifactRoot).length, 0);
+    assert.match(String(videoNode?.artifact_path), /callscore_operating_graph\/video\/operating-video-node-/);
+  });
+
   test("start-video worker dispatcher contains broll between captions and render", () => {
     const source = readFileSync("src/video/queues/start-video-workers.ts", "utf8");
     assert.match(source, /stage === "broll"\) return runBrollStage\(statePath\)/);

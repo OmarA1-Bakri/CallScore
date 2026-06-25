@@ -7,6 +7,8 @@ import { buildVideoArtifactPaths } from "../../../video/artifacts/artifact-paths
 import { runVideoStage } from "../../../video/queues/start-video-workers";
 import { createVideoJobState, enqueueVideoStage, VIDEO_STAGES, type VideoStage } from "../../../video/queues/video-queues";
 
+const VIDEO_OPERATING_ARTIFACT_DIR = ".tmp/workflow-receipts/callscore_operating_graph/video";
+
 function stageForStatus(status: string | null | undefined): VideoStage {
   switch (status) {
     case "queued":
@@ -79,6 +81,13 @@ function writeVideoNodeArtifact(statePath: string, payload: Record<string, unkno
   return artifactPath;
 }
 
+function writeStandaloneVideoNodeArtifact(payload: Record<string, unknown>): string {
+  mkdirSync(VIDEO_OPERATING_ARTIFACT_DIR, { recursive: true });
+  const artifactPath = join(VIDEO_OPERATING_ARTIFACT_DIR, `operating-video-node-${Date.now()}.json`);
+  writeFileSync(artifactPath, `${JSON.stringify(payload, null, 2)}\n`, { mode: 0o600 });
+  return artifactPath;
+}
+
 function ensureFixtureStatePath(input: { artifactRoot?: string; jobId?: string }): string {
   const jobId = input.jobId ?? `video-operating-${Date.now()}`;
   const root = input.artifactRoot;
@@ -104,9 +113,8 @@ export const videoGoalLoopNode = wrapDirectFunctionNode({
     if (!state.config.dryRun && state.config.mode === "read_live" && !configuredStatePath) {
       const entry = listQueueFiles(queueRoot).map(readQueueEntry).find((item): item is VideoQueueEntry => item !== null);
       if (!entry) {
-        const fallbackStatePath = ensureFixtureStatePath({ artifactRoot, jobId: configuredJobId });
         const detail = { stage: null, stages: [], executed_stages: 0, queue_root: queueRoot, queue_empty: true, approved, broll_dispatcher_wired: true };
-        const artifactPath = writeVideoNodeArtifact(fallbackStatePath, { schema_version: "callscore_video_goal_loop_receipt.v1", status: "ok", detail });
+        const artifactPath = writeStandaloneVideoNodeArtifact({ schema_version: "callscore_video_goal_loop_receipt.v1", status: "ok", detail });
         return {
           status: "ok" as const,
           summary: "Video queue empty.",
