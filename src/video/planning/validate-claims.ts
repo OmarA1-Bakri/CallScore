@@ -34,7 +34,7 @@ export function allowedNumericClaimsForCreator(creator: CreatorScore): readonly 
 
 export function validateScriptClaims(script: ScriptPackage, creators: readonly CreatorScore[]): ClaimValidationResult {
   const allowed = new Set(creators.flatMap(allowedNumericClaimsForCreator));
-  const ignored = new Set(["7", "30", "60", "90", "120", "1", "2", "3", "4", "5", "8"]);
+  const ignored = new Set(["0", "7", "30", "60", "90", "120", "1", "2", "3", "4", "5", "8"]);
   const numeric = script.voiceover.match(/-?\d+(?:\.\d+)?%?/g) ?? [];
   const errors = numeric
     .filter((token) => !ignored.has(token))

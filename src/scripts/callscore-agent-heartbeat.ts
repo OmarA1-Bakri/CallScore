@@ -400,8 +400,8 @@ export async function runAgentHeartbeat(options: AgentHeartbeatRunOptions = {}):
     }
     // ── State machine transition ──
     let state = loadState(agent.agentId, channelId, join(paths.receiptDir, "channel-head-states"), nowIso);
-    // If starting fresh, transition through EVALUATING first
-    if (state.state === "INITIAL") {
+    // Always start a heartbeat cycle in EVALUATING — re-evaluate the agent's state
+    if (state.state !== "EVALUATING") {
       state = transitionState(state, "EVALUATING", "heartbeat cycle start", undefined, undefined, nowIso);
     }
     const nextState = decisionToNextState(decisionArtifacts.decision.decision, state.state);

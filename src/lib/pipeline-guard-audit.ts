@@ -21,6 +21,7 @@ export interface PipelineGuardAudit {
   readonly transition_readiness: ReadinessStatus;
   readonly storm_readiness: ReadinessStatus;
   readonly public_publish_readiness: ReadinessStatus;
+  readonly markov_readiness?: ReadinessStatus;
 }
 
 function maxStatus(statuses: readonly HardeningStatus[]): HardeningStatus {
@@ -40,12 +41,13 @@ function readinessFromChecks(checks: readonly HardeningCheck[], warnIds: readonl
   return "green";
 }
 
-export function derivePipelineReadinessClasses(checks: readonly HardeningCheck[]): Pick<PipelineGuardAudit, "core_pipeline_status" | "transition_readiness" | "storm_readiness" | "public_publish_readiness"> {
+export function derivePipelineReadinessClasses(checks: readonly HardeningCheck[]): Pick<PipelineGuardAudit, "core_pipeline_status" | "transition_readiness" | "storm_readiness" | "public_publish_readiness" | "markov_readiness"> {
   return {
     core_pipeline_status: readinessFromChecks(checks, ["pending_candle_refresh"]),
     transition_readiness: readinessFromChecks(checks, ["creator_stats_30d", "ml_verifier_label_integrity", "daily_closes_lag", "creator_news_channel_exclusion"]),
     storm_readiness: readinessFromChecks(checks, ["ml_verifier_label_integrity", "creator_news_channel_exclusion", "transcript_collect_laptop"]),
     public_publish_readiness: readinessFromChecks(checks, ["creator_stats_30d", "ml_promotion_state", "transcript_collect_laptop", "daily_closes_lag", "ml_verifier_label_integrity", "creator_news_channel_exclusion", "pending_candle_refresh"]),
+    markov_readiness: readinessFromChecks(checks, ["transition_state_coverage"], ["markov_sparsity_block"]),
   };
 }
 
@@ -311,6 +313,61 @@ export async function auditCreatorEligibilityTaxonomy(queryFn: QueryFn): Promise
   };
 }
 
+export async function auditMarkovReadiness(queryFn: QueryFn): Promise<HardeningCheck> {
+  const [row] = await queryFn<{ transition_creators: string | number; total_observations: string | number; sparse_rows: string | number }>(`
+    WITH counted AS (
+      SELECT creator_id, COUNT(*) AS obs
+      FROM transition_state_records
+      GROUP BY creator_id
+    ), sparse AS (
+      SELECT state, COUNT(*) AS cnt
+      FROM transition_state_records
+      GROUP BY state
+      HAVING COUNT(*) < 10
+    )
+    SELECT
+      COUNT(DISTINCT creator_id)::text AS transition_creators,
+      COUNT(*)::text AS total_observations,
+      (SELECT COUNT(*) FROM sparse)::text AS sparse_rows
+    FROM transition_state_records
+  `);
+  const totalObs = num(row?.total_observations);
+  const sparseRowCount = num(row?.sparse_rows);
+  const creatorCount = num(row?.transition_creators);
+
+  let status: HardeningStatus = "block";
+  let summary = "No transition state records found — cannot build Markov matrix.";
+  let nextAction = "Run transition-state-classifier first to produce transition state records.";
+
+  if (totalObs >= 200 && sparseRowCount === 0) {
+    status = "pass";
+    summary = `Markov readiness: ${totalObs} observations across ${creatorCount} creators, no sparse rows.`;
+    nextAction = "Markov matrix can be built reliably. Run markov-head for trajectory predictions.";
+  } else if (totalObs >= 50) {
+    status = "warn";
+    summary = `Markov readiness: ${totalObs} observations, ${sparseRowCount} sparse states — treat predictions as preliminary.`;
+    nextAction = sparseRowCount > 0
+      ? "Increase transition snapshot cadence to fill sparse states before relying on Markov predictions."
+      : "Continue monitoring; more observations improve prediction accuracy.";
+  } else if (totalObs > 0) {
+    status = "warn";
+    summary = `Markov readiness: only ${totalObs} observations — insufficient for reliable transition matrix.`;
+    nextAction = "Run more transition snapshots (weekly/monthly) until 50+ observations accumulate.";
+  }
+
+  return {
+    id: "transition_state_coverage",
+    status,
+    summary,
+    metrics: {
+      total_observations: totalObs,
+      creator_count: creatorCount,
+      sparse_state_rows: sparseRowCount,
+    },
+    next_action: nextAction,
+  };
+}
+
 export async function runPipelineGuardAudit(
   queryFn: QueryFn = defaultQuery,
   now = new Date(),
@@ -322,6 +379,7 @@ export async function runPipelineGuardAudit(
   checks.push(...await auditCandleRefreshAndDailyCloses(queryFn));
   checks.push(await auditMlVerifierAnomalies(queryFn));
   checks.push(await auditCreatorEligibilityTaxonomy(queryFn));
+  checks.push(await auditMarkovReadiness(queryFn));
   const readiness = derivePipelineReadinessClasses(checks);
   return {
     generated_at: now.toISOString(),

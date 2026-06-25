@@ -38,6 +38,16 @@ The next autonomy target is `FULL_AUTONOMOUS_BOUNDED_OWNED_GTM`, not unrestricte
 | `callscore-opportunity-research-head` | `opportunity_matrix`, `creator-video-swipefile` | Read-only research and briefs can be autonomous; posting/outreach/spend remain gated. |
 | `callscore-compliance-linter-head` | `marketing-compliance-linter` | Autonomous gatekeeper; cannot publish or weaken policy. |
 | `callscore-data-pipeline-sentinel` | Workplane/freshness/pipeline jobs | Autonomous read-only truth sentinel; DB writes/restarts/backfills/promotions remain gated. |
+| `callscore-youtube-discovery-head` | `discover:videos`, `creator_db` | Discovery polling can become autonomous; provider/bulk change remains gated. |
+| `callscore-transcript-scraper-head` | `scrape:v2`, laptop bridge | Scrape-acquire can become autonomous; yt-dlp migration / provider change remains gated. |
+| `callscore-llm-extractor-head` | `extract:llm`, Gemini/Ollama providers | Extraction can become autonomous; LLM provider/prompt change remains gated. |
+| `callscore-price-matcher-head` | `match`, candle data | Price matching can become autonomous; provider/backfill change remains gated. |
+| `callscore-scorer-head` | `score`, leaderboard | Scoring can become autonomous; algorithm/leaderboard schema change remains gated. |
+| `callscore-consensus-head` | `consensus`, multi-model merge | Consensus can become autonomous; model weight/algorithm change remains gated. |
+| `callscore-ml-verifier-head` | `ml_verifier_batch`, Gemma/Ollama | Verification can become autonomous; model swap/promotion remains gated. |
+| `callscore-candle-refresher-head` | `candle_refresh`, market data | Candle refresh can become autonomous; provider/datalake change remains gated. |
+| `callscore-candidate-admission-head` | `candidate_admission`, eligibility manifest | Admission can become autonomous; admission criteria change remains gated. |
+| `callscore-markov-trajectory-head` | transition report, HMM engine | Trajectory prediction pre-Markov; matrix/prediction publication remains gated until backtest validated. |
 
 ## Roster
 
@@ -58,6 +68,16 @@ The next autonomy target is `FULL_AUTONOMOUS_BOUNDED_OWNED_GTM`, not unrestricte
 | `linkedin` | LinkedIn inbox triage specialist | `/srv/agents/repos/Claude_Code_Automations/agent_workflows/linkedin/SKILL.md` | yes | Manual-input LinkedIn inbox classification and reply drafting. | No send; Omar approval / SEND_GATE before outbound action. |
 | `outlook` | Email triage specialist | `/srv/agents/repos/Claude_Code_Automations/agent_workflows/outlook/SKILL.md` | yes | Outlook/Gmail inbox triage, sorting, draft reply generation. | Moves/drafts only within approved envelope; sends require approval. |
 | `autoresearch` | Autonomous experiment loop | `/srv/agents/repos/Claude_Code_Automations/agent_workflows/autoresearch/SKILL.md` | yes | Long-running mutate/bench/keep-discard loops for code/prompt/outreach experiments. | Must have target file, benchmark, metric, budget/stop constraints; no live provider side effects unless gated. |
+| `callscore-youtube-discovery-head` | Pipeline discovery | soul in `callscore-channel-head-souls.yaml` | yes | YouTube creator/video discovery via API; enqueue for scrape. | Discovery polling autonomous; bulk/provider change gated. |
+| `callscore-transcript-scraper-head` | Pipeline scraper | soul in `callscore-channel-head-souls.yaml` | yes | yt-dlp transcript scraping, duration validation, gap detection. | Scrape acquisition autonomous; yt-dlp migration gated. |
+| `callscore-llm-extractor-head` | Pipeline extractor | soul in `callscore-channel-head-souls.yaml` | yes | LLM price-call extraction from transcripts. | Extraction autonomous; provider/prompt change gated. |
+| `callscore-price-matcher-head` | Pipeline matcher | soul in `callscore-channel-head-souls.yaml` | yes | Match calls vs candle data for correctness/alpha. | Matching autonomous; provider/backfill gated. |
+| `callscore-scorer-head` | Pipeline scorer | soul in `callscore-channel-head-souls.yaml` | yes | Creator accuracy scoring and leaderboard inputs. | Scoring autonomous; algorithm/schema change gated. |
+| `callscore-consensus-head` | Pipeline consensus | soul in `callscore-channel-head-souls.yaml` | yes | Multi-model score consensus and quality merge. | Consensus autonomous; weight/retirement change gated. |
+| `callscore-ml-verifier-head` | Pipeline verifier | soul in `callscore-channel-head-souls.yaml` | yes | Gemma/Ollama verification batches. | Verification autonomous; model swap/promotion gated. |
+| `callscore-candle-refresher-head` | Pipeline refresher | soul in `callscore-channel-head-souls.yaml` | yes | Market data freshness guardian and gap detection. | Refresh autonomous; provider/datalake change gated. |
+| `callscore-candidate-admission-head` | Pipeline admission | soul in `callscore-channel-head-souls.yaml` | yes | Creator candidate eligibility and pipeline admission. | Admission autonomous; criteria/rule change gated. |
+| `callscore-markov-trajectory-head` | Pipeline Markov | soul in `callscore-channel-head-souls.yaml` | pre-implementation | Creator trajectory prediction via HMM from transition snapshots. | Trajectory publication gated until backtest validated; matrix parameter change gated. |
 
 ## Registry-backed channel ownership
 
@@ -81,6 +101,16 @@ The next autonomy target is `FULL_AUTONOMOUS_BOUNDED_OWNED_GTM`, not unrestricte
 | Art of War campaign engine | `Art of War` | `artofwar_strategy_brief`, `artofwar_campaign_preflight`, `artofwar_campaign_verify`, `artofwar_campaign_persona_test`, `artofwar_campaign_gemma_eval`, `artofwar_campaign_dossier`, `artofwar_campaign_receipt` | local dry-run CLI | `ready_public_owned` | READY_PUBLIC_OWNED + PUBLIC_MESSAGING_POLICY + POST_EXECUTION_RECEIPT + SECRET_GATE for owned organic public posts; SEND_GATE/SPEND_GATE/FINANCIAL_GATE/PRODUCTION_GATE as action-specific for restricted lanes |
 | Workplane / Hermes governance | `Hermes / Workplane` | `HH control bridge`, `agentmemory`, `callscore-memory` | Hermes / HH control bridge | `ready` | SECRET_GATE + PRODUCTION_GATE for mutations |
 | Automation registry / health checks | `automation_registry_refresh` | `automation_dry_run`, `automation_health_check`, `automation_activation_review`, `Claude_Code_Automations workplane` | local automation registry | `monitored` | SECRET_GATE + action-specific approval gate |
+| YouTube video discovery | `callscore-youtube-discovery-head` | `callscore-transcript-scraper-head`, `callscore-candidate-admission-head` | YouTube Data API / composio | `monitored` | DB_WRITE check for enqueue; SPEND_GATE for paid API enrichment |
+| Transcript acquisition | `callscore-transcript-scraper-head` | `callscore-youtube-discovery-head`, laptop bridge | yt-dlp / laptop bridge | `monitored` | PRODUCTION_GATE for provider mutation; SECRET_GATE for cookie rotation |
+| LLM call extraction | `callscore-llm-extractor-head` | `callscore-transcript-scraper-head`, `callscore-consensus-head` | Gemini / Ollama / LLM provider | `monitored` | SPEND_GATE for LLM provider usage; PRODUCTION_GATE for prompt change |
+| Price matching | `callscore-price-matcher-head` | `callscore-llm-extractor-head`, `callscore-candle-refresher-head` | Candle data provider | `monitored` | PRODUCTION_GATE for provider/backfill change; SECRET_GATE for data source credentials |
+| Creator scoring | `callscore-scorer-head` | `callscore-price-matcher-head`, `callscore-consensus-head` | Scoring engine / local computation | `monitored` | PRODUCTION_GATE for algorithm change; FINANCIAL_GATE if scoring affects monetisation |
+| Multi-model consensus | `callscore-consensus-head` | `callscore-scorer-head`, `callscore-ml-verifier-head` | Consensus engine | `monitored` | PRODUCTION_GATE for weight/algorithm change; PRODUCTION_GATE for model retirement |
+| ML verification | `callscore-ml-verifier-head` | `callscore-consensus-head`, `callscore-gemma-transcript-head` | Gemma / Ollama local | `monitored` | PRODUCTION_GATE for model swap; PRODUCTION_GATE for shadow promotion |
+| Candle data refresh | `callscore-candle-refresher-head` | `callscore-price-matcher-head` | Candle data provider | `monitored` | SPEND_GATE for paid data source; PRODUCTION_GATE for historical backfill |
+| Creator admission | `callscore-candidate-admission-head` | `callscore-youtube-discovery-head`, creator eligibility manifest | Admission engine | `monitored` | PRODUCTION_GATE for admission criteria change; DATA_POLICY_GATE for exclusion rule changes |
+| Markov trajectory | `callscore-markov-trajectory-head` | `callscore-consensus-head`, `callscore-scorer-head`, transition report | Transition HMM engine | `pre_markov` | PRODUCTION_GATE for prediction publication; DATA_POLICY_GATE for transition matrix changes |
 
 ## Correction note
 
