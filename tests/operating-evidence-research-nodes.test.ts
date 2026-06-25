@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -24,6 +24,74 @@ function emptyEvidenceState(): OperatingGraphState {
     artifacts: {},
   };
 }
+
+function liveGateContext() {
+  return {
+    workplaneStatus: { status: "OK", automation_readiness: "CONTROLLED_FULL", autonomous_revenue_status: "YES" },
+    heartbeat: {
+      heartbeat_id: "evidence-test-heartbeat",
+      fresh: true,
+      lease_expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    },
+  };
+}
+
+function writeFakeCreatorGrowthScout(root: string): { command: string; markerPath: string; receiptPath: string } {
+  const command = join(root, "fake-creator-growth-scout.sh");
+  const markerPath = join(root, "invoked.txt");
+  const receiptPath = join(root, "creator-growth-scout-receipt.json");
+  writeFileSync(command, `#!/usr/bin/env bash
+set -euo pipefail
+echo invoked > ${JSON.stringify(markerPath)}
+cat > ${JSON.stringify(receiptPath)} <<'JSON'
+{
+  "receipt_id": "creator-growth-scout-test-receipt",
+  "created_at": "2026-06-25T12:00:00.000Z",
+  "external_mutation_performed": false,
+  "provider_spend_performed": false,
+  "queries": {
+    "hidden_gems_count": 1,
+    "recent_promising_count": 2,
+    "missing_coverage_count": 3
+  },
+  "payload_hash": "sha256:test-growth-scout"
+}
+JSON
+echo "# CallScore Creator Growth Scout"
+echo "Receipt: ${receiptPath}"
+`, { mode: 0o700 });
+  chmodSync(command, 0o700);
+  return { command, markerPath, receiptPath };
+}
+
+test("evidence_research read-live invokes creator growth scout through the operating graph", async () => {
+  const root = mkdtempSync(join(tmpdir(), "operating-evidence-live-test-"));
+  const fake = writeFakeCreatorGrowthScout(root);
+  const graph = createCallscoreOperatingGraph();
+
+  const result = await graph.invoke(
+    buildInitialOperatingState({ goal: "evidence_research", mode: "read_live", dryRun: false, maxItems: 1 }),
+    {
+      configurable: {
+        thread_id: "operating-evidence-live-test",
+        ...liveGateContext(),
+        creatorGrowthScoutCommand: fake.command,
+      },
+    },
+  );
+
+  assert.equal(existsSync(fake.markerPath), true);
+  const evidenceNode = result.node_results.find((item) => item.node_id === "evidence_goal_loop");
+  assert.equal(evidenceNode?.status, "ok");
+  assert.equal(evidenceNode?.receipt_id, "creator-growth-scout-test-receipt");
+  assert.equal(evidenceNode?.detail.invoked_implementation, "callscore-creator-growth-scout");
+  assert.equal(evidenceNode?.detail.hidden_gems_count, 1);
+  assert.equal(evidenceNode?.detail.recent_promising_count, 2);
+  assert.equal(evidenceNode?.detail.missing_coverage_count, 3);
+  assert.equal(evidenceNode?.artifact_path, fake.receiptPath);
+  assert.equal(result.mutation_flags.external_mutation_performed, false);
+  assert.equal(result.mutation_flags.db_write_performed, false);
+});
 
 test("evidence research goal wraps transition, STORM, ML quality, Markov, and WorkflowRuntime bridge with fixture artifacts", async () => {
   const artifactDir = mkdtempSync(join(tmpdir(), "operating-evidence-test-"));

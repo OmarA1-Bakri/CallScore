@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { buildDataPipelineStageCommands, parseDataPipelineArgs } from "../../../scripts/run-data-pipeline";
@@ -12,6 +13,53 @@ import { trustReviewGoalLoopNode } from "./trust-review-nodes";
 export { videoGoalLoopNode } from "./video-pipeline-nodes";
 
 const DOMAIN_ARTIFACT_DIR = ".tmp/workflow-receipts/callscore_operating_graph/domain";
+const DEFAULT_CREATOR_GROWTH_SCOUT_COMMAND = "/srv/agents/hermes/scripts/callscore-creator-growth-scout.sh";
+
+type ChildProcessExecution = { stdout: string; stderr: string; exitCode: number | null };
+
+function execFilePromise(command: string, args: readonly string[], options: { cwd: string; timeoutMs: number }): Promise<ChildProcessExecution> {
+  return new Promise((resolve) => {
+    execFile(command, [...args], { cwd: options.cwd, timeout: options.timeoutMs, maxBuffer: 2_000_000 }, (error, stdout, stderr) => {
+      if (!error) {
+        resolve({ stdout: String(stdout), stderr: String(stderr), exitCode: 0 });
+        return;
+      }
+      const code = typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === "number"
+        ? ((error as NodeJS.ErrnoException & { code?: number }).code ?? 1)
+        : 1;
+      resolve({ stdout: String(stdout), stderr: String(stderr || error.message), exitCode: code });
+    });
+  });
+}
+
+function configurableRecord(config?: RunnableConfig): Record<string, unknown> {
+  const value = config?.configurable;
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function parseCreatorGrowthScoutReceiptPath(stdout: string): string | null {
+  const receiptLine = stdout.match(/^Receipt:\s*(.+)$/m)?.[1]?.trim();
+  if (receiptLine) return receiptLine;
+  return stdout.match(/^receipt=(.+)$/m)?.[1]?.trim() ?? null;
+}
+
+function readJsonRecord(path: string): Record<string, unknown> {
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("creator_growth_scout_receipt_not_object");
+  return parsed as Record<string, unknown>;
+}
+
+function nestedNumber(source: Record<string, unknown>, key: string): number {
+  const queries = source.queries && typeof source.queries === "object" && !Array.isArray(source.queries)
+    ? source.queries as Record<string, unknown>
+    : {};
+  return Number(queries[key] ?? 0);
+}
+
 
 function sha256(value: unknown): string {
   return `sha256:${createHash("sha256").update(JSON.stringify(value)).digest("hex")}`;
@@ -210,7 +258,71 @@ export const alertGoalLoopNode = wrapDirectFunctionNode({
 export const evidenceGoalLoopNode = wrapDirectFunctionNode({
   nodeId: "evidence_goal_loop",
   domain: "evidence_research",
-  run: async ({ state }) => {
+  run: async ({ state, config }) => {
+    if (!state.config.testFixtures && !state.config.dryRun) {
+      const cfg = configurableRecord(config);
+      const command = typeof cfg.creatorGrowthScoutCommand === "string"
+        ? cfg.creatorGrowthScoutCommand
+        : DEFAULT_CREATOR_GROWTH_SCOUT_COMMAND;
+      const args = stringArray(cfg.creatorGrowthScoutArgs);
+      const timeoutMs = typeof cfg.creatorGrowthScoutTimeoutMs === "number"
+        ? Math.max(1_000, Math.floor(cfg.creatorGrowthScoutTimeoutMs))
+        : 120_000;
+      const execution = await execFilePromise(command, args, { cwd: process.cwd(), timeoutMs });
+      const stdout = redactCommandOutput(execution.stdout);
+      const stderr = redactCommandOutput(execution.stderr);
+      if (execution.exitCode !== 0) {
+        return {
+          status: "failed" as const,
+          summary: `Creator growth scout failed with exit ${execution.exitCode}`,
+          blockers: [`creator_growth_scout_exit_${execution.exitCode}`],
+          detail: {
+            invoked_implementation: "callscore-creator-growth-scout",
+            exit_code: execution.exitCode,
+            stderr_excerpt: stderr.slice(0, 2_000),
+            stdout_excerpt: stdout.slice(0, 1_000),
+          },
+          mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+        };
+      }
+
+      const receiptPath = parseCreatorGrowthScoutReceiptPath(stdout);
+      if (!receiptPath || !existsSync(receiptPath)) {
+        return {
+          status: "failed" as const,
+          summary: "Creator growth scout completed but did not expose a readable receipt path.",
+          blockers: ["creator_growth_scout_receipt_missing"],
+          detail: {
+            invoked_implementation: "callscore-creator-growth-scout",
+            exit_code: execution.exitCode,
+            stdout_excerpt: stdout.slice(0, 1_000),
+          },
+          mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+        };
+      }
+
+      const scoutReceipt = readJsonRecord(receiptPath);
+      const receiptId = typeof scoutReceipt.receipt_id === "string" ? scoutReceipt.receipt_id : undefined;
+      return {
+        status: "ok" as const,
+        receipt_id: receiptId,
+        artifact_path: receiptPath,
+        summary: "Creator growth scout executed through the operating graph in read-only mode.",
+        detail: {
+          invoked_implementation: "callscore-creator-growth-scout",
+          source_receipt_path: receiptPath,
+          source_receipt_id: receiptId ?? null,
+          hidden_gems_count: nestedNumber(scoutReceipt, "hidden_gems_count"),
+          recent_promising_count: nestedNumber(scoutReceipt, "recent_promising_count"),
+          missing_coverage_count: nestedNumber(scoutReceipt, "missing_coverage_count"),
+          payload_hash: typeof scoutReceipt.payload_hash === "string" ? scoutReceipt.payload_hash : null,
+          external_mutation_performed: scoutReceipt.external_mutation_performed === true,
+          provider_spend_performed: scoutReceipt.provider_spend_performed === true,
+        },
+        mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+      };
+    }
+
     const artifact = {
       schema_version: "callscore_evidence_research_node_plan.v1",
       created_at: nowIso(),
