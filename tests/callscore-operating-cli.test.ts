@@ -1,7 +1,82 @@
 import * as assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
+function writeFakeScout(root: string): { command: string; markerPath: string; receiptPath: string } {
+  const command = join(root, "fake-scout.sh");
+  const markerPath = join(root, "fake-scout-invoked.txt");
+  const receiptPath = join(root, "fake-scout-receipt.json");
+  writeFileSync(command, `#!/usr/bin/env bash
+set -euo pipefail
+echo invoked > ${JSON.stringify(markerPath)}
+cat > ${JSON.stringify(receiptPath)} <<'JSON'
+{
+  "receipt_id": "creator-growth-scout-cli-test-receipt",
+  "created_at": "2026-06-25T12:00:00.000Z",
+  "external_mutation_performed": false,
+  "provider_spend_performed": false,
+  "queries": {
+    "hidden_gems_count": 4,
+    "recent_promising_count": 5,
+    "missing_coverage_count": 6
+  },
+  "payload_hash": "sha256:test-cli-growth-scout"
+}
+JSON
+echo "# CallScore Creator Growth Scout"
+echo "Receipt: ${receiptPath}"
+`, { mode: 0o700 });
+  chmodSync(command, 0o700);
+  return { command, markerPath, receiptPath };
+}
+
+function writeJson(path: string, value: unknown): string {
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  return path;
+}
+
+test("callscore-operating-goal CLI evidence_research read-live accepts gate context files and invokes scout", () => {
+  const root = mkdtempSync(join(tmpdir(), "operating-evidence-cli-test-"));
+  const fake = writeFakeScout(root);
+  const workplanePath = writeJson(join(root, "workplane.json"), { status: "OK", automation_readiness: "CONTROLLED_FULL", autonomous_revenue_status: "YES" });
+  const heartbeatPath = writeJson(join(root, "heartbeat.json"), {
+    heartbeat_id: "cli-evidence-heartbeat",
+    fresh: true,
+    lease_expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+  });
+
+  const stdout = execFileSync(process.execPath, [
+    "--import",
+    "tsx",
+    "src/scripts/callscore-operating-goal.ts",
+    "--goal",
+    "evidence_research",
+    "--read-live",
+    "--max-items",
+    "1",
+    "--workplane-status-json",
+    workplanePath,
+    "--heartbeat-json",
+    heartbeatPath,
+    "--creator-growth-scout-command",
+    fake.command,
+  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8" });
+
+  const parsed = JSON.parse(stdout) as { status: string; blockers: string[]; latest_receipt_path: string };
+  assert.equal(parsed.status, "ok");
+  assert.deepEqual(parsed.blockers, []);
+  assert.equal(existsSync(fake.markerPath), true);
+  assert.equal(existsSync(parsed.latest_receipt_path), true);
+  const receipt = JSON.parse(readFileSync(parsed.latest_receipt_path, "utf8")) as {
+    node_results: Array<{ node_id: string; receipt_id: string; detail: Record<string, unknown> }>;
+  };
+  const evidence = receipt.node_results.find((node) => node.node_id === "evidence_goal_loop");
+  assert.equal(evidence?.receipt_id, "creator-growth-scout-cli-test-receipt");
+  assert.equal(evidence?.detail.invoked_implementation, "callscore-creator-growth-scout");
+  assert.equal(evidence?.detail.hidden_gems_count, 4);
+});
 
 test("callscore-operating-goal CLI runs monitor dry-run and prints JSON summary", () => {
   const stdout = execFileSync(process.execPath, [

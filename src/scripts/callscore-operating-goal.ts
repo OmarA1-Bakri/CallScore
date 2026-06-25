@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { buildInitialOperatingState, createCallscoreOperatingGraph } from "../lib/workplane/callscore-operating-graph";
 import { OperatingGoalModeSchema, OperatingGoalSchema, type OperatingGoal } from "../lib/workplane/operating-goals";
 
@@ -9,6 +10,25 @@ function valueAfter(argv: readonly string[], flag: string): string | null {
 
 function parseBooleanFlag(argv: readonly string[], flag: string): boolean {
   return argv.includes(flag);
+}
+
+function readJsonObject(path: string): Record<string, unknown> {
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${path} did not contain a JSON object`);
+  return parsed as Record<string, unknown>;
+}
+
+function buildRunnableConfig(argv: readonly string[], goal: OperatingGoal): Record<string, unknown> {
+  const configurable: Record<string, unknown> = { thread_id: `callscore-operating-${goal}-${randomUUID()}` };
+  const workplanePath = valueAfter(argv, "--workplane-status-json");
+  if (workplanePath) configurable.workplaneStatus = readJsonObject(workplanePath);
+  const heartbeatPath = valueAfter(argv, "--heartbeat-json");
+  if (heartbeatPath) configurable.heartbeat = readJsonObject(heartbeatPath);
+  const creatorGrowthScoutCommand = valueAfter(argv, "--creator-growth-scout-command");
+  if (creatorGrowthScoutCommand) configurable.creatorGrowthScoutCommand = creatorGrowthScoutCommand;
+  const creatorGrowthScoutTimeoutRaw = valueAfter(argv, "--creator-growth-scout-timeout-ms");
+  if (creatorGrowthScoutTimeoutRaw) configurable.creatorGrowthScoutTimeoutMs = Number(creatorGrowthScoutTimeoutRaw);
+  return configurable;
 }
 
 export function parseOperatingGoalCliArgs(argv = process.argv.slice(2)) {
@@ -42,7 +62,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const graph = createCallscoreOperatingGraph();
   const result = await graph.invoke(
     buildInitialOperatingState(input),
-    { configurable: { thread_id: `callscore-operating-${input.goal}-${randomUUID()}` } },
+    { configurable: buildRunnableConfig(argv, input.goal) },
   );
   const failed = result.errors.length > 0 || result.node_results.some((item) => item.status === "failed");
   const summaryNode = result.node_results.find((item) => item.node_id === "operating_summary");
