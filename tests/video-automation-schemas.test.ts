@@ -26,6 +26,7 @@ test("video Zod schemas validate canonical creator and job state", () => {
     qaReport: null,
     youtubeVideoId: null,
     publishUrl: null,
+    brollManifestPath: null,
     artifactDir: "artifacts/video-jobs/video-test-001",
     errors: [],
     warnings: [],

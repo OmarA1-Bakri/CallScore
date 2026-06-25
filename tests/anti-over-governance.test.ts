@@ -15,8 +15,8 @@ const now = "2026-06-21T15:00:00.000Z";
 test("anti-over-governance audit discovers the final runtime agents from canonical souls config", () => {
   const agents = discoverFinalRuntimeAgents(soulsYaml);
 
-  assert.equal(agents.length, 16);
-  assert.equal(new Set(agents.map((agent) => agent.agentId)).size, 16);
+  assert.equal(agents.length, 26);
+  assert.equal(new Set(agents.map((agent) => agent.agentId)).size, 26);
   assert.ok(agents.every((agent) => agent.agentId.startsWith("callscore-")));
   assert.ok(agents.every((agent) => agent.className.length > 0));
   assert.ok(agents.every((agent) => agent.ownerSurface.length > 0));
@@ -27,7 +27,7 @@ test("anti-over-governance audit allows every healthy routine agent fixture with
   const agents = discoverFinalRuntimeAgents(soulsYaml);
   const report = runAntiOverGovernanceAudit({ agents, now });
 
-  assert.equal(report.safeResults.length, 16);
+  assert.equal(report.safeResults.length, 26);
   assert.equal(report.safeResults.some((result) => result.proposedActionType === "publish_owned_public"), true);
   assert.equal(report.safeResults.every((result) => result.finalVerdict === "PASS"), true);
   assert.equal(report.safeResults.every((result) => result.founderRequired === false), true);
@@ -67,7 +67,7 @@ test("anti-over-governance audit markdown includes required agent and restricted
   assert.match(markdown, /# CallScore Anti-Over-Governance Audit/);
   assert.match(markdown, /\| Agent \| Safe scenario \| Decision \| Governance gates triggered \| founder_required \| non_founder_review_required \| Final verdict \|/);
   assert.match(markdown, /\| Restricted scenario \| Decision \| Governance gates triggered \| founder_required \| Final verdict \|/);
-  assert.equal((markdown.match(/\| callscore-/g) ?? []).length, 16);
+  assert.equal((markdown.match(/\| callscore-/g) ?? []).length, 26);
   assert.match(markdown, /whop_financial_customer_payment_mutation/);
   assert.match(markdown, /provider_spend/);
   assert.match(markdown, /db_deploy_infra_mutation/);
