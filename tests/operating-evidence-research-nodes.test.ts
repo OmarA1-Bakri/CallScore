@@ -89,6 +89,9 @@ test("evidence_research read-live invokes creator growth scout through the opera
   assert.equal(evidenceNode?.detail.recent_promising_count, 2);
   assert.equal(evidenceNode?.detail.missing_coverage_count, 3);
   assert.equal(evidenceNode?.artifact_path, fake.receiptPath);
+  assert.equal(result.node_results.some((item) => item.receipt_id.startsWith("op-monitor-")), false);
+  assert.equal(result.node_results.find((item) => item.node_id === "boot_context")?.receipt_id.startsWith("op-evidence_research-"), true);
+  assert.equal(result.node_results.find((item) => item.node_id === "hard_gate_preflight")?.receipt_id.startsWith("op-evidence_research-"), true);
   assert.equal(result.mutation_flags.external_mutation_performed, false);
   assert.equal(result.mutation_flags.db_write_performed, false);
 });

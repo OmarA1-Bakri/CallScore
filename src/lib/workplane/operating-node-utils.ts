@@ -66,6 +66,7 @@ export function nodeResultToStatePatch(result: OperatingNodeResult, state: Opera
 function makeResult(input: {
   readonly nodeId: string;
   readonly domain: OperatingDomain;
+  readonly goal: OperatingGraphState["config"]["goal"];
   readonly status: OperatingNodeResult["status"];
   readonly startedAtMs: number;
   readonly summary: string;
@@ -81,7 +82,7 @@ function makeResult(input: {
     node_id: input.nodeId,
     domain: input.domain,
     status: input.status,
-    receipt_id: input.receiptId ?? generateOperatingReceiptId("monitor", input.nodeId),
+    receipt_id: input.receiptId ?? generateOperatingReceiptId(input.goal, input.nodeId),
     artifact_path: input.artifactPath ?? null,
     blockers: [...(input.blockers ?? [])],
     warnings: [...(input.warnings ?? [])],
@@ -103,6 +104,7 @@ export function wrapDirectFunctionNode(options: DirectFunctionNodeOptions): Oper
       const result = makeResult({
         nodeId: options.nodeId,
         domain: options.domain,
+        goal: parsedState.config.goal,
         status: output.status ?? "ok",
         startedAtMs,
         summary: output.summary ?? `${options.nodeId} completed`,
@@ -119,6 +121,7 @@ export function wrapDirectFunctionNode(options: DirectFunctionNodeOptions): Oper
       const result = makeResult({
         nodeId: options.nodeId,
         domain: options.domain,
+        goal: parsedState.config.goal,
         status: "failed",
         startedAtMs,
         summary: `${options.nodeId} failed: ${message}`,
@@ -173,6 +176,7 @@ export function wrapChildProcessNode(options: ChildProcessNodeOptions): Operatin
     const result = makeResult({
       nodeId: options.nodeId,
       domain: options.domain,
+      goal: parsedState.config.goal,
       status: ok ? "ok" : "failed",
       startedAtMs,
       summary: ok ? `${options.nodeId} command completed` : `${options.nodeId} command failed with exit ${execution.exitCode}`,
