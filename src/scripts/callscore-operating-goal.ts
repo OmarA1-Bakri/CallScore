@@ -18,7 +18,7 @@ function readJsonObject(path: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-function buildRunnableConfig(argv: readonly string[], goal: OperatingGoal): Record<string, unknown> {
+export function buildRunnableConfig(argv: readonly string[], goal: OperatingGoal): Record<string, unknown> {
   const configurable: Record<string, unknown> = { thread_id: `callscore-operating-${goal}-${randomUUID()}` };
   const workplanePath = valueAfter(argv, "--workplane-status-json");
   if (workplanePath) configurable.workplaneStatus = readJsonObject(workplanePath);
@@ -28,6 +28,14 @@ function buildRunnableConfig(argv: readonly string[], goal: OperatingGoal): Reco
   if (creatorGrowthScoutCommand) configurable.creatorGrowthScoutCommand = creatorGrowthScoutCommand;
   const creatorGrowthScoutTimeoutRaw = valueAfter(argv, "--creator-growth-scout-timeout-ms");
   if (creatorGrowthScoutTimeoutRaw) configurable.creatorGrowthScoutTimeoutMs = Number(creatorGrowthScoutTimeoutRaw);
+  const videoSchedulerMode = valueAfter(argv, "--video-scheduler-mode");
+  if (videoSchedulerMode) configurable.videoSchedulerMode = videoSchedulerMode;
+  const videoArtifactRoot = valueAfter(argv, "--video-artifact-root");
+  if (videoArtifactRoot) configurable.videoArtifactRoot = videoArtifactRoot;
+  const videoQueueRoot = valueAfter(argv, "--video-queue-root");
+  if (videoQueueRoot) configurable.videoQueueRoot = videoQueueRoot;
+  const videoSchedulerNow = valueAfter(argv, "--video-scheduler-now");
+  if (videoSchedulerNow) configurable.videoSchedulerNow = videoSchedulerNow;
   return configurable;
 }
 

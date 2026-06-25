@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { buildRunnableConfig } from "../src/scripts/callscore-operating-goal";
 function writeFakeScout(root: string): { command: string; markerPath: string; receiptPath: string } {
   const command = join(root, "fake-scout.sh");
   const markerPath = join(root, "fake-scout-invoked.txt");
@@ -36,6 +37,30 @@ function writeJson(path: string, value: unknown): string {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   return path;
 }
+
+test("callscore-operating-goal CLI maps produce_video scheduler flags into runnable config", () => {
+  const root = mkdtempSync(join(tmpdir(), "operating-video-scheduler-cli-test-"));
+  const artifactRoot = join(root, "artifacts");
+  const queueRoot = join(root, "queue");
+  const config = buildRunnableConfig([
+    "--goal",
+    "produce_video",
+    "--read-live",
+    "--video-scheduler-mode",
+    "enqueue_scheduled",
+    "--video-artifact-root",
+    artifactRoot,
+    "--video-queue-root",
+    queueRoot,
+    "--video-scheduler-now",
+    "2026-06-24T08:00:00.000Z",
+  ], "produce_video");
+
+  assert.equal(config.videoSchedulerMode, "enqueue_scheduled");
+  assert.equal(config.videoArtifactRoot, artifactRoot);
+  assert.equal(config.videoQueueRoot, queueRoot);
+  assert.equal(config.videoSchedulerNow, "2026-06-24T08:00:00.000Z");
+});
 
 test("callscore-operating-goal CLI evidence_research read-live accepts gate context files and invokes scout", () => {
   const root = mkdtempSync(join(tmpdir(), "operating-evidence-cli-test-"));

@@ -6,6 +6,7 @@ import { DEFAULT_OPERATING_MUTATION_FLAGS } from "../operating-graph-schemas";
 import { buildVideoArtifactPaths } from "../../../video/artifacts/artifact-paths";
 import { runVideoStage } from "../../../video/queues/start-video-workers";
 import { createVideoJobState, enqueueVideoStage, VIDEO_STAGES, type VideoStage } from "../../../video/queues/video-queues";
+import { enqueueScheduledVideoJobs } from "../../../video/queues/scheduler";
 
 const VIDEO_OPERATING_ARTIFACT_DIR = ".tmp/workflow-receipts/callscore_operating_graph/video";
 
@@ -108,7 +109,35 @@ export const videoGoalLoopNode = wrapDirectFunctionNode({
     const configuredStatePath = cfg?.videoStatePath as string | undefined;
     const configuredJobId = state.config.videoJobId ?? undefined;
     const queueRoot = (cfg?.videoQueueRoot as string | undefined) ?? ".tmp/video-queue";
+    const schedulerMode = cfg?.videoSchedulerMode as string | undefined;
+    const schedulerNowRaw = cfg?.videoSchedulerNow as string | undefined;
     const approved = state.config.approved === true;
+
+    if (state.config.mode === "read_live" && schedulerMode === "enqueue_scheduled") {
+      const scheduled = await enqueueScheduledVideoJobs(schedulerNowRaw ? new Date(schedulerNowRaw) : new Date(), { artifactRoot, queueRoot });
+      const jobs = scheduled.map((item) => ({ format: item.format, job_id: item.jobId, queue_path: item.queuePath, skipped: item.skipped }));
+      const enqueuedCount = scheduled.filter((item) => !item.skipped).length;
+      const skippedCount = scheduled.filter((item) => item.skipped).length;
+      const detail = {
+        scheduler_mode: "enqueue_scheduled",
+        jobs,
+        enqueued_count: enqueuedCount,
+        skipped_count: skippedCount,
+        queue_root: queueRoot,
+        artifact_root: artifactRoot ?? "artifacts/video-jobs",
+        scheduler_now: schedulerNowRaw ?? null,
+        approved,
+        broll_dispatcher_wired: true,
+      };
+      const artifactPath = writeStandaloneVideoNodeArtifact({ schema_version: "callscore_video_scheduler_receipt.v1", status: "ok", detail });
+      return {
+        status: "ok" as const,
+        summary: `Scheduled video jobs enqueued=${enqueuedCount} skipped=${skippedCount}.`,
+        artifact_path: artifactPath,
+        detail,
+        mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS },
+      };
+    }
 
     if (!state.config.dryRun && state.config.mode === "read_live" && !configuredStatePath) {
       const entry = listQueueFiles(queueRoot).map(readQueueEntry).find((item): item is VideoQueueEntry => item !== null);

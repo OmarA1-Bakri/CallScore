@@ -187,6 +187,55 @@ describe("operating video pipeline nodes", () => {
     assert.match(String(videoNode?.artifact_path), /callscore_operating_graph\/video\/operating-video-node-/);
   });
 
+  test("produce_video scheduler mode enqueues scheduled jobs idempotently through the operating graph", async () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), "operating-video-scheduler-artifacts-"));
+    const queueRoot = mkdtempSync(join(tmpdir(), "operating-video-scheduler-queue-"));
+    const graph = createCallscoreOperatingGraph();
+
+    const first = await graph.invoke(
+      buildInitialOperatingState({ goal: "produce_video", mode: "read_live", dryRun: false, maxItems: 1 }),
+      {
+        configurable: {
+          thread_id: "operating-video-scheduler-test-a",
+          ...liveGateContext(),
+          videoSchedulerMode: "enqueue_scheduled",
+          videoSchedulerNow: "2026-06-24T08:00:00.000Z",
+          videoArtifactRoot: artifactRoot,
+          videoQueueRoot: queueRoot,
+        },
+      },
+    );
+
+    const firstNode = first.node_results.find((item) => item.node_id === "video_goal_loop");
+    assert.equal(firstNode?.status, "ok");
+    assert.equal(firstNode?.detail.scheduler_mode, "enqueue_scheduled");
+    assert.equal(firstNode?.detail.enqueued_count, 2);
+    assert.equal(firstNode?.detail.skipped_count, 0);
+    assert.equal(readdirSync(queueRoot).filter((name) => name.endsWith(".json")).length, 2);
+
+    const second = await graph.invoke(
+      buildInitialOperatingState({ goal: "produce_video", mode: "read_live", dryRun: false, maxItems: 1 }),
+      {
+        configurable: {
+          thread_id: "operating-video-scheduler-test-b",
+          ...liveGateContext(),
+          videoSchedulerMode: "enqueue_scheduled",
+          videoSchedulerNow: "2026-06-24T08:00:00.000Z",
+          videoArtifactRoot: artifactRoot,
+          videoQueueRoot: queueRoot,
+        },
+      },
+    );
+
+    const secondNode = second.node_results.find((item) => item.node_id === "video_goal_loop");
+    assert.equal(secondNode?.status, "ok");
+    assert.equal(secondNode?.detail.enqueued_count, 0);
+    assert.equal(secondNode?.detail.skipped_count, 2);
+    assert.equal(readdirSync(queueRoot).filter((name) => name.endsWith(".json")).length, 2);
+    assert.equal(second.mutation_flags.db_write_performed, false);
+    assert.equal(second.mutation_flags.provider_mutation_performed, false);
+  });
+
   test("start-video worker dispatcher contains broll between captions and render", () => {
     const source = readFileSync("src/video/queues/start-video-workers.ts", "utf8");
     assert.match(source, /stage === "broll"\) return runBrollStage\(statePath\)/);

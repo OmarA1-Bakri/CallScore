@@ -6,6 +6,7 @@ import test from "node:test";
 import { computePublishAt, loadVideoAutomationConfig } from "../src/video/config/publishing-config";
 import { decidePublish } from "../src/video/qa/publish-decision";
 import { createVideoJobState, createAndEnqueueVideoJob } from "../src/video/queues/video-queues";
+import { enqueueScheduledVideoJobs } from "../src/video/queues/scheduler";
 import { qaVideoJob } from "../src/video/qa/qa-job";
 import { mockVideoCandidates } from "../src/video/data/mock-video-candidates";
 import { planVideo } from "../src/video/planning/video-planner.graph";
@@ -36,10 +37,20 @@ test("QA job fails safely when media artifacts are missing", async () => {
   assert.ok(report.errors.includes("video_missing"));
 });
 
-test("file-backed queue creates canonical state and queue item", async () => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "callscore-video-queue-"));
-  const queue = path.join(dir, "queue");
-  const result = await createAndEnqueueVideoJob({ format: "daily_short", artifactRoot: path.join(dir, "artifacts"), queueRoot: queue, now: new Date("2026-06-23T00:00:00.000Z") });
-  assert.equal(result.state.status, "queued");
-  assert.ok((await fs.stat(result.queuePath)).size > 0);
+test("scheduled video enqueue is idempotent for the same UTC day and isolated queue root", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "callscore-video-scheduler-"));
+  const queueRoot = path.join(dir, "queue");
+  const artifactRoot = path.join(dir, "artifacts");
+  const now = new Date("2026-06-24T08:00:00.000Z");
+
+  const first = await enqueueScheduledVideoJobs(now, { artifactRoot, queueRoot });
+  const second = await enqueueScheduledVideoJobs(now, { artifactRoot, queueRoot });
+  const queueFiles = await fs.readdir(queueRoot);
+
+  assert.equal(first.length, 2);
+  assert.equal(first.every((item) => item.skipped === false), true);
+  assert.equal(second.length, 2);
+  assert.equal(second.every((item) => item.skipped === true), true);
+  assert.equal(queueFiles.filter((name) => name.endsWith(".json")).length, 2);
+  assert.deepEqual(first.map((item) => item.jobId), second.map((item) => item.jobId));
 });
