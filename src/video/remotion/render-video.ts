@@ -19,6 +19,7 @@ export interface RenderVideoInput {
   readonly scenes: readonly ScenePlan[];
   readonly captions: readonly CaptionCue[];
   readonly audioSrc?: string;
+  readonly brollManifestPath?: string;
   readonly outputPath: string;
 }
 

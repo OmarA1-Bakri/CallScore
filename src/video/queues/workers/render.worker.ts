@@ -19,6 +19,7 @@ export async function runRenderStage(statePath: string, options: { readonly skip
       scenes,
       captions,
       audioSrc: state.normalizedAudioPath ?? undefined,
+      brollManifestPath: state.brollManifestPath ?? undefined,
       outputPath: paths.videoMp4,
     });
   }

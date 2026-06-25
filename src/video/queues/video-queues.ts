@@ -4,7 +4,7 @@ import { buildVideoArtifactPaths } from "../artifacts/artifact-paths";
 import { writeJsonArtifact } from "../artifacts/state-store";
 import { isoNow, VideoFormatSchema, VideoJobStateSchema, type VideoFormat, type VideoJobState } from "../schemas/video.schemas";
 
-export const VIDEO_STAGES = ["plan", "audio", "captions", "render", "thumbnail", "qa", "publish", "analytics"] as const;
+export const VIDEO_STAGES = ["plan", "audio", "captions", "broll", "render", "thumbnail", "qa", "publish", "analytics"] as const;
 export type VideoStage = (typeof VIDEO_STAGES)[number];
 
 export interface VideoQueueItem {
