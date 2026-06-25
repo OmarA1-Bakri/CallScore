@@ -47,6 +47,13 @@ const CLASS_DEFAULTS: Record<string, ActionAuthorityType[]> = {
   growth_hacker: ["draft_artifact", "owned_public_publish"],
   system_guardian: ["hard_gate"],
   agent_coach: ["read_only_observe"],
+  // Marketing specialist classes
+  social_posting_agent: ["draft_artifact", "owned_public_publish"],
+  social_commenting_agent: ["draft_artifact", "gated_external_send"],
+  social_image_agent: ["draft_artifact"],
+  social_discovery_agent: ["read_only_observe", "internal_enqueue"],
+  social_analytics_agent: ["read_only_observe", "internal_state_mutation"],
+  cmo_head: ["read_only_observe", "internal_enqueue", "draft_artifact"],
 };
 
 /**
@@ -75,11 +82,25 @@ export function inferClass(agentId: string): string {
     return `pipeline_${segments[1]}`;
   }
 
+  // Specialist role detection — segments like x-posting → social_posting_agent
+  const specialistRoles: Record<string, string> = {
+    posting: "social_posting_agent",
+    commenting: "social_commenting_agent",
+    image: "social_image_agent",
+    profile: "social_discovery_agent",
+    analytics: "social_analytics_agent",
+  };
+  if (segments.length >= 2 && specialistRoles[segments[1]]) {
+    return specialistRoles[segments[1]];
+  }
+
   // Known non-pipeline agents
   const knownClasses: Record<string, string> = {
     artofwar: "strategist",
     x: "channel_head",
     linkedin: "channel_head",
+    reddit: "channel_head",
+    cmo: "cmo_head",
     community: "channel_head",
     whop: "channel_head_gated_send",
     email: "channel_head_gated_send",

@@ -99,7 +99,10 @@ export function extractAgents(yaml: string): readonly AgentSeed[] {
 
 function channelFor(agentId: string): string {
   if (agentId.includes("artofwar")) return "art_of_war";
-  if (agentId.includes("x-linkedin")) return "owned_social";
+  if (agentId.includes("cmo")) return "cmo_strategy";
+  if (agentId.includes("-x-")) return "owned_social";
+  if (agentId.includes("linkedin")) return "owned_social";
+  if (agentId.includes("reddit")) return "owned_community";
   if (agentId.includes("community")) return "owned_community";
   if (agentId.includes("whop")) return "whop_commerce";
   if (agentId.includes("email")) return "email_partnership_drafts";
@@ -111,7 +114,10 @@ function channelFor(agentId: string): string {
 
 function defaultTaskType(agentId: string): string {
   if (agentId.includes("artofwar")) return "artofwar_campaign_dossier";
-  if (agentId.includes("x-linkedin")) return "owned_social_draft_and_monitor";
+  if (agentId.includes("cmo")) return "cmo_strategy_review";
+  if (agentId.includes("-x-")) return "x_specialist_dispatch";
+  if (agentId.includes("linkedin")) return "linkedin_specialist_dispatch";
+  if (agentId.includes("reddit")) return "reddit_specialist_dispatch";
   if (agentId.includes("community")) return "owned_community_draft_and_monitor";
   if (agentId.includes("whop")) return "whop_copy_asset_and_read_only_health";
   if (agentId.includes("email")) return "email_partnership_draft_packet_only";

@@ -12,7 +12,7 @@ function baseCtx(overrides: Partial<ChannelHeadDecisionContext> = {}): ChannelHe
   return {
     now, taskId: "task-1", targetActionType: "publish_owned_public",
     riskClass: "safe_owned_public",
-    channelHeadSoul: { agentId: "callscore-x-linkedin-growth-head", channelId: "owned_social", soulVersion: "v1", purpose: "test" },
+    channelHeadSoul: { agentId: "callscore-x-head", channelId: "owned_social", soulVersion: "v1", purpose: "test" },
     gtmRegistryState: { laneId: "owned-social", currentStatus: "ready_public_owned", requiredGate: "NONE", ownedOrManaged: true, zeroSpendRequired: true, allowedActions: ["publish_owned_public"], forbiddenActions: [], rollbackPath: "/rollback" },
     workplane: { status: "OK", blockers: [] },
     recentReceipts: [],
@@ -124,7 +124,7 @@ test("no registered authority handler fails closed", () => {
 
 test("router escalates ambiguous quality to non-founder review", () => {
   const result = routeDecision(baseCtx({
-    channelHeadSoul: { agentId: "callscore-x-linkedin-growth-head", channelId: "owned_social", soulVersion: "v1", purpose: "test" },
+    channelHeadSoul: { agentId: "callscore-x-head", channelId: "owned_social", soulVersion: "v1", purpose: "test" },
     qualitySignal: { ...baseCtx().qualitySignal, status: "ambiguous", score: 0.67 },
   }));
   assert.equal(result.decision.decision, "escalate_non_founder_review");
@@ -305,14 +305,26 @@ test("every canonical agent class resolves to at least one registered handler", 
   // Each canonical agent class mapped in CLASS_DEFAULTS should route through a registered handler
   const canonicalTests: Record<string, string[]> = {
     "callscore-artofwar-strategist": ["draft_artifact", "owned_public_publish"],
-    "callscore-x-linkedin-growth-head": ["draft_artifact", "owned_public_publish"],
+    "callscore-x-head": ["draft_artifact", "owned_public_publish"],
+    "callscore-x-posting-agent": ["draft_artifact", "owned_public_publish"],
+    "callscore-x-commenting-agent": ["draft_artifact", "gated_external_send"],
+    "callscore-x-image-agent": ["draft_artifact"],
+    "callscore-x-profile-discovery-agent": ["read_only_observe", "internal_enqueue"],
+    "callscore-x-analytics-agent": ["read_only_observe", "internal_state_mutation"],
+    "callscore-linkedin-head": ["draft_artifact", "owned_public_publish"],
+    "callscore-linkedin-posting-agent": ["draft_artifact", "owned_public_publish"],
+    "callscore-linkedin-image-agent": ["draft_artifact"],
+    "callscore-linkedin-analytics-agent": ["read_only_observe", "internal_state_mutation"],
+    "callscore-reddit-head": ["draft_artifact", "owned_public_publish"],
+    "callscore-reddit-posting-agent": ["draft_artifact", "owned_public_publish"],
+    "callscore-reddit-commenting-agent": ["draft_artifact", "gated_external_send"],
+    "callscore-cmo-head": ["read_only_observe", "internal_enqueue", "draft_artifact"],
     "callscore-whop-commerce-head": ["draft_artifact", "gated_external_send"],
     "callscore-data-pipeline-sentinel": ["read_only_observe", "hard_gate"],
     "callscore-pipeline-scorer-head": ["internal_state_mutation"],
     "callscore-pipeline-consensus-head": ["internal_state_mutation"],
     "callscore-opportunity-research-head": ["read_only_observe"],
     "callscore-compliance-linter-head": ["hard_gate"],
-    "callscore-linkedin-growth-head": ["draft_artifact", "owned_public_publish"],
     "callscore-email-partnership-drafts-head": ["draft_artifact", "gated_external_send"],
     "callscore-community-head": ["draft_artifact", "owned_public_publish"],
   };
