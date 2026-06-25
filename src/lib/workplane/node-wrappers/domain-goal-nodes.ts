@@ -3,16 +3,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { buildDataPipelineStageCommands, parseDataPipelineArgs } from "../../../scripts/run-data-pipeline";
-import { runFreshCallSentinel } from "../../sentinels/fresh-call-sentinel";
 import { PipelineDispatchJobTypeSchema, DEFAULT_OPERATING_MUTATION_FLAGS, OperatingGraphStateSchema, type OperatingGraphState } from "../operating-graph-schemas";
 import { wrapDirectFunctionNode } from "../operating-node-utils";
 import { redactCommandOutput } from "../operating-receipts";
 import { cmoRevenueGoalLoopNode } from "./cmo-revenue-nodes";
+import { sentinelMonitorGoalNode } from "./sentinel-nodes";
 import { trustReviewGoalLoopNode } from "./trust-review-nodes";
 export { videoGoalLoopNode } from "./video-pipeline-nodes";
-
-import { sentinelMonitorGoalNode } from "./sentinel-nodes";
-import { nodeResultToStatePatch } from "../operating-node-utils";
 
 const DOMAIN_ARTIFACT_DIR = ".tmp/workflow-receipts/callscore_operating_graph/domain";
 
@@ -147,54 +144,8 @@ export const workerDispatchGoalLoopNode = wrapDirectFunctionNode({
 });
 
 export const monitoringGoalLoopNode = (async (state: OperatingGraphState, config?: RunnableConfig) => {
-  const safeState = (typeof state?.config === "object" && state !== null) ? state : (() => { try { return OperatingGraphStateSchema.parse(state ?? {}); } catch { return state as OperatingGraphState; } })();
-  const cfg = config?.configurable ?? {};
-  const c = (cfg && typeof cfg === "object" && !Array.isArray(cfg)) ? cfg as Record<string, unknown> : {};
-
-  const isTest = (safeState.config as any)?.testFixtures === true;
-  if (isTest) {
-    return sentinelMonitorGoalNode(safeState, config as any) as any;
-  }
-
-  const parsed = OperatingGraphStateSchema.parse(state);
-  const result = runFreshCallSentinel({
-    candidates: [{
-      kind: "video",
-      source: "manual_seed",
-      creator_handle: "@CallScoreFixture",
-      youtube_video_id: `fixture-${safePart(parsed.config.goal)}`,
-      transcript_status: "ready",
-      candidate_call_count: 1,
-    }],
-    mode: "read_only",
-    repoRoot: process.cwd(),
-    writeReceipt: false,
-    now: new Date("2026-06-25T00:00:00.000Z"),
-  });
-  const artifact = {
-    schema_version: "callscore_monitoring_node_receipt.v1",
-    created_at: nowIso(),
-    sentinel_receipt: result.receipt,
-    recommendation_count: result.recommendations.length,
-    event_count: result.events.length,
-  };
-  const artifactPath = writeDomainArtifact("monitoring_goal_loop", artifact);
-  const nodeResult = {
-    node_id: "monitoring_goal_loop" as const,
-    domain: "monitoring" as const,
-    status: (result.receipt.blockers.length ? "blocked" : "ok") as "ok" | "blocked" | "failed" | "skipped",
-    summary: "Fresh-call sentinel wrapper executed in read-only mode.",
-    artifact_path: artifactPath,
-    blockers: [...result.receipt.blockers],
-    detail: {
-      schema_version: artifact.schema_version,
-      sentinel_schema_version: result.receipt.schema_version,
-      recommended_count: result.receipt.recommended_count,
-      cooldowns_respected: result.receipt.cooldowns_respected,
-    },
-    mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
-  };
-  return nodeResultToStatePatch(nodeResult as any, parsed);
+  const safeState = OperatingGraphStateSchema.parse(state);
+  return sentinelMonitorGoalNode(safeState, config as RunnableConfig) as any;
 }) as any;
 
 export const trustGoalLoopNode = async (state: OperatingGraphState, config?: RunnableConfig) => {

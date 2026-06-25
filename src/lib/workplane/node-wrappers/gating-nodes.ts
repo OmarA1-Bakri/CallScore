@@ -184,6 +184,10 @@ export const bootContextNode = wrapDirectFunctionNode({
   }),
 });
 
+function missingRuntimeContextIsWarningOnly(state: OperatingGraphState): boolean {
+  return state.config.goal === "monitor";
+}
+
 export async function hardGatePreflightNode(state: OperatingGraphState, config: RunnableConfig): Promise<OperatingNodePatch> {
   const blockers: string[] = [];
   const warnings: string[] = [];
@@ -203,7 +207,8 @@ export async function hardGatePreflightNode(state: OperatingGraphState, config: 
   const workplane = workplaneResult.status;
   if (workplaneResult.warning) warnings.push(workplaneResult.warning);
   if (workplaneResult.unavailable) {
-    blockers.push("workplane_status_unavailable");
+    if (missingRuntimeContextIsWarningOnly(state)) warnings.push("workplane_status_unavailable");
+    else blockers.push("workplane_status_unavailable");
   }
   if (workplane?.status === "BLOCKED" || workplane?.automation_readiness === "BLOCKED") {
     blockers.push("workplane_blocked");
@@ -217,7 +222,9 @@ export async function hardGatePreflightNode(state: OperatingGraphState, config: 
   }
 
   const heartbeat = resolveHeartbeat(state, config);
-  blockers.push(...heartbeatBlockers(heartbeat));
+  const heartbeatIssues = heartbeatBlockers(heartbeat);
+  if (heartbeat === null && missingRuntimeContextIsWarningOnly(state)) warnings.push(...heartbeatIssues);
+  else blockers.push(...heartbeatIssues);
   blockers.push(...pipelineFreshnessBlockers(state));
   blockers.push(...authorityBlockers({ state, config, workplane, killSwitch, heartbeat }));
 

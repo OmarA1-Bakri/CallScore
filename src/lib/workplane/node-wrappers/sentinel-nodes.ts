@@ -1,8 +1,10 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import { DEFAULT_MUTATION_FLAGS, type OperatingNodeResult, type OperatingGraphState, type OperatingNodePatch } from "../operating-node-utils";
+import { DEFAULT_MUTATION_FLAGS, nodeResultToStatePatch, type OperatingNodeResult, type OperatingGraphState, type OperatingNodePatch } from "../operating-node-utils";
 import { buildInitialOperatingState } from "../callscore-operating-graph";
+import { redactCommandOutput } from "../operating-receipts";
 
 const SENTINEL_ARTIFACT_DIR = ".tmp/workflow-receipts/callscore_operating_graph/sentinel";
 
@@ -13,10 +15,124 @@ function writeSentinelArtifact(name: string, value: unknown): string {
   return path;
 }
 
+function configurableObject(config: RunnableConfig): Record<string, unknown> {
+  const value = config?.configurable;
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function parseJsonObject(value: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function readJsonObject(path: string): Record<string, unknown> | null {
+  try {
+    if (!existsSync(path)) return null;
+    return parseJsonObject(readFileSync(path, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function execFilePromise(command: string, args: readonly string[], timeoutMs: number): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  return new Promise((resolve) => {
+    execFile(command, [...args], { cwd: process.cwd(), timeout: timeoutMs, maxBuffer: 2_000_000 }, (error, stdout, stderr) => {
+      if (!error) {
+        resolve({ stdout: String(stdout), stderr: String(stderr), exitCode: 0 });
+        return;
+      }
+      const code = typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === "number"
+        ? Number((error as NodeJS.ErrnoException & { code?: number }).code)
+        : 1;
+      resolve({ stdout: String(stdout), stderr: String(stderr || error.message), exitCode: code });
+    });
+  });
+}
+
+async function runControlPlaneCanaryNode(state: OperatingGraphState, config: RunnableConfig): Promise<OperatingNodePatch> {
+  const startedAt = Date.now();
+  const cfg = configurableObject(config);
+  const command = Array.isArray(cfg.monitorCanaryCommand)
+    ? cfg.monitorCanaryCommand.filter((item): item is string => typeof item === "string" && item.length > 0)
+    : [process.execPath, "--import", "tsx", "src/scripts/run-control-plane-canary.ts"];
+  const receiptDir = typeof cfg.monitorCanaryReceiptDir === "string"
+    ? cfg.monitorCanaryReceiptDir
+    : join(SENTINEL_ARTIFACT_DIR, "control-plane-canary");
+  mkdirSync(receiptDir, { recursive: true });
+  const receiptPath = join(receiptDir, `control-plane-canary-${Date.now()}.json`);
+  const timeoutMs = typeof cfg.monitorCanaryTimeoutMs === "number" && cfg.monitorCanaryTimeoutMs > 0 ? cfg.monitorCanaryTimeoutMs : 300_000;
+  const [bin, ...baseArgs] = command.length > 0 ? command : [process.execPath, "--import", "tsx", "src/scripts/run-control-plane-canary.ts"];
+  const args = [...baseArgs, "--receipt-out", receiptPath];
+  const execution = await execFilePromise(bin, args, timeoutMs);
+  const stdout = redactCommandOutput(execution.stdout);
+  const stderr = redactCommandOutput(execution.stderr);
+  const stdoutJson = parseJsonObject(stdout.trim().split("\n").filter(Boolean).at(-1) ?? "");
+  const receipt = readJsonObject(receiptPath);
+  const workflowStatus = typeof receipt?.workflow_status === "string"
+    ? receipt.workflow_status
+    : typeof stdoutJson?.workflow_status === "string"
+      ? stdoutJson.workflow_status
+      : null;
+  const ok = execution.exitCode === 0 && (workflowStatus == null || workflowStatus === "completed");
+  const artifact = {
+    schema_version: "callscore_monitoring_control_plane_canary_receipt.v1",
+    created_at: new Date().toISOString(),
+    invoked_implementation: "run-control-plane-canary",
+    command: [bin, ...args].map((part) => redactCommandOutput(part)),
+    exit_code: execution.exitCode,
+    stdout,
+    stderr,
+    receipt_path: receiptPath,
+    receipt,
+    stdout_json: stdoutJson,
+    workflow_status: workflowStatus,
+    mutation_scope: receipt?.mutation_scope ?? null,
+    final_business_tables_mutated: receipt?.final_business_tables_mutated ?? null,
+  };
+  const artifactPath = writeSentinelArtifact("control-plane-canary", artifact);
+  const result: OperatingNodeResult = {
+    node_id: "monitoring_goal_loop",
+    domain: "monitoring",
+    status: ok ? "ok" : "failed",
+    receipt_id: typeof receipt?.workflow_run_id === "string" ? receipt.workflow_run_id : `monitor-canary-${Date.now()}`,
+    artifact_path: artifactPath,
+    blockers: ok ? [] : [stderr || `control_plane_canary_exit_${execution.exitCode}`],
+    warnings: [],
+    started_at: new Date(startedAt).toISOString(),
+    finished_at: new Date().toISOString(),
+    duration_ms: Math.max(0, Date.now() - startedAt),
+    mutation_flags: {
+      ...DEFAULT_MUTATION_FLAGS,
+      db_write_performed: ok,
+      external_mutation_performed: false,
+      provider_mutation_performed: false,
+      public_publish_performed: false,
+      production_mutation_performed: false,
+    },
+    summary: ok ? "Control-plane canary executed through operating graph." : "Control-plane canary failed through operating graph.",
+    detail: {
+      invoked_implementation: "run-control-plane-canary",
+      receipt_path: receiptPath,
+      workflow_status: workflowStatus,
+      exit_code: execution.exitCode,
+      final_business_tables_mutated: receipt?.final_business_tables_mutated ?? null,
+    },
+  };
+  return nodeResultToStatePatch(result, state);
+}
+
 export async function sentinelMonitorGoalNode(
   state: OperatingGraphState | ReturnType<typeof buildInitialOperatingState>,
-  _config: RunnableConfig,
+  config: RunnableConfig,
 ): Promise<OperatingNodePatch> {
+  if (!state.config.testFixtures && !state.config.dryRun) {
+    return runControlPlaneCanaryNode(state as OperatingGraphState, config);
+  }
+
   const monitoringArtifact = {
     schema_version: "callscore_monitoring_goal_loop_fixture.v1",
     sentinel_schema_version: "callscore_sentinel_run_receipt.v1",

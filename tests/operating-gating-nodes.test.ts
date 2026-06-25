@@ -42,8 +42,8 @@ describe("operating hard gate nodes", () => {
     assert.equal(patch.blockers?.includes("workplane_blocked"), true);
   });
 
-  test("hardGatePreflightNode returns a blocker when Workplane status is missing", async () => {
-    const state = buildInitialOperatingState({ goal: "monitor" });
+  test("hardGatePreflightNode blocks non-monitor goals when Workplane status is missing", async () => {
+    const state = buildInitialOperatingState({ goal: "refresh_data", mode: "bounded_write", dryRun: false, approved: true, approvalReceiptId: "approval-refresh-test" });
     const patch = await hardGatePreflightNode(state, { configurable: { thread_id: "missing-workplane-test" } });
     assert.equal(patch.node_results?.[0]?.status, "blocked");
     assert.equal(patch.blockers?.includes("workplane_status_unavailable"), true);
