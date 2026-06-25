@@ -2,12 +2,27 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { routeDecision } from "../lib/autonomy/decision-router";
 import {
-  decideChannelHeadAction,
   writeChannelHeadDecisionReceipt,
   type ChannelHeadDecisionContext,
   type ChannelHeadDecisionResult,
 } from "../lib/autonomy/channel-head-decision";
+import {
+  createDecisionTrace,
+  traceInputSnapshot,
+  traceDecision,
+  traceReceipt,
+  traceStateTransition,
+  langfuseConfigured,
+} from "../lib/autonomy/channel-head-langfuse";
+import {
+  loadState,
+  transitionState,
+  decisionToNextState,
+  saveState,
+  type ChannelHeadStateData,
+} from "../lib/autonomy/channel-head-state-machine";
 import { query } from "../lib/db";
 
 const REPO_ROOT = process.cwd();
@@ -207,7 +222,7 @@ export function buildHeartbeatDecisionArtifacts(input: HeartbeatDecisionArtifact
     heartbeat: { heartbeat_id: `heartbeat:${input.agent.agentId}`, fresh: true, lease_expires_at: input.nextWakeAt },
     publicVerify: { status: "pass", checked_at: input.nowIso },
   };
-  const result = decideChannelHeadAction(context);
+  const result = routeDecision(context);
   return { ...result, receipt: { ...result.receipt, artifact_path: input.receiptPath } };
 }
 
@@ -373,6 +388,30 @@ export async function runAgentHeartbeat(options: AgentHeartbeatRunOptions = {}):
     });
     const decisionReceiptPath = writeChannelHeadDecisionReceipt(decisionArtifacts, paths.receiptDir);
     decisionReceiptPaths.push(decisionReceiptPath);
+
+    // ── Langfuse tracing + state machine ──
+    if (langfuseConfigured()) {
+      const traceId = createDecisionTrace(agent.agentId, channelId);
+      if (traceId) {
+        traceInputSnapshot(traceId, decisionArtifacts.input);
+        traceDecision(traceId, decisionArtifacts.decision);
+        traceReceipt(traceId, decisionArtifacts.receipt);
+      }
+    }
+    // ── State machine transition ──
+    let state = loadState(agent.agentId, channelId, join(paths.receiptDir, "channel-head-states"), nowIso);
+    // If starting fresh, transition through EVALUATING first
+    if (state.state === "INITIAL") {
+      state = transitionState(state, "EVALUATING", "heartbeat cycle start", undefined, undefined, nowIso);
+    }
+    const nextState = decisionToNextState(decisionArtifacts.decision.decision, state.state);
+    const updatedState = transitionState(state, nextState, `decision: ${decisionArtifacts.decision.decision}`, decisionArtifacts.decision.decision_id, decisionArtifacts.receipt.receipt_id, nowIso);
+    if (nextState === "COMPLETE") {
+      const resetState = transitionState(updatedState, "INITIAL", "reset for next cycle", undefined, undefined, nowIso);
+      saveState(resetState, join(paths.receiptDir, "channel-head-states"));
+    } else {
+      saveState(updatedState, join(paths.receiptDir, "channel-head-states"));
+    }
     const heartbeatPayload = {
       inputs_read: [paths.soulsPath, paths.gtmRegistryPath, "npm run workplane:status", "https://call-score.com"],
       decisions: ["agent_registered", "heartbeat_recorded", `channel_head_decision:${decisionArtifacts.decision.decision}`, "restricted_lanes_fail_closed", "hermes_is_orchestrator"],
