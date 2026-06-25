@@ -46,3 +46,7 @@ home-*-alpha-nav.png
 
 # Local Netlify folder
 .netlify
+
+# Art of War live/control-plane runtime artifacts are canonical in the control repo,
+# not in the app source checkout. Keep accidental local copies out of git.
+/art-of-war/
