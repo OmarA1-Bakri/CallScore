@@ -50,11 +50,10 @@ test("authorityForAgent returns correct authorities for gated_external_send agen
   assert.ok(whop.includes("gated_external_send"));
 });
 
-test("authorityForAgent returns class-based fallback for unknown agents", () => {
+test("authorityForAgent returns empty array for unknown agents", () => {
   const unknown = authorityForAgent("callscore-unknown-agent");
   assert.ok(Array.isArray(unknown));
-  assert.ok(unknown.length > 0);
-  assert.ok(unknown.includes("read_only_observe"));
+  assert.equal(unknown.length, 0);
 });
 
 test("authoritiesForClass returns correct defaults per class", () => {
@@ -65,4 +64,5 @@ test("authoritiesForClass returns correct defaults per class", () => {
   assert.deepEqual(authoritiesForClass("research_head"), ["read_only_observe"]);
   assert.deepEqual(authoritiesForClass("pipeline_scorer"), ["internal_state_mutation"]);
   assert.deepEqual(authoritiesForClass("channel_head_gated_send"), ["draft_artifact", "gated_external_send"]);
+  assert.deepEqual(authoritiesForClass("nonexistent_unknown"), []);
 });

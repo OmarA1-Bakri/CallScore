@@ -1,5 +1,6 @@
 import type { ChannelHeadDecisionContext } from "./channel-head-context";
 import type { ChannelHeadDecisionResult } from "./channel-head-decision";
+import type { GateResult } from "./decision-gates";
 import { authorityForAgent, type ActionAuthorityType } from "./action-authority";
 import { handleOwnedPublicPublish } from "./decision-handlers/owned-public-publish";
 import { handleReadOnlyObserve } from "./decision-handlers/read-only-observe";
@@ -8,7 +9,7 @@ import { handleDraftArtifact } from "./decision-handlers/draft-artifact";
 import { handleInternalEnqueue } from "./decision-handlers/internal-enqueue";
 import { handleInternalStateMutation } from "./decision-handlers/internal-state-mutation";
 import { handleGatedExternalSend } from "./decision-handlers/gated-external-send";
-import { decideChannelHeadAction } from "./channel-head-decision";
+import { makeDecisionFromGates } from "./gate-decision-builder";
 
 type DecisionHandler = (context: ChannelHeadDecisionContext) => ChannelHeadDecisionResult;
 
@@ -24,21 +25,34 @@ const HANDLER_REGISTRY: Partial<Record<ActionAuthorityType, DecisionHandler>> = 
 
 /**
  * Route a decision through the correct handler based on the agent's
- * declared action authorities. The most specific matching handler
- * is used. When no handler is registered for any of the agent's
- * authorities, falls back to the legacy decision engine.
+ * declared action authorities. The first matching handler authority
+ * is used. When no authorities are resolved or no handler is registered
+ * for any authority, fails closed with a schema-valid suppress result.
  */
 export function routeDecision(context: ChannelHeadDecisionContext): ChannelHeadDecisionResult {
   const agentId = context.channelHeadSoul.agentId;
   const authorities = authorityForAgent(agentId);
+
+  // No authorities resolved — agent is unrecognised / not in any known class
+  if (authorities.length === 0) {
+    return makeDecisionFromGates(context, {
+      decision: "suppress",
+      reason_codes: ["unknown_agent_not_authorized"],
+      suppress_until: undefined,
+    });
+  }
 
   for (const authority of authorities) {
     const handler = HANDLER_REGISTRY[authority];
     if (handler) return handler(context);
   }
 
-  // Fallback: legacy decision engine for agents with no specific handler
-  return decideChannelHeadAction(context);
+  // Authorities resolved but none have a registered handler
+  return makeDecisionFromGates(context, {
+    decision: "suppress",
+    reason_codes: ["no_registered_authority_handler"],
+    suppress_until: undefined,
+  });
 }
 
 /**

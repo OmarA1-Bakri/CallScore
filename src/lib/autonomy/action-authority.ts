@@ -100,7 +100,7 @@ export function inferClass(agentId: string): string {
  * Get default authorities for a given agent class.
  */
 export function authoritiesForClass(className: string): ActionAuthorityType[] {
-  return CLASS_DEFAULTS[className] ?? ["read_only_observe"];
+  return CLASS_DEFAULTS[className] ?? [];
 }
 
 /**
