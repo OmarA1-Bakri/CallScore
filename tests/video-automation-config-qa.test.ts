@@ -37,6 +37,21 @@ test("QA job fails safely when media artifacts are missing", async () => {
   assert.ok(report.errors.includes("video_missing"));
 });
 
+test("scheduled video enqueue skips legacy timestamp jobs for the same UTC day", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "callscore-video-legacy-scheduler-"));
+  const queueRoot = path.join(dir, "queue");
+  const artifactRoot = path.join(dir, "artifacts");
+  const now = new Date("2026-06-24T08:00:00.000Z");
+
+  await createAndEnqueueVideoJob({ format: "daily_short", artifactRoot, queueRoot, now });
+  const scheduled = await enqueueScheduledVideoJobs(now, { artifactRoot, queueRoot });
+  const queueFiles = await fs.readdir(queueRoot);
+
+  const daily = scheduled.find((item) => item.format === "daily_short");
+  assert.equal(daily?.skipped, true);
+  assert.equal(queueFiles.filter((name) => name.includes("daily_short") && name.endsWith(".json")).length, 1);
+});
+
 test("scheduled video enqueue is idempotent for the same UTC day and isolated queue root", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "callscore-video-scheduler-"));
   const queueRoot = path.join(dir, "queue");

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 import { buildVideoArtifactPaths } from "../artifacts/artifact-paths";
 import { loadVideoAutomationConfig } from "../config/publishing-config";
 import { createAndEnqueueVideoJob } from "./video-queues";
@@ -30,9 +31,34 @@ async function stateExists(jobId: string, artifactRoot?: string): Promise<boolea
   }
 }
 
+async function hasExistingStateForFormatDay(input: { readonly format: VideoFormat; readonly day: string; readonly artifactRoot?: string; readonly deterministicJobId: string }): Promise<boolean> {
+  if (await stateExists(input.deterministicJobId, input.artifactRoot)) return true;
+  const root = input.artifactRoot ?? loadVideoAutomationConfig().artifactsDir;
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await fs.readdir(root, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    try {
+      const parsed = JSON.parse(await fs.readFile(path.join(root, entry.name, "state.json"), "utf8")) as { format?: unknown; runDate?: unknown };
+      if (parsed.format === input.format && typeof parsed.runDate === "string" && parsed.runDate.slice(0, 10) === input.day) return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      if (error instanceof SyntaxError) continue;
+      throw error;
+    }
+  }
+  return false;
+}
+
 async function enqueueOne(format: VideoFormat, now: Date, options: ScheduledVideoJobOptions): Promise<ScheduledVideoJobResult> {
+  const day = now.toISOString().slice(0, 10);
   const jobId = scheduledJobId(format, now);
-  if (await stateExists(jobId, options.artifactRoot)) {
+  if (await hasExistingStateForFormatDay({ format, day, deterministicJobId: jobId, artifactRoot: options.artifactRoot })) {
     return { format, jobId, queuePath: null, skipped: true };
   }
   const created = await createAndEnqueueVideoJob({
