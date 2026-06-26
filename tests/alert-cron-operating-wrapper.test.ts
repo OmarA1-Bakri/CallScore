@@ -46,11 +46,13 @@ test("alert cron operating helper executes bounded fail-closed proof without mut
   assert.ok(result.blockers.includes("heartbeat_missing"));
 });
 
-test("alert cron operating helper invokes the alerts graph fail-closed without direct send/scan", () => {
+test("alert cron operating helper invokes the alerts graph out-of-process without direct send/scan", () => {
   const helper = read("src/lib/workplane/alert-cron-operating.ts");
-  assert.match(helper, /createCallscoreOperatingGraph/);
-  assert.match(helper, /buildInitialOperatingState\(\{[\s\S]*goal:\s*"alerts"/);
-  assert.match(helper, /mode:\s*"dry_run"/);
+  assert.doesNotMatch(helper, /callscore-operating-graph|createCallscoreOperatingGraph|buildInitialOperatingState/);
+  assert.match(helper, /execFile/);
+  assert.match(helper, /src\/scripts\/callscore-operating-goal\.ts/);
+  assert.match(helper, /--goal",\s*"alerts"/);
+  assert.match(helper, /--dry-run/);
   assert.match(helper, /direct_execution_performed:\s*false/);
   assert.match(helper, /send_disabled_in_graph_plan/);
   assert.doesNotMatch(helper, /runAlertSend|runAlertScan|sendEmail|claimPendingAlerts/);
