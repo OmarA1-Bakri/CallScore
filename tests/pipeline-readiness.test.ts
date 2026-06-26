@@ -195,3 +195,20 @@ test("buildPipelineReadinessSummary can allow bounded shadow runs for shipping r
   assert.equal(summary.creatorCompleteness.byStatus.pending_shadow, 1);
   assert.ok(!summary.blockers.includes("pending_shadow_recheck"));
 });
+
+test("buildPipelineReadinessSummary treats transcript backlog as monitored degradation for bounded shipping readiness", () => {
+  const summary = buildPipelineReadinessSummary({
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    publicCounts: { ...DEFAULT_PUBLIC_COUNTS, trackedCalls: 10, publicScoredCalls: 8 },
+    creators: [
+      creator({ creator_id: 2, youtube_handle: "@PendingTranscript", missing_transcript_videos: 3 }),
+    ],
+    extractionRecords: [shadow({ video: { ...video, creator_id: 2 } })],
+    diffRecords: [],
+    promotionRecords: [],
+    requireFullShadowRecheck: false,
+  });
+
+  assert.equal(summary.creatorCompleteness.byStatus.missing_transcripts, 1);
+  assert.ok(!summary.blockers.includes("missing_transcripts_or_terminal_reasons"));
+});
