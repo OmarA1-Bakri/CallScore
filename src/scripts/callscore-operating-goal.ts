@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { buildInitialOperatingState, createCallscoreOperatingGraph } from "../lib/workplane/callscore-operating-graph";
+import { createLangfuseTrace, flushLangfuseObservability, traceLangfuseSpan } from "../lib/langfuse-observability";
 import { OperatingGoalModeSchema, OperatingGoalSchema, type OperatingGoal } from "../lib/workplane/operating-goals";
+import { loadEnv } from "./script-helpers";
 
 function valueAfter(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -77,12 +79,34 @@ export function parseOperatingGoalCliArgs(argv = process.argv.slice(2)) {
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
+  loadEnv();
   const input = parseOperatingGoalCliArgs(argv);
   const graph = createCallscoreOperatingGraph();
-  const result = await graph.invoke(
-    buildInitialOperatingState(input),
-    { configurable: buildRunnableConfig(argv, input.goal) },
-  );
+  const traceId = createLangfuseTrace({
+    name: `operating-goal/${input.goal}`,
+    tags: ["callscore", "operating_goal", input.goal, input.mode],
+    metadata: {
+      goal: input.goal,
+      mode: input.mode,
+      dry_run: input.dryRun,
+      approved: input.approved,
+      bounded: input.bounded,
+      max_items: input.maxItems,
+    },
+    input,
+  });
+  let result;
+  try {
+    result = await graph.invoke(
+      buildInitialOperatingState(input),
+      { configurable: buildRunnableConfig(argv, input.goal) },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (traceId) traceLangfuseSpan({ traceId, name: "operating_goal_failed", output: { error: message }, level: "ERROR" });
+    await flushLangfuseObservability();
+    throw error;
+  }
   const failed = result.errors.length > 0 || result.node_results.some((item) => item.status === "failed");
   const summaryNode = result.node_results.find((item) => item.node_id === "operating_summary");
   const blocked = result.blockers.length > 0 || summaryNode?.status === "blocked";
@@ -100,6 +124,15 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     latest_summary_path: typeof result.artifacts.operating_summary_path === "string" ? result.artifacts.operating_summary_path : null,
     latest_artifact_path: result.node_results.at(-1)?.artifact_path ?? null,
   };
+  if (traceId) {
+    traceLangfuseSpan({
+      traceId,
+      name: failed ? "operating_goal_failed" : blocked ? "operating_goal_blocked" : "operating_goal_completed",
+      output: summary,
+      level: failed ? "ERROR" : blocked ? "WARNING" : "DEFAULT",
+    });
+  }
+  await flushLangfuseObservability();
   process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
   if (failed) process.exitCode = 1;
 }

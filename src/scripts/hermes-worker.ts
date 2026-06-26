@@ -36,6 +36,7 @@ import {
 } from "../lib/channel-agent-tasks";
 import { query } from "../lib/db";
 import { createLogger } from "../lib/logger";
+import { createLangfuseTrace, flushLangfuseObservability, traceLangfuseSpan } from "../lib/langfuse-observability";
 import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
 import { buildInitialOperatingState, createCallscoreOperatingGraph } from "../lib/workplane/callscore-operating-graph";
 import { loadEnv, sleep, timestamp } from "./script-helpers";
@@ -161,6 +162,31 @@ export async function executeJobWithKeepalive(
   await auditDispatchEvent(job, "started");
 
   const startMs = Date.now();
+  const traceId = createLangfuseTrace({
+    name: `pipeline-job/${job.type}`,
+    tags: ["callscore", "pipeline_job", job.type],
+    metadata: {
+      job_id: job.id,
+      run_id: job.run_id,
+      job_type: job.type,
+      phase: job.phase ?? DEFAULT_PHASE,
+      worker_id: job.locked_by,
+      attempt: job.attempts,
+      max_attempts: job.max_attempts,
+    },
+    input: {
+      payload: job.payload,
+      idempotency_key: job.idempotency_key,
+      metrics: job.metrics,
+    },
+  });
+  if (traceId) {
+    traceLangfuseSpan({
+      traceId,
+      name: "job_started",
+      input: { job_id: job.id, run_id: job.run_id, job_type: job.type },
+    });
+  }
   const heartbeat = setInterval(() => {
     void updatePipelineJobHeartbeat(job, { worker_id: job.locked_by }).catch((error) => {
       logger.warn("job_heartbeat_failed", {
@@ -176,14 +202,30 @@ export async function executeJobWithKeepalive(
     const result = await executeJob(job);
     const durationMs = Date.now() - startMs;
     await auditDispatchEvent(job, "completed", { duration_ms: durationMs });
+    if (traceId) {
+      traceLangfuseSpan({
+        traceId,
+        name: "job_completed",
+        output: { result, duration_ms: durationMs },
+      });
+    }
     return result;
   } catch (error) {
     const durationMs = Date.now() - startMs;
     const message = error instanceof Error ? error.message : String(error);
     await auditDispatchEvent(job, "failed", { duration_ms: durationMs, error: message });
+    if (traceId) {
+      traceLangfuseSpan({
+        traceId,
+        name: "job_failed",
+        output: { error: message, duration_ms: durationMs },
+        level: "ERROR",
+      });
+    }
     throw error;
   } finally {
     clearInterval(heartbeat);
+    await flushLangfuseObservability();
   }
 }
 
@@ -370,6 +412,20 @@ export async function dispatchClaimedChannelTaskThroughOperatingGraph(
   logger: ReturnType<typeof createLogger>,
 ): Promise<void> {
   let failureHandled = false;
+  const traceId = createLangfuseTrace({
+    name: `channel-task/${task.task_type}`,
+    tags: ["callscore", "channel_task", task.task_type, task.agent_id],
+    metadata: {
+      task_id: task.id,
+      agent_id: task.agent_id,
+      channel_id: task.channel_id,
+      task_type: task.task_type,
+      worker_id: workerId,
+      attempt: task.attempts,
+      max_attempts: task.max_attempts,
+    },
+    input: { payload: task.payload },
+  });
   const graph = createCallscoreOperatingGraph({
     workerDispatch: {
       supportedPipelineJobTypes: [],
@@ -417,11 +473,13 @@ export async function dispatchClaimedChannelTaskThroughOperatingGraph(
     });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
+    if (traceId) traceLangfuseSpan({ traceId, name: "channel_task_failed", output: { error: err.message }, level: "ERROR" });
     if (!failureHandled) {
       await failChannelTask(task, err);
       failureHandled = true;
       await captureChannelTaskFailure(task, err, logger);
     }
+    await flushLangfuseObservability();
     return;
   }
 
@@ -454,6 +512,14 @@ export async function dispatchClaimedChannelTaskThroughOperatingGraph(
     receipt,
     dispatch_receipt_id: dispatchResult.receipt_id,
   });
+  if (traceId) {
+    traceLangfuseSpan({
+      traceId,
+      name: "channel_task_completed",
+      output: { receipt, dispatch_receipt_id: dispatchResult.receipt_id },
+    });
+  }
+  await flushLangfuseObservability();
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
