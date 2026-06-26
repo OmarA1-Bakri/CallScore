@@ -50,6 +50,10 @@ type DigestGroup = {
   readonly creatorBuckets: ReadonlyMap<number, CreatorBucket>;
 };
 
+export function assertQueuedAlertSendGraphContext(_env: NodeJS.ProcessEnv = process.env): void {
+  throw new Error("non_graph_alert_send_blocked: legacy_alert_sender_direct_provider_mutation_disabled_use_resend_alert_send_node_or_gmail_send_node");
+};
+
 /* ------------------------------------------------------------------ */
 /*  Utilities                                                          */
 /* ------------------------------------------------------------------ */
@@ -248,6 +252,7 @@ function parseClaimBatch(): number {
 
 async function main(): Promise<void> {
   loadEnv();
+  assertQueuedAlertSendGraphContext();
 
   const batchSize = parseClaimBatch();
   const hasUsers = await userEmailsTableExists();
@@ -361,9 +366,11 @@ async function main(): Promise<void> {
   process.exit(failed > 0 || revertFailures > 0 ? 1 : 0);
 }
 
-main().catch((err: unknown) => {
-  const ts = new Date().toISOString();
-  const msg = err instanceof Error ? err.message : String(err);
-  console.error("[%s] Fatal error: %s", ts, msg);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err: unknown) => {
+    const ts = new Date().toISOString();
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[%s] Fatal error: %s", ts, msg);
+    process.exit(1);
+  });
+}

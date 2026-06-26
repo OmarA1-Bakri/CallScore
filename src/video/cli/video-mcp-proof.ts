@@ -14,6 +14,7 @@ async function main(): Promise<void> {
     thumbnailPath: state.thumbnailPath,
     metadata: state.metadata,
     privacyStatus: "private",
+    graph_context: state.graph_context,
   });
   console.log(JSON.stringify({ ok: true, youtubeVideoId: result.youtubeVideoId, publishUrl: result.publishUrl, privacyStatus: result.privacyStatus }, null, 2));
 }

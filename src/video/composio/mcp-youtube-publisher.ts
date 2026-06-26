@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { ComposioPublishResultSchema, YoutubePublishInputSchema, type ComposioPublishResult, type YoutubePublishInput } from "../schemas/youtube.schemas";
 import type { VideoPublisher } from "./youtube-publisher";
+import { evaluateExternalMutationRequest, finalizeExternalMutationReceipt } from "../../lib/workplane/external-mutation-guard";
 
 export interface McpYoutubePublisherOptions {
   readonly helperPath?: string;
@@ -21,6 +22,10 @@ function sanitizeError(value: string): string {
     .replace(/ghp_[A-Za-z0-9]{12,}/g, "<redacted>")
     .replace(/x-api-key[^\n\r]*/gi, "x-api-key=<redacted>")
     .slice(0, 2_000);
+}
+
+function jsonSafe<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 async function runHelper(input: unknown, options: Required<Pick<McpYoutubePublisherOptions, "helperPath" | "pythonPath" | "timeoutMs">>): Promise<unknown> {
@@ -59,6 +64,19 @@ export class McpYoutubePublisher implements VideoPublisher {
 
   async publishVideo(input: YoutubePublishInput): Promise<ComposioPublishResult> {
     const parsed = YoutubePublishInputSchema.parse(input);
+    const graphContext = parsed.graph_context ?? null;
+    const preflight = evaluateExternalMutationRequest({
+      mode: "approved_publish",
+      graph_context: graphContext,
+      requested_action: "provider_mutation",
+      platform: "youtube",
+      provider_tool: "YOUTUBE_UPLOAD_VIDEO",
+      approved: true,
+      approval_receipt_id: graphContext?.approval_receipt_id ?? null,
+    });
+    if (!preflight.allowed || graphContext?.graph_node_id !== "youtube_video_publish_node") {
+      throw new Error(preflight.blocker_code ?? "non_graph_youtube_mutation_blocked");
+    }
     if (parsed.privacyStatus !== "private" && process.env.VIDEO_PRIVATE_CANARY_ONLY !== "false") {
       throw new Error("MCP YouTube publisher is private-only unless VIDEO_PRIVATE_CANARY_ONLY=false is explicitly set");
     }
@@ -69,13 +87,30 @@ export class McpYoutubePublisher implements VideoPublisher {
     });
     const result = raw as Record<string, unknown>;
     if (!result.ok) throw new Error(`MCP YouTube private upload failed: ${sanitizeError(JSON.stringify(result).slice(0, 1_500))}`);
+    const providerExecutionReceiptId = `mcp-youtube-helper-${String(result.youtubeVideoId ?? "unknown")}`;
+    const finalReceipt = finalizeExternalMutationReceipt({
+      mode: "approved_publish",
+      graph_context: graphContext,
+      requested_action: "provider_mutation",
+      platform: "youtube",
+      provider_tool: "YOUTUBE_UPLOAD_VIDEO",
+      approved: true,
+      approval_receipt_id: graphContext?.approval_receipt_id ?? null,
+      provider_response: result,
+      mutation_flags: { external_mutation_performed: true, provider_mutation_performed: true, public_publish_performed: true },
+      provider_execution_receipt_id: providerExecutionReceiptId,
+      child_receipt_ids: [providerExecutionReceiptId],
+    });
+    if (!finalReceipt.allowed) {
+      throw new Error(finalReceipt.blocker_code ?? "provider_success_required_before_mutation_flags");
+    }
     return ComposioPublishResultSchema.parse({
       jobId: parsed.jobId,
       youtubeVideoId: result.youtubeVideoId,
       publishUrl: result.publishUrl ?? null,
       privacyStatus: "private",
       publishAt: parsed.publishAt ?? null,
-      rawResponse: result as never,
+      rawResponse: jsonSafe({ ...result, externalMutationReceipt: finalReceipt.receipt }) as never,
     });
   }
 }

@@ -28,6 +28,7 @@ export async function runPublishStage(statePath: string, options: { readonly pub
     metadata: state.metadata,
     privacyStatus: config.privacyStatus,
     publishAt: computePublishAt({ config }),
+    graph_context: state.graph_context,
   });
   await writeJsonArtifact(paths.publishResultJson, result as never, { force: true });
   const updated = VideoJobStateSchema.parse({ ...state, status: "published", youtubeVideoId: result.youtubeVideoId, publishUrl: result.publishUrl ?? null, updatedAt: new Date().toISOString() });

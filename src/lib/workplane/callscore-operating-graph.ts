@@ -74,7 +74,70 @@ function stateHasBlockingPreflight(state: OperatingGraphState): boolean {
 function routeAfterPreflight(state: OperatingGraphState) {
   const parsed = OperatingGraphStateSchema.parse(state);
   if (stateHasBlockingPreflight(parsed)) return "collect_receipts";
+  return "external_mutation_preflight";
+}
+
+function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
+  const parsed = OperatingGraphStateSchema.parse(state);
+  if (stateHasBlockingPreflight(parsed)) return "collect_receipts";
   return routeOperatingGoalToNode(parsed.config.goal);
+}
+
+export const externalMutationPreflightNode = wrapDirectFunctionNode({
+  nodeId: "external_mutation_preflight",
+  domain: "gating",
+  run: async ({ state }) => {
+    const cfg = state.config;
+    const mutationMode = cfg.mode === "approved_publish" || cfg.mode === "bounded_write";
+    if (mutationMode && !cfg.approvalReceiptId && !cfg.approvedByOperator) {
+      return {
+        status: "blocked" as const,
+        summary: `External mutation mode=${cfg.mode} requires graph approval evidence before goal lane execution.`,
+        blockers: ["external_mutation_approval_missing"],
+        detail: { goal: cfg.goal, mode: cfg.mode, graph_owned_provider_nodes_required: true },
+        mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+      };
+    }
+
+    return {
+      status: "ok" as const,
+      summary: `External mutation preflight passed for goal=${cfg.goal} mode=${cfg.mode}; provider mutations remain graph-node-only.`,
+      blockers: [],
+      detail: {
+        goal: cfg.goal,
+        mode: cfg.mode,
+        provider_mutation_allowed_outside_graph: false,
+        graph_owned_mutation_nodes: [
+          "x_owned_publish_node",
+          "linkedin_owned_publish_node",
+          "reddit_owned_profile_publish_node",
+          "reddit_comment_or_subreddit_publish_node",
+          "youtube_video_publish_node",
+          "youtube_thumbnail_update_node",
+          "gmail_send_node",
+          "resend_alert_send_node",
+          "whop_mutation_node",
+          "attio_write_node",
+          "posthog_write_node",
+        ],
+      },
+      mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+    };
+  },
+});
+
+function graphOwnedMutationPlaceholderNode(nodeId: string) {
+  return wrapDirectFunctionNode({
+    nodeId,
+    domain: "gating",
+    run: async () => ({
+      status: "blocked" as const,
+      summary: `${nodeId} is registered in the operating graph and must be reached only by an explicit approved mutation edge.`,
+      blockers: ["graph_mutation_node_not_routed"],
+      detail: { node_id: nodeId, provider_mutation_allowed_outside_graph: false },
+      mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+    }),
+  });
 }
 
 function uniqueStrings(values: readonly string[]): string[] {
@@ -283,6 +346,18 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
   const builder = new StateGraph(OperatingGraphAnnotation)
     .addNode("boot_context", bootContextNode)
     .addNode("hard_gate_preflight", hardGatePreflightNode)
+    .addNode("external_mutation_preflight", externalMutationPreflightNode)
+    .addNode("x_owned_publish_node", graphOwnedMutationPlaceholderNode("x_owned_publish_node"))
+    .addNode("linkedin_owned_publish_node", graphOwnedMutationPlaceholderNode("linkedin_owned_publish_node"))
+    .addNode("reddit_owned_profile_publish_node", graphOwnedMutationPlaceholderNode("reddit_owned_profile_publish_node"))
+    .addNode("reddit_comment_or_subreddit_publish_node", graphOwnedMutationPlaceholderNode("reddit_comment_or_subreddit_publish_node"))
+    .addNode("youtube_video_publish_node", graphOwnedMutationPlaceholderNode("youtube_video_publish_node"))
+    .addNode("youtube_thumbnail_update_node", graphOwnedMutationPlaceholderNode("youtube_thumbnail_update_node"))
+    .addNode("gmail_send_node", graphOwnedMutationPlaceholderNode("gmail_send_node"))
+    .addNode("resend_alert_send_node", graphOwnedMutationPlaceholderNode("resend_alert_send_node"))
+    .addNode("whop_mutation_node", graphOwnedMutationPlaceholderNode("whop_mutation_node"))
+    .addNode("attio_write_node", graphOwnedMutationPlaceholderNode("attio_write_node"))
+    .addNode("posthog_write_node", graphOwnedMutationPlaceholderNode("posthog_write_node"))
     .addNode("revenue_goal_loop", revenueGoalLoopNode)
     .addNode("data_goal_loop", dataGoalLoopNode)
     .addNode("worker_dispatch_goal_loop", workerDispatchNode)
@@ -305,6 +380,29 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       alert_goal_loop: "alert_goal_loop",
       evidence_goal_loop: "evidence_goal_loop",
       collect_receipts: "collect_receipts",
+      external_mutation_preflight: "external_mutation_preflight",
+    })
+    .addConditionalEdges("external_mutation_preflight", routeAfterExternalMutationPreflight, {
+      revenue_goal_loop: "revenue_goal_loop",
+      data_goal_loop: "data_goal_loop",
+      worker_dispatch_goal_loop: "worker_dispatch_goal_loop",
+      video_goal_loop: "video_goal_loop",
+      monitoring_goal_loop: "monitoring_goal_loop",
+      trust_goal_loop: "trust_goal_loop",
+      alert_goal_loop: "alert_goal_loop",
+      evidence_goal_loop: "evidence_goal_loop",
+      x_owned_publish_node: "x_owned_publish_node",
+      linkedin_owned_publish_node: "linkedin_owned_publish_node",
+      reddit_owned_profile_publish_node: "reddit_owned_profile_publish_node",
+      reddit_comment_or_subreddit_publish_node: "reddit_comment_or_subreddit_publish_node",
+      youtube_video_publish_node: "youtube_video_publish_node",
+      youtube_thumbnail_update_node: "youtube_thumbnail_update_node",
+      gmail_send_node: "gmail_send_node",
+      resend_alert_send_node: "resend_alert_send_node",
+      whop_mutation_node: "whop_mutation_node",
+      attio_write_node: "attio_write_node",
+      posthog_write_node: "posthog_write_node",
+      collect_receipts: "collect_receipts",
     });
 
   for (const node of [
@@ -316,6 +414,17 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "trust_goal_loop",
     "alert_goal_loop",
     "evidence_goal_loop",
+    "x_owned_publish_node",
+    "linkedin_owned_publish_node",
+    "reddit_owned_profile_publish_node",
+    "reddit_comment_or_subreddit_publish_node",
+    "youtube_video_publish_node",
+    "youtube_thumbnail_update_node",
+    "gmail_send_node",
+    "resend_alert_send_node",
+    "whop_mutation_node",
+    "attio_write_node",
+    "posthog_write_node",
   ] as const) {
     builder.addEdge(node, "collect_receipts");
   }

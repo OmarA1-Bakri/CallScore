@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OperatingGraphMutationContextSchema } from "../../lib/workplane/external-mutation-schemas";
 
 const IsoDateStringSchema = z.string().regex(
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/,
@@ -188,6 +189,7 @@ export const VideoJobStateSchema = z.object({
   thumbnailPath: z.string().nullable(),
   metadata: YoutubeMetadataSchema.nullable(),
   qaReport: QaReportSchema.nullable(),
+  graph_context: OperatingGraphMutationContextSchema.optional(),
   youtubeVideoId: z.string().nullable(),
   publishUrl: z.string().nullable(),
   artifactDir: z.string().min(1),

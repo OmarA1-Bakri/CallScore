@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { JsonValueSchema, YoutubeMetadataSchema } from "./video.schemas";
+import { OperatingGraphMutationContextSchema } from "../../lib/workplane/external-mutation-schemas";
 
 export const YoutubePrivacyStatusSchema = z.enum(["private", "unlisted", "public"]);
 export type YoutubePrivacyStatus = z.infer<typeof YoutubePrivacyStatusSchema>;
@@ -21,5 +22,6 @@ export const YoutubePublishInputSchema = z.object({
   metadata: YoutubeMetadataSchema,
   privacyStatus: YoutubePrivacyStatusSchema,
   publishAt: z.string().optional(),
+  graph_context: OperatingGraphMutationContextSchema.optional(),
 });
 export type YoutubePublishInput = z.infer<typeof YoutubePublishInputSchema>;

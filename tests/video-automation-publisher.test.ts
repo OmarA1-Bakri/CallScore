@@ -13,6 +13,21 @@ class MockExecutor implements ComposioToolExecutor {
   }
 }
 
+const graphContext = {
+  operating_graph_run_id: "graph-run-video-automation-001",
+  graph_node_id: "youtube_video_publish_node",
+  goal: "produce_video",
+  platform: "youtube",
+  mutation_family: "video_publish",
+  acting_agent_id: "callscore-video-publish-node",
+  authority: "gated_external_send",
+  approval_receipt_id: "approval-youtube-001",
+  evidence_receipt_id: "evidence-youtube-001",
+  originality_receipt_id: "originality-youtube-001",
+  approved_payload_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  dry_run: false,
+} as const;
+
 test("Composio YouTube publisher uses exact upload, update, and thumbnail schema fields", async () => {
   const executor = new MockExecutor();
   const publisher = new ComposioYoutubePublisher(executor);
@@ -22,6 +37,7 @@ test("Composio YouTube publisher uses exact upload, update, and thumbnail schema
     thumbnailPath: "https://example.com/thumbnail.jpg",
     privacyStatus: "public",
     metadata: { title: "CallScore test", description: "CallScore test description", tags: ["CallScore"], categoryId: "28", madeForKids: false, language: "en" },
+    graph_context: graphContext,
   });
   assert.equal(result.youtubeVideoId, "yt-test-123");
   assert.equal(result.publishUrl, "https://youtu.be/yt-test-123");
@@ -42,6 +58,7 @@ test("Composio YouTube publisher blocks raw local video paths until a file bridg
       thumbnailPath: "https://example.com/thumbnail.jpg",
       privacyStatus: "private",
       metadata: { title: "CallScore test", description: "CallScore test description", tags: ["CallScore"], categoryId: "28", madeForKids: false, language: "en" },
+      graph_context: graphContext,
     }),
     /requires a file object/,
   );

@@ -55,7 +55,12 @@ export function readBootstrapProducts(env: NodeJS.ProcessEnv = process.env): {
   };
 }
 
+export function assertWhopBootstrapGraphContext(_env: NodeJS.ProcessEnv = process.env): void {
+  throw new Error("non_graph_whop_mutation_blocked: legacy_whop_bootstrap_direct_provider_mutation_disabled_use_whop_mutation_node");
+}
+
 async function main(): Promise<void> {
+  assertWhopBootstrapGraphContext();
   const products = readBootstrapProducts();
   const companyId = process.env.WHOP_COMPANY_ID ?? (await discoverCompanyIdFromProduct(products.pro));
 
