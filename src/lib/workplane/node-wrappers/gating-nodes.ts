@@ -233,7 +233,8 @@ export async function hardGatePreflightNode(state: OperatingGraphState, config: 
     warnings.push("workplane_readiness_blocked_for_unrelated_restricted_lane");
   }
   if (workplane?.autonomous_revenue_status === "NO" && state.config.goal === "revenue_now" && !state.config.dryRun) {
-    blockers.push("autonomous_revenue_not_live");
+    if (state.config.mode === "live_owned_public") warnings.push("autonomous_revenue_not_live_warning_only_for_graph_owned_public_execution");
+    else blockers.push("autonomous_revenue_not_live");
   }
 
   if (operatingGoalRequiresApproval(state.config) && !state.config.approved && !state.config.approvalReceiptId && !state.config.approvedByOperator) {

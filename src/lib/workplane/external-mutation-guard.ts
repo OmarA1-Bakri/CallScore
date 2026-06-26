@@ -136,7 +136,7 @@ function receiptBase(
   request: ExternalMutationGuardRequest,
   status: "ok" | "failed",
   blockerCode?: ExternalMutationBlockerCode,
-): Omit<ExternalMutationReceipt, "provider_mutation_performed" | "public_publish_performed" | "external_url" | "external_object_id" | "provider_response"> {
+): Omit<ExternalMutationReceipt, "provider_mutation_performed" | "public_publish_performed" | "public_engagement_performed" | "external_url" | "external_object_id" | "provider_response"> {
   const graphContext = request.graph_context ?? undefined;
   return {
     receipt_id: receiptId(request, status),
@@ -169,6 +169,7 @@ function failedReceipt(
     ...receiptBase(request, "failed", blockerCode),
     provider_mutation_performed: false,
     public_publish_performed: false,
+    public_engagement_performed: false,
     external_url: providerObject.external_url,
     external_object_id: providerObject.external_object_id,
     provider_response: request.provider_response,
@@ -182,6 +183,7 @@ function okReceipt(request: ExternalMutationGuardRequest): ExternalMutationRecei
     ...receiptBase(request, "ok"),
     provider_mutation_performed: flags.provider_mutation_performed,
     public_publish_performed: flags.public_publish_performed,
+    public_engagement_performed: Boolean(flags.public_engagement_performed),
     external_url: providerObject.external_url,
     external_object_id: providerObject.external_object_id,
     provider_response: request.provider_response,
@@ -209,12 +211,20 @@ export function evaluateExternalMutationRequest(input: Record<string, unknown>):
   const flags = normalizedFlags(request.mutation_flags);
   const mode = request.mode ?? "bounded_write";
 
-  if (isProviderMutationIntent(request) && mode !== "approved_publish" && mode !== "bounded_write") {
+  if (isProviderMutationIntent(request) && mode !== "approved_publish" && mode !== "live_owned_public" && mode !== "bounded_write") {
     return blocked(mode === "draft_only" ? "draft_only_external_mutation_blocked" : "non_graph_external_mutation_blocked");
   }
 
   const routeBlocker = validateGraphRoute(request);
   if (routeBlocker) return blocked(routeBlocker);
+
+  if (isProviderMutationIntent(request) && request.provider_payload !== undefined && (request.provider_payload === null || (typeof request.provider_payload === "object" && Object.keys(request.provider_payload as Record<string, unknown>).length === 0))) {
+    return blocked("payload_missing");
+  }
+
+  if ((request.requested_action === "public_engagement" || request.graph_context?.mutation_family === "public_engagement") && !request.target_url_or_id) {
+    return blocked("target_missing");
+  }
 
   const providerObject = providerExternalObject(request.provider_response);
   const hasProviderObject = Boolean(providerObject.external_object_id || providerObject.external_url);
@@ -237,7 +247,7 @@ export function evaluateExternalMutationRequest(input: Record<string, unknown>):
   const graphContext = request.graph_context;
   if (!graphContext) return blocked(missingGraphContextBlocker(request));
 
-  if ((graphContext.mutation_family === "public_publish" || graphContext.mutation_family === "video_publish")
+  if (mode === "approved_publish" && (graphContext.mutation_family === "public_publish" || graphContext.mutation_family === "video_publish")
     && (!graphContext.evidence_receipt_id || !graphContext.originality_receipt_id)) {
     return blocked("evidence_originality_receipts_required");
   }
@@ -280,7 +290,7 @@ export function finalizeExternalMutationReceipt(input: Record<string, unknown>):
   }
 
   const providerObject = providerExternalObject(request.provider_response);
-  if ((request.graph_context?.mutation_family === "public_publish" || request.graph_context?.mutation_family === "video_publish")
+  if ((request.graph_context?.mutation_family === "public_publish" || request.graph_context?.mutation_family === "public_engagement" || request.graph_context?.mutation_family === "video_publish")
     && !providerObject.external_object_id && !providerObject.external_url) {
     return blocked("provider_external_object_required", failedReceipt(request, "provider_external_object_required"));
   }
@@ -296,6 +306,7 @@ export function finalizeExternalMutationReceipt(input: Record<string, unknown>):
         external_mutation_performed: true,
         provider_mutation_performed: true,
         public_publish_performed: request.graph_context?.mutation_family === "public_publish" || request.graph_context?.mutation_family === "video_publish",
+        public_engagement_performed: request.graph_context?.mutation_family === "public_engagement",
       },
     }),
   };

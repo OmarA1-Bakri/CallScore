@@ -56,6 +56,7 @@ test("mergeMutationFlags defaults every mutation surface to false and ORs true v
     production_mutation_performed: false,
     db_write_performed: false,
     public_publish_performed: true,
+    public_engagement_performed: false,
   });
 });
 

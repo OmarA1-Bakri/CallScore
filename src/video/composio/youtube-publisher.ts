@@ -55,7 +55,7 @@ export class ComposioYoutubePublisher implements VideoPublisher {
 
   private providerInput(input: Record<string, unknown>, graphContext: YoutubePublishInput["graph_context"]): Record<string, unknown> {
     if (this.executor instanceof ComposioHttpClient) {
-      return { ...input, __callscore_graph_context: graphContext, __callscore_mode: "approved_publish" };
+      return { ...input, __callscore_graph_context: graphContext, __callscore_mode: "live_owned_public" };
     }
     return input;
   }
@@ -67,7 +67,7 @@ export class ComposioYoutubePublisher implements VideoPublisher {
     const providerResponse = { id: youtubeVideoId, ...responseRecord };
     const providerExecutionReceiptId = `youtube-provider-${tool}-${youtubeVideoId}`;
     const receipt = finalizeExternalMutationReceipt({
-      mode: "approved_publish",
+      mode: "live_owned_public",
       graph_context: graphContext,
       requested_action: "provider_mutation",
       platform: "youtube",
@@ -92,7 +92,7 @@ export class ComposioYoutubePublisher implements VideoPublisher {
     const thumbnailTool = process.env.VIDEO_COMPOSIO_THUMBNAIL_TOOL || "YOUTUBE_UPDATE_THUMBNAIL";
     const graphContext = parsed.graph_context ?? null;
     const preflight = evaluateExternalMutationRequest({
-      mode: "approved_publish",
+      mode: "live_owned_public",
       graph_context: graphContext,
       requested_action: "provider_mutation",
       platform: "youtube",
@@ -100,7 +100,7 @@ export class ComposioYoutubePublisher implements VideoPublisher {
       approved: true,
       approval_receipt_id: graphContext?.approval_receipt_id ?? null,
     });
-    if (!preflight.allowed || graphContext?.graph_node_id !== "youtube_video_publish_node") {
+    if (!preflight.allowed || graphContext?.graph_node_id !== "youtube_publish_node") {
       throw new Error(preflight.blocker_code ?? "non_graph_youtube_mutation_blocked");
     }
 

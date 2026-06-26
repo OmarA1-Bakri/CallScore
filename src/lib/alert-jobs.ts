@@ -135,7 +135,12 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === "AbortError";
 }
 
+export function assertRunAlertSendGraphContext(): void {
+  throw new Error("non_graph_alert_send_blocked: runAlertSend_direct_resend_webhook_mutation_disabled_use_resend_alert_send_node_or_gmail_send_node");
+}
+
 export async function runAlertSend(batchSize = 500, options: CronSignalOptions = {}): Promise<AlertSendResult> {
+  assertRunAlertSendGraphContext();
   const limit = Math.max(1, Math.min(batchSize, 10_000));
   throwIfAborted(options.signal);
   const claimed = await claimPendingAlerts(limit, await userEmailsTableExists(options.signal));

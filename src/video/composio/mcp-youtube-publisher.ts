@@ -66,7 +66,7 @@ export class McpYoutubePublisher implements VideoPublisher {
     const parsed = YoutubePublishInputSchema.parse(input);
     const graphContext = parsed.graph_context ?? null;
     const preflight = evaluateExternalMutationRequest({
-      mode: "approved_publish",
+      mode: "live_owned_public",
       graph_context: graphContext,
       requested_action: "provider_mutation",
       platform: "youtube",
@@ -74,7 +74,7 @@ export class McpYoutubePublisher implements VideoPublisher {
       approved: true,
       approval_receipt_id: graphContext?.approval_receipt_id ?? null,
     });
-    if (!preflight.allowed || graphContext?.graph_node_id !== "youtube_video_publish_node") {
+    if (!preflight.allowed || graphContext?.graph_node_id !== "youtube_publish_node") {
       throw new Error(preflight.blocker_code ?? "non_graph_youtube_mutation_blocked");
     }
     if (parsed.privacyStatus !== "private" && process.env.VIDEO_PRIVATE_CANARY_ONLY !== "false") {
@@ -89,7 +89,7 @@ export class McpYoutubePublisher implements VideoPublisher {
     if (!result.ok) throw new Error(`MCP YouTube private upload failed: ${sanitizeError(JSON.stringify(result).slice(0, 1_500))}`);
     const providerExecutionReceiptId = `mcp-youtube-helper-${String(result.youtubeVideoId ?? "unknown")}`;
     const finalReceipt = finalizeExternalMutationReceipt({
-      mode: "approved_publish",
+      mode: "live_owned_public",
       graph_context: graphContext,
       requested_action: "provider_mutation",
       platform: "youtube",

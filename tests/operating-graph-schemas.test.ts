@@ -117,6 +117,7 @@ describe("operating graph schemas", () => {
       production_mutation_performed: false,
       db_write_performed: false,
       public_publish_performed: false,
+      public_engagement_performed: false,
     });
   });
 

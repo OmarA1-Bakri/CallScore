@@ -19,6 +19,7 @@ type VideoPublishDecision = {
 type VideoPublishNodesModule = {
   runYoutubeVideoPublishNode: (input: Record<string, unknown>) => VideoPublishDecision | Promise<VideoPublishDecision>;
   runYoutubeThumbnailUpdateNode: (input: Record<string, unknown>) => VideoPublishDecision | Promise<VideoPublishDecision>;
+  runYoutubeMetadataUpdateNode: (input: Record<string, unknown>) => VideoPublishDecision | Promise<VideoPublishDecision>;
 };
 
 class RecordingExecutor implements ComposioToolExecutor {
@@ -36,7 +37,7 @@ async function loadVideoNodes(): Promise<VideoPublishNodesModule> {
 
 const graphContext = {
   operating_graph_run_id: "graph-run-video-001",
-  graph_node_id: "youtube_video_publish_node",
+  graph_node_id: "youtube_publish_node",
   goal: "produce_video",
   platform: "youtube",
   mutation_family: "video_publish",
@@ -48,23 +49,19 @@ const graphContext = {
 };
 
 describe("video publish graph-only RED contract", () => {
-  test("YouTube publish blocks without QA report and approval", async () => {
+  test("YouTube publish blocks only on precise missing execution inputs", async () => {
     const nodes = await loadVideoNodes();
     const decision = await nodes.runYoutubeVideoPublishNode({
       graph_context: graphContext,
-      approval_receipt_id: null,
-      qa_report_path: null,
       payload: {
         title: "CallScore daily briefing",
         description: "Daily CallScore briefing",
-        thumbnail_path: "https://example.com/thumb.jpg",
-        captions_path: "captions.vtt",
-        video_path: "composio://47563/youtube/video.mp4?name=video.mp4&mimetype=video/mp4",
       },
+      provider_tool: "YOUTUBE_UPLOAD_VIDEO",
     });
 
     assert.equal(decision.status, "blocked");
-    assert.equal(decision.blocker_code, "youtube_qa_and_approval_required");
+    assert.equal(decision.blocker_code, "youtube_render_missing");
     assert.equal(decision.provider_call_permitted, false);
   });
 

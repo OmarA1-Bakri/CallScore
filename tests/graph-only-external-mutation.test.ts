@@ -79,33 +79,33 @@ describe("graph-only social external mutation RED contract", () => {
     assert.equal(decision.mutation_flags?.public_publish_performed, true);
   });
 
-  test("LinkedIn publish blocks if OAuth is not confirmed", async () => {
+  test("LinkedIn owned publish is open by default when graph-owned and provider exists", async () => {
     const nodes = await loadSocialNodes();
     const decision = await nodes.runLinkedInOwnedPublishNode({
-      graph_context: { ...approvalContext, graph_node_id: "linkedin_owned_publish_node", platform: "linkedin" },
+      graph_context: { ...approvalContext, graph_node_id: "linkedin_owned_publish_node", platform: "linkedin", approved_payload_hash: "sha256:8ed4aa9e02eba8940c87e5d5e5834f2d8b780aa7967b51db517b2417ff54648a" },
       payload: { text: "CallScore evidence update" },
-      oauth_confirmed: false,
       provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
+      provider_response: { ok: true, id: "li-post-001", url: "https://linkedin.com/feed/update/li-post-001" },
     });
 
-    assert.equal(decision.status, "blocked");
-    assert.equal(decision.blocker_code, "linkedin_oauth_not_confirmed");
-    assert.equal(decision.provider_call_permitted, false);
+    assert.equal(decision.status, "ok");
+    assert.equal(decision.provider_call_permitted, true);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
   });
 
-  test("Reddit subreddit action blocks without explicit community approval", async () => {
+  test("Reddit public subreddit action is open by default when graph-owned and target exists", async () => {
     const nodes = await loadSocialNodes();
     const decision = await nodes.runRedditCommunityMutationNode({
-      graph_context: { ...approvalContext, graph_node_id: "reddit_comment_or_subreddit_publish_node", platform: "reddit" },
-      destination: "r/CryptoCurrency",
+      graph_context: { ...approvalContext, graph_node_id: "reddit_public_comment_node", platform: "reddit", mutation_family: "public_engagement", approved_payload_hash: "sha256:8ed4aa9e02eba8940c87e5d5e5834f2d8b780aa7967b51db517b2417ff54648a" },
+      target_url_or_id: "r/CryptoCurrency",
       payload: { text: "CallScore evidence update" },
-      reddit_community_approval: null,
       provider_tool: "REDDIT_CREATE_REDDIT_POST",
+      provider_response: { ok: true, id: "reddit-post-001", url: "https://reddit.com/r/CryptoCurrency/comments/reddit-post-001" },
     });
 
-    assert.equal(decision.status, "blocked");
-    assert.equal(decision.blocker_code, "reddit_community_approval_missing");
-    assert.equal(decision.provider_call_permitted, false);
+    assert.equal(decision.status, "ok");
+    assert.equal(decision.provider_call_permitted, true);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
   });
 
   test("legacy Hermes social wrapper has no provider calls and only invokes operating graph", () => {

@@ -26,7 +26,7 @@ print(json.dumps({
 
 const graphContext = {
   operating_graph_run_id: "graph-run-mcp-youtube-001",
-  graph_node_id: "youtube_video_publish_node",
+  graph_node_id: "youtube_publish_node",
   goal: "produce_video",
   platform: "youtube",
   mutation_family: "video_publish",
@@ -91,7 +91,7 @@ test("McpYoutubePublisher rejects forged minimal graph context before helper exe
       thumbnailPath: path.join(dir, "thumbnail.jpg"),
       metadata: plan.metadata,
       privacyStatus: "private",
-      graph_context: { graph_node_id: "youtube_video_publish_node" } as never,
+      graph_context: { graph_node_id: "youtube_publish_node" } as never,
     }),
     /missing_operating_graph_context|approval_missing|invalid_type/,
   );

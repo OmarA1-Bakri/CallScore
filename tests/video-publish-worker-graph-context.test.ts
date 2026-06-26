@@ -14,7 +14,7 @@ import type { YoutubePublishInput } from "../src/video/schemas/youtube.schemas";
 
 const graphContext = {
   operating_graph_run_id: "graph-run-worker-001",
-  graph_node_id: "youtube_video_publish_node",
+  graph_node_id: "youtube_publish_node",
   goal: "produce_video",
   platform: "youtube",
   mutation_family: "video_publish",

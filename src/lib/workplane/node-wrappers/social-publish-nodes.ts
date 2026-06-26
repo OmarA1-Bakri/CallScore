@@ -8,7 +8,7 @@ export function runXOwnedPublishNode(input: Record<string, unknown>): SocialPubl
     nodeId: "x_owned_publish_node",
     platform: "x",
     mutationFamily: "public_publish",
-    mode: "approved_publish",
+    mode: "live_owned_public",
     requestedAction: "publish_owned_public",
     missingProviderBlocker: "x_provider_tool_missing",
     wrongNodeBlocker: "non_graph_publish_blocked",
@@ -17,33 +17,14 @@ export function runXOwnedPublishNode(input: Record<string, unknown>): SocialPubl
 }
 
 export function runLinkedInOwnedPublishNode(input: Record<string, unknown>): SocialPublishNodeDecision {
-  if (input.oauth_confirmed === false) {
-    return {
-      status: "blocked",
-      blocker_code: "linkedin_oauth_not_confirmed",
-      node_id: "linkedin_owned_publish_node",
-      provider_call_permitted: false,
-      provider_calls: [],
-      mutation_flags: {
-        external_mutation_performed: false,
-        send_or_outreach_performed: false,
-        provider_mutation_performed: false,
-        whop_mutation_performed: false,
-        production_mutation_performed: false,
-        db_write_performed: false,
-        public_publish_performed: false,
-      },
-    };
-  }
-
   return runGraphOwnedMutationNode({
     input,
     nodeId: "linkedin_owned_publish_node",
     platform: "linkedin",
     mutationFamily: "public_publish",
-    mode: "approved_publish",
+    mode: "live_owned_public",
     requestedAction: "publish_owned_public",
-    missingProviderBlocker: "linkedin_oauth_not_confirmed",
+    missingProviderBlocker: "linkedin_provider_tool_missing",
     wrongNodeBlocker: "non_graph_publish_blocked",
     publicPublish: true,
   });
@@ -52,10 +33,10 @@ export function runLinkedInOwnedPublishNode(input: Record<string, unknown>): Soc
 export function runRedditOwnedProfilePublishNode(input: Record<string, unknown>): SocialPublishNodeDecision {
   return runGraphOwnedMutationNode({
     input,
-    nodeId: "reddit_owned_profile_publish_node",
+    nodeId: "reddit_owned_publish_node",
     platform: "reddit",
     mutationFamily: "public_publish",
-    mode: "approved_publish",
+    mode: "live_owned_public",
     requestedAction: "publish_owned_public",
     missingProviderBlocker: "reddit_provider_tool_missing",
     wrongNodeBlocker: "non_graph_reddit_mutation_blocked",
@@ -64,36 +45,46 @@ export function runRedditOwnedProfilePublishNode(input: Record<string, unknown>)
 }
 
 export function runRedditCommunityMutationNode(input: Record<string, unknown>): SocialPublishNodeDecision {
-  if (!input.reddit_community_approval) {
-    return {
-      status: "blocked",
-      blocker_code: "reddit_community_approval_missing",
-      node_id: "reddit_comment_or_subreddit_publish_node",
-      provider_call_permitted: false,
-      provider_calls: [],
-      mutation_flags: {
-        external_mutation_performed: false,
-        send_or_outreach_performed: false,
-        provider_mutation_performed: false,
-        whop_mutation_performed: false,
-        production_mutation_performed: false,
-        db_write_performed: false,
-        public_publish_performed: false,
-      },
-    };
-  }
-
   return runGraphOwnedMutationNode({
     input,
-    nodeId: "reddit_comment_or_subreddit_publish_node",
+    nodeId: "reddit_public_comment_node",
     platform: "reddit",
-    mutationFamily: "public_publish",
-    mode: "approved_publish",
-    requestedAction: "publish_owned_public",
+    mutationFamily: "public_engagement",
+    mode: "live_owned_public",
+    requestedAction: "public_engagement",
     missingProviderBlocker: "reddit_provider_tool_missing",
     wrongNodeBlocker: "non_graph_reddit_mutation_blocked",
-    publicPublish: true,
+    publicEngagement: true,
   });
 }
 
+
 export const runRedditCommentOrSubredditPublishNode = runRedditCommunityMutationNode;
+
+export function runXPublicReplyNode(input: Record<string, unknown>): SocialPublishNodeDecision {
+  return runGraphOwnedMutationNode({
+    input,
+    nodeId: "x_public_reply_node",
+    platform: "x",
+    mutationFamily: "public_engagement",
+    mode: "live_owned_public",
+    requestedAction: "public_engagement",
+    missingProviderBlocker: "x_provider_tool_missing",
+    wrongNodeBlocker: "non_graph_engagement_blocked",
+    publicEngagement: true,
+  });
+}
+
+export function runLinkedInPublicCommentNode(input: Record<string, unknown>): SocialPublishNodeDecision {
+  return runGraphOwnedMutationNode({
+    input,
+    nodeId: "linkedin_public_comment_node",
+    platform: "linkedin",
+    mutationFamily: "public_engagement",
+    mode: "live_owned_public",
+    requestedAction: "public_engagement",
+    missingProviderBlocker: "linkedin_provider_tool_missing",
+    wrongNodeBlocker: "non_graph_engagement_blocked",
+    publicEngagement: true,
+  });
+}

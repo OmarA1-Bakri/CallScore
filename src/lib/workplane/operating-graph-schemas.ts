@@ -16,6 +16,7 @@ export const DEFAULT_OPERATING_MUTATION_FLAGS = {
   production_mutation_performed: false,
   db_write_performed: false,
   public_publish_performed: false,
+  public_engagement_performed: false,
 } as const;
 
 export const MutationFlagsSchema = z.object({
@@ -26,6 +27,7 @@ export const MutationFlagsSchema = z.object({
   production_mutation_performed: z.boolean().default(false),
   db_write_performed: z.boolean().default(false),
   public_publish_performed: z.boolean().default(false),
+  public_engagement_performed: z.boolean().default(false),
 }).strict();
 
 export type MutationFlags = z.infer<typeof MutationFlagsSchema>;
@@ -132,6 +134,7 @@ export type OperatingGraphState = z.infer<typeof OperatingGraphStateSchema>;
 
 export const ExternalMutationActionSchema = z.enum([
   "publish_owned_public",
+  "public_engagement",
   "send_or_outreach",
   "provider_mutation",
   "whop_mutation",
@@ -170,8 +173,8 @@ export const ExternalMutationRequestSchema = z.object({
   if (mutating && (!request.approved || (!request.approvalReceiptId && !request.approvedByOperator))) {
     ctx.addIssue({ code: "custom", path: ["approvalReceiptId"], message: "mutation requires approval evidence" });
   }
-  if (request.mutation_flags.public_publish_performed && !request.destination) {
-    ctx.addIssue({ code: "custom", path: ["destination"], message: "public publish requires destination" });
+  if ((request.mutation_flags.public_publish_performed || request.mutation_flags.public_engagement_performed) && !request.destination) {
+    ctx.addIssue({ code: "custom", path: ["destination"], message: "public publish/engagement requires destination" });
   }
   if (request.mutation_flags.public_publish_performed && !request.rollback_or_recovery_note) {
     ctx.addIssue({ code: "custom", path: ["rollback_or_recovery_note"], message: "public publish requires rollback/recovery note" });

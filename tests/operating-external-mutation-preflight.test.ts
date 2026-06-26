@@ -32,22 +32,36 @@ test("approved publish mode without approval evidence blocks before goal lane ex
 });
 
 
-test("operating graph source registers graph-owned external mutation node ids", async () => {
+test("operating graph source wires public graph-owned mutation nodes to real wrappers, not placeholders", async () => {
   const { readFile } = await import("node:fs/promises");
   const source = await readFile("src/lib/workplane/callscore-operating-graph.ts", "utf8");
+  const realWrappers = [
+    "runXOwnedPublishNode",
+    "runXPublicReplyNode",
+    "runLinkedInOwnedPublishNode",
+    "runLinkedInPublicCommentNode",
+    "runRedditOwnedProfilePublishNode",
+    "runRedditCommunityMutationNode",
+    "runYoutubeVideoPublishNode",
+    "runYoutubePublicCommentNode",
+    "runYoutubeThumbnailUpdateNode",
+    "runYoutubeMetadataUpdateNode",
+  ];
+  for (const wrapper of realWrappers) {
+    assert.match(source, new RegExp(wrapper));
+  }
   for (const nodeId of [
     "x_owned_publish_node",
+    "x_public_reply_node",
     "linkedin_owned_publish_node",
-    "reddit_owned_profile_publish_node",
-    "reddit_comment_or_subreddit_publish_node",
-    "youtube_video_publish_node",
+    "linkedin_public_comment_node",
+    "reddit_owned_publish_node",
+    "reddit_public_comment_node",
+    "youtube_publish_node",
+    "youtube_public_comment_node",
     "youtube_thumbnail_update_node",
-    "gmail_send_node",
-    "resend_alert_send_node",
-    "whop_mutation_node",
-    "attio_write_node",
-    "posthog_write_node",
+    "youtube_metadata_update_node",
   ]) {
-    assert.match(source, new RegExp(`\\.addNode\\("${nodeId}"`));
+    assert.doesNotMatch(source, new RegExp(`\\.addNode\\("${nodeId}", graphOwnedMutationPlaceholderNode`));
   }
 });

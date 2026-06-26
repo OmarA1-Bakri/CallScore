@@ -309,6 +309,8 @@ primeCache(AUTH_PATH, {
 
 const alerts = require(path.join(PROJECT_ROOT, "src", "lib", "alerts.ts")) as
   typeof import("../src/lib/alerts");
+const alertJobs = require(path.join(PROJECT_ROOT, "src", "lib", "alert-jobs.ts")) as
+  typeof import("../src/lib/alert-jobs");
 const watchHelpers = require(
   path.join(PROJECT_ROOT, "src", "app", "api", "alerts", "watch", "helpers.ts"),
 ) as typeof import("../src/app/api/alerts/watch/helpers");
@@ -558,6 +560,13 @@ test("parseCreatorId rejects non-integer numbers and non-string types", () => {
   assert.equal(parseCreatorId(undefined), null);
   assert.equal(parseCreatorId({}), null);
   assert.equal(parseCreatorId([]), null);
+});
+
+test("runAlertSend itself fails closed outside graph-owned resend alert node", async () => {
+  await assert.rejects(
+    () => alertJobs.runAlertSend(1),
+    /non_graph_alert_send_blocked/,
+  );
 });
 
 /* ----------------------------------------------------------------- */

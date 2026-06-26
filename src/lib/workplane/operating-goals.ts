@@ -17,6 +17,7 @@ export const OperatingGoalModeSchema = z.enum([
   "dry_run",
   "draft_only",
   "approved_publish",
+  "live_owned_public",
   "read_live",
   "bounded_write",
 ]);

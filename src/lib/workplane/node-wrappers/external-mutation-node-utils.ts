@@ -33,10 +33,11 @@ export interface GraphOwnedMutationNodeOptions {
   readonly platform: ExternalMutationPlatform;
   readonly mutationFamily: ExternalMutationFamily;
   readonly mode: ExternalMutationMode;
-  readonly requestedAction: "publish_owned_public" | "send_or_outreach" | "provider_mutation" | "whop_mutation";
+  readonly requestedAction: "publish_owned_public" | "public_engagement" | "send_or_outreach" | "provider_mutation" | "whop_mutation";
   readonly missingProviderBlocker: string;
   readonly wrongNodeBlocker: string;
   readonly publicPublish?: boolean;
+  readonly publicEngagement?: boolean;
   readonly sendOrOutreach?: boolean;
   readonly whopMutation?: boolean;
   readonly extraMutationFlags?: Partial<MutationFlags>;
@@ -127,6 +128,7 @@ function successFlags(options: GraphOwnedMutationNodeOptions): MutationFlags {
     external_mutation_performed: true,
     provider_mutation_performed: true,
     public_publish_performed: options.publicPublish === true,
+    public_engagement_performed: options.publicEngagement === true,
     send_or_outreach_performed: options.sendOrOutreach === true,
     whop_mutation_performed: options.whopMutation === true,
     ...(options.extraMutationFlags ?? {}),
@@ -166,12 +168,17 @@ export function runGraphOwnedMutationNode(options: GraphOwnedMutationNodeOptions
     platform: options.platform,
     provider_tool: providerTool ?? undefined,
     provider_payload: providerPayload,
+    target_url_or_id: options.input.target_url_or_id,
     approved: approvalOk,
     approval_receipt_id: receiptId,
     mutation_flags: blankFlags(),
   });
   if (!preflight.allowed) {
     return blocked(options.nodeId, preflight.blocker_code ?? options.wrongNodeBlocker, blankFlags(), preflight.receipt);
+  }
+
+  if (providerPayload === undefined || providerPayload === null || (typeof providerPayload === "string" && !providerPayload.trim()) || (isRecord(providerPayload) && Object.keys(providerPayload).length === 0)) {
+    return blocked(options.nodeId, "payload_missing");
   }
 
   const executionReceiptId = providerExecutionReceiptId(options.input, graphContext);
@@ -190,6 +197,7 @@ export function runGraphOwnedMutationNode(options: GraphOwnedMutationNodeOptions
     approval_receipt_id: receiptId,
     provider_response: options.input.provider_response,
     provider_payload: providerPayload,
+    target_url_or_id: options.input.target_url_or_id,
     mutation_flags: flags,
     provider_execution_receipt_id: executionReceiptId,
     child_receipt_ids: [executionReceiptId],

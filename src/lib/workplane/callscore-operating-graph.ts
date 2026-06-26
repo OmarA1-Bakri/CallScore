@@ -31,6 +31,21 @@ import {
 } from "./node-wrappers/domain-goal-nodes";
 import { createEvidenceResearchGoalNode } from "./node-wrappers/evidence-research-nodes";
 import { createWorkerDispatchOnceNode, type WorkerDispatchNodeDeps } from "./node-wrappers/worker-dispatch-nodes";
+import {
+  runLinkedInOwnedPublishNode,
+  runLinkedInPublicCommentNode,
+  runRedditCommunityMutationNode,
+  runRedditOwnedProfilePublishNode,
+  runXOwnedPublishNode,
+  runXPublicReplyNode,
+} from "./node-wrappers/social-publish-nodes";
+import {
+  runYoutubeMetadataUpdateNode,
+  runYoutubePublicCommentNode,
+  runYoutubeThumbnailUpdateNode,
+  runYoutubeVideoPublishNode,
+} from "./node-wrappers/video-publish-nodes";
+import type { GraphOwnedMutationDecision } from "./node-wrappers/external-mutation-node-utils";
 
 function replace<T>() {
   return (_left: T | undefined, right: T): T => right;
@@ -109,11 +124,15 @@ export const externalMutationPreflightNode = wrapDirectFunctionNode({
         provider_mutation_allowed_outside_graph: false,
         graph_owned_mutation_nodes: [
           "x_owned_publish_node",
+          "x_public_reply_node",
           "linkedin_owned_publish_node",
-          "reddit_owned_profile_publish_node",
-          "reddit_comment_or_subreddit_publish_node",
-          "youtube_video_publish_node",
+          "linkedin_public_comment_node",
+          "reddit_owned_publish_node",
+          "reddit_public_comment_node",
+          "youtube_publish_node",
+          "youtube_public_comment_node",
           "youtube_thumbnail_update_node",
+          "youtube_metadata_update_node",
           "gmail_send_node",
           "resend_alert_send_node",
           "whop_mutation_node",
@@ -137,6 +156,46 @@ function graphOwnedMutationPlaceholderNode(nodeId: string) {
       detail: { node_id: nodeId, provider_mutation_allowed_outside_graph: false },
       mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
     }),
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function graphMutationInputFor(state: OperatingGraphState, nodeId: string): Record<string, unknown> {
+  const keyed = isRecord(state.artifacts.graph_mutation_inputs)
+    ? state.artifacts.graph_mutation_inputs[nodeId]
+    : undefined;
+  if (isRecord(keyed)) return keyed;
+  const generic = state.artifacts.external_mutation_input;
+  return isRecord(generic) ? generic : {};
+}
+
+function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<string, unknown>) => GraphOwnedMutationDecision) {
+  return wrapDirectFunctionNode({
+    nodeId,
+    domain: "gating",
+    run: async ({ state }) => {
+      const decision = runner(graphMutationInputFor(state, nodeId));
+      const blocker = decision.blocker_code ? [decision.blocker_code] : [];
+      return {
+        status: decision.status,
+        summary: decision.status === "ok"
+          ? `${nodeId} completed graph-owned provider mutation.`
+          : `${nodeId} did not call provider: ${decision.blocker_code ?? decision.status}.`,
+        blockers: decision.status === "ok" ? [] : blocker,
+        detail: {
+          node_id: nodeId,
+          provider_call_permitted: decision.provider_call_permitted,
+          provider_calls: decision.provider_calls,
+          provider_response: decision.provider_response ?? null,
+          receipt: decision.receipt ?? null,
+          blocker_code: decision.blocker_code ?? null,
+        },
+        mutation_flags: decision.mutation_flags,
+      };
+    },
   });
 }
 
@@ -347,12 +406,16 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("boot_context", bootContextNode)
     .addNode("hard_gate_preflight", hardGatePreflightNode)
     .addNode("external_mutation_preflight", externalMutationPreflightNode)
-    .addNode("x_owned_publish_node", graphOwnedMutationPlaceholderNode("x_owned_publish_node"))
-    .addNode("linkedin_owned_publish_node", graphOwnedMutationPlaceholderNode("linkedin_owned_publish_node"))
-    .addNode("reddit_owned_profile_publish_node", graphOwnedMutationPlaceholderNode("reddit_owned_profile_publish_node"))
-    .addNode("reddit_comment_or_subreddit_publish_node", graphOwnedMutationPlaceholderNode("reddit_comment_or_subreddit_publish_node"))
-    .addNode("youtube_video_publish_node", graphOwnedMutationPlaceholderNode("youtube_video_publish_node"))
-    .addNode("youtube_thumbnail_update_node", graphOwnedMutationPlaceholderNode("youtube_thumbnail_update_node"))
+    .addNode("x_owned_publish_node", graphOwnedMutationWrapperNode("x_owned_publish_node", runXOwnedPublishNode))
+    .addNode("x_public_reply_node", graphOwnedMutationWrapperNode("x_public_reply_node", runXPublicReplyNode))
+    .addNode("linkedin_owned_publish_node", graphOwnedMutationWrapperNode("linkedin_owned_publish_node", runLinkedInOwnedPublishNode))
+    .addNode("linkedin_public_comment_node", graphOwnedMutationWrapperNode("linkedin_public_comment_node", runLinkedInPublicCommentNode))
+    .addNode("reddit_owned_publish_node", graphOwnedMutationWrapperNode("reddit_owned_publish_node", runRedditOwnedProfilePublishNode))
+    .addNode("reddit_public_comment_node", graphOwnedMutationWrapperNode("reddit_public_comment_node", runRedditCommunityMutationNode))
+    .addNode("youtube_publish_node", graphOwnedMutationWrapperNode("youtube_publish_node", runYoutubeVideoPublishNode))
+    .addNode("youtube_public_comment_node", graphOwnedMutationWrapperNode("youtube_public_comment_node", runYoutubePublicCommentNode))
+    .addNode("youtube_thumbnail_update_node", graphOwnedMutationWrapperNode("youtube_thumbnail_update_node", runYoutubeThumbnailUpdateNode))
+    .addNode("youtube_metadata_update_node", graphOwnedMutationWrapperNode("youtube_metadata_update_node", runYoutubeMetadataUpdateNode))
     .addNode("gmail_send_node", graphOwnedMutationPlaceholderNode("gmail_send_node"))
     .addNode("resend_alert_send_node", graphOwnedMutationPlaceholderNode("resend_alert_send_node"))
     .addNode("whop_mutation_node", graphOwnedMutationPlaceholderNode("whop_mutation_node"))
@@ -392,11 +455,15 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       alert_goal_loop: "alert_goal_loop",
       evidence_goal_loop: "evidence_goal_loop",
       x_owned_publish_node: "x_owned_publish_node",
+      x_public_reply_node: "x_public_reply_node",
       linkedin_owned_publish_node: "linkedin_owned_publish_node",
-      reddit_owned_profile_publish_node: "reddit_owned_profile_publish_node",
-      reddit_comment_or_subreddit_publish_node: "reddit_comment_or_subreddit_publish_node",
-      youtube_video_publish_node: "youtube_video_publish_node",
+      linkedin_public_comment_node: "linkedin_public_comment_node",
+      reddit_owned_publish_node: "reddit_owned_publish_node",
+      reddit_public_comment_node: "reddit_public_comment_node",
+      youtube_publish_node: "youtube_publish_node",
+      youtube_public_comment_node: "youtube_public_comment_node",
       youtube_thumbnail_update_node: "youtube_thumbnail_update_node",
+      youtube_metadata_update_node: "youtube_metadata_update_node",
       gmail_send_node: "gmail_send_node",
       resend_alert_send_node: "resend_alert_send_node",
       whop_mutation_node: "whop_mutation_node",
@@ -415,11 +482,15 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "alert_goal_loop",
     "evidence_goal_loop",
     "x_owned_publish_node",
+    "x_public_reply_node",
     "linkedin_owned_publish_node",
-    "reddit_owned_profile_publish_node",
-    "reddit_comment_or_subreddit_publish_node",
-    "youtube_video_publish_node",
+    "linkedin_public_comment_node",
+    "reddit_owned_publish_node",
+    "reddit_public_comment_node",
+    "youtube_publish_node",
+    "youtube_public_comment_node",
     "youtube_thumbnail_update_node",
+    "youtube_metadata_update_node",
     "gmail_send_node",
     "resend_alert_send_node",
     "whop_mutation_node",

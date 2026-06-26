@@ -1,4 +1,5 @@
 import * as assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { assertWhopBootstrapGraphContext } from "../src/scripts/bootstrap-whop";
 import { assertQueuedAlertSendGraphContext } from "../src/scripts/send-queued-alerts";
@@ -83,6 +84,28 @@ describe("legacy CallScore mutation path blockers", () => {
     assert.equal(decision.status, "ok");
     assert.equal(decision.provider_call_permitted, false);
     assert.equal(decision.allowed_next_action, "call_operating_goal");
+  });
+
+  test("legacy video rollback impl wrappers fail closed instead of direct TS provider-adjacent entrypoints", () => {
+    for (const script of [
+      "/srv/agents/hermes/scripts/callscore-video-scheduler-impl.sh",
+      "/srv/agents/hermes/scripts/callscore-video-queue-consumer-impl.sh",
+    ]) {
+      const source = readFileSync(script, "utf8");
+      assert.match(source, /non_graph_video_(?:schedule|queue)_impl_blocked|non_graph_youtube_mutation_blocked/, script);
+      assert.doesNotMatch(source, /exec node --import tsx\s+(?:scripts\/callscore-video-scheduler\.ts|src\/scripts\/video-queue-consumer\.ts)/, script);
+    }
+  });
+
+  test("legacy video publish CLIs fail closed for provider-adjacent publish stages", () => {
+    const publishCli = readFileSync("src/video/cli/video-publish.ts", "utf8");
+    assert.match(publishCli, /non_graph_youtube_mutation_blocked/);
+    assert.match(publishCli, /assertDirectVideoPublishCliBlocked\(\)/);
+
+    const workerCli = readFileSync("src/video/cli/video-worker.ts", "utf8");
+    assert.match(workerCli, /import \{ assertDirectVideoPublishCliBlocked \} from "\.\/video-publish"/);
+    assert.match(workerCli, /stageArg === "publish"|stageArg === "all"/);
+    assert.match(workerCli, /assertDirectVideoPublishCliBlocked\(\)/);
   });
 
   test("Whop bootstrap entrypoint fails closed outside graph-owned mutation node", () => {
