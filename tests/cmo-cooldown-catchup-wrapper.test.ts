@@ -41,3 +41,50 @@ test("CMO cooldown catch-up watcher is a no-op when no social receipts exist", (
   assert.equal(parsed.action, "none");
   assert.equal(parsed.reason, "no_social_receipts");
 });
+
+
+test("current cooldown receipts with nested prior verified posts do not trigger stale wakeups", () => {
+  const root = mkdtempSync(join(tmpdir(), "cmo-catchup-current-cooldown-"));
+  const receiptDir = join(root, "receipts");
+  const stateDir = join(root, "state");
+  require("node:fs").mkdirSync(receiptDir, { recursive: true });
+  require("node:fs").writeFileSync(join(receiptDir, "20260626T201028Z-x-cooldown_skipped_no_provider_mutation.json"), JSON.stringify({
+    status: "cooldown_skipped_no_provider_mutation",
+    created_at_utc: "2099-01-01T00:00:00Z",
+    earliest_safe_reconsideration_utc: "2099-01-01T12:00:00Z",
+    prior_posts: {
+      x: {
+        status: "published_verified",
+        created_at_utc: "2099-01-01T00:00:00Z",
+        post_url: "https://x.com/example/status/1"
+      }
+    }
+  }));
+  require("node:fs").writeFileSync(join(receiptDir, "20260626T201028Z-linkedin-cooldown_skipped_no_provider_mutation.json"), JSON.stringify({
+    status: "cooldown_skipped_no_provider_mutation",
+    created_at_utc: "2099-01-01T00:00:00Z",
+    earliest_safe_reconsideration_utc: "2099-01-01T12:00:00Z",
+    prior_posts: {
+      linkedin: {
+        status: "published_create_verified_readback_forbidden",
+        created_at_utc: "2099-01-01T00:00:00Z",
+        post_urn: "urn:li:share:1"
+      }
+    }
+  }));
+  const output = execFileSync(WATCHER, {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VERBOSE: "1",
+      CALLSCORE_CMO_RECEIPT_DIR: receiptDir,
+      CALLSCORE_CMO_CATCHUP_STATE_DIR: stateDir,
+      CALLSCORE_CMO_JOB_ID: "test-main-cmo-job",
+    },
+  });
+  const parsed = JSON.parse(output) as { action: string; reason: string; latest_verified?: Record<string, string> };
+  assert.equal(parsed.action, "none");
+  assert.equal(parsed.reason, "no_due_trigger");
+  assert.equal(parsed.latest_verified?.x, "2099-01-01T00:00:00Z");
+  assert.equal(parsed.latest_verified?.linkedin, "2099-01-01T00:00:00Z");
+});
