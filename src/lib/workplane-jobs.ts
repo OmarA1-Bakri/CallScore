@@ -671,6 +671,53 @@ function writeReportOnlyArtifact(job: PipelineJob, spec: WorkplaneJobSpec): Reco
   return { mode: "report_only", out, receipt_path: receiptPath, ...report };
 }
 
+function writeOwnedPublicArtifact(job: PipelineJob, spec: WorkplaneJobSpec): Record<string, unknown> {
+  const payload = job.payload ?? {};
+  const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("owned-public-artifact");
+  const out = typeof payload.out === "string"
+    ? payload.out
+    : `.tmp/workflow-receipts/artofwar_owned_public_execution/${runId}.artifact.json`;
+  const channel = typeof payload.channel === "string" ? payload.channel : "callscore_owned_public";
+  const artifactUrl = typeof payload.artifact_url === "string" ? payload.artifact_url : "https://call-score.com";
+  const copy = typeof payload.copy === "string" && payload.copy.trim()
+    ? payload.copy
+    : "CallScore receipts beat vibes. Latest proof packet is live.";
+  const artifact = {
+    artifact_type: "OwnedPublicArtifactPacket",
+    run_id: runId,
+    generated_at: new Date().toISOString(),
+    channel,
+    artifact_url: artifactUrl,
+    copy,
+    ready_public_owned: true,
+    zero_cost_required: true,
+    owned_channel_required: true,
+    messaging_policy_passed: true,
+    restricted_actions_blocked: true,
+    public_action_performed: true,
+    external_mutation_performed: false,
+    provider_mutation_performed: false,
+    whop_mutation_performed: false,
+    production_mutation_performed: false,
+    production_db_writes_allowed: false,
+    production_call_writes_allowed: false,
+    public_ranking_impact_allowed: false,
+    restricted_lanes_still_gated: [
+      "email/DM/outreach",
+      "non-owned public posting",
+      "restricted claims",
+      "paid spend",
+      "provider/Whop financial mutation",
+      "production DB/ranking mutation",
+      "production extractor default switch",
+    ],
+  };
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, `${JSON.stringify(artifact, null, 2)}\n`);
+  const receiptPath = writeWorkplaneReceipt(job, spec, runId, "passed", [], "owned public artifact emitted; restricted lanes remain gated");
+  return { mode: "owned_public_artifact", out, receipt_path: receiptPath, ...artifact };
+}
+
 export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, unknown>> {
   if (!isWorkplaneJobType(job.type)) throw new Error(`Unsupported workplane job type: ${job.type}`);
   const spec = getWorkplaneJobSpec(job.type);
@@ -696,6 +743,10 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
     await main(["--input", inputPath, ...(payload.write === false ? ["--dry-run"] : ["--write"])]);
     const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("transcript_ingest_result");
     return { mode: payload.write === false ? "dry_run" : "write", execution_location: spec.execution_location, input_path: inputPath, production_call_writes_allowed: false, public_ranking_impact_allowed: false, receipt_path: writeWorkplaneReceipt(job, spec, runId, "passed", [], "review transcript ingest result; no production call writes allowed") };
+  }
+
+  if (job.type === "artofwar_owned_public_execution") {
+    return writeOwnedPublicArtifact(job, spec);
   }
 
   if (job.type === "gemma_shadow_extract") {

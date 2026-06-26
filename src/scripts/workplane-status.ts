@@ -1,6 +1,7 @@
 import { query } from "../lib/db";
 import {
   buildReadinessDomains,
+  chooseStatusNextAction,
   defaultCollectorStatePath,
   decideNextAutonomousAction,
   latestArtOfWarCampaignReceipt,
@@ -12,6 +13,7 @@ import {
   latestLoopEngineeringReceipt,
   readCollectorCooldownState,
   rootHygieneAudit,
+  summarizePublicArtifactReadiness,
   workplaneJobModelForStatus,
 } from "../lib/workplane-status";
 import { loadEnv } from "./script-helpers";
@@ -135,6 +137,8 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     nextAction,
   });
   const rootAudit = rootHygieneAudit();
+  const publicArtifactReadiness = summarizePublicArtifactReadiness(readiness_domains);
+  const statusNextAction = chooseStatusNextAction(nextAction, publicArtifactReadiness);
   const domainStatuses = Object.values(readiness_domains).map((domain) => domain.status);
   const blockingDomain = domainStatuses.some((status) => status === "BLOCKED");
   const hardPartialDomain = domainStatuses.some((status) => status === "PARTIAL" || status === "NOT_CONNECTED");
@@ -150,6 +154,8 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     generatedAt: new Date().toISOString(),
     status: unsafeSourceRanks > 0 || unsafeOfficial.count > 0 ? "FAIL" : "OK",
     automation_readiness: automationReadiness,
+    system_purpose: "produce safe owned public artifacts with receipts; gates exist for irreversible, non-owned, spend, provider, financial, DB/ranking, and restricted-claim mutations",
+    public_artifact_readiness: publicArtifactReadiness,
     daily_pipeline_status: freshness.dailyTimer ?? null,
     readiness_domains,
     root_hygiene: readiness_domains.root_hygiene,
@@ -210,7 +216,8 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
       "produce_promotion_reviews_without_auto_promotion",
     ],
     job_model: workplaneJobModelForStatus(),
-    next_recommended_autonomous_action: nextAction,
+    next_recommended_autonomous_action: statusNextAction,
+    next_private_infra_action: nextAction,
   };
 }
 

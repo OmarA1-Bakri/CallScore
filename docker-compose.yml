@@ -33,6 +33,7 @@ services:
       YTDLP_JS_RUNTIMES: node
       YTDLP_REMOTE_COMPONENTS: "1"
     volumes:
+      - ./.tmp:/app/.tmp
       - /opt/callscore/secrets/youtube-cookies.txt:/run/secrets/youtube-cookies.txt:ro
     command: ["npm", "run", "pipeline:worker", "--", "--worker-id", "data-pipeline-worker", "--poll-ms", "15000", "--no-channel-tasks"]
 
@@ -57,6 +58,8 @@ services:
       YTDLP_PLAYER_CLIENT: web
       YTDLP_JS_RUNTIMES: node
       YTDLP_REMOTE_COMPONENTS: "1"
+    volumes:
+      - ./.tmp:/app/.tmp
     command: ["npm", "run", "pipeline:worker", "--", "--worker-id", "channel-agent-worker", "--poll-ms", "15000", "--no-pipeline-jobs"]
 
   hermes-worker-once:

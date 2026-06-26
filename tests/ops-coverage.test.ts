@@ -127,9 +127,11 @@ test("Docker compose runs pipeline and channel-agent workers as separate service
   const latentContinuous = compose.match(/  data-pipeline-continuous:\n[\s\S]*?(?=\n  [a-zA-Z0-9_-]+:|\n?$)/)?.[0] ?? "";
   assert.match(hermesWorker, /--worker-id", "data-pipeline-worker/);
   assert.match(hermesWorker, /--no-channel-tasks/);
+  assert.match(hermesWorker, /\.tmp:\/app\/\.tmp/, "pipeline worker receipts and public artifacts must persist on host");
   assert.doesNotMatch(hermesWorker, /--no-pipeline-jobs/);
   assert.match(channelWorker, /--worker-id", "channel-agent-worker/);
   assert.match(channelWorker, /--no-pipeline-jobs/);
+  assert.match(channelWorker, /\.tmp:\/app\/\.tmp/, "channel worker receipts must persist on host");
   assert.doesNotMatch(channelWorker, /pipeline:data:continuous/);
   assert.match(latentContinuous, /profiles:\s*\["debug"\]/, "latent continuous direct consumer must require the debug profile");
 });

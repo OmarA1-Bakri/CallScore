@@ -46,6 +46,15 @@ export interface WorkplaneDecision {
   readonly allowed: boolean;
 }
 
+export interface PublicArtifactReadiness {
+  readonly status: "READY_PUBLIC_OWNED" | "BLOCKED";
+  readonly allowed: boolean;
+  readonly reason: string;
+  readonly next_job_type: "artofwar_owned_public_execution" | null;
+  readonly blockers: readonly string[];
+  readonly restricted_lanes_still_gated: readonly string[];
+}
+
 function parseDate(value: unknown): number | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const parsed = Date.parse(value);
@@ -404,6 +413,49 @@ export function workplaneJobModelForStatus(): readonly Record<string, unknown>[]
     production_call_writes_allowed: spec.production_call_writes_allowed,
     public_ranking_impact_allowed: spec.public_ranking_impact_allowed,
   }));
+}
+
+export function summarizePublicArtifactReadiness(domains: Record<string, WorkplaneDomainStatus>): PublicArtifactReadiness {
+  const blockers: string[] = [];
+  const art = domains.art_of_war;
+  const activation = domains.activation_gates;
+  const provider = domains.provider_integrations;
+
+  if (!art || art.status === "BLOCKED" || art.status === "NOT_CONNECTED") blockers.push("art_of_war_not_ready");
+  if (!activation || activation.status === "BLOCKED") blockers.push("activation_gate_blocked");
+  if (!provider || provider.status === "BLOCKED") blockers.push("provider_integration_blocked");
+
+  const allowed = blockers.length === 0;
+  return {
+    status: allowed ? "READY_PUBLIC_OWNED" : "BLOCKED",
+    allowed,
+    reason: allowed
+      ? "Public artifacts are the system's purpose: owned public organic artifacts can execute while unrelated private infra lanes remain gated."
+      : "Owned public artifact execution blocked by public-surface gate, not by private infra lanes.",
+    next_job_type: allowed ? "artofwar_owned_public_execution" : null,
+    blockers,
+    restricted_lanes_still_gated: [
+      "email/DM/outreach",
+      "non-owned public posting",
+      "restricted claims",
+      "paid spend",
+      "provider/Whop financial mutation",
+      "production DB/ranking mutation",
+      "production extractor default switch",
+    ],
+  };
+}
+
+export function chooseStatusNextAction(nextAction: WorkplaneDecision, publicArtifactReadiness: PublicArtifactReadiness): WorkplaneDecision {
+  if (nextAction.allowed === false && publicArtifactReadiness.allowed) {
+    return {
+      action: "run_owned_public_artifact_canary",
+      reason: publicArtifactReadiness.reason,
+      job_type: publicArtifactReadiness.next_job_type,
+      allowed: true,
+    };
+  }
+  return nextAction;
 }
 
 export type ReadinessStatus = "READY" | "MONITORED" | "PARTIAL" | "BLOCKED" | "NOT_CONNECTED" | "NEEDS_APPROVAL";

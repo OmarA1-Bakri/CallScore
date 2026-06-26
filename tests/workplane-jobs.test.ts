@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec } from "../src/lib/workplane-jobs";
+import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec, runWorkplaneJob } from "../src/lib/workplane-jobs";
 import {
   buildReadinessDomains,
+  chooseStatusNextAction,
   decideNextAutonomousAction,
+  summarizePublicArtifactReadiness,
   latestArtOfWarCampaignReceipt,
   latestGemmaShadowArtifact,
   latestGemmaCapacityPreflightArtifact,
@@ -471,6 +473,42 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
   assert.match(domains.art_of_war.safe_next_action ?? "", /owned-channel GTM loop/);
 });
 
+test("public artifact readiness stays open when unrelated private infra lane is blocked", async () => {
+  const { buildReadinessDomains } = await import("../src/lib/workplane-status");
+  const root = mkdtempSync(join(tmpdir(), "callscore-public-artifact-readiness-"));
+  mkdirSync(join(root, ".tmp", "workflow-receipts", "gemma_capacity_preflight"), { recursive: true });
+  writeFileSync(join(root, ".tmp", "workflow-receipts", "gemma_capacity_preflight", "blocked.json"), JSON.stringify({
+    result: "failed",
+    can_load: false,
+    blockers: ["insufficient_system_memory"],
+  }));
+
+  const domains = buildReadinessDomains({
+    repoRoot: root,
+    unsafeSourceRanks: 0,
+    apiUnsafeOfficialCount: 0,
+    collectorCooldown: { state_path: null, status: "clear", cooldown_until_utc: null, cooldown_reason: null, latest_failure_reason: null, latest_job_id: null, last_run_utc: null, last_attempted_count: 0, last_success_count: 0, last_failure_count: 0, last_success_rate: null, recent_failure_reasons: {}, checked_at: "now" },
+    latestGemmaShadow: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    latestMlEval: { path: null, exists: false, modified_at: null, malformed: false, summary: {} },
+    transcriptBacklogRecent30d: 0,
+    dailyPipelineActive: true,
+    nextAction: { action: "wait_for_laptop_collector_rate_limit_cooldown", reason: "private lane", job_type: "transcript_collect_laptop", allowed: false },
+    now: new Date("2026-06-26T13:00:00.000Z"),
+  });
+
+  assert.equal(domains.gemma_runtime_capacity.status, "BLOCKED");
+  const readiness = summarizePublicArtifactReadiness(domains);
+  assert.equal(readiness.status, "READY_PUBLIC_OWNED");
+  assert.equal(readiness.allowed, true);
+  assert.equal(readiness.next_job_type, "artofwar_owned_public_execution");
+  assert.deepEqual(readiness.blockers, []);
+  assert.match(readiness.reason, /public artifacts/i);
+
+  const next = chooseStatusNextAction({ action: "wait_for_laptop_collector_rate_limit_cooldown", reason: "private lane", job_type: "transcript_collect_laptop", allowed: false }, readiness);
+  assert.equal(next.action, "run_owned_public_artifact_canary");
+  assert.equal(next.job_type, "artofwar_owned_public_execution");
+  assert.equal(next.allowed, true);
+});
 
 
 test("rate-limited laptop cadence receipts become monitored cooldown rather than hard partial", () => {
@@ -554,6 +592,30 @@ test("Art of War campaign loop supports owned public execution while restricted 
   assert.equal(owned.input_payload.receipt_required_after_execution, true);
   assert.match(owned.success_criteria.join(" "), /post-execution receipt required/);
   assert.ok(owned.failure_classification.includes("not_owned_channel"));
+});
+
+test("owned public execution job emits a public artifact packet and receipt without restricted mutations", async () => {
+  const runId = "owned-public-artifact-test";
+  const out = join(mkdtempSync(join(tmpdir(), "callscore-owned-public-artifact-")), "artifact.json");
+  const result = await runWorkplaneJob({
+    id: 1,
+    run_id: 1,
+    type: "artofwar_owned_public_execution",
+    payload: { run_id: runId, out, channel: "callscore_owned_dashboard", artifact_url: "https://call-score.com", copy: "CallScore receipts beat vibes. Latest proof packet is live." },
+  } as never);
+
+  assert.equal(result.mode, "owned_public_artifact");
+  assert.equal(result.public_action_performed, true);
+  assert.equal(result.external_mutation_performed, false);
+  assert.equal(result.provider_mutation_performed, false);
+  assert.equal(result.production_mutation_performed, false);
+  assert.equal(result.out, out);
+  const artifact = JSON.parse(readFileSync(out, "utf8"));
+  assert.equal(artifact.artifact_type, "OwnedPublicArtifactPacket");
+  assert.equal(artifact.channel, "callscore_owned_dashboard");
+  assert.equal(artifact.ready_public_owned, true);
+  assert.equal(artifact.restricted_actions_blocked, true);
+  assert.match(String(result.receipt_path), /artofwar_owned_public_execution/);
 });
 
 test("Gemma Ollama Modelfile is aligned to production shadow extraction schema", () => {
