@@ -18,6 +18,33 @@ function writeRevenueArtifact(campaignId: string, value: unknown): string {
   return path;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function nestedRecord(parent: Record<string, unknown> | null, key: string): Record<string, unknown> | null {
+  if (!parent) return null;
+  const value = parent[key];
+  return isRecord(value) ? value : null;
+}
+
+function socialPacketDetail(socialPacket: Record<string, unknown> | null, socialPacketPath: string | null): Record<string, unknown> {
+  const visualAsset = nestedRecord(socialPacket, "visual_asset");
+  const brandGate = nestedRecord(visualAsset, "brand_gate");
+  const policyChecks = nestedRecord(socialPacket, "policy_checks");
+  const copyRule = typeof socialPacket?.copy_rule === "string" ? socialPacket.copy_rule : "";
+  return {
+    social_packet_present: Boolean(socialPacket),
+    social_packet_path: socialPacketPath,
+    social_packet_ok: socialPacket ? socialPacket.ok === true : null,
+    social_packet_schema: typeof socialPacket?.schema === "string" ? socialPacket.schema : null,
+    social_packet_visual_required: visualAsset ? visualAsset.required === true : null,
+    social_packet_brand_gate_ok: brandGate ? brandGate.ok === true : null,
+    social_packet_copy_rule_zero_copy: /ZERO COPY/i.test(copyRule),
+    social_packet_policy_no_mutation: policyChecks ? policyChecks.no_mutation === true : null,
+  };
+}
+
 export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
   nodeId: "revenue_goal_loop",
   domain: "revenue",
@@ -29,6 +56,9 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
     const campaignId = state.config.campaignId ?? `campaign-${state.config.goal}`;
     const approvedLive = !state.config.dryRun && state.config.mode === "approved_publish";
     const providerProof = cfg.providerPublicationProof;
+    const socialPacket = isRecord(cfg.socialPacket) ? cfg.socialPacket : null;
+    const socialPacketPath = typeof cfg.socialPacketPath === "string" ? cfg.socialPacketPath : null;
+    const socialDetail = socialPacketDetail(socialPacket, socialPacketPath);
     const artOfWarRuntimeRoot = typeof cfg.artOfWarRuntimeRoot === "string" ? cfg.artOfWarRuntimeRoot : undefined;
     const artOfWarContext = readArtOfWarCampaignContext({ runtimeRoot: artOfWarRuntimeRoot });
 
@@ -84,6 +114,8 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
       art_of_war_context: artOfWarContext.context,
       art_of_war_blockers: [...artOfWarContext.blockers],
       art_of_war_warnings: [...artOfWarContext.warnings],
+      social_packet: socialPacket,
+      social_packet_path: socialPacketPath,
       mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
     };
     const artifactPath = writeRevenueArtifact(campaignId, packet);
@@ -103,6 +135,7 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
         art_of_war_preflight_ok: artOfWarContext.context?.preflight_ok ?? null,
         art_of_war_active_channels: artOfWarContext.context?.active_channels ?? [],
         art_of_war_blockers: [...artOfWarContext.blockers],
+        ...socialDetail,
       },
       mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
     };

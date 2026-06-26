@@ -42,6 +42,11 @@ export function buildRunnableConfig(argv: readonly string[], goal: OperatingGoal
   if (refreshDataCommand) configurable.refreshDataCommand = refreshDataCommand;
   const refreshDataTimeoutRaw = valueAfter(argv, "--refresh-data-timeout-ms");
   if (refreshDataTimeoutRaw) configurable.refreshDataTimeoutMs = Number(refreshDataTimeoutRaw);
+  const socialPacketPath = valueAfter(argv, "--social-packet-json");
+  if (socialPacketPath) {
+    configurable.socialPacketPath = socialPacketPath;
+    configurable.socialPacket = readJsonObject(socialPacketPath);
+  }
   return configurable;
 }
 

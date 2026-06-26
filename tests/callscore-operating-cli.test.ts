@@ -59,6 +59,29 @@ test("callscore-operating-goal CLI maps refresh_data producer flags into runnabl
   assert.equal(config.refreshDataTimeoutMs, 12345);
 });
 
+test("callscore-operating-goal CLI maps revenue_now social packet into runnable config", () => {
+  const root = mkdtempSync(join(tmpdir(), "operating-revenue-social-cli-test-"));
+  const packetPath = writeJson(join(root, "social-packet.json"), {
+    ok: true,
+    schema: "callscore.genuine_social_packet.v3",
+    copy_rule: "ZERO COPY IN PACKET. Specialist agent writes from scratch using facts as evidence.",
+    facts: { raw_calls: 123, ranked_creators: 45 },
+    visual_asset: { required: true, brand_gate: { ok: true } },
+    policy_checks: { no_mutation: true },
+  });
+  const config = buildRunnableConfig([
+    "--goal",
+    "revenue_now",
+    "--draft-only",
+    "--social-packet-json",
+    packetPath,
+  ], "revenue_now");
+
+  assert.equal(config.socialPacketPath, packetPath);
+  assert.equal((config.socialPacket as { schema: string }).schema, "callscore.genuine_social_packet.v3");
+  assert.equal((config.socialPacket as { facts: { raw_calls: number } }).facts.raw_calls, 123);
+});
+
 test("callscore-operating-goal CLI maps produce_video scheduler flags into runnable config", () => {
   const root = mkdtempSync(join(tmpdir(), "operating-video-scheduler-cli-test-"));
   const artifactRoot = join(root, "artifacts");

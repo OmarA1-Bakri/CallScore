@@ -72,6 +72,34 @@ describe("callscore operating graph", () => {
     assert.equal(result.mutation_flags.public_publish_performed, false);
   });
 
+  test("revenue_now draft-only routes packet facts and visual metadata without public mutation", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const socialPacket = {
+      ok: true,
+      schema: "callscore.genuine_social_packet.v3",
+      copy_rule: "ZERO COPY IN PACKET. Specialist agent writes from scratch using facts as evidence.",
+      facts: { raw_calls: 123, ranked_creators: 45 },
+      visual_asset: { required: true, brand_gate: { ok: true } },
+      policy_checks: { no_mutation: true },
+    };
+    const result = await graph.invoke(
+      buildInitialOperatingState({ goal: "revenue_now", mode: "draft_only", testFixtures: true, campaignId: "campaign-social-packet-test" }),
+      { configurable: { thread_id: "operating-revenue-social-packet-test", socialPacket, socialPacketPath: "/tmp/social-packet.json" } },
+    );
+
+    const revenueNode = result.node_results.find((item) => item.node_id === "revenue_goal_loop");
+    assert.equal(revenueNode?.detail.social_packet_present, true);
+    assert.equal(revenueNode?.detail.social_packet_schema, "callscore.genuine_social_packet.v3");
+    assert.equal(revenueNode?.detail.social_packet_visual_required, true);
+    assert.equal(revenueNode?.detail.social_packet_brand_gate_ok, true);
+    assert.equal(revenueNode?.detail.social_packet_copy_rule_zero_copy, true);
+    assert.equal(result.mutation_flags.public_publish_performed, false);
+    const packet = JSON.parse(readFileSync(revenueNode!.artifact_path!, "utf8")) as Record<string, unknown>;
+    const embedded = packet.social_packet as { facts: { raw_calls: number }; copy_rule: string };
+    assert.equal(embedded.facts.raw_calls, 123);
+    assert.match(embedded.copy_rule, /ZERO COPY/);
+  });
+
   test("approved revenue publish with approval but no provider proof blocks instead of faking success", async () => {
     const graph = createCallscoreOperatingGraph();
     const result = await graph.invoke(
