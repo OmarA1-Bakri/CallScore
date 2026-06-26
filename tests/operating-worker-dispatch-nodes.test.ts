@@ -139,6 +139,87 @@ describe("worker dispatch operating node", () => {
     assert.equal(result?.blockers.some((item) => item.includes("totally_unknown")), true);
   });
 
+  test("pipeline execution failures route to retryOrFailPipelineJob and do not complete", async () => {
+    const calls: string[] = [];
+    const job = pipelineJob();
+    const node = createWorkerDispatchOnceNode(deps({
+      claimNextPipelineJob: async () => job,
+      executePipelineJobWithKeepalive: async () => {
+        calls.push("execute");
+        throw new Error("pipeline fixture failed");
+      },
+      completePipelineJob: async () => {
+        calls.push("complete");
+      },
+      retryOrFailPipelineJob: async (failed, error) => {
+        calls.push(`retry-or-fail:${failed.id}:${error.message}`);
+        return { retrying: true };
+      },
+    }));
+
+    const patch = await node(
+      buildInitialOperatingState({ goal: "dispatch_worker_once", testFixtures: true }),
+      { configurable: { thread_id: "worker-dispatch-pipeline-failure", workerId: "worker-test" } },
+    );
+
+    assert.deepEqual(calls, ["execute", "retry-or-fail:101:pipeline fixture failed"]);
+    const result = patch.node_results?.[0];
+    assert.equal(result?.status, "failed");
+    assert.equal(result?.detail.dispatch_kind, "pipeline_job");
+    assert.equal(result?.detail.job_id, 101);
+    assert.equal(result?.blockers.includes("pipeline fixture failed"), true);
+  });
+
+  test("top-level dispatch_worker_once graph uses injected worker dispatch deps for a live bounded dispatch", async () => {
+    const calls: string[] = [];
+    const job = pipelineJob({ type: "candle_refresh" });
+    const graph = createCallscoreOperatingGraph({
+      workerDispatch: deps({
+        supportedPipelineJobTypes: ["candle_refresh"],
+        resetStalePipelineJobs: async () => {
+          calls.push("reset");
+          return [];
+        },
+        claimNextPipelineJob: async (input) => {
+          calls.push(`claim:${input.workerId}:${input.types.join(",")}`);
+          return job;
+        },
+        executePipelineJobWithKeepalive: async (claimed) => {
+          calls.push(`execute:${claimed.id}:${claimed.type}`);
+          return { refreshed: true };
+        },
+        completePipelineJob: async (completed, metrics) => {
+          calls.push(`complete:${completed.id}:${String(metrics.refreshed)}`);
+        },
+      }),
+    });
+
+    const result = await graph.invoke(
+      buildInitialOperatingState({
+        goal: "dispatch_worker_once",
+        mode: "bounded_write",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "approval-worker-dispatch-live-test",
+      }),
+      {
+        configurable: {
+          thread_id: "worker-dispatch-live-injected",
+          workerId: "worker-live-test",
+          workplaneStatus: { status: "OK", automation_readiness: "CONTROLLED_FULL", autonomous_revenue_status: "NO" },
+          heartbeat: { heartbeat_id: "worker-dispatch-test", fresh: true, lease_expires_at: "2099-06-25T12:15:00.000Z" },
+        },
+      },
+    );
+
+    assert.deepEqual(calls, ["reset", "claim:worker-live-test:candle_refresh", "execute:101:candle_refresh", "complete:101:true"]);
+    const dispatchNode = result.node_results.find((item) => item.node_id === "worker_dispatch_goal_loop");
+    assert.equal(dispatchNode?.status, "ok");
+    assert.equal(dispatchNode?.detail.dispatch_kind, "pipeline_job");
+    assert.equal(dispatchNode?.detail.job_type, "candle_refresh");
+    assert.equal(result.mutation_flags.db_write_performed, true);
+  });
+
   test("channel task failures route to failChannelTask and do not report success", async () => {
     const calls: string[] = [];
     const task = channelTask();

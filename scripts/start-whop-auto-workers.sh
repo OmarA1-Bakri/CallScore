@@ -3,8 +3,10 @@
 #
 # ytdlp singleton rule:
 #   - crypto-tuber-ranked owns the only ytdlp-pot-provider on port 4416.
-#   - whop-auto must start only hermes-worker and channel-agent-worker.
-#   - --no-deps is required because those services depend_on ytdlp-pot-provider in
+#   - crypto-tuber-ranked also owns the canonical data-pipeline hermes-worker.
+#   - whop-auto must start only channel-agent-worker; starting whop-auto hermes-worker
+#     resurrects a duplicate data-pipeline poller with the same worker id.
+#   - --no-deps is required because channel-agent-worker depends_on ytdlp-pot-provider in
 #     the shared compose file; without --no-deps, whop-auto can recreate a duplicate
 #     whop-auto-ytdlp-pot-provider-1 container.
 #   - --no-recreate is required so a safe-start attempt does not stop/recreate
@@ -19,7 +21,7 @@ REPO_DIR="/opt/crypto-tuber-ranked"
 SINGLETON_CONTAINER="crypto-tuber-ranked-ytdlp-pot-provider-1"
 DUPLICATE_CONTAINER="whop-auto-ytdlp-pot-provider-1"
 PING_URL="http://127.0.0.1:4416/ping"
-SAFE_SERVICES=(hermes-worker channel-agent-worker)
+SAFE_SERVICES=(channel-agent-worker)
 
 usage() {
   cat <<'USAGE'
@@ -115,12 +117,12 @@ if [[ "$mode" == "--check" ]]; then
 fi
 
 if [[ "$mode" == "--print-command" ]]; then
-  echo "cd $REPO_DIR && docker compose -f $COMPOSE_FILE -p whop-auto up -d --no-deps --no-recreate hermes-worker channel-agent-worker"
+  echo "cd $REPO_DIR && docker compose -f $COMPOSE_FILE -p whop-auto up -d --no-deps --no-recreate channel-agent-worker"
   exit 0
 fi
 
 cd "$REPO_DIR"
-docker compose -f "$COMPOSE_FILE" -p whop-auto up -d --no-deps --no-recreate hermes-worker channel-agent-worker
+docker compose -f "$COMPOSE_FILE" -p whop-auto up -d --no-deps --no-recreate channel-agent-worker
 assert_duplicate_absent
 assert_workers_running_after_start
 assert_singleton_healthy

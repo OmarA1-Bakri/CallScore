@@ -101,6 +101,21 @@ test("Hermes worker can run dedicated channel-agent task workers", () => {
   assert.equal(args.workerId, "channel-agent-owned-social-1");
 });
 
+test("Hermes worker dispatches claimed pipeline jobs through the operating graph", () => {
+  const source = read("src/scripts/hermes-worker.ts");
+  assert.match(source, /dispatchClaimedPipelineJobThroughOperatingGraph/);
+  assert.match(source, /goal:\s*"dispatch_worker_once"/);
+  assert.match(source, /workerDispatchFixture/);
+});
+
+test("Hermes worker dispatches claimed channel tasks through the operating graph", () => {
+  const source = read("src/scripts/hermes-worker.ts");
+  assert.match(source, /dispatchClaimedChannelTaskThroughOperatingGraph/);
+  assert.match(source, /await dispatchClaimedChannelTaskThroughOperatingGraph\(channelTask, args\.workerId, logger\)/);
+  assert.match(source, /supportedChannelTaskTypes:\s*\[\.\.\.SUPPORTED_CHANNEL_TASK_TYPES\]/);
+  assert.doesNotMatch(source, /const metrics = await runChannelTask\(channelTask, args\.workerId\)/);
+});
+
 test("Docker compose runs pipeline and channel-agent workers as separate services", () => {
   const compose = read("docker-compose.yml");
   const hermesWorker = compose.match(/  hermes-worker:\n[\s\S]*?(?=\n  [a-zA-Z0-9_-]+:)/)?.[0] ?? "";

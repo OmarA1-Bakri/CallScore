@@ -32,10 +32,12 @@ import {
   claimNextChannelTask,
   failChannelTask,
   runChannelTask,
+  type ChannelAgentTask,
 } from "../lib/channel-agent-tasks";
 import { query } from "../lib/db";
 import { createLogger } from "../lib/logger";
 import { captureException, flushMonitoring, initMonitoring } from "../lib/monitoring";
+import { buildInitialOperatingState, createCallscoreOperatingGraph } from "../lib/workplane/callscore-operating-graph";
 import { loadEnv, sleep, timestamp } from "./script-helpers";
 
 const HERMES_WORKPLANE_JOB_TYPES = WORKPLANE_JOB_TYPES.filter((type) => getWorkplaneJobSpec(type).execution_location !== "Omar laptop");
@@ -185,6 +187,275 @@ export async function executeJobWithKeepalive(
   }
 }
 
+async function capturePipelineJobFailure(
+  job: PipelineJob,
+  error: Error,
+  retrying: boolean,
+  logger: ReturnType<typeof createLogger>,
+): Promise<void> {
+  await captureException(error, {
+    serviceName: "hermes-worker",
+    tags: {
+      component: "hermes-worker",
+      job_type: job.type,
+      retrying,
+    },
+    extra: {
+      job_id: job.id,
+      run_id: job.run_id,
+      attempt: job.attempts,
+      max_attempts: job.max_attempts,
+    },
+  });
+  logger.error("job_failed", {
+    job_id: job.id,
+    job_type: job.type,
+    run_id: job.run_id,
+    phase: job.phase ?? DEFAULT_PHASE,
+    retrying,
+    error: error.message,
+  });
+}
+
+async function captureChannelTaskFailure(
+  task: ChannelAgentTask,
+  error: Error,
+  logger: ReturnType<typeof createLogger>,
+): Promise<void> {
+  await captureException(error, {
+    serviceName: "hermes-worker",
+    tags: {
+      component: "hermes-worker",
+      channel_task_type: task.task_type,
+      agent_id: task.agent_id,
+    },
+    extra: {
+      task_id: task.id,
+      channel_id: task.channel_id,
+      attempt: task.attempts,
+      max_attempts: task.max_attempts,
+    },
+  });
+  logger.error("channel_task_failed", {
+    task_id: task.id,
+    agent_id: task.agent_id,
+    channel_id: task.channel_id,
+    task_type: task.task_type,
+    error: error.message,
+  });
+}
+
+function freshWorkerDispatchHeartbeat(workerId: string, dispatchId: string, source: string): Record<string, unknown> {
+  return {
+    heartbeat_id: `worker-dispatch:${workerId}:${dispatchId}`,
+    fresh: true,
+    lease_expires_at: new Date(Date.now() + Math.max(HEARTBEAT_INTERVAL_MS * 2, 60_000)).toISOString(),
+    source,
+  };
+}
+
+function workerDispatchHeartbeat(job: PipelineJob): Record<string, unknown> {
+  const fallbackLease = new Date(Date.now() + Math.max(HEARTBEAT_INTERVAL_MS * 2, 60_000)).toISOString();
+  const rawLease = job.lease_expires_at as unknown;
+  const leaseExpiresAt = typeof rawLease === "string"
+    ? rawLease
+    : rawLease instanceof Date
+      ? rawLease.toISOString()
+      : fallbackLease;
+  return {
+    heartbeat_id: `worker-dispatch:${job.locked_by ?? "unknown-worker"}:${job.id}`,
+    fresh: true,
+    lease_expires_at: Number.isFinite(Date.parse(leaseExpiresAt)) ? leaseExpiresAt : fallbackLease,
+    source: "pipeline_job_lease",
+  };
+}
+
+function workerDispatchWorkplaneStatus(): Record<string, unknown> {
+  return {
+    status: "OK",
+    automation_readiness: "CONTROLLED_FULL",
+    autonomous_revenue_status: "NO",
+    generatedAt: new Date().toISOString(),
+    source: "hermes_worker_internal_dispatch",
+  };
+}
+
+export async function dispatchClaimedPipelineJobThroughOperatingGraph(
+  job: PipelineJob,
+  logger: ReturnType<typeof createLogger>,
+): Promise<void> {
+  let failureHandled = false;
+  const graph = createCallscoreOperatingGraph({
+    workerDispatch: {
+      supportedPipelineJobTypes: [...SUPPORTED_JOB_TYPES],
+      supportedChannelTaskTypes: [],
+      resetStalePipelineJobs: async () => [],
+      claimNextPipelineJob: async () => job,
+      executePipelineJobWithKeepalive: (claimedJob) => executeJobWithKeepalive(claimedJob, logger),
+      completePipelineJob,
+      retryOrFailPipelineJob: async (failedJob, error) => {
+        const result = await retryOrFailPipelineJob(failedJob, error);
+        failureHandled = true;
+        await capturePipelineJobFailure(failedJob, error, result.retrying, logger);
+        return result;
+      },
+      claimNextChannelTask: async () => null,
+      runChannelTask: async () => ({ receipt: "not-run-for-pipeline-dispatch" }),
+      failChannelTask: async () => undefined,
+    },
+  });
+
+  const graphInput = buildInitialOperatingState({
+    goal: "dispatch_worker_once",
+    mode: "bounded_write",
+    dryRun: false,
+    approved: true,
+    approvalReceiptId: `o13-worker-dispatch:${job.run_id}:${job.id}`,
+    maxItems: 1,
+  });
+
+  let result;
+  try {
+    result = await graph.invoke(graphInput, {
+      configurable: {
+        thread_id: `worker-dispatch-${job.run_id}-${job.id}`,
+        workerId: job.locked_by ?? "data-pipeline-worker",
+        workerDispatchFixture: { pipelineJob: job },
+        workplaneStatus: workerDispatchWorkplaneStatus(),
+        heartbeat: workerDispatchHeartbeat(job),
+      },
+    });
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    if (!failureHandled) {
+      const retryResult = await retryOrFailPipelineJob(job, err);
+      failureHandled = true;
+      await capturePipelineJobFailure(job, err, retryResult.retrying, logger);
+    }
+    return;
+  }
+
+  const dispatchResult = result.node_results.find((item) => item.node_id === "worker_dispatch_goal_loop");
+  const failedOrBlocked = result.errors.length > 0
+    || result.blockers.length > 0
+    || !dispatchResult
+    || dispatchResult.status === "failed"
+    || dispatchResult.status === "blocked";
+  if (failedOrBlocked) {
+    const message = dispatchResult?.blockers.join("; ")
+      || result.blockers.join("; ")
+      || result.errors.join("; ")
+      || "worker dispatch operating graph did not complete the claimed job";
+    if (!failureHandled) {
+      const err = new Error(message);
+      const retryResult = await retryOrFailPipelineJob(job, err);
+      failureHandled = true;
+      await capturePipelineJobFailure(job, err, retryResult.retrying, logger);
+    }
+    return;
+  }
+
+  logger.info("job_completed", {
+    job_id: job.id,
+    job_type: job.type,
+    run_id: job.run_id,
+    phase: job.phase ?? DEFAULT_PHASE,
+    dispatch_receipt_id: dispatchResult.receipt_id,
+  });
+}
+
+export async function dispatchClaimedChannelTaskThroughOperatingGraph(
+  task: ChannelAgentTask,
+  workerId: string,
+  logger: ReturnType<typeof createLogger>,
+): Promise<void> {
+  let failureHandled = false;
+  const graph = createCallscoreOperatingGraph({
+    workerDispatch: {
+      supportedPipelineJobTypes: [],
+      supportedChannelTaskTypes: [...SUPPORTED_CHANNEL_TASK_TYPES],
+      resetStalePipelineJobs: async () => [],
+      claimNextPipelineJob: async () => null,
+      executePipelineJobWithKeepalive: async () => {
+        throw new Error("pipeline job execution disabled for claimed channel task dispatch");
+      },
+      completePipelineJob: async () => undefined,
+      retryOrFailPipelineJob: async (_job, error) => ({ retrying: false, error: error.message }),
+      claimNextChannelTask: async () => task,
+      runChannelTask: async (claimedTask) => {
+        const result = await runChannelTask(claimedTask, workerId);
+        const receipt = typeof result.receipt === "string" ? result.receipt : String(result.receipt ?? "");
+        return { receipt };
+      },
+      failChannelTask: async (failedTask, error) => {
+        await failChannelTask(failedTask, error);
+        failureHandled = true;
+        await captureChannelTaskFailure(failedTask, error, logger);
+      },
+    },
+  });
+
+  const graphInput = buildInitialOperatingState({
+    goal: "dispatch_worker_once",
+    mode: "bounded_write",
+    dryRun: false,
+    approved: true,
+    approvalReceiptId: `o13-channel-dispatch:${task.id}:${task.attempts}`,
+    maxItems: 1,
+  });
+
+  let result;
+  try {
+    result = await graph.invoke(graphInput, {
+      configurable: {
+        thread_id: `channel-task-dispatch-${task.id}-${task.attempts}`,
+        workerId,
+        workerDispatchFixture: { channelTask: task },
+        workplaneStatus: workerDispatchWorkplaneStatus(),
+        heartbeat: freshWorkerDispatchHeartbeat(workerId, task.id, "channel_task_worker_lease"),
+      },
+    });
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    if (!failureHandled) {
+      await failChannelTask(task, err);
+      failureHandled = true;
+      await captureChannelTaskFailure(task, err, logger);
+    }
+    return;
+  }
+
+  const dispatchResult = result.node_results.find((item) => item.node_id === "worker_dispatch_goal_loop");
+  const failedOrBlocked = result.errors.length > 0
+    || result.blockers.length > 0
+    || !dispatchResult
+    || dispatchResult.status === "failed"
+    || dispatchResult.status === "blocked";
+  if (failedOrBlocked) {
+    const message = dispatchResult?.blockers.join("; ")
+      || result.blockers.join("; ")
+      || result.errors.join("; ")
+      || "worker dispatch operating graph did not complete the claimed channel task";
+    if (!failureHandled) {
+      const err = new Error(message);
+      await failChannelTask(task, err);
+      failureHandled = true;
+      await captureChannelTaskFailure(task, err, logger);
+    }
+    return;
+  }
+
+  const receipt = typeof dispatchResult.detail.receipt === "string" ? dispatchResult.detail.receipt : undefined;
+  logger.info("channel_task_completed", {
+    task_id: task.id,
+    agent_id: task.agent_id,
+    channel_id: task.channel_id,
+    task_type: task.task_type,
+    receipt,
+    dispatch_receipt_id: dispatchResult.receipt_id,
+  });
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
   const args = parseHermesWorkerArgs(argv);
@@ -245,40 +516,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           attempt: channelTask.attempts,
           max_attempts: channelTask.max_attempts,
         });
-        try {
-          const metrics = await runChannelTask(channelTask, args.workerId);
-          logger.info("channel_task_completed", {
-            task_id: channelTask.id,
-            agent_id: channelTask.agent_id,
-            channel_id: channelTask.channel_id,
-            task_type: channelTask.task_type,
-            receipt: metrics.receipt,
-          });
-        } catch (error) {
-          await failChannelTask(channelTask, error);
-          const message = error instanceof Error ? error.message : String(error);
-          await captureException(error, {
-            serviceName: "hermes-worker",
-            tags: {
-              component: "hermes-worker",
-              channel_task_type: channelTask.task_type,
-              agent_id: channelTask.agent_id,
-            },
-            extra: {
-              task_id: channelTask.id,
-              channel_id: channelTask.channel_id,
-              attempt: channelTask.attempts,
-              max_attempts: channelTask.max_attempts,
-            },
-          });
-          logger.error("channel_task_failed", {
-            task_id: channelTask.id,
-            agent_id: channelTask.agent_id,
-            channel_id: channelTask.channel_id,
-            task_type: channelTask.task_type,
-            error: message,
-          });
-        }
+        await dispatchClaimedChannelTaskThroughOperatingGraph(channelTask, args.workerId, logger);
         processed += 1;
         if (args.once) break;
         continue;
@@ -300,41 +538,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       attempt: job.attempts,
       max_attempts: job.max_attempts,
     });
-    try {
-      const metrics = await executeJobWithKeepalive(job, logger);
-      await completePipelineJob(job, metrics);
-      logger.info("job_completed", {
-        job_id: job.id,
-        job_type: job.type,
-        run_id: job.run_id,
-        phase: job.phase ?? DEFAULT_PHASE,
-      });
-    } catch (error) {
-      const result = await retryOrFailPipelineJob(job, error);
-      await captureException(error, {
-        serviceName: "hermes-worker",
-        tags: {
-          component: "hermes-worker",
-          job_type: job.type,
-          retrying: result.retrying,
-        },
-        extra: {
-          job_id: job.id,
-          run_id: job.run_id,
-          attempt: job.attempts,
-          max_attempts: job.max_attempts,
-        },
-      });
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error("job_failed", {
-        job_id: job.id,
-        job_type: job.type,
-        run_id: job.run_id,
-        phase: job.phase ?? DEFAULT_PHASE,
-        retrying: result.retrying,
-        error: message,
-      });
-    }
+    await dispatchClaimedPipelineJobThroughOperatingGraph(job, logger);
 
     processed += 1;
     if (args.once) break;

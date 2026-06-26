@@ -19,7 +19,8 @@ test("whop-auto worker startup wrapper enforces ytdlp singleton guard", () => {
   assert.match(script, /127\.0\.0\.1:4416\/ping/, "wrapper must health-check singleton provider");
   assert.match(script, /crypto-tuber-ranked-ytdlp-pot-provider-1/, "wrapper must verify crypto-owned singleton container");
   assert.match(script, /whop-auto-ytdlp-pot-provider-1/, "wrapper must guard against the duplicate container");
-  assert.match(executableScript, /docker compose[\s\S]*-p whop-auto[\s\S]*up -d --no-deps --no-recreate hermes-worker channel-agent-worker/, "wrapper must start only whop-auto workers without dependencies or recreating healthy workers");
+  assert.match(executableScript, /docker compose[\s\S]*-p whop-auto[\s\S]*up -d --no-deps --no-recreate channel-agent-worker/, "wrapper must start only the whop-auto channel-agent worker without dependencies or recreating healthy workers");
+  assert.doesNotMatch(executableScript, /up -d --no-deps --no-recreate hermes-worker/, "wrapper must not resurrect the duplicate whop-auto data-pipeline worker");
   assert.doesNotMatch(executableScript, /docker compose[\s\S]*(?:down|restart)/, "wrapper must not stop or restart the stack");
   assert.doesNotMatch(executableScript, /up -d ytdlp-pot-provider/, "wrapper must not start ytdlp under whop-auto");
   assert.match(script, /--check/, "wrapper must support check-only verification mode");

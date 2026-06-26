@@ -35,10 +35,10 @@ Check-only verification:
 The wrapper uses explicit service targets with `--no-deps` and `--no-recreate`:
 
 ```bash
-docker compose -f /opt/crypto-tuber-ranked/docker-compose.yml -p whop-auto up -d --no-deps --no-recreate hermes-worker channel-agent-worker
+docker compose -f /opt/crypto-tuber-ranked/docker-compose.yml -p whop-auto up -d --no-deps --no-recreate channel-agent-worker
 ```
 
-`--no-deps` is required because `hermes-worker` and `channel-agent-worker` have `depends_on: ytdlp-pot-provider` in the shared compose file. Without `--no-deps`, Docker Compose can recreate the whop-auto provider dependency even when only worker services are named.
+`--no-deps` is required because `channel-agent-worker` depends on `ytdlp-pot-provider` in the shared compose file. Without `--no-deps`, Docker Compose can recreate the whop-auto provider dependency even when only worker services are named.
 
 `--no-recreate` is required so the safe-start wrapper does not stop and recreate already-running healthy whop-auto worker containers while enforcing the singleton guard.
 

@@ -30,6 +30,7 @@ import {
   workerDispatchGoalLoopNode,
 } from "./node-wrappers/domain-goal-nodes";
 import { createEvidenceResearchGoalNode } from "./node-wrappers/evidence-research-nodes";
+import { createWorkerDispatchOnceNode, type WorkerDispatchNodeDeps } from "./node-wrappers/worker-dispatch-nodes";
 
 function replace<T>() {
   return (_left: T | undefined, right: T): T => right;
@@ -266,17 +267,25 @@ export const operatingSummaryNode = wrapDirectFunctionNode({
   }),
 });
 
-export function createCallscoreOperatingGraph(options?: { evidenceResearch?: { artifactDir: string } }) {
+export interface CallscoreOperatingGraphOptions {
+  readonly evidenceResearch?: { artifactDir: string };
+  readonly workerDispatch?: WorkerDispatchNodeDeps;
+}
+
+export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphOptions) {
   const evidenceNode = options?.evidenceResearch
     ? createEvidenceResearchGoalNode(options.evidenceResearch)
     : evidenceGoalLoopNode;
+  const workerDispatchNode = options?.workerDispatch
+    ? createWorkerDispatchOnceNode(options.workerDispatch)
+    : workerDispatchGoalLoopNode;
 
   const builder = new StateGraph(OperatingGraphAnnotation)
     .addNode("boot_context", bootContextNode)
     .addNode("hard_gate_preflight", hardGatePreflightNode)
     .addNode("revenue_goal_loop", revenueGoalLoopNode)
     .addNode("data_goal_loop", dataGoalLoopNode)
-    .addNode("worker_dispatch_goal_loop", workerDispatchGoalLoopNode)
+    .addNode("worker_dispatch_goal_loop", workerDispatchNode)
     .addNode("video_goal_loop", videoGoalLoopNode)
     .addNode("monitoring_goal_loop", monitoringGoalLoopNode)
     .addNode("trust_goal_loop", trustGoalLoopNode)
