@@ -9,26 +9,11 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# ── Cron jobs via scheduled functions ──
-# Each wrapper calls the corresponding Next.js API route
-
-[functions."cron-weekly"]
-  schedule = "0 6 * * 1"
+# O13 cutover: only graph-backed alert scheduled functions remain active on Netlify.
+# Data, ML, and weekly producer/mutation schedules are owned by Hermes/systemd operating-goal wrappers.
 
 [functions."cron-alerts-scan"]
   schedule = "0 */6 * * *"
 
 [functions."cron-alerts-send"]
   schedule = "15 */6 * * *"
-
-[functions."cron-ml-enqueue"]
-  schedule = "0 3 * * *"
-
-[functions."cron-candles-enqueue"]
-  schedule = "*/15 * * * *"
-
-[functions."cron-match-enqueue"]
-  schedule = "30 3 * * *"
-
-[functions."cron-scores-enqueue"]
-  schedule = "45 3 * * *"

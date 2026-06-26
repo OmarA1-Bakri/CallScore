@@ -74,6 +74,53 @@ function deps(overrides: Partial<WorkerDispatchNodeDeps> = {}): WorkerDispatchNo
 }
 
 describe("worker dispatch operating node", () => {
+  test("dry-run injected worker dispatch never touches mutating dependencies", async () => {
+    const calls: string[] = [];
+    const node = createWorkerDispatchOnceNode(deps({
+      resetStalePipelineJobs: async () => {
+        calls.push("reset");
+        return [];
+      },
+      claimNextPipelineJob: async () => {
+        calls.push("claim-pipeline");
+        return pipelineJob();
+      },
+      executePipelineJobWithKeepalive: async () => {
+        calls.push("execute");
+        return { ok: true };
+      },
+      completePipelineJob: async () => {
+        calls.push("complete");
+      },
+      retryOrFailPipelineJob: async () => {
+        calls.push("retry-or-fail");
+        return { retrying: false };
+      },
+      claimNextChannelTask: async () => {
+        calls.push("claim-channel");
+        return channelTask();
+      },
+      runChannelTask: async () => {
+        calls.push("run-channel");
+        return { receipt: ".tmp/should-not-run.json" };
+      },
+      failChannelTask: async () => {
+        calls.push("fail-channel");
+      },
+    }));
+
+    const patch = await node(
+      buildInitialOperatingState({ goal: "dispatch_worker_once", mode: "dry_run", dryRun: true }),
+      { configurable: { thread_id: "worker-dispatch-dry-run-zero-deps", workerId: "worker-test" } },
+    );
+
+    assert.deepEqual(calls, []);
+    const result = patch.node_results?.[0];
+    assert.equal(result?.status, "blocked");
+    assert.equal(result?.blockers.includes("worker_dispatch_dry_run_no_mutation"), true);
+    assert.deepEqual(result?.mutation_flags, DEFAULT_MUTATION_FLAGS);
+  });
+
   test("claims, validates, executes, and completes at most one fixture pipeline job", async () => {
     const calls: string[] = [];
     const job = pipelineJob();
@@ -96,7 +143,14 @@ describe("worker dispatch operating node", () => {
     }));
 
     const patch = await node(
-      buildInitialOperatingState({ goal: "dispatch_worker_once", testFixtures: true }),
+      buildInitialOperatingState({
+        goal: "dispatch_worker_once",
+        mode: "bounded_write",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "worker-dispatch-execution-test",
+        testFixtures: true,
+      }),
       { configurable: { thread_id: "worker-dispatch-pipeline", workerId: "worker-test" } },
     );
 
@@ -107,7 +161,7 @@ describe("worker dispatch operating node", () => {
     assert.equal(result?.detail.dispatch_kind, "pipeline_job");
     assert.equal(result?.detail.job_id, 101);
     assert.equal(result?.detail.job_type, "hermes_smoke_test");
-    assert.equal(result?.mutation_flags.db_write_performed, false);
+    assert.equal(result?.mutation_flags.db_write_performed, true);
   });
 
   test("unsupported pipeline job types fail closed before execution and route to fail wrapper", async () => {
@@ -128,7 +182,14 @@ describe("worker dispatch operating node", () => {
     }));
 
     const patch = await node(
-      buildInitialOperatingState({ goal: "dispatch_worker_once", testFixtures: true }),
+      buildInitialOperatingState({
+        goal: "dispatch_worker_once",
+        mode: "bounded_write",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "worker-dispatch-unsupported-test",
+        testFixtures: true,
+      }),
       { configurable: { thread_id: "worker-dispatch-unsupported", workerId: "worker-test" } },
     );
 
@@ -158,7 +219,14 @@ describe("worker dispatch operating node", () => {
     }));
 
     const patch = await node(
-      buildInitialOperatingState({ goal: "dispatch_worker_once", testFixtures: true }),
+      buildInitialOperatingState({
+        goal: "dispatch_worker_once",
+        mode: "bounded_write",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "worker-dispatch-failure-test",
+        testFixtures: true,
+      }),
       { configurable: { thread_id: "worker-dispatch-pipeline-failure", workerId: "worker-test" } },
     );
 
@@ -239,7 +307,14 @@ describe("worker dispatch operating node", () => {
     }));
 
     const patch = await node(
-      buildInitialOperatingState({ goal: "dispatch_worker_once", testFixtures: true }),
+      buildInitialOperatingState({
+        goal: "dispatch_worker_once",
+        mode: "bounded_write",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "worker-dispatch-channel-test",
+        testFixtures: true,
+      }),
       { configurable: { thread_id: "worker-dispatch-channel", workerId: "worker-test" } },
     );
 

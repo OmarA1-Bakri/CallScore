@@ -29,9 +29,24 @@ export function createWorkerDispatchOnceNode(deps: WorkerDispatchNodeDeps) {
       const fixture = cfg.workerDispatchFixture as Record<string, unknown> | undefined;
       const supportedPipelineJobTypes = deps.supportedPipelineJobTypes ?? ["hermes_smoke_test"];
       const supportedChannelTaskTypes = deps.supportedChannelTaskTypes ?? ["data_pipeline_freshness_sentinel"];
-      const liveMutationFlags = state.config.dryRun
-        ? { ...DEFAULT_MUTATION_FLAGS }
-        : { ...DEFAULT_MUTATION_FLAGS, db_write_performed: true };
+
+      if (state.config.dryRun) {
+        return {
+          status: "blocked",
+          summary: "Worker dispatch dry-run skipped all mutating dependencies.",
+          blockers: ["worker_dispatch_dry_run_no_mutation"],
+          detail: {
+            dispatch_kind: "dry_run",
+            worker_id: workerId,
+            supported_pipeline_job_types: supportedPipelineJobTypes,
+            supported_channel_task_types: supportedChannelTaskTypes,
+            mutating_dependency_calls_skipped: true,
+          },
+          mutation_flags: { ...DEFAULT_MUTATION_FLAGS },
+        };
+      }
+
+      const liveMutationFlags = { ...DEFAULT_MUTATION_FLAGS, db_write_performed: true };
 
       try {
         const resetIds = await deps.resetStalePipelineJobs();

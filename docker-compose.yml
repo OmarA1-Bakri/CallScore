@@ -87,6 +87,7 @@ services:
       context: .
       dockerfile: Dockerfile.hermes
     image: crypto-tuber-ranked-hermes-worker:latest
+    profiles: ["debug"]
     restart: unless-stopped
     depends_on:
       - ytdlp-pot-provider

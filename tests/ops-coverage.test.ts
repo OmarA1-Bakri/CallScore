@@ -20,6 +20,10 @@ function read(relativePath: string): string {
   return readFileSync(join(root, relativePath), "utf8");
 }
 
+function readAbsolute(path: string): string {
+  return readFileSync(path, "utf8");
+}
+
 test("global security headers include a restrictive CSP", async () => {
   const nextConfig = (await import("../next.config.js")).default as NextConfigType;
   const headersConfig = await nextConfig.headers();
@@ -120,12 +124,62 @@ test("Docker compose runs pipeline and channel-agent workers as separate service
   const compose = read("docker-compose.yml");
   const hermesWorker = compose.match(/  hermes-worker:\n[\s\S]*?(?=\n  [a-zA-Z0-9_-]+:)/)?.[0] ?? "";
   const channelWorker = compose.match(/  channel-agent-worker:\n[\s\S]*?(?=\n  [a-zA-Z0-9_-]+:)/)?.[0] ?? "";
+  const latentContinuous = compose.match(/  data-pipeline-continuous:\n[\s\S]*?(?=\n  [a-zA-Z0-9_-]+:|\n?$)/)?.[0] ?? "";
   assert.match(hermesWorker, /--worker-id", "data-pipeline-worker/);
   assert.match(hermesWorker, /--no-channel-tasks/);
   assert.doesNotMatch(hermesWorker, /--no-pipeline-jobs/);
   assert.match(channelWorker, /--worker-id", "channel-agent-worker/);
   assert.match(channelWorker, /--no-pipeline-jobs/);
   assert.doesNotMatch(channelWorker, /pipeline:data:continuous/);
+  assert.match(latentContinuous, /profiles:\s*\["debug"\]/, "latent continuous direct consumer must require the debug profile");
+});
+
+test("Netlify schedules only graph-backed alert crons after O13 cutover", () => {
+  const netlify = read("netlify.toml");
+  assert.match(netlify, /\[functions\."cron-alerts-scan"\][\s\S]*schedule = "0 \*\/6 \* \* \*"/);
+  assert.match(netlify, /\[functions\."cron-alerts-send"\][\s\S]*schedule = "15 \*\/6 \* \* \*"/);
+  for (const disabled of [
+    "cron-weekly",
+    "cron-ml-enqueue",
+    "cron-candles-enqueue",
+    "cron-match-enqueue",
+    "cron-scores-enqueue",
+  ]) {
+    assert.doesNotMatch(netlify, new RegExp(`\\[functions\\."${disabled}"\\][\\s\\S]*schedule\\s*=`), `${disabled} must not be an active Netlify scheduled function`);
+  }
+});
+
+test("active O13 shell wrappers enter operating goals before legacy implementations", () => {
+  const wrappers = [
+    ["/srv/agents/hermes/scripts/callscore-daily-pipeline-operating.sh", "refresh_data", /--refresh-data-command/],
+    ["/srv/agents/hermes/scripts/callscore-cron-candles.sh", "refresh_data", /CALLSCORE_CANDLES_PRODUCER|callscore-enqueue-candles/],
+    ["/srv/agents/hermes/scripts/callscore-cron-match.sh", "refresh_data", /CALLSCORE_MATCH_PRODUCER|callscore-enqueue-match/],
+    ["/srv/agents/hermes/scripts/callscore-cron-scores.sh", "refresh_data", /CALLSCORE_SCORES_PRODUCER|callscore-enqueue-scores/],
+    ["/srv/agents/hermes/scripts/callscore-video-scheduler.sh", "produce_video", /--video-command|CALLSCORE_VIDEO_SCHEDULER_IMPL/],
+    ["/srv/agents/hermes/scripts/callscore-video-queue-consumer.sh", "produce_video", /--video-command|CALLSCORE_VIDEO_QUEUE_CONSUMER_IMPL/],
+    ["/srv/agents/hermes/scripts/callscore-creator-growth-scout.sh", "evidence_research", /--evidence-command|CALLSCORE_CREATOR_GROWTH_SCOUT_IMPL/],
+  ] as const;
+
+  for (const [scriptPath, goal, commandPattern] of wrappers) {
+    assert.equal(existsSync(scriptPath), true, `${scriptPath} must exist`);
+    const script = readAbsolute(scriptPath);
+    assert.match(script, /npm run operating:goal/);
+    assert.match(script, new RegExp(`--goal\\s+${goal}`));
+    assert.match(script, commandPattern);
+    assert.match(script, /npm run workplane:status -- --json/);
+    assert.match(script, /npm run agents:heartbeat -- --dry-run/);
+  }
+});
+
+test("installed O13 systemd entrypoints use graph wrappers or canonical compose workers", () => {
+  const canary = readAbsolute("/etc/systemd/system/callscore-control-plane-canary.service");
+  const dailyDropIn = readAbsolute("/etc/systemd/system/callscore-daily-pipeline.service.d/o13-operating-graph.conf");
+  const worker = readAbsolute("/etc/systemd/system/hermes-worker.service");
+
+  assert.match(canary, /ExecStart=\/usr\/bin\/npm run operating:goal -- --goal monitor --read-live --max-items 1/);
+  assert.match(dailyDropIn, /ExecStart=\s*\nExecStart=\/srv\/agents\/hermes\/scripts\/callscore-daily-pipeline-operating\.sh/);
+  assert.match(worker, /ExecStart=\/usr\/bin\/docker compose up -d hermes-worker/);
+  assert.doesNotMatch(worker, /data-pipeline-continuous/);
 });
 
 test("agent heartbeat does not enqueue duplicate open channel tasks", () => {

@@ -50,6 +50,64 @@ describe("alert distribution operating node", () => {
     assert.equal(patch.mutation_flags?.send_or_outreach_performed, false);
   });
 
+  test("allowSend in read-live without approval blocks before claim or send", async () => {
+    const calls: string[] = [];
+    const node = createAlertDistributionNode({
+      claimPendingAlerts: async () => {
+        calls.push("claim");
+        return [claimed()];
+      },
+      sendEmail: async () => {
+        calls.push("send");
+      },
+      revertClaim: async () => {
+        calls.push("revert");
+        return 0;
+      },
+      hasUsersTable: async () => {
+        calls.push("has-users");
+        return true;
+      },
+    });
+
+    const patch = await node(
+      buildInitialOperatingState({
+        goal: "alerts",
+        mode: "read_live",
+        dryRun: false,
+        approved: false,
+        testFixtures: true,
+      }),
+      {
+        configurable: {
+          thread_id: "alerts-read-live-unapproved-test",
+          alertDistribution: {
+            sendPolicy: {
+              allowSend: true,
+              toolAvailable: true,
+              requireApproval: true,
+              policyId: "alert-policy-test",
+            },
+          },
+        },
+      },
+    );
+
+    assert.deepEqual(calls, []);
+    const result = patch.node_results?.[0];
+    assert.equal(result?.status, "blocked");
+    assert.equal(result?.blockers.includes("alert_send_approval_missing"), true);
+    assert.deepEqual(result?.mutation_flags, {
+      external_mutation_performed: false,
+      send_or_outreach_performed: false,
+      provider_mutation_performed: false,
+      whop_mutation_performed: false,
+      production_mutation_performed: false,
+      db_write_performed: false,
+      public_publish_performed: false,
+    });
+  });
+
   test("approved policy with injected mailer fixture claims builds digest and sends", async () => {
     const sent: AlertDistributionMailerPayload[] = [];
     const node = createAlertDistributionNode({
@@ -104,6 +162,7 @@ describe("alert distribution operating node", () => {
     assert.match(sent[0].text, /ETH/);
     assert.equal(patch.mutation_flags?.external_mutation_performed, true);
     assert.equal(patch.mutation_flags?.send_or_outreach_performed, true);
+    assert.equal(patch.mutation_flags?.db_write_performed, true);
   });
 
   test("send failure reverts the claimed alert ids and records blocker", async () => {
@@ -151,5 +210,6 @@ describe("alert distribution operating node", () => {
     assert.equal(result?.detail.reverted_claim_count, 1);
     assert.equal(patch.mutation_flags?.send_or_outreach_performed, false);
     assert.equal(patch.mutation_flags?.external_mutation_performed, true);
+    assert.equal(patch.mutation_flags?.db_write_performed, true);
   });
 });

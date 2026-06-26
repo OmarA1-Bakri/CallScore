@@ -39,6 +39,23 @@ export function createAlertDistributionNode(deps: AlertDistributionNodeDeps) {
         };
       }
 
+      const hasApprovalEvidence = Boolean(state.config.approvalReceiptId || state.config.approvedByOperator);
+      const approvedForSend = state.config.mode === "approved_publish" && state.config.approved && hasApprovalEvidence;
+      if (!approvedForSend) {
+        return {
+          status: "blocked",
+          summary: "Alert send approval evidence is missing.",
+          blockers: ["alert_send_approval_missing"],
+          detail: {
+            send_allowed: false,
+            mode: state.config.mode,
+            approved: state.config.approved,
+            approval_evidence_present: hasApprovalEvidence,
+          },
+          mutation_flags: { ...DEFAULT_MUTATION_FLAGS },
+        };
+      }
+
       const maxItems = state.config.maxItems || 2;
       const hasTable = await deps.hasUsersTable();
       const claimed = await deps.claimPendingAlerts(maxItems, hasTable);
@@ -67,7 +84,12 @@ export function createAlertDistributionNode(deps: AlertDistributionNodeDeps) {
           status: "ok",
           summary: "Alerts sent.",
           detail: { claimed_alert_count: claimed.length, sent_alert_count: claimed.length },
-          mutation_flags: { ...DEFAULT_MUTATION_FLAGS, external_mutation_performed: true, send_or_outreach_performed: true },
+          mutation_flags: {
+            ...DEFAULT_MUTATION_FLAGS,
+            external_mutation_performed: true,
+            send_or_outreach_performed: true,
+            db_write_performed: true,
+          },
         };
       } catch (err) {
         const ids = claimed.map((r) => r.alert_id);
@@ -77,7 +99,7 @@ export function createAlertDistributionNode(deps: AlertDistributionNodeDeps) {
           summary: "Alert send failed.",
           blockers: [err instanceof Error ? err.message : String(err)],
           detail: { reverted_claim_count: ids.length },
-          mutation_flags: { ...DEFAULT_MUTATION_FLAGS, external_mutation_performed: true },
+          mutation_flags: { ...DEFAULT_MUTATION_FLAGS, external_mutation_performed: true, db_write_performed: true },
         };
       }
     },
