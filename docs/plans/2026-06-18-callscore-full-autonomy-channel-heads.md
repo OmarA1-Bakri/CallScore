@@ -1,6 +1,8 @@
 # CallScore Bounded Full Autonomy Plan — Channel Heads, Heartbeats, Souls
 
-> **For Hermes:** Use task-router → writing-plans → subagent-driven-development before implementation. This document is the canonical design/implementation plan for moving CallScore from `CONTROLLED_FULL` to bounded `FULL_AUTONOMOUS`.
+> Historical 8-core-channel-head plan. Superseded by O13/canonical-green 44-agent souls and the CMO → X/LinkedIn/Reddit specialist hierarchy. Do not use `callscore-x-linkedin-growth-head` for new tests, heartbeats, or router fixtures.
+
+> **Historical note:** This was the 2026-06-18 design/implementation plan for moving CallScore from `CONTROLLED_FULL` toward bounded `FULL_AUTONOMOUS`. It is superseded for current implementation by the O13/canonical-green 44-agent baseline.
 
 **Goal:** Make CallScore operate through independent channel-head agents with their own heartbeat, soul, memory, queue, receipts, and rollback constraints, while Hermes remains the oversight/orchestrator.
 

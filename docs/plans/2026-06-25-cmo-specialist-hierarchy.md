@@ -1,5 +1,7 @@
 # CMO Channel Specialist Hierarchy Implementation Plan
 
+> Implementation completed/superseded by the current 44-agent O13/canonical-green baseline. Use this as historical refactor rationale, not as a fresh implementation checklist.
+
 > **For Hermes:** Execute phases sequentially — each builds on the previous.
 
 **Goal:** Refactor marketing agent model from broad channel heads into CMO → channel head → single-job specialist hierarchy across X, LinkedIn, and Reddit.

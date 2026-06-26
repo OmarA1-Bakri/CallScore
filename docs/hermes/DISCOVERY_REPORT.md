@@ -1,5 +1,7 @@
 # Hermes Discovery Report — CallScore Control Plane Architecture
 
+> Historical pre-O13 discovery snapshot. Direct Netlify data/ML/weekly schedules listed below were removed by O13. Current Netlify schedules are alert-only; data/ML/refresh lanes route through graph-backed operating goals.
+
 Generated: 2026-06-18
 Repository: `/opt/crypto-tuber-ranked`
 Hard gate: Phase 1 discovery only. No source-code implementation changes were made in this phase.
@@ -109,7 +111,7 @@ Library/tooling discovery highlights:
 - Netlify publish directory: `.next`.
 - Netlify Node version: `20`.
 - Netlify plugin: `@netlify/plugin-nextjs`.
-- Scheduled functions configured:
+- Scheduled functions configured at this historical snapshot (pre-O13; no longer current except alerts):
   - `cron-weekly`: weekly Monday 06:00
   - `cron-alerts-scan`: every 6h
   - `cron-alerts-send`: every 6h offset 15m

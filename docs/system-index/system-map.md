@@ -1,5 +1,7 @@
 # CallScore System Index — First Pass
 
+> O13 supersession: first-pass 2026-06-18 inventory snapshot. Current production entrypoints are graph-backed via `docs/ops/o13-production-entrypoint-inventory.md`; direct pipeline commands below are implementation/building-block evidence unless explicitly wrapped by operating goals.
+
 Generated: 2026-06-18
 Status: first-pass verified map; not a migration approval.
 

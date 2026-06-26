@@ -1,5 +1,7 @@
 # Authority-Based Decision Router Implementation Plan
 
+> Historical implementation plan. Current canonical tests use live souls IDs from `docs/ops/callscore-channel-head-souls.yaml`; translate any pre-CMO snippets such as `callscore-x-linkedin-growth-head` to current IDs before reuse.
+
 > **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task with TDD.
 
 **Goal:** Replace the monolithic `decideChannelHeadAction()` with an authority-based decision router that separates hard gates from priority scoring and dispatches to focused handlers per action authority tier.

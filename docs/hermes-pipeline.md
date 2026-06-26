@@ -1,6 +1,8 @@
 # Netlify → HH pgsql → Hermes ML pipeline
 
-Netlify is the canonical app host and scheduler. HH VM PostgreSQL/pgsql is the canonical primary database for durable runs/jobs/events and ML audit state. Neon remains backup/legacy compatibility only. Hermes/Hetzner runs the long-lived Docker worker that claims pgsql jobs with `FOR UPDATE SKIP LOCKED`.
+Netlify is the canonical app host. O13/canonical-green changed scheduling: Netlify schedules are **alert-only** (`cron-alerts-scan`, `cron-alerts-send`). HH VM PostgreSQL/pgsql is the canonical primary database for durable runs/jobs/events and ML audit state. Neon remains backup/legacy compatibility only. Hermes/Hetzner runs graph-backed Docker/systemd workers that claim pgsql jobs with `FOR UPDATE SKIP LOCKED`.
+
+> O13 supersession: direct Netlify data/ML/weekly schedules are absent and must not be reintroduced. Production refresh/worker operation routes through `npm run operating:goal` / wrappers recorded in `docs/ops/o13-production-entrypoint-inventory.md`.
 
 ## Deploy on Hermes
 
@@ -32,7 +34,7 @@ Worker stdout/stderr is JSONL structured logging with `event`, `worker_id`,
 
 ## Netlify/Next endpoints
 
-- `GET|POST /api/cron/ml/enqueue` requires `Authorization: Bearer $CRON_SECRET` and queues one idempotent nightly `ml_verifier_batch` job.
+- `GET|POST /api/cron/ml/enqueue` is a legacy/manual enqueue route, not an active O13 Netlify schedule. Use graph-backed `refresh_data`/worker dispatch entrypoints for production scheduling.
 - `GET /api/pipeline/status` requires `Authorization: Bearer $PIPELINE_STATUS_SECRET` (or `$CRON_SECRET`) and returns recent runs/jobs/events.
 - `GET /api/pipeline/stats?limit=15` uses the same bearer auth and returns the holistic data inventory: creators, videos/transcripts, raw calls, confidence/scoring funnel, public eligibility, leaderboard freshness, candle coverage, consensus, and pipeline orchestration totals.
 - `GET /api/pipeline/blockers?limit=25` uses the same bearer auth and returns the operating views for non-public calls: blocked by reason, symbol, creator, and pipeline stage.
@@ -41,9 +43,9 @@ Worker stdout/stderr is JSONL structured logging with `event`, `worker_id`,
 
 The ML verifier is audit-only: it writes `ml_verification_runs` and pipeline events. It does not update `calls`; promotion remains a separate future workflow after holdout evals are trusted.
 
-## Continuous data pipeline
+## Continuous data pipeline implementation/debug path
 
-Use the continuous runner when the launch data pipeline should keep cycling without overlapping itself:
+Use the continuous runner only as an implementation/debug path. In O13 production, data refresh is scheduled via graph-backed operating-goal wrappers; `data-pipeline-continuous` remains debug-profile only.
 
 ```bash
 npm run pipeline:data:continuous -- --write --interval-minutes 30 -- \
@@ -88,11 +90,13 @@ For a one-cycle dry-run smoke check:
 docker compose --profile debug run --rm data-pipeline-continuous-once
 ```
 
-For continuous operation on Hermes:
+For a debug-profile continuous loop only, with explicit operator intent:
 
 ```bash
-docker compose up -d data-pipeline-continuous
+docker compose --profile debug up -d data-pipeline-continuous
 ```
+
+Do not use `data-pipeline-continuous` as the default production scheduler.
 
 Reviewed promotions remain explicit. Pass reviewed IDs after the second `--` when you intentionally want promotion in a cycle:
 

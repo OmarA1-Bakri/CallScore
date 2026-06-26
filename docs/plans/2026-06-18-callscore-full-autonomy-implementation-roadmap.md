@@ -1,5 +1,7 @@
 # CallScore Full Autonomy Implementation Roadmap
 
+> Historical P12/P14 roadmap. Superseded by O13/canonical-green 44-agent souls in `docs/ops/callscore-channel-head-souls.yaml`; old initial-head lists are historical only.
+
 Target mode: `FULL_AUTONOMOUS_BOUNDED_OWNED_GTM`
 
 This roadmap turns the design in `docs/plans/2026-06-18-callscore-full-autonomy-channel-heads.md` into implementation phases with acceptance gates.

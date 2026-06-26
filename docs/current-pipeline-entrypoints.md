@@ -3,7 +3,9 @@
 This repo has older scraper/extractor scripts kept for reproducibility. Use this
 page to avoid accidentally choosing a superseded path.
 
-## Canonical production/data-refresh path
+## Canonical implementation sequence
+
+These direct scripts are canonical building blocks. For production scheduling/operation, use O13 graph-backed `refresh_data` entrypoints and wrappers from `docs/ops/o13-production-entrypoint-inventory.md` instead of invoking this chain as an independent scheduler.
 
 1. `npm run discover:videos`
 2. `npm run scrape:v2`
