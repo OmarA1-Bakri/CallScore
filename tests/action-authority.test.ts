@@ -1,11 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   ActionAuthority,
   authorityForAgent,
   authoritiesForClass,
   type ActionAuthorityType,
 } from "../src/lib/autonomy/action-authority";
+
+const soulsPath = join(process.cwd(), "docs/ops/callscore-channel-head-souls.yaml");
+
+function canonicalAgentIds(): string[] {
+  return Array.from(readFileSync(soulsPath, "utf8").matchAll(/^\s+- agent_id:\s*(\S+)/gm), (match) => match[1]);
+}
 
 test("action-authority defines the 7 canonical authority tiers", () => {
   assert.equal(ActionAuthority.length, 7);
@@ -124,6 +132,12 @@ test("authorityForAgent returns empty array for unknown agents", () => {
   const unknown = authorityForAgent("callscore-unknown-agent");
   assert.ok(Array.isArray(unknown));
   assert.equal(unknown.length, 0);
+});
+
+test("authorityForAgent resolves every agent from canonical souls YAML", () => {
+  const missing = canonicalAgentIds().filter((agentId) => authorityForAgent(agentId).length === 0);
+
+  assert.deepEqual(missing, []);
 });
 
 test("authoritiesForClass returns correct defaults per class", () => {

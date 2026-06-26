@@ -112,9 +112,18 @@ export function inferClass(agentId: string): string {
     discoverer: "pipeline_discovery",
     youtube: "pipeline_discovery",
     "youtube-discovery": "pipeline_discovery",
+    "gemma-transcript": "transcript_shadow",
+    "channel-agent": "runtime_worker",
+    "transcript-scraper": "pipeline_scraper",
+    "llm-extractor": "pipeline_extractor",
+    "price-matcher": "pipeline_matcher",
+    consensus: "pipeline_consensus",
+    "ml-verifier": "pipeline_verifier",
+    "candle-refresher": "pipeline_refresher",
+    "candidate-admission": "pipeline_admission",
   };
 
-  return knownClasses[segments[0]] ?? segments[0];
+  return knownClasses[segments.join("-")] ?? knownClasses[segments[0]] ?? segments[0];
 }
 
 /**

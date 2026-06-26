@@ -1,8 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { routeDecision } from "../src/lib/autonomy/decision-router";
 import { ChannelHeadDecisionSchema, AutonomyReceiptSchema } from "../src/lib/autonomy/contracts";
 import type { ChannelHeadDecisionContext } from "../src/lib/autonomy/channel-head-context";
+
+const soulsPath = join(process.cwd(), "docs/ops/callscore-channel-head-souls.yaml");
+
+function canonicalAgentIds(): string[] {
+  return Array.from(readFileSync(soulsPath, "utf8").matchAll(/^\s+- agent_id:\s*(\S+)/gm), (match) => match[1]);
+}
 
 const now = "2026-06-21T12:00:00.000Z";
 const later = "2026-06-21T13:00:00.000Z";
@@ -351,6 +359,25 @@ test("every canonical agent class resolves to at least one registered handler", 
       assert.ok(result.decision.reason_codes.length > 0, `${agentId} non-act result has reason codes`);
     }
   }
+});
+
+test("every live canonical agent routes without unknown-agent suppression", () => {
+  const blocked = canonicalAgentIds()
+    .map((agentId) => {
+      const result = routeDecision(baseCtx({
+        channelHeadSoul: { agentId, channelId: agentId.replace(/^callscore-/, ""), soulVersion: "v1", purpose: "canonical coverage" },
+        targetActionType: "monitor_read_only",
+        gtmRegistryState: {
+          ...baseCtx().gtmRegistryState,
+          laneId: agentId,
+          allowedActions: ["monitor_read_only", "draft", "publish_owned_public"],
+        },
+      }));
+      return { agentId, reasonCodes: result.decision.reason_codes };
+    })
+    .filter((item) => item.reasonCodes.includes("unknown_agent_not_authorized"));
+
+  assert.deepEqual(blocked, []);
 });
 
 // ── routeDecision() never calls decideChannelHeadAction() for canonical agents ──
