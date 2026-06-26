@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { buildRunnableConfig } from "../src/scripts/callscore-operating-goal";
+import { buildRunnableConfig, buildRunnableConfigWithRuntimeContext } from "../src/scripts/callscore-operating-goal";
 function writeFakeScout(root: string): { command: string; markerPath: string; receiptPath: string } {
   const command = join(root, "fake-scout.sh");
   const markerPath = join(root, "fake-scout-invoked.txt");
@@ -104,6 +104,21 @@ test("callscore-operating-goal CLI maps produce_video scheduler flags into runna
   assert.equal(config.videoArtifactRoot, artifactRoot);
   assert.equal(config.videoQueueRoot, queueRoot);
   assert.equal(config.videoSchedulerNow, "2026-06-24T08:00:00.000Z");
+});
+
+test("callscore-operating-goal CLI auto-injects live Workplane status and fresh operating heartbeat when no gate context files are supplied", async () => {
+  const config = await buildRunnableConfigWithRuntimeContext([
+    "--goal",
+    "produce_video",
+    "--read-live",
+  ], "produce_video", {
+    buildWorkplaneStatus: async () => ({ status: "OK", automation_readiness: "BLOCKED", autonomous_revenue_status: "NO" }),
+  });
+
+  assert.deepEqual(config.workplaneStatus, { status: "OK", automation_readiness: "BLOCKED", autonomous_revenue_status: "NO" });
+  assert.match(String((config.heartbeat as { heartbeat_id: string }).heartbeat_id), /^operating-goal:produce_video:/);
+  assert.equal((config.heartbeat as { fresh: boolean }).fresh, true);
+  assert.equal(Number.isFinite(Date.parse(String((config.heartbeat as { lease_expires_at: string }).lease_expires_at))), true);
 });
 
 test("callscore-operating-goal CLI evidence_research read-live accepts gate context files and invokes scout", () => {

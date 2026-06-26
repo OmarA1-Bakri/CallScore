@@ -188,6 +188,23 @@ function missingRuntimeContextIsWarningOnly(state: OperatingGraphState): boolean
   return state.config.goal === "monitor";
 }
 
+function isWorkplaneStatusBlocked(workplane: Record<string, unknown> | null): boolean {
+  return workplane?.status === "BLOCKED";
+}
+
+function workplaneReadinessBlocksGoal(workplane: Record<string, unknown> | null): boolean {
+  if (workplane?.automation_readiness !== "BLOCKED") return false;
+  if (isWorkplaneStatusBlocked(workplane)) return true;
+
+  // A BLOCKED readiness value can be caused by fail-closed restricted lanes
+  // (email/DM, spend, non-owned public posting, provider mutation, transcript
+  // provider cooldown) while core Workplane status remains OK. Do not let those
+  // unrelated restricted-lane blockers stop bounded internal CallScore work.
+  // Goal-specific hard gates below still block revenue/public publish without
+  // approval, autonomous revenue disabled, kill switches, stale heartbeat, etc.
+  return false;
+}
+
 export async function hardGatePreflightNode(state: OperatingGraphState, config: RunnableConfig): Promise<OperatingNodePatch> {
   const blockers: string[] = [];
   const warnings: string[] = [];
@@ -210,8 +227,10 @@ export async function hardGatePreflightNode(state: OperatingGraphState, config: 
     if (missingRuntimeContextIsWarningOnly(state)) warnings.push("workplane_status_unavailable");
     else blockers.push("workplane_status_unavailable");
   }
-  if (workplane?.status === "BLOCKED" || workplane?.automation_readiness === "BLOCKED") {
+  if (workplaneReadinessBlocksGoal(workplane)) {
     blockers.push("workplane_blocked");
+  } else if (workplane?.automation_readiness === "BLOCKED") {
+    warnings.push("workplane_readiness_blocked_for_unrelated_restricted_lane");
   }
   if (workplane?.autonomous_revenue_status === "NO" && state.config.goal === "revenue_now" && !state.config.dryRun) {
     blockers.push("autonomous_revenue_not_live");

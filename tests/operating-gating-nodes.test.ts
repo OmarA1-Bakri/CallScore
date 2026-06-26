@@ -42,6 +42,28 @@ describe("operating hard gate nodes", () => {
     assert.equal(patch.blockers?.includes("workplane_blocked"), true);
   });
 
+  test("hardGatePreflightNode allows approved bounded internal goals when Workplane status is OK but readiness is blocked by unrelated restricted lanes", async () => {
+    const state = buildInitialOperatingState({
+      goal: "refresh_data",
+      mode: "bounded_write",
+      dryRun: false,
+      approved: true,
+      approvalReceiptId: "approval-refresh-test",
+      testFixtures: true,
+    });
+    state.artifacts.workplane_status = {
+      status: "OK",
+      automation_readiness: "BLOCKED",
+      autonomous_revenue_status: "NO",
+      blocked_public_actions: ["email/DM/outreach", "non-owned public posting", "spend", "provider mutation"],
+      next_recommended_autonomous_action: { action: "wait_for_laptop_collector_rate_limit_cooldown", allowed: false },
+    };
+    const patch = await hardGatePreflightNode(state, { configurable: { thread_id: "bounded-safe-workplane-test" } });
+    assert.equal(patch.node_results?.[0]?.status, "ok");
+    assert.equal(patch.blockers?.includes("workplane_blocked"), false);
+    assert.equal(patch.warnings?.includes("workplane_readiness_blocked_for_unrelated_restricted_lane"), true);
+  });
+
   test("hardGatePreflightNode blocks non-monitor goals when Workplane status is missing", async () => {
     const state = buildInitialOperatingState({ goal: "refresh_data", mode: "bounded_write", dryRun: false, approved: true, approvalReceiptId: "approval-refresh-test" });
     const patch = await hardGatePreflightNode(state, { configurable: { thread_id: "missing-workplane-test" } });

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { buildInitialOperatingState, createCallscoreOperatingGraph } from "../lib/workplane/callscore-operating-graph";
 import { createLangfuseTrace, flushLangfuseObservability, traceLangfuseSpan } from "../lib/langfuse-observability";
 import { OperatingGoalModeSchema, OperatingGoalSchema, type OperatingGoal } from "../lib/workplane/operating-goals";
+import { buildWorkplaneStatus } from "./workplane-status";
 import { loadEnv } from "./script-helpers";
 
 function valueAfter(argv: readonly string[], flag: string): string | null {
@@ -52,6 +53,35 @@ export function buildRunnableConfig(argv: readonly string[], goal: OperatingGoal
   return configurable;
 }
 
+function hasExplicitGateContext(argv: readonly string[]): boolean {
+  return argv.includes("--test-fixtures")
+    || argv.includes("--dry-run")
+    || Boolean(valueAfter(argv, "--workplane-status-json"))
+    || Boolean(valueAfter(argv, "--heartbeat-json"));
+}
+
+function freshOperatingHeartbeat(goal: OperatingGoal): Record<string, unknown> {
+  return {
+    heartbeat_id: `operating-goal:${goal}:${randomUUID()}`,
+    fresh: true,
+    lease_expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    source: "callscore_operating_goal_cli",
+  };
+}
+
+export async function buildRunnableConfigWithRuntimeContext(
+  argv: readonly string[],
+  goal: OperatingGoal,
+  deps: { readonly buildWorkplaneStatus: () => Promise<Record<string, unknown>> } = { buildWorkplaneStatus },
+): Promise<Record<string, unknown>> {
+  const configurable = buildRunnableConfig(argv, goal);
+  if (!hasExplicitGateContext(argv)) {
+    configurable.workplaneStatus = await deps.buildWorkplaneStatus();
+    configurable.heartbeat = freshOperatingHeartbeat(goal);
+  }
+  return configurable;
+}
+
 export function parseOperatingGoalCliArgs(argv = process.argv.slice(2)) {
   const goalRaw = valueAfter(argv, "--goal");
   if (!goalRaw) throw new Error("--goal is required");
@@ -97,9 +127,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   });
   let result;
   try {
+    const configurable = await buildRunnableConfigWithRuntimeContext(argv, input.goal);
     result = await graph.invoke(
       buildInitialOperatingState(input),
-      { configurable: buildRunnableConfig(argv, input.goal) },
+      { configurable },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
