@@ -1,5 +1,11 @@
 # CallScore FULL_AUTONOMOUS_BOUNDED_OWNED_GTM receipt
 
+> Historical receipt note (2026-06-26): this 2026-06-18 receipt predates O13
+> canonical-green acceptance. Counts such as `8 / 16 / 8 / 16` below are kept as
+> historical evidence from the 8-core-channel-head activation board, not current
+> roster guidance. Current canonical agent/soul count is 44 in
+> `docs/ops/callscore-channel-head-souls.yaml`.
+
 Generated: 2026-06-18T20:44:00Z
 Operator: Hermes default profile
 Mode: `FULL_AUTONOMOUS_BOUNDED_OWNED_GTM`
@@ -57,7 +63,7 @@ Mode: `FULL_AUTONOMOUS_BOUNDED_OWNED_GTM`
    - NPM script: `npm run agents:heartbeat`
    - Cron wrapper: `/srv/agents/hermes/scripts/callscore-agent-heartbeat.sh`
    - Manual heartbeat receipt: `/opt/crypto-tuber-ranked/.tmp/workflow-receipts/agent_heartbeat/agent-heartbeat-2026-06-18T20-39-48-473Z.json`
-   - DB counts after final validation: `agent_instances=8`, `agent_heartbeats=16`, `channel_tasks=8`, `autonomy_events=16`.
+   - Historical DB counts after 2026-06-18 validation: `agent_instances=8`, `agent_heartbeats=16`, `channel_tasks=8`, `autonomy_events=16`. Current canonical souls baseline is 44 agents; use current heartbeat dry-run output for live counts.
 
 ## Live validation
 
@@ -65,7 +71,7 @@ Final app validation log:
 
 `/opt/crypto-tuber-ranked/.tmp/prod-rollout/final-autonomy-validation-rerun-20260618T204141Z.log`
 
-Results:
+Historical 2026-06-18 results, superseded by current O13/canonical-green validation for live counts:
 
 ```text
 npm run typecheck -> ok

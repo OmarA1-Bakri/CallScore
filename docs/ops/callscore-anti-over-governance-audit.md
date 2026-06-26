@@ -5,6 +5,8 @@ Schema: callscore_anti_over_governance_audit.v1
 Agent source: docs/ops/callscore-channel-head-souls.yaml
 Verdict: PASS
 
+> Historical generated audit from the 8-agent era. Current canonical green coverage is enforced by `tests/canonical-souls-schema.test.ts`, `tests/action-authority.test.ts`, and `tests/decision-router.test.ts` against all 44 live souls.
+
 ## Scope and method
 
 This deterministic dry-run discovers the final upgraded runtime agents from the canonical channel-head souls config, then feeds each agent a healthy routine safe-owned-public fixture: cooldown clear, required evidence present, originality pass, media pass, verifier/trust confidence above the publish/action threshold, and no restricted mutation requested. It separately verifies that restricted mutation classes still fail closed.

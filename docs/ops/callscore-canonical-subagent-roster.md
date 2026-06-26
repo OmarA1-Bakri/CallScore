@@ -31,7 +31,7 @@ The next autonomy target is `FULL_AUTONOMOUS_BOUNDED_OWNED_GTM`, not unrestricte
 | Channel head | Maps to existing specialists | Live autonomy posture |
 |---|---|---|
 | `callscore-artofwar-strategist` | Art of War jobs, `marketing-compliance-linter` | Strategy/dossier/dry-run now; owned-public execution only after full receipt chain + policy pass. |
-| `callscore-x-linkedin-growth-head` | `marketing-channel-growth`, `content_creator`, `marketing-compliance-linter` | Owned X/LinkedIn posts can become bounded autonomous; DMs/spend/profile/provider changes remain gated. |
+| `callscore-x-head` / `callscore-linkedin-head` / `callscore-reddit-head` + social specialists | `marketing-channel-growth`, `content_creator`, `marketing-compliance-linter` | Owned X/LinkedIn/Reddit profile work is decomposed under CMO/channel graphs; DMs/spend/profile/provider changes remain gated. |
 | `callscore-community-drops-head` | `marketing-community-drops`, `opportunity_matrix`, `marketing-compliance-linter` | Owned Telegram/Discord can become bounded autonomous; Reddit/non-owned posting and DMs remain gated. |
 | `callscore-whop-commerce-head` | `marketing-whop-marketplace`, `whop_auto` | Copy/assets/read-only health can become autonomous; pricing/product/customer/payment/provider mutation remains gated. |
 | `callscore-email-partnership-drafts-head` | `marketing-channel-growth`, `outlook`, `linkedin`, BD workflows | Draft/approval packet only; live sends/outreach remain gated. |

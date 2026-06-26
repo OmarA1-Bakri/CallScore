@@ -1325,6 +1325,6 @@ Final:
 - [ ] Full system test passes
 - [ ] All decision-related tests pass
 - [ ] Skills updated
-- [ ] Capability registry covers all 26 agents
+- [ ] Capability registry covers all 44 current canonical agents/souls in `docs/ops/callscore-channel-head-souls.yaml` (the earlier 26-agent target is historical and superseded)
 - [ ] Gate chain correctly prioritizes (kill switch → verify → cooldown → risk → owned-public → evidence → media → quality → review)
 - [ ] Each authority handler has the correct subset of gates

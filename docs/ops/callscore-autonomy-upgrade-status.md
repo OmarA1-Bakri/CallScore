@@ -1,9 +1,17 @@
 # CallScore autonomy upgrade status
 
+> Supersession note (2026-06-26): this file is a historical P12/P14 verification
+> receipt from the 8-channel-head autonomy board. It is not the current canonical
+> agent roster. Current O13 acceptance uses 44 canonical agents/souls in
+> `docs/ops/callscore-channel-head-souls.yaml`; HH PostgreSQL/pgsql plus HH Read
+> API are canonical and Neon is backup/legacy compatibility only.
+
 Verification timestamp (UTC): 2026-06-21T14:35:32Z
 Reviewer tasks: `t_6816b101` / P11 integration verification, `t_ed6d4f3f` / P11F2 heartbeat dry-run/no-db-write verification, `t_264642fe` / P12 final validation, `t_104bfec9` / P12F5 status update
 Workspace: `/opt/crypto-tuber-ranked`
 Branch/HEAD at P12F5 doc update: `master` / `67f01f2`
+
+> Historical P12 status, superseded by O13/canonical-green evidence. Current canonical baseline is 44 agents/souls in `docs/ops/callscore-channel-head-souls.yaml`, graph-backed O13 entrypoints, and full-suite baseline 1058/1058 at `50501ad` plus later remediation commits. Treat older 8-agent/task counts below as P12 historical receipt values only, not current operating expectations.
 
 ## Verdict
 
@@ -23,8 +31,8 @@ P12 final validation initially returned REQUEST_CHANGES, then parent takeover cl
 |---|---:|---|---|
 | Full project local test integration | BUILT | Parent run after P12F fixes: `npm test` PASS, 789/789 | Anti-over-governance module/tests exist and full local tests pass. |
 | Typecheck/lint/build/hygiene gates | BUILT | Parent run after P12F fixes: `npm run typecheck`, `npm run lint`, `npm run hygiene:secrets`, `npm run build`, `git diff --check` all PASS | Build warning observed for Next edge-runtime static generation; non-fatal. |
-| Heartbeat CLI `--dry-run` | BUILT | P12 parent run: `npm run agents:heartbeat -- --dry-run` PASS, `db_write_performed:false`, 8 agents/tasks proposed | Safe local/no-DB-write lane for exercising heartbeat plan and receipts. |
-| Heartbeat CLI `--no-db-write` | BUILT | P12 parent run: `npm run agents:heartbeat -- --no-db-write` PASS, `db_write_performed:false`, 8 agents/tasks proposed | Alias for dry-run/no-DB-write. |
+| Heartbeat CLI `--dry-run` | BUILT | Historical P12 parent run: `npm run agents:heartbeat -- --dry-run` PASS, `db_write_performed:false`, 8 core channel-head tasks proposed. Current O13 dry-run should report 44 canonical agents/souls. | Safe local/no-DB-write lane for exercising heartbeat plan and receipts. |
+| Heartbeat CLI `--no-db-write` | BUILT | Historical P12 parent run: `npm run agents:heartbeat -- --no-db-write` PASS, `db_write_performed:false`, 8 core channel-head tasks proposed. Current O13 dry-run should report 44 canonical agents/souls. | Alias for dry-run/no-DB-write. |
 | Heartbeat `--help` and unknown-flag no-write safety | BUILT | P11F2 parent verification: help exits 0 before writes; unknown flag exits nonzero before writes; targeted tests 22/22 | Prevents accidental write path from help/typos. |
 | Normal heartbeat DB-writing runtime | PARTIAL / GATED | Source inspection: writes are guarded by `if (!dryRun)` in `src/scripts/callscore-agent-heartbeat.ts` | Built as a DB-writing runtime path, but not safe for unattended activation without approval and P12 fixes. |
 | Autonomy contract schemas | BUILT | Parent run after P12F fixes includes full 789/789 and targeted P12 suite 101/101 | Core schemas reject malformed mutation receipts/gates and raw secret-like receipt detail keys. |
@@ -61,9 +69,9 @@ P12 final validation initially returned REQUEST_CHANGES, then parent takeover cl
 - `npm run build`
   - Result: PASS. Non-fatal Next edge-runtime static-generation warning observed.
 - `npm run agents:heartbeat -- --dry-run`
-  - Result: PASS, `db_write_performed:false`, 8 agents/tasks proposed.
+  - Historical P12 result: PASS, `db_write_performed:false`, 8 core channel-head tasks proposed. Current O13 expectation is 44 canonical agents/souls.
 - `npm run agents:heartbeat -- --no-db-write`
-  - Result: PASS, `db_write_performed:false`, 8 agents/tasks proposed.
+  - Historical P12 result: PASS, `db_write_performed:false`, 8 core channel-head tasks proposed. Current O13 expectation is 44 canonical agents/souls.
 - `node --import tsx src/scripts/callscore-cmo-response-monitor.ts --limit 5`
   - Result: PASS, monitor-only, mutation flags false.
 - `node --import tsx src/scripts/callscore-fresh-call-sentinel.ts --limit 5 --since-days 7 --no-receipt`

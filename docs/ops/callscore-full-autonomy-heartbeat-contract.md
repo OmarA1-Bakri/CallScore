@@ -6,10 +6,24 @@ The purpose is to make each channel head independently operable without Hermes p
 
 ## Scope
 
-Applies to the main CallScore autonomous heads:
+Applies to every live `agent_id` in the canonical souls file. The original
+heartbeat contract started from the 8 core lane/channel-head examples listed
+below; those 8 are still useful lane examples, but they are not the complete
+canonical roster. Current O13 acceptance requires **44 canonical agents/souls**
+to validate, route through authority, and emit heartbeat/task receipts when
+scheduled.
+
+Core lane examples:
+
+Current canonical baseline: 44 unique agents/souls. The former `callscore-x-linkedin-growth-head` was decomposed into the CMO hierarchy plus X/LinkedIn/Reddit channel heads and social specialists; do not use that deprecated ID for new heartbeat/router tests.
+
+Representative high-level heads include:
 
 - `callscore-artofwar-strategist`
-- `callscore-x-linkedin-growth-head`
+- `callscore-cmo-head`
+- `callscore-x-head`
+- `callscore-linkedin-head`
+- `callscore-reddit-head`
 - `callscore-community-drops-head`
 - `callscore-whop-commerce-head`
 - `callscore-email-partnership-drafts-head`
@@ -17,9 +31,14 @@ Applies to the main CallScore autonomous heads:
 - `callscore-compliance-linter-head`
 - `callscore-data-pipeline-sentinel`
 
+The full 44-agent roster, including social specialists, control agents, runtime worker head, and pipeline heads, is validated from the souls YAML by `tests/canonical-souls-schema.test.ts`.
+
 The canonical soul definitions live in:
 
 - `docs/ops/callscore-channel-head-souls.yaml`
+
+Use the souls file for roster count and identity. Do not hard-code 8, 16, or 26
+as the live agent count outside explicitly marked historical receipts/fixtures.
 
 The canonical channel/provider/gate registry lives in:
 
@@ -59,12 +78,13 @@ JSONL mirrors are allowed for debugging/recovery, but chat history and transient
 
 ## Heartbeat packet
 
-Every channel-head wake/run must write a heartbeat packet with this shape:
+Every scheduled agent/channel-head wake/run must write a heartbeat packet with
+this shape:
 
 ```json
 {
-  "heartbeat_id": "callscore-x-linkedin-growth-head-2026-06-18T00:00:00Z",
-  "agent_id": "callscore-x-linkedin-growth-head",
+  "heartbeat_id": "callscore-x-head-2026-06-18T00:00:00Z",
+  "agent_id": "callscore-x-head",
   "schema_version": "callscore_agent_heartbeat.v1",
   "mode": "observe|draft|execute_owned|blocked|escalate|sleep",
   "autonomy_mode": "controlled_full|full_autonomous_bounded|draft_only|disabled",
