@@ -53,6 +53,25 @@ function readJsonRecord(path: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
+function parseLastJsonRecord(stdout: string): Record<string, unknown> {
+  for (const line of stdout.trim().split(/\r?\n/).reverse()) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{")) continue;
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed as Record<string, unknown>;
+    } catch {
+      // Continue scanning older lines.
+    }
+  }
+  return {};
+}
+
+function recordValue(source: Record<string, unknown>, key: string): Record<string, unknown> {
+  const value = source[key];
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
 function nestedNumber(source: Record<string, unknown>, key: string): number {
   const queries = source.queries && typeof source.queries === "object" && !Array.isArray(source.queries)
     ? source.queries as Record<string, unknown>
@@ -98,7 +117,91 @@ export const revenueGoalLoopNode = cmoRevenueGoalLoopNode;
 export const dataGoalLoopNode = wrapDirectFunctionNode({
   nodeId: "data_goal_loop",
   domain: "data",
-  run: async ({ state }) => {
+  run: async ({ state, config }) => {
+    const cfg = configurableRecord(config);
+    const refreshDataProducer = typeof cfg.refreshDataProducer === "string" ? cfg.refreshDataProducer : null;
+    const refreshDataCommand = typeof cfg.refreshDataCommand === "string" ? cfg.refreshDataCommand : null;
+    if (refreshDataProducer && refreshDataCommand && !state.config.dryRun) {
+      if (state.config.mode !== "bounded_write") {
+        return {
+          status: "blocked" as const,
+          summary: "Refresh data producer execution requires bounded_write mode.",
+          blockers: ["refresh_data_producer_requires_bounded_write"],
+          detail: { producer: refreshDataProducer, executed: false },
+          mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+        };
+      }
+      if (!state.config.approved || (!state.config.approvalReceiptId && !state.config.approvedByOperator)) {
+        return {
+          status: "blocked" as const,
+          summary: "Refresh data producer execution requires approval evidence.",
+          blockers: ["refresh_data_producer_approval_missing"],
+          detail: { producer: refreshDataProducer, executed: false },
+          mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+        };
+      }
+
+      const commandArgs = stringArray(cfg.refreshDataCommandArgs);
+      const timeoutMs = typeof cfg.refreshDataTimeoutMs === "number"
+        ? Math.max(1_000, Math.floor(cfg.refreshDataTimeoutMs))
+        : 120_000;
+      const execution = await execFilePromise(refreshDataCommand, commandArgs, { cwd: process.cwd(), timeoutMs });
+      const stdout = redactCommandOutput(execution.stdout);
+      const stderr = redactCommandOutput(execution.stderr);
+      const parsed = parseLastJsonRecord(stdout);
+      const run = recordValue(parsed, "run");
+      const job = recordValue(parsed, "job");
+      const mutationFlags = { ...DEFAULT_OPERATING_MUTATION_FLAGS, db_write_performed: execution.exitCode === 0 };
+      const artifact = {
+        schema_version: "callscore_refresh_data_producer_receipt.v1",
+        created_at: nowIso(),
+        producer: refreshDataProducer,
+        command: redactCommandOutput(refreshDataCommand),
+        args: commandArgs.map((arg) => redactCommandOutput(arg)),
+        exit_code: execution.exitCode,
+        stdout_excerpt: stdout.slice(0, 4_000),
+        stderr_excerpt: stderr.slice(0, 2_000),
+        parsed_output: parsed,
+        mutation_flags: mutationFlags,
+      };
+      const artifactPath = writeDomainArtifact(`data_goal_loop-${refreshDataProducer}`, artifact);
+      if (execution.exitCode !== 0) {
+        return {
+          status: "failed" as const,
+          summary: `Refresh data producer ${refreshDataProducer} failed with exit ${execution.exitCode}`,
+          blockers: [`refresh_data_producer_exit_${execution.exitCode}`],
+          artifact_path: artifactPath,
+          detail: {
+            producer: refreshDataProducer,
+            executed: true,
+            exit_code: execution.exitCode,
+            stderr_excerpt: stderr.slice(0, 1_000),
+          },
+          mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+        };
+      }
+
+      return {
+        status: "ok" as const,
+        summary: `Refresh data producer ${refreshDataProducer} executed through the operating graph.`,
+        artifact_path: artifactPath,
+        detail: {
+          schema_version: artifact.schema_version,
+          producer: refreshDataProducer,
+          executed: true,
+          exit_code: execution.exitCode,
+          run_id: run.id ?? null,
+          run_key: run.run_key ?? null,
+          job_id: job.id ?? null,
+          job_type: job.type ?? null,
+          job_status: job.status ?? null,
+          approval_receipt_id: state.config.approvalReceiptId,
+          approved_by_operator: state.config.approvedByOperator,
+        },
+        mutation_flags: mutationFlags,
+      };
+    }
+
     const args = parseDataPipelineArgs([
       "--dry-run",
       "--limit-creators", "1",

@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,6 +25,8 @@ import {
   DATA_PIPELINE_STAGE_NAMES,
   buildBoundedDataPipelineCommandPlan,
 } from "../src/lib/workplane/node-wrappers/data-pipeline-nodes";
+import { dataGoalLoopNode } from "../src/lib/workplane/node-wrappers/domain-goal-nodes";
+import { buildInitialOperatingState } from "../src/lib/workplane/callscore-operating-graph";
 
 function emptyState(): OperatingGraphState {
   return {
@@ -162,6 +164,48 @@ test("redactCommandOutput redacts secret-shaped values", () => {
   assert.match(redacted, /Authorization: Bearer \[REDACTED\]/);
   assert.match(redacted, /password: \[REDACTED\]/);
   assert.match(redacted, /normal line/);
+});
+
+test("dataGoalLoopNode runs approved refresh_data producer command and records DB enqueue mutation", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "operating-refresh-producer-"));
+  const marker = join(dir, "producer.marker");
+  const producer = join(dir, "fake-producer.js");
+  writeFileSync(producer, `
+const fs = require('node:fs');
+fs.writeFileSync(${JSON.stringify(marker)}, 'called\\n');
+console.log(JSON.stringify({ ok: true, mode: 'schedule', queued_by: 'test', run: { id: 11, run_key: 'local-hh-candles:2026-06-25', type: 'candle-refresh', status: 'queued' }, job: { id: 22, type: 'candle_refresh', status: 'pending', priority: 90 } }));
+`, { mode: 0o700 });
+
+  const state = buildInitialOperatingState({
+    goal: "refresh_data",
+    mode: "bounded_write",
+    dryRun: false,
+    approved: true,
+    approvalReceiptId: "approval-refresh-producer-test",
+  });
+  const patch = await dataGoalLoopNode(state, {
+    configurable: {
+      thread_id: "refresh-producer-test",
+      refreshDataProducer: "candles",
+      refreshDataCommand: process.execPath,
+      refreshDataCommandArgs: [producer],
+      refreshDataTimeoutMs: 10_000,
+    },
+  });
+  const result = patch.node_results?.[0];
+
+  assert.equal(existsSync(marker), true);
+  assert.equal(result?.status, "ok");
+  assert.equal(result?.detail.executed, true);
+  assert.equal(result?.detail.producer, "candles");
+  assert.equal(result?.detail.job_id, 22);
+  assert.equal(result?.detail.job_type, "candle_refresh");
+  assert.equal(patch.mutation_flags?.db_write_performed, true);
+  assert.equal(result?.mutation_flags.db_write_performed, true);
+  assert.equal(result?.mutation_flags.provider_mutation_performed, false);
+  assert.ok(result?.artifact_path);
+  assert.equal(existsSync(result!.artifact_path!), true);
+  assert.match(readFileSync(result!.artifact_path!, "utf8"), /local-hh-candles/);
 });
 
 test("buildBoundedDataPipelineCommandPlan wraps the current 18-stage run-data-pipeline command builder safely", () => {

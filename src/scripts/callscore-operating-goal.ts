@@ -36,6 +36,12 @@ export function buildRunnableConfig(argv: readonly string[], goal: OperatingGoal
   if (videoQueueRoot) configurable.videoQueueRoot = videoQueueRoot;
   const videoSchedulerNow = valueAfter(argv, "--video-scheduler-now");
   if (videoSchedulerNow) configurable.videoSchedulerNow = videoSchedulerNow;
+  const refreshDataProducer = valueAfter(argv, "--refresh-data-producer");
+  if (refreshDataProducer) configurable.refreshDataProducer = refreshDataProducer;
+  const refreshDataCommand = valueAfter(argv, "--refresh-data-command");
+  if (refreshDataCommand) configurable.refreshDataCommand = refreshDataCommand;
+  const refreshDataTimeoutRaw = valueAfter(argv, "--refresh-data-timeout-ms");
+  if (refreshDataTimeoutRaw) configurable.refreshDataTimeoutMs = Number(refreshDataTimeoutRaw);
   return configurable;
 }
 

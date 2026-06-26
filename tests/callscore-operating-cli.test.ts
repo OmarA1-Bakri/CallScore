@@ -38,6 +38,27 @@ function writeJson(path: string, value: unknown): string {
   return path;
 }
 
+test("callscore-operating-goal CLI maps refresh_data producer flags into runnable config", () => {
+  const root = mkdtempSync(join(tmpdir(), "operating-refresh-data-cli-test-"));
+  const producerCommand = join(root, "fake-producer.sh");
+  const config = buildRunnableConfig([
+    "--goal",
+    "refresh_data",
+    "--mode",
+    "bounded_write",
+    "--refresh-data-producer",
+    "candles",
+    "--refresh-data-command",
+    producerCommand,
+    "--refresh-data-timeout-ms",
+    "12345",
+  ], "refresh_data");
+
+  assert.equal(config.refreshDataProducer, "candles");
+  assert.equal(config.refreshDataCommand, producerCommand);
+  assert.equal(config.refreshDataTimeoutMs, 12345);
+});
+
 test("callscore-operating-goal CLI maps produce_video scheduler flags into runnable config", () => {
   const root = mkdtempSync(join(tmpdir(), "operating-video-scheduler-cli-test-"));
   const artifactRoot = join(root, "artifacts");
