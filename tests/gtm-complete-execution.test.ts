@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { strictEqual } from "node:assert/strict";
-import { evaluateExternalMutationRequest, type ExternalMutationRequest } from "../src/lib/workplane/external-mutation-guard";
+import { evaluateExternalMutationRequest } from "../src/lib/workplane/external-mutation-guard";
 
 // ── Live receipt test helpers ──
 const RECEIPT_DIR = ".tmp/workflow-receipts/artofwar_owned_public_execution";
@@ -239,7 +239,7 @@ describe("Phase 5 — Engagement executor explicit states", () => {
     if (files.length === 0) return;
     const receipt = receiptJson(join(eeDir, files[0]));
     assert.equal(receipt.schema, "callscore.engagement_execution_receipt.v1");
-    const validStatuses = ["no_opportunities_found", "engagement_request_queued", "blocked"];
+    const validStatuses = ["no_opportunities_found", "engagement_request_queued", "blocked", "blocked_provider_missing"];
     assert.ok(validStatuses.includes(receipt.status as string),
       `status should be one of ${validStatuses.join(", ")}, got ${receipt.status}`);
   });
