@@ -143,10 +143,11 @@ export const videoGoalLoopNode = wrapDirectFunctionNode({
       const entry = listQueueFiles(queueRoot).map(readQueueEntry).find((item): item is VideoQueueEntry => item !== null);
       if (!entry) {
         const detail = { stage: null, stages: [], executed_stages: 0, queue_root: queueRoot, queue_empty: true, approved, broll_dispatcher_wired: true };
-        const artifactPath = writeStandaloneVideoNodeArtifact({ schema_version: "callscore_video_goal_loop_receipt.v1", status: "ok", detail });
+        const artifactPath = writeStandaloneVideoNodeArtifact({ schema_version: "callscore_video_goal_loop_receipt.v1", status: "video_queue_empty", detail });
         return {
-          status: "ok" as const,
-          summary: "Video queue empty.",
+          status: "blocked" as const,
+          summary: "Video queue empty — no jobs to process.",
+          blockers: ["video_queue_empty"],
           artifact_path: artifactPath,
           detail,
           mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS },
