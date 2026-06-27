@@ -94,6 +94,7 @@ export const OperatingSummarySchema = z.object({
   goal: OperatingGoalSchema,
   status: OperatingNodeStatusSchema,
   child_receipt_ids: z.array(NonEmptyStringSchema).default([]),
+  summary: z.string().default(""),
   mutation_flags: MutationFlagsSchema.default(DEFAULT_OPERATING_MUTATION_FLAGS),
   blockers_by_domain: z.record(z.string(), z.array(NonEmptyStringSchema)).default({}),
   warnings_by_domain: z.record(z.string(), z.array(NonEmptyStringSchema)).default({}),

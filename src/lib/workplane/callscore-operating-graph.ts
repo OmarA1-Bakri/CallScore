@@ -355,11 +355,40 @@ export async function collectReceiptsNode(state: OperatingGraphState): Promise<P
     blockersByDomain.control_plane = uniqueStrings([...(blockersByDomain.control_plane ?? []), ...auditBlockers]);
   }
   const warningsByDomain = groupMessagesByDomain(parsed.node_results, "warnings", parsed.warnings);
+
+  // Build human-readable summary from aggregated node results
+  const nodeStatusSummary = (() => {
+    const blockParts: string[] = [];
+    const blockedNodes = parsed.node_results.filter((r) => r.status === "blocked");
+    for (const bn of blockedNodes) {
+      const bl = bn.blockers ?? [];
+      if (bl.length > 0) {
+        blockParts.push(`${bn.node_id}:\`${bl.join(", ")}\``);
+      }
+    }
+    const blockedNodeCount = blockedNodes.length;
+    const okNodeCount = parsed.node_results.filter((r) => r.status === "ok").length;
+    const parts: string[] = [];
+    if (status === "ok") {
+      parts.push(`All ${parsed.node_results.length} node(s) passed (${okNodeCount} ok).`);
+    } else {
+      parts.push(`Status=${status}: ${okNodeCount} ok, ${blockedNodeCount} blocked.`);
+    }
+    if (blockParts.length > 0) {
+      parts.push("Blockers: " + blockParts.join("; "));
+    }
+    if (auditBlockers.length > 0) {
+      parts.push("Audit: " + auditBlockers.join(", "));
+    }
+    return parts.join(" ");
+  })();
+
   const summary = OperatingSummarySchema.parse({
     schema_version: "callscore_operating_summary.v1",
     goal: parsed.config.goal,
     status,
     child_receipt_ids: childReceiptIds,
+    summary: nodeStatusSummary,
     mutation_flags: childMutationFlags,
     blockers_by_domain: blockersByDomain,
     warnings_by_domain: warningsByDomain,
