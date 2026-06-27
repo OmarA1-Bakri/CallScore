@@ -53,6 +53,15 @@ export function buildRunnableConfig(argv: readonly string[], goal: OperatingGoal
   return configurable;
 }
 
+export function buildInitialArtifactsFromCliArgs(argv: readonly string[]): Record<string, unknown> {
+  const artifacts: Record<string, unknown> = {};
+  const finalDraftPath = valueAfter(argv, "--owned-public-final-draft-json") ?? valueAfter(argv, "--final-draft-json");
+  if (finalDraftPath) artifacts.owned_public_final_draft = readJsonObject(finalDraftPath);
+  const graphMutationInputsPath = valueAfter(argv, "--graph-mutation-inputs-json");
+  if (graphMutationInputsPath) artifacts.graph_mutation_inputs = readJsonObject(graphMutationInputsPath);
+  return artifacts;
+}
+
 function hasExplicitGateContext(argv: readonly string[]): boolean {
   return argv.includes("--test-fixtures")
     || argv.includes("--dry-run")
@@ -129,7 +138,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   try {
     const configurable = await buildRunnableConfigWithRuntimeContext(argv, input.goal);
     result = await graph.invoke(
-      buildInitialOperatingState(input),
+      buildInitialOperatingState({ ...input, artifacts: buildInitialArtifactsFromCliArgs(argv) }),
       { configurable },
     );
   } catch (error) {

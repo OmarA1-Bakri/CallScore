@@ -46,6 +46,7 @@ import {
   runYoutubeVideoPublishNode,
 } from "./node-wrappers/video-publish-nodes";
 import type { GraphOwnedMutationDecision } from "./node-wrappers/external-mutation-node-utils";
+import { validatePublishedReceiptIntegrity } from "./external-mutation-guard";
 
 function replace<T>() {
   return (_left: T | undefined, right: T): T => right;
@@ -68,7 +69,7 @@ export const OperatingGraphAnnotation = Annotation.Root({
 
 export type CallscoreOperatingGraphState = typeof OperatingGraphAnnotation.State;
 
-export function buildInitialOperatingState(input: Partial<NormalizedOperatingGoalConfig> & { goal: NormalizedOperatingGoalConfig["goal"] }): OperatingGraphState {
+export function buildInitialOperatingState(input: Partial<NormalizedOperatingGoalConfig> & { goal: NormalizedOperatingGoalConfig["goal"], artifacts?: Record<string, unknown> }): OperatingGraphState {
   return OperatingGraphStateSchema.parse({
     config: normalizeOperatingGoalConfig(input),
     node_results: [],
@@ -77,7 +78,7 @@ export function buildInitialOperatingState(input: Partial<NormalizedOperatingGoa
     warnings: [],
     errors: [],
     mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS },
-    artifacts: {},
+    artifacts: input.artifacts ?? {},
   });
 }
 
@@ -92,10 +93,42 @@ function routeAfterPreflight(state: OperatingGraphState) {
   return "external_mutation_preflight";
 }
 
+function graphMutationInputs(state: OperatingGraphState): Record<string, unknown> {
+  const raw = state.artifacts.graph_mutation_inputs;
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+}
+
+function hasGraphMutationInput(state: OperatingGraphState, nodeId: string): boolean {
+  const value = graphMutationInputs(state)[nodeId];
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function nodeAlreadyRan(state: OperatingGraphState, nodeId: string): boolean {
+  return state.node_results.some((result) => result.node_id === nodeId);
+}
+
 function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
   const parsed = OperatingGraphStateSchema.parse(state);
   if (stateHasBlockingPreflight(parsed)) return "collect_receipts";
+  if (parsed.config.goal === "revenue_now" && parsed.config.mode === "live_owned_public") {
+    if (hasGraphMutationInput(parsed, "x_owned_publish_node")) return "x_owned_publish_node";
+    if (hasGraphMutationInput(parsed, "linkedin_owned_publish_node")) return "linkedin_owned_publish_node";
+  }
   return routeOperatingGoalToNode(parsed.config.goal);
+}
+
+function routeAfterXOwnedPublish(state: OperatingGraphState) {
+  const parsed = OperatingGraphStateSchema.parse(state);
+  if (stateHasBlockingPreflight(parsed)) return "collect_receipts";
+  if (hasGraphMutationInput(parsed, "linkedin_owned_publish_node") && !nodeAlreadyRan(parsed, "linkedin_owned_publish_node")) return "linkedin_owned_publish_node";
+  return "collect_receipts";
+}
+
+function routeAfterLinkedInOwnedPublish(state: OperatingGraphState) {
+  const parsed = OperatingGraphStateSchema.parse(state);
+  if (stateHasBlockingPreflight(parsed)) return "collect_receipts";
+  if (hasGraphMutationInput(parsed, "x_owned_publish_node") && !nodeAlreadyRan(parsed, "x_owned_publish_node")) return "x_owned_publish_node";
+  return "collect_receipts";
 }
 
 export const externalMutationPreflightNode = wrapDirectFunctionNode({
@@ -259,6 +292,22 @@ function auditMutationAmbiguity(results: readonly OperatingNodeResult[]): string
   });
 }
 
+function auditPublishedReceiptIntegrity(input: {
+  readonly receipts: readonly OperatingReceipt[];
+  readonly results: readonly OperatingNodeResult[];
+}): string[] {
+  const candidates: Record<string, unknown>[] = [];
+  for (const result of input.results) {
+    if (isRecord(result.detail.receipt)) candidates.push(result.detail.receipt);
+    if (isRecord(result.detail)) candidates.push(result.detail);
+  }
+  for (const receipt of input.receipts) candidates.push(receipt as unknown as Record<string, unknown>);
+  return candidates.flatMap((candidate) => {
+    const verdict = validatePublishedReceiptIntegrity(candidate);
+    return verdict.ok ? [] : [verdict.blocker_code ?? "parent_provider_mutation_not_graph_owned"];
+  });
+}
+
 function computeCollectStatus(input: {
   readonly auditBlockers: readonly string[];
   readonly errors: readonly string[];
@@ -289,6 +338,7 @@ export async function collectReceiptsNode(state: OperatingGraphState): Promise<P
   const auditBlockers = [
     ...mismatchKeys.map((key) => `mutation_flags_inconsistent:${key}`),
     ...auditMutationAmbiguity(parsed.node_results),
+    ...auditPublishedReceiptIntegrity({ receipts: parsed.receipts, results: parsed.node_results }),
   ];
   const status = computeCollectStatus({
     auditBlockers,
@@ -472,6 +522,16 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       collect_receipts: "collect_receipts",
     });
 
+  builder
+    .addConditionalEdges("x_owned_publish_node", routeAfterXOwnedPublish, {
+      linkedin_owned_publish_node: "linkedin_owned_publish_node",
+      collect_receipts: "collect_receipts",
+    })
+    .addConditionalEdges("linkedin_owned_publish_node", routeAfterLinkedInOwnedPublish, {
+      x_owned_publish_node: "x_owned_publish_node",
+      collect_receipts: "collect_receipts",
+    });
+
   for (const node of [
     "revenue_goal_loop",
     "data_goal_loop",
@@ -481,9 +541,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "trust_goal_loop",
     "alert_goal_loop",
     "evidence_goal_loop",
-    "x_owned_publish_node",
     "x_public_reply_node",
-    "linkedin_owned_publish_node",
     "linkedin_public_comment_node",
     "reddit_owned_publish_node",
     "reddit_public_comment_node",

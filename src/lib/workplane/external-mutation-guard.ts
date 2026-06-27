@@ -52,7 +52,7 @@ function providerExternalObject(response: unknown): { external_url: string | nul
     return { external_url: null, external_object_id: null };
   }
   const providerResponse = response as ProviderResponse;
-  const id = providerResponse.id ?? providerResponse.object_id ?? providerResponse.external_object_id ?? providerResponse.videoId ?? providerResponse.youtubeVideoId;
+  const id = providerResponse.id ?? providerResponse.object_id ?? providerResponse.external_object_id ?? providerResponse.x_restli_id ?? providerResponse.urn ?? providerResponse.videoId ?? providerResponse.youtubeVideoId;
   const url = providerResponse.url ?? providerResponse.external_url ?? providerResponse.publishUrl;
   return {
     external_url: typeof url === "string" && url.trim() ? url : null,
@@ -261,6 +261,55 @@ export function evaluateExternalMutationRequest(input: Record<string, unknown>):
     provider_call_permitted: true,
     receipt: okReceipt(request),
   };
+}
+
+export type PublishedReceiptIntegrityDecision = {
+  readonly ok: boolean;
+  readonly blocker_code?: "parent_provider_mutation_not_graph_owned";
+};
+
+function isExternalMutationClaim(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const receipt = value as Record<string, unknown>;
+  return receipt.provider_action_performed === true
+    || receipt.public_post_published === true
+    || receipt.external_mutation_performed === true
+    || receipt.public_publish_performed === true;
+}
+
+function childReceiptHasGraphOwnedProof(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const receipt = value as Record<string, unknown>;
+  const response = receipt.provider_response;
+  const object = providerExternalObject(response);
+  return receipt.status === "ok"
+    && typeof receipt.operating_graph_run_id === "string" && receipt.operating_graph_run_id.trim().length > 0
+    && typeof receipt.graph_node_id === "string" && receipt.graph_node_id.trim().length > 0
+    && typeof receipt.provider_tool === "string" && receipt.provider_tool.trim().length > 0
+    && typeof receipt.provider_execution_receipt_id === "string" && receipt.provider_execution_receipt_id.trim().length > 0
+    && typeof receipt.approved_payload_hash === "string" && /^sha256:[a-f0-9]{64}$/.test(receipt.approved_payload_hash)
+    && response !== undefined
+    && Boolean(object.external_object_id || object.external_url);
+}
+
+export function validatePublishedReceiptIntegrity(receipt: Record<string, unknown>): PublishedReceiptIntegrityDecision {
+  if (!isExternalMutationClaim(receipt)) return { ok: true };
+  if (childReceiptHasGraphOwnedProof(receipt)) return { ok: true };
+  const providerProof = receipt.provider_proof;
+  if (providerProof && typeof providerProof === "object" && !Array.isArray(providerProof)) {
+    const tool = String((providerProof as Record<string, unknown>).tool ?? "");
+    if (/mcp_composio_COMPOSIO_MULTI_EXECUTE_TOOL/i.test(tool)) {
+      return { ok: false, blocker_code: "parent_provider_mutation_not_graph_owned" };
+    }
+  }
+  const children = Array.isArray(receipt.child_external_mutation_receipts)
+    ? receipt.child_external_mutation_receipts
+    : Array.isArray(receipt.external_mutation_receipts)
+      ? receipt.external_mutation_receipts
+      : [];
+  return children.some(childReceiptHasGraphOwnedProof)
+    ? { ok: true }
+    : { ok: false, blocker_code: "parent_provider_mutation_not_graph_owned" };
 }
 
 export function finalizeExternalMutationReceipt(input: Record<string, unknown>): GuardDecision {

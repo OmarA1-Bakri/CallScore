@@ -45,6 +45,18 @@ function socialPacketDetail(socialPacket: Record<string, unknown> | null, social
   };
 }
 
+function graphMutationInputsFromArtifacts(artifacts: Record<string, unknown>): Record<string, unknown> {
+  const raw = artifacts.graph_mutation_inputs;
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+}
+
+function hasOwnedPublicFinalDraft(artifacts: Record<string, unknown>): boolean {
+  const draft = artifacts.owned_public_final_draft;
+  if (!isRecord(draft)) return false;
+  const quality = nestedRecord(draft, "quality_gate");
+  return quality?.ok === true || isRecord(draft.drafts);
+}
+
 export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
   nodeId: "revenue_goal_loop",
   domain: "revenue",
@@ -74,6 +86,24 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
           art_of_war_context: artOfWarContext.context,
           art_of_war_blockers: artOfWarContext.blockers,
           art_of_war_warnings: artOfWarContext.warnings,
+        },
+        mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+      };
+    }
+
+    const graphMutationInputs = graphMutationInputsFromArtifacts(state.artifacts);
+    const graphOwnedPublishInputPresent = isRecord(graphMutationInputs.x_owned_publish_node) || isRecord(graphMutationInputs.linkedin_owned_publish_node);
+    if (state.config.mode === "live_owned_public" && hasOwnedPublicFinalDraft(state.artifacts) && !graphOwnedPublishInputPresent) {
+      return {
+        status: "blocked" as const,
+        summary: "Owned-public provider publish blocked: graph-owned X/LinkedIn provider implementation missing; parent fallback forbidden.",
+        blockers: ["graph_owned_provider_publish_missing"],
+        warnings: [],
+        detail: {
+          campaign_id: campaignId,
+          public_gates_open: true,
+          parent_provider_fallback_allowed: false,
+          required_next: "route quality-passed payload through x_owned_publish_node/linkedin_owned_publish_node with provider execution receipt proof",
         },
         mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
       };
