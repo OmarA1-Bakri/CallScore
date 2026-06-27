@@ -113,7 +113,7 @@ export const videoGoalLoopNode = wrapDirectFunctionNode({
     const schedulerNowRaw = cfg?.videoSchedulerNow as string | undefined;
     const approved = state.config.approved === true;
 
-    if (state.config.mode === "read_live" && schedulerMode === "enqueue_scheduled") {
+    if ((state.config.mode === "read_live" || state.config.mode === "live_owned_public") && schedulerMode === "enqueue_scheduled") {
       const scheduled = await enqueueScheduledVideoJobs(schedulerNowRaw ? new Date(schedulerNowRaw) : new Date(), { artifactRoot, queueRoot });
       const jobs = scheduled.map((item) => ({ format: item.format, job_id: item.jobId, queue_path: item.queuePath, skipped: item.skipped }));
       const enqueuedCount = scheduled.filter((item) => !item.skipped).length;
@@ -139,7 +139,7 @@ export const videoGoalLoopNode = wrapDirectFunctionNode({
       };
     }
 
-    if (!state.config.dryRun && state.config.mode === "read_live" && !configuredStatePath) {
+    if (!state.config.dryRun && (state.config.mode === "read_live" || state.config.mode === "live_owned_public") && !configuredStatePath) {
       const entry = listQueueFiles(queueRoot).map(readQueueEntry).find((item): item is VideoQueueEntry => item !== null);
       if (!entry) {
         const detail = { stage: null, stages: [], executed_stages: 0, queue_root: queueRoot, queue_empty: true, approved, broll_dispatcher_wired: true };

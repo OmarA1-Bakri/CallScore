@@ -180,7 +180,7 @@ describe("operating video pipeline nodes", () => {
     );
 
     const videoNode = result.node_results.find((item) => item.node_id === "video_goal_loop");
-    assert.equal(videoNode?.status, "ok");
+    assert.equal(videoNode?.status, "blocked");
     assert.equal(videoNode?.detail.queue_empty, true);
     assert.equal(videoNode?.detail.executed_stages, 0);
     assert.equal(readdirSync(artifactRoot).length, 0);
