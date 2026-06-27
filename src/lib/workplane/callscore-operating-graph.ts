@@ -34,10 +34,14 @@ import { createWorkerDispatchOnceNode, type WorkerDispatchNodeDeps } from "./nod
 import {
   runLinkedInOwnedPublishNode,
   runLinkedInPublicCommentNode,
+  runLinkedInPublicReactionNode,
   runRedditCommunityMutationNode,
   runRedditOwnedProfilePublishNode,
+  runRedditPublicUpvoteNode,
   runXOwnedPublishNode,
+  runXPublicLikeNode,
   runXPublicReplyNode,
+  runYoutubePublicLikeNode,
 } from "./node-wrappers/social-publish-nodes";
 import {
   runYoutubeMetadataUpdateNode,
@@ -464,6 +468,10 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("reddit_public_comment_node", graphOwnedMutationWrapperNode("reddit_public_comment_node", runRedditCommunityMutationNode))
     .addNode("youtube_publish_node", graphOwnedMutationWrapperNode("youtube_publish_node", runYoutubeVideoPublishNode))
     .addNode("youtube_public_comment_node", graphOwnedMutationWrapperNode("youtube_public_comment_node", runYoutubePublicCommentNode))
+    .addNode("x_public_like_node", graphOwnedMutationWrapperNode("x_public_like_node", runXPublicLikeNode))
+    .addNode("linkedin_public_reaction_node", graphOwnedMutationWrapperNode("linkedin_public_reaction_node", runLinkedInPublicReactionNode))
+    .addNode("reddit_public_upvote_node", graphOwnedMutationWrapperNode("reddit_public_upvote_node", runRedditPublicUpvoteNode))
+    .addNode("youtube_public_like_node", graphOwnedMutationWrapperNode("youtube_public_like_node", runYoutubePublicLikeNode))
     .addNode("youtube_thumbnail_update_node", graphOwnedMutationWrapperNode("youtube_thumbnail_update_node", runYoutubeThumbnailUpdateNode))
     .addNode("youtube_metadata_update_node", graphOwnedMutationWrapperNode("youtube_metadata_update_node", runYoutubeMetadataUpdateNode))
     .addNode("gmail_send_node", graphOwnedMutationPlaceholderNode("gmail_send_node"))
@@ -514,6 +522,10 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       youtube_public_comment_node: "youtube_public_comment_node",
       youtube_thumbnail_update_node: "youtube_thumbnail_update_node",
       youtube_metadata_update_node: "youtube_metadata_update_node",
+      x_public_like_node: "x_public_like_node",
+      linkedin_public_reaction_node: "linkedin_public_reaction_node",
+      reddit_public_upvote_node: "reddit_public_upvote_node",
+      youtube_public_like_node: "youtube_public_like_node",
       gmail_send_node: "gmail_send_node",
       resend_alert_send_node: "resend_alert_send_node",
       whop_mutation_node: "whop_mutation_node",
@@ -549,6 +561,10 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "youtube_public_comment_node",
     "youtube_thumbnail_update_node",
     "youtube_metadata_update_node",
+    "x_public_like_node",
+    "linkedin_public_reaction_node",
+    "reddit_public_upvote_node",
+    "youtube_public_like_node",
     "gmail_send_node",
     "resend_alert_send_node",
     "whop_mutation_node",
