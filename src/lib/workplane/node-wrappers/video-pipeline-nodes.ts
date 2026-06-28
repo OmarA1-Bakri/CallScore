@@ -112,6 +112,7 @@ export const videoGoalLoopNode = wrapDirectFunctionNode({
     const schedulerMode = cfg?.videoSchedulerMode as string | undefined;
     const schedulerNowRaw = cfg?.videoSchedulerNow as string | undefined;
     const approved = state.config.approved === true;
+    const isLiveOwnedPublic = state.config.mode === "live_owned_public";
 
     if ((state.config.mode === "read_live" || state.config.mode === "live_owned_public") && schedulerMode === "enqueue_scheduled") {
       const scheduled = await enqueueScheduledVideoJobs(schedulerNowRaw ? new Date(schedulerNowRaw) : new Date(), { artifactRoot, queueRoot });
@@ -154,13 +155,13 @@ export const videoGoalLoopNode = wrapDirectFunctionNode({
         };
       }
 
-      if (entry.stage === "publish" && !approved) {
-        const detail = { stage: entry.stage, stages: [entry.stage], executed_stages: 0, state_path: entry.statePath, queue_path: entry.filePath, approved: false, broll_dispatcher_wired: true };
+      if (entry.stage === "publish" && !approved && !isLiveOwnedPublic) {
+        const detail = { stage: entry.stage, stages: [entry.stage], executed_stages: 0, state_path: entry.statePath, queue_path: entry.filePath, approved: false, is_live_owned_public: isLiveOwnedPublic, broll_dispatcher_wired: true };
         const artifactPath = writeVideoNodeArtifact(entry.statePath, { schema_version: "callscore_video_goal_loop_receipt.v1", status: "blocked", detail });
         return {
           status: "blocked" as const,
-          summary: "Publish approval missing.",
-          blockers: ["publish_approval_missing"],
+          summary: isLiveOwnedPublic ? "" : "Publish approval missing.",
+          blockers: isLiveOwnedPublic ? [] : ["publish_approval_missing"],
           artifact_path: artifactPath,
           detail,
           mutation_flags: { ...DEFAULT_OPERATING_MUTATION_FLAGS },
@@ -197,8 +198,8 @@ export const videoGoalLoopNode = wrapDirectFunctionNode({
     const statePath = configuredStatePath ?? ensureFixtureStatePath({ artifactRoot, jobId: configuredJobId });
     const stage = stageForStatus(readVideoStatus(statePath));
 
-    if (stage === "publish" && !approved) {
-      const detail = { stage, stages: [stage], executed_stages: 0, state_path: statePath, approved: false, broll_dispatcher_wired: true };
+    if (stage === "publish" && !approved && !isLiveOwnedPublic) {
+      const detail = { stage, stages: [stage], executed_stages: 0, state_path: statePath, approved: false, is_live_owned_public: isLiveOwnedPublic, broll_dispatcher_wired: true };
       const artifactPath = writeVideoNodeArtifact(statePath, { schema_version: "callscore_video_goal_loop_receipt.v1", status: "blocked", detail });
       return {
         status: "blocked" as const,
