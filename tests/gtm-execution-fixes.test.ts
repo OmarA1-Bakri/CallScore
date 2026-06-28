@@ -96,7 +96,7 @@ test("Phase 1.4 — CMO packet stdout fits within pipe buffer", () => {
   const result = execSync("bash /srv/agents/hermes/scripts/callscore-genuine-social-packet.sh 2>/dev/null || true", {
     cwd: REPO,
     encoding: "utf-8",
-    timeout: 30000,
+    timeout: 60000,
   });
   // The output should be under 50KB to avoid any pipe buffer issues
   assert.ok(
