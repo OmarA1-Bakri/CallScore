@@ -51,6 +51,7 @@ import {
 } from "./node-wrappers/video-publish-nodes";
 import type { GraphOwnedMutationDecision } from "./node-wrappers/external-mutation-node-utils";
 import { validatePublishedReceiptIntegrity } from "./external-mutation-guard";
+import { executeGraphOwnedProviderCall, needsProviderCall, preflightGraphOwnedProviderCall } from "./node-wrappers/graph-owned-provider-adapter";
 
 function replace<T>() {
   return (_left: T | undefined, right: T): T => right;
@@ -214,7 +215,81 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
     nodeId,
     domain: "gating",
     run: async ({ state }) => {
-      const decision = runner(graphMutationInputFor(state, nodeId));
+      const input = graphMutationInputFor(state, nodeId);
+
+      // ── Graph-owned provider execution ──
+      // Provider calls may happen only after the same graph guard proves that
+      // this node has valid graph context, payload hash, platform, and action.
+      if (needsProviderCall(input)) {
+        if (state.config.dryRun) {
+          return {
+            status: "blocked" as const,
+            summary: `${nodeId} did not call provider: draft_only_external_mutation_blocked.`,
+            blockers: ["draft_only_external_mutation_blocked"],
+            detail: {
+              node_id: nodeId,
+              provider_call_permitted: false,
+              provider_calls: [],
+              provider_response: null,
+              receipt: null,
+              blocker_code: "draft_only_external_mutation_blocked",
+            },
+            mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+          };
+        }
+
+        const preflight = preflightGraphOwnedProviderCall(nodeId, input);
+        if (!preflight.ok) {
+          return {
+            status: "blocked" as const,
+            summary: `${nodeId} did not call provider: ${preflight.blockerCode ?? "graph_preflight_failed"}.`,
+            blockers: [preflight.blockerCode ?? "graph_preflight_failed"],
+            detail: {
+              node_id: nodeId,
+              provider_call_permitted: false,
+              provider_calls: [],
+              provider_response: null,
+              receipt: null,
+              blocker_code: preflight.blockerCode ?? "graph_preflight_failed",
+            },
+            mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+          };
+        }
+
+        const tool = input["provider_tool"] as string;
+        const payload = input["provider_payload"] as Record<string, unknown>;
+        const result = await executeGraphOwnedProviderCall(tool, payload);
+        input["provider_response"] = result.response;
+        input["provider_execution_receipt_id"] = result.executionReceiptId;
+        input["provider_execution_receipt_path"] = result.executionReceiptPath;
+        input["child_receipt_ids"] = [
+          ...(Array.isArray(input["child_receipt_ids"])
+            ? (input["child_receipt_ids"] as string[])
+            : []),
+          result.executionReceiptId,
+        ];
+
+        if (!result.ok) {
+          return {
+            status: "blocked" as const,
+            summary: `${nodeId} provider call blocked: ${result.blockerCode ?? "provider_call_failed"}.`,
+            blockers: [result.blockerCode ?? "provider_call_failed"],
+            detail: {
+              node_id: nodeId,
+              provider_call_permitted: true,
+              provider_calls: [{ tool, payload }],
+              provider_response: result.response,
+              provider_execution_receipt_id: result.executionReceiptId,
+              provider_execution_receipt_path: result.executionReceiptPath,
+              receipt: null,
+              blocker_code: result.blockerCode ?? "provider_call_failed",
+            },
+            mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+          };
+        }
+      }
+
+      const decision = runner(input);
       const blocker = decision.blocker_code ? [decision.blocker_code] : [];
       return {
         status: decision.status,
