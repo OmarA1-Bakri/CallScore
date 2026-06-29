@@ -61,6 +61,20 @@ export function runRedditCommunityMutationNode(input: Record<string, unknown>): 
 
 export const runRedditCommentOrSubredditPublishNode = runRedditCommunityMutationNode;
 
+export function runXFollowUserNode(input: Record<string, unknown>): SocialPublishNodeDecision {
+  return runGraphOwnedMutationNode({
+    input,
+    nodeId: "x_follow_user_node",
+    platform: "x",
+    mutationFamily: "public_engagement",
+    mode: "live_owned_public",
+    requestedAction: "public_engagement",
+    missingProviderBlocker: "x_follow_provider_missing",
+    wrongNodeBlocker: "non_graph_follow_blocked",
+    publicEngagement: true,
+  });
+}
+
 export function runXPublicReplyNode(input: Record<string, unknown>): SocialPublishNodeDecision {
   return runGraphOwnedMutationNode({
     input,

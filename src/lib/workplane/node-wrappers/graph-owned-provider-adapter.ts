@@ -52,12 +52,28 @@ function validateKnownProviderPayload(toolSlug: string, payload: Record<string, 
     if (!hasText && !hasMedia && !hasQuote) return "payload_missing";
   }
 
+  if (toolSlug === "TWITTER_FOLLOW_USER") {
+    const targetUserId = typeof payload.target_user_id === "string" ? payload.target_user_id.trim() : "";
+    if (!/^[0-9]{1,19}$/.test(targetUserId)) return "payload_missing";
+  }
+
   if (toolSlug === "LINKEDIN_CREATE_LINKED_IN_POST") {
     const author = typeof payload.author === "string" ? payload.author.trim() : "";
     const commentary = typeof payload.commentary === "string" ? payload.commentary.trim() : "";
     if (!/^urn:li:(person|organization):[A-Za-z0-9_-]+$/.test(author)) return "blocked_auth";
     if (!commentary) return "payload_missing";
     if (commentary.length > 3000) return "payload_too_long";
+  }
+
+  if (toolSlug === "LINKEDIN_CREATE_COMMENT_ON_POST") {
+    const actor = typeof payload.actor === "string" ? payload.actor.trim() : "";
+    const target = typeof payload.target_urn === "string" ? payload.target_urn.trim() : "";
+    const object = typeof payload.object === "string" ? payload.object.trim() : "";
+    const message = isRecord(payload.message) && typeof payload.message.text === "string" ? payload.message.text.trim() : "";
+    if (!/^urn:li:(person|organization):[A-Za-z0-9_-]+$/.test(actor)) return "blocked_auth";
+    if (!/^urn:li:(share|ugcPost|comment):/.test(target) || !/^urn:li:(share|ugcPost):/.test(object)) return "target_missing";
+    if (!message) return "payload_missing";
+    if (message.length > 1250) return "payload_too_long";
   }
 
   return null;
@@ -297,6 +313,7 @@ function unwrapMultiExecuteResponse(body: Record<string, unknown>, toolSlug: str
 
 function blockerForProviderMessage(message: string): string {
   const lower = message.toLowerCase();
+  if (lower.includes("reply to this conversation is not allowed") || lower.includes("quoting this post is not allowed") || lower.includes("not allowed because you have not been mentioned")) return "blocked_platform_permission";
   if (lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("invalid api key") || lower.includes("auth")) return "blocked_auth";
   if (lower.includes("rate limit") || lower.includes("too many requests")) return "blocked_rate_limit";
   if (lower.includes("duplicate") || lower.includes("already")) return "blocked_duplicate_or_cadence";
@@ -415,6 +432,11 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
     const ok = call.response.ok && !rpcError && !mcpResultIsError && !innerFailed;
     const errorMessage = rpcError ? JSON.stringify(rpcError) : mcpResultIsError || innerFailed ? (unwrapped.error ?? JSON.stringify(body)) : call.text;
     const normalizedResponse = normalizeProviderResponse(toolSlug, body, ok, call.response.headers);
+    if (ok && toolSlug === "TWITTER_FOLLOW_USER" && typeof payload.target_user_id === "string") {
+      normalizedResponse.id = normalizedResponse.id ?? payload.target_user_id;
+      normalizedResponse.external_object_id = normalizedResponse.external_object_id ?? payload.target_user_id;
+      normalizedResponse.url = normalizedResponse.url ?? `https://x.com/i/user/${payload.target_user_id}`;
+    }
     const blockerCode = ok ? undefined : call.response.ok ? blockerForProviderMessage(errorMessage) : blockerForHttpStatus(call.response.status, call.text, toolSlug);
     const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizedResponse, blockerCode, statusCode: call.response.status, error: ok ? undefined : `Composio MCP ${toolSlug} failed ${call.response.status}` });
 

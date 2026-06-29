@@ -38,6 +38,7 @@ import {
   runRedditCommunityMutationNode,
   runRedditOwnedProfilePublishNode,
   runRedditPublicUpvoteNode,
+  runXFollowUserNode,
   runXOwnedPublishNode,
   runXPublicLikeNode,
   runXPublicReplyNode,
@@ -115,9 +116,23 @@ function nodeAlreadyRan(state: OperatingGraphState, nodeId: string): boolean {
 function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
   const parsed = OperatingGraphStateSchema.parse(state);
   if (stateHasBlockingPreflight(parsed)) return "collect_receipts";
-  if (parsed.config.goal === "revenue_now" && parsed.config.mode === "live_owned_public") {
-    if (hasGraphMutationInput(parsed, "x_owned_publish_node")) return "x_owned_publish_node";
-    if (hasGraphMutationInput(parsed, "linkedin_owned_publish_node")) return "linkedin_owned_publish_node";
+  if (parsed.config.mode === "live_owned_public") {
+    for (const nodeId of [
+      "x_owned_publish_node",
+      "linkedin_owned_publish_node",
+      "x_public_reply_node",
+      "x_follow_user_node",
+      "linkedin_public_comment_node",
+      "linkedin_public_reaction_node",
+      "reddit_owned_publish_node",
+      "reddit_public_comment_node",
+      "youtube_public_comment_node",
+      "x_public_like_node",
+      "reddit_public_upvote_node",
+      "youtube_public_like_node",
+    ] as const) {
+      if (hasGraphMutationInput(parsed, nodeId) && !nodeAlreadyRan(parsed, nodeId)) return nodeId;
+    }
   }
   return routeOperatingGoalToNode(parsed.config.goal);
 }
@@ -163,6 +178,7 @@ export const externalMutationPreflightNode = wrapDirectFunctionNode({
         graph_owned_mutation_nodes: [
           "x_owned_publish_node",
           "x_public_reply_node",
+          "x_follow_user_node",
           "linkedin_owned_publish_node",
           "linkedin_public_comment_node",
           "reddit_owned_publish_node",
@@ -566,6 +582,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("external_mutation_preflight", externalMutationPreflightNode)
     .addNode("x_owned_publish_node", graphOwnedMutationWrapperNode("x_owned_publish_node", runXOwnedPublishNode))
     .addNode("x_public_reply_node", graphOwnedMutationWrapperNode("x_public_reply_node", runXPublicReplyNode))
+    .addNode("x_follow_user_node", graphOwnedMutationWrapperNode("x_follow_user_node", runXFollowUserNode))
     .addNode("linkedin_owned_publish_node", graphOwnedMutationWrapperNode("linkedin_owned_publish_node", runLinkedInOwnedPublishNode))
     .addNode("linkedin_public_comment_node", graphOwnedMutationWrapperNode("linkedin_public_comment_node", runLinkedInPublicCommentNode))
     .addNode("reddit_owned_publish_node", graphOwnedMutationWrapperNode("reddit_owned_publish_node", runRedditOwnedProfilePublishNode))
@@ -618,6 +635,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       evidence_goal_loop: "evidence_goal_loop",
       x_owned_publish_node: "x_owned_publish_node",
       x_public_reply_node: "x_public_reply_node",
+      x_follow_user_node: "x_follow_user_node",
       linkedin_owned_publish_node: "linkedin_owned_publish_node",
       linkedin_public_comment_node: "linkedin_public_comment_node",
       reddit_owned_publish_node: "reddit_owned_publish_node",
@@ -658,6 +676,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "alert_goal_loop",
     "evidence_goal_loop",
     "x_public_reply_node",
+    "x_follow_user_node",
     "linkedin_public_comment_node",
     "reddit_owned_publish_node",
     "reddit_public_comment_node",

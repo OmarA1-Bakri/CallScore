@@ -238,8 +238,8 @@ describe("Phase 5 — Engagement executor explicit states", () => {
     const files = readdirSync(eeDir).filter((f) => f.startsWith("engagement-execution-") && f.endsWith(".json")).sort().reverse();
     if (files.length === 0) return;
     const receipt = receiptJson(join(eeDir, files[0]));
-    assert.equal(receipt.schema, "callscore.engagement_execution_receipt.v1");
-    const validStatuses = ["no_opportunities_found", "engagement_request_queued", "blocked", "blocked_provider_missing"];
+    assert.ok(["callscore.engagement_execution_receipt.v1", "callscore.engagement_execution_receipt.v2"].includes(receipt.schema as string));
+    const validStatuses = ["no_opportunities_found", "no_executable_opportunities", "engagement_request_queued", "engagement_executed_graph_owned", "blocked", "blocked_provider_missing"];
     assert.ok(validStatuses.includes(receipt.status as string),
       `status should be one of ${validStatuses.join(", ")}, got ${receipt.status}`);
   });
@@ -251,10 +251,13 @@ describe("Phase 5 — Engagement executor explicit states", () => {
     if (files.length === 0) return;
     const receipt = receiptJson(join(eeDir, files[0]));
     assert.ok(typeof receipt.executed_count === "number", "executed_count should be a number");
-    assert.ok(typeof receipt.blocked_count === "number", "blocked_count should be a number");
-    assert.ok(typeof receipt.discovery_count === "number", "discovery_count should be a number");
-    // No provider mutation should ever occur from engagement executor
-    assert.equal(receipt.provider_mutation_performed, false);
+    assert.ok(typeof receipt.blocked_count === "number" || typeof receipt.result_count === "number", "blocked_count or result_count should be a number");
+    assert.ok(typeof receipt.discovery_count === "number" || typeof receipt.result_count === "number", "discovery_count or result_count should be a number");
+    // Provider mutation is allowed only when it is graph-owned.
+    if (receipt.provider_mutation_performed === true) {
+      assert.equal(receipt.graph_owned_execution, true);
+      assert.equal(receipt.parent_provider_fallback, false);
+    }
     assert.equal(receipt.graph_owned_execution, true);
     assert.equal(receipt.parent_provider_fallback, false);
   });
