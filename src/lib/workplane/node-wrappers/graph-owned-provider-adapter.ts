@@ -247,8 +247,13 @@ export function preflightGraphOwnedProviderCall(nodeId: string, input: Record<st
 
 export async function executeGraphOwnedProviderCall(toolSlug: string, payload: Record<string, unknown>): Promise<ProviderExecutionResult> {
   const apiKey = process.env.COMPOSIO_API_KEY;
-  const baseUrl = process.env.COMPOSIO_API_BASE_URL ?? "https://backend.composio.dev/api/v1";
+  const baseUrl = process.env.COMPOSIO_API_BASE_URL ?? "https://backend.composio.dev/api/v3.1";
   const executionReceiptId = providerExecutionReceiptId(toolSlug, payload);
+  const connectedAccountId = toolSlug.startsWith("TWITTER_")
+    ? process.env.COMPOSIO_TWITTER_CONNECTED_ACCOUNT_ID
+    : toolSlug.startsWith("LINKEDIN_")
+      ? process.env.COMPOSIO_LINKEDIN_CONNECTED_ACCOUNT_ID
+      : undefined;
 
   if (!apiKey) {
     const response = { ok: false, error: "COMPOSIO_API_KEY not set in graph-owned node context" };
@@ -265,16 +270,34 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
   }
 
   try {
-    const response = await fetch(`${baseUrl}/actions/${encodeURIComponent(toolSlug)}/execute`, {
+    const requestBody: Record<string, unknown> = {
+      arguments: payload,
+      version: process.env.COMPOSIO_TOOLKIT_VERSION ?? "latest",
+    };
+    if (connectedAccountId) requestBody.connected_account_id = connectedAccountId;
+
+    const endpoint = `${baseUrl}/tools/execute/${encodeURIComponent(toolSlug)}`;
+    const authHeaderName = process.env.COMPOSIO_API_KEY_HEADER
+      ?? (apiKey.startsWith("ak_") ? "x-org-api-key" : "x-api-key");
+    const doFetch = async (headerName: string) => fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
+        [headerName]: apiKey,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestBody),
     });
 
-    const text = await response.text();
+    let response = await doFetch(authHeaderName);
+    let text = await response.text();
+    if (response.status === 401 && authHeaderName !== "x-org-api-key") {
+      const retry = await doFetch("x-org-api-key");
+      const retryText = await retry.text();
+      if (retry.ok || retry.status !== 401) {
+        response = retry;
+        text = retryText;
+      }
+    }
     let body: Record<string, unknown> = { raw: text };
     try {
       const parsed = JSON.parse(text) as unknown;
