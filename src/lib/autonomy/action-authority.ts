@@ -64,6 +64,13 @@ const AGENT_OVERRIDES: Record<string, ActionAuthorityType[]> = {
   "callscore-artofwar-strategist": ["draft_artifact", "owned_public_publish"],
   "callscore-whop-commerce-head": ["draft_artifact", "gated_external_send"],
   "callscore-email-partnership-drafts-head": ["draft_artifact", "gated_external_send"],
+  "callscore-youtube-head": ["draft_artifact", "owned_public_publish"],
+  "callscore-youtube-script-agent": ["draft_artifact"],
+  "callscore-youtube-packaging-agent": ["draft_artifact"],
+  "callscore-youtube-thumbnail-agent": ["draft_artifact"],
+  "callscore-youtube-publishing-agent": ["draft_artifact", "owned_public_publish"],
+  "callscore-youtube-commenting-agent": ["draft_artifact", "gated_external_send"],
+  "callscore-youtube-analytics-agent": ["read_only_observe", "internal_state_mutation"],
 };
 
 /**

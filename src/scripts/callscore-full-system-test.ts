@@ -573,7 +573,7 @@ async function main(): Promise<void> {
 
   // ── 9 ──
   console.log("\n9. Agent heartbeat");
-  test("Heartbeat --dry-run with 44 agents", checkHeartbeat);
+  test("Heartbeat --dry-run with 51 agents", checkHeartbeat);
   await runAll();
 
   // ── Summary ──

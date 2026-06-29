@@ -1,0 +1,11 @@
+flowchart TD
+    callscore_cmo_head["callscore-cmo-head"] -->|channel allocation| callscore_linkedin_head["callscore-linkedin-head"]
+    callscore_linkedin_head["callscore-linkedin-head"] -->|copy task| callscore_linkedin_posting_agent["callscore-linkedin-posting-agent"]
+    callscore_linkedin_head["callscore-linkedin-head"] -->|visual task| callscore_linkedin_image_agent["callscore-linkedin-image-agent"]
+    callscore_linkedin_posting_agent["callscore-linkedin-posting-agent"] -->|copy receipt| callscore_reviewer_head["callscore-reviewer-head"]
+    callscore_linkedin_image_agent["callscore-linkedin-image-agent"] -->|visual receipt| callscore_reviewer_head["callscore-reviewer-head"]
+    callscore_reviewer_head["callscore-reviewer-head"] -->|claim/trust| callscore_trust_head["callscore-trust-head"]
+    callscore_trust_head["callscore-trust-head"] -->|policy| callscore_compliance_linter_head["callscore-compliance-linter-head"]
+    callscore_compliance_linter_head["callscore-compliance-linter-head"] -->|safety| callscore_safety_head["callscore-safety-head"]
+    callscore_safety_head["callscore-safety-head"] -->|handoff| Existing_LinkedIn_publication_gate["Existing LinkedIn publication gate"]
+    Existing_LinkedIn_publication_gate["Existing LinkedIn publication gate"] -->|feedback| callscore_linkedin_analytics_agent["callscore-linkedin-analytics-agent"]

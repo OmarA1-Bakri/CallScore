@@ -1,0 +1,13 @@
+flowchart TD
+    Data_social_market_signal["Data / social / market signal"] -->|research intelligence| callscore_opportunity_research_head["callscore-opportunity-research-head"]
+    Data_social_market_signal["Data / social / market signal"] -->|evidence freshness| callscore_data_pipeline_sentinel["callscore-data-pipeline-sentinel"]
+    callscore_opportunity_research_head["callscore-opportunity-research-head"] -->|angle thesis| callscore_artofwar_strategist["callscore-artofwar-strategist"]
+    callscore_data_pipeline_sentinel["callscore-data-pipeline-sentinel"] -->|fresh evidence| callscore_artofwar_strategist["callscore-artofwar-strategist"]
+    callscore_artofwar_strategist["callscore-artofwar-strategist"] -->|campaign angle| callscore_cmo_head["callscore-cmo-head"]
+    callscore_cmo_head["callscore-cmo-head"] -->|platform allocation| Channel_Router["Channel Router"]
+    Channel_Router["Channel Router"] -->|dispatch| Channel_Cluster["Channel Cluster"]
+    Channel_Cluster["Channel Cluster"] -->|receipts verification| callscore_reviewer_head["callscore-reviewer-head"]
+    callscore_reviewer_head["callscore-reviewer-head"] -->|evidence/trust| callscore_trust_head["callscore-trust-head"]
+    callscore_trust_head["callscore-trust-head"] -->|policy| callscore_compliance_linter_head["callscore-compliance-linter-head"]
+    callscore_compliance_linter_head["callscore-compliance-linter-head"] -->|hard safety| callscore_safety_head["callscore-safety-head"]
+    callscore_safety_head["callscore-safety-head"] -->|handoff only| Existing_publication_action_gates["Existing publication/action gates"]

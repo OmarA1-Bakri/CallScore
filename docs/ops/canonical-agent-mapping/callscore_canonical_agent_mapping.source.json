@@ -1,0 +1,1249 @@
+{
+  "schema": "callscore.canonical_agent_mapping.v1",
+  "canonical_rules": {
+    "canonical_rule": "44 agents are the baseline. Upgrade/remap existing agents first. Create new agents only when a real role gap remains after mapping.",
+    "documentation_rule": "All documentation is Markdown. Flow diagrams are Mermaid. Machine-readable source of truth comes first.",
+    "publication_gate_rule": "Do not redesign or touch publication gates in this mapping. This maps upstream agent, editorial, visual, learning, and channel responsibilities.",
+    "new_agent_policy": {
+      "default": "no_new_agent",
+      "allowed_only_if": [
+        "No existing agent has a matching owner_surface.",
+        "No existing agent can be upgraded without role confusion.",
+        "The function requires independent state, receipts, cadence, and failure modes."
+      ]
+    }
+  },
+  "verified_external_patterns": [
+    {
+      "pattern": "Supervisor / subagents",
+      "callscore_use": "callscore-cmo-head supervises editorial/channel allocation; callscore-orchestrator-head supervises runtime control."
+    },
+    {
+      "pattern": "Router",
+      "callscore_use": "Route by channel and asset type."
+    },
+    {
+      "pattern": "Orchestrator-worker",
+      "callscore_use": "Channel heads delegate to posting, visual, analytics, data, evidence, and review workers."
+    },
+    {
+      "pattern": "Evaluator-optimizer",
+      "callscore_use": "Review, trust, compliance, visual QA, and platform-fit agents reject or return work for revision before gate handoff."
+    },
+    {
+      "pattern": "Human-in-the-loop",
+      "callscore_use": "Restricted actions and editorial uncertainty can pause without weakening existing gates."
+    },
+    {
+      "pattern": "Deep Agents",
+      "callscore_use": "Persistent planning, memory, skills, filesystem artifacts, and subagent delegation."
+    }
+  ],
+  "agents": [
+    {
+      "agent_id": "callscore-artofwar-strategist",
+      "status": "existing",
+      "current_declared_role": "Art of War campaign engine",
+      "target_upgraded_role": "Campaign thesis / Angle Editor",
+      "cluster": "GTM / Control",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Turn fresh CallScore evidence into safe campaign dossiers and owned-public canary candidates.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-cmo-head",
+      "status": "existing",
+      "current_declared_role": "cross-channel CallScore marketing strategy and channel allocation",
+      "target_upgraded_role": "Editorial Supervisor / Copy Chief equivalent",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "supervisor/router",
+      "responsibilities": "Set channel priorities, allocate campaign themes, interpret cross-channel performance, and sequence multi-channel GTM launches.",
+      "current_gap": "Strategy exists but weak content passed; editorial veto not enforced.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-x-head",
+      "status": "existing",
+      "current_declared_role": "X / Twitter channel coordination",
+      "target_upgraded_role": "X / Twitter channel coordination",
+      "cluster": "X Channel",
+      "channel_or_surface": "x",
+      "langgraph_pattern": "supervisor/router",
+      "responsibilities": "Coordinate X specialists \u2014 approve content calendar, verify cadence, hand off between posting/images/analytics.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-x-posting-agent",
+      "status": "existing",
+      "current_declared_role": "X / Twitter owned posting",
+      "target_upgraded_role": "X / Twitter owned posting",
+      "cluster": "X Channel",
+      "channel_or_surface": "x",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Draft and publish owned X posts within cadence caps. Generate or request image cards from image agent.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-x-commenting-agent",
+      "status": "existing",
+      "current_declared_role": "X / Twitter commenting and engagement",
+      "target_upgraded_role": "X / Twitter commenting and engagement",
+      "cluster": "X Channel",
+      "channel_or_surface": "x",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Draft and submit safe replies/comments on non-owned posts. Higher reputational risk than posting.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-x-image-agent",
+      "status": "existing",
+      "current_declared_role": "X / Twitter visual asset creation",
+      "target_upgraded_role": "X / Twitter visual asset creation",
+      "cluster": "X Channel",
+      "channel_or_surface": "x",
+      "langgraph_pattern": "visual worker + QA",
+      "responsibilities": "Generate brand-gated image cards, screenshots, and visual assets for X posts. Apply brand gate before delivery.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-x-profile-discovery-agent",
+      "status": "existing",
+      "current_declared_role": "X / Twitter account discovery and research",
+      "target_upgraded_role": "X / Twitter account discovery and research",
+      "cluster": "X Channel",
+      "channel_or_surface": "x",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Find accounts to follow/engage, score fit, and enqueue recommendations. Does not auto-follow.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-x-analytics-agent",
+      "status": "existing",
+      "current_declared_role": "X / Twitter performance analytics",
+      "target_upgraded_role": "X / Twitter performance analytics",
+      "cluster": "X Channel",
+      "channel_or_surface": "x",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Read X post metrics, compute engagement rates, detect topic fatigue, and recommend iteration.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-linkedin-head",
+      "status": "existing",
+      "current_declared_role": "LinkedIn channel coordination",
+      "target_upgraded_role": "LinkedIn channel coordination",
+      "cluster": "LinkedIn Channel",
+      "channel_or_surface": "linkedin",
+      "langgraph_pattern": "supervisor/router",
+      "responsibilities": "Coordinate LinkedIn specialists \u2014 approve content calendar, verify cadence, hand off between posting/images/analytics.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-linkedin-posting-agent",
+      "status": "existing",
+      "current_declared_role": "LinkedIn owned posting",
+      "target_upgraded_role": "LinkedIn owned posting",
+      "cluster": "LinkedIn Channel",
+      "channel_or_surface": "linkedin",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Draft and publish owned LinkedIn posts \u2014 max 1 per day, deeper format than X.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-linkedin-commenting-agent",
+      "status": "existing",
+      "current_declared_role": "LinkedIn commenting and engagement",
+      "target_upgraded_role": "LinkedIn commenting and engagement",
+      "cluster": "LinkedIn Channel",
+      "channel_or_surface": "linkedin",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Draft and gate replies/comments on LinkedIn posts. Professional reputation at stake.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-linkedin-image-agent",
+      "status": "existing",
+      "current_declared_role": "LinkedIn visual asset creation",
+      "target_upgraded_role": "LinkedIn visual asset creation",
+      "cluster": "LinkedIn Channel",
+      "channel_or_surface": "linkedin",
+      "langgraph_pattern": "visual worker + QA",
+      "responsibilities": "Generate brand-gated image cards and visual assets for LinkedIn posts. Document-oriented, professional format.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-linkedin-profile-discovery-agent",
+      "status": "existing",
+      "current_declared_role": "LinkedIn profile discovery and research",
+      "target_upgraded_role": "LinkedIn profile discovery and research",
+      "cluster": "LinkedIn Channel",
+      "channel_or_surface": "linkedin",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Find LinkedIn accounts to follow/engage, score fit, and enqueue recommendations.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-linkedin-analytics-agent",
+      "status": "existing",
+      "current_declared_role": "LinkedIn performance analytics",
+      "target_upgraded_role": "LinkedIn performance analytics",
+      "cluster": "LinkedIn Channel",
+      "channel_or_surface": "linkedin",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Read LinkedIn post metrics, compute engagement rates, detect topic fatigue, and recommend iteration.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-reddit-head",
+      "status": "existing",
+      "current_declared_role": "Reddit channel coordination",
+      "target_upgraded_role": "Reddit channel coordination",
+      "cluster": "Reddit Channel",
+      "channel_or_surface": "reddit",
+      "langgraph_pattern": "supervisor/router",
+      "responsibilities": "Coordinate Reddit specialists \u2014 approve content calendar, gate subreddit participation, hand off between posting/comments.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-reddit-posting-agent",
+      "status": "existing",
+      "current_declared_role": "Reddit /u/Crush1nator owned profile posting",
+      "target_upgraded_role": "Reddit /u/Crush1nator owned profile posting",
+      "cluster": "Reddit Channel",
+      "channel_or_surface": "reddit",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Draft and publish owned Reddit profile posts (build logs, announcements). Not subreddit posts.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-reddit-commenting-agent",
+      "status": "existing",
+      "current_declared_role": "Reddit subreddit commenting and participation",
+      "target_upgraded_role": "Reddit subreddit commenting and participation",
+      "cluster": "Reddit Channel",
+      "channel_or_surface": "reddit",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Draft subreddit comments/replies. Higher reputational risk \u2014 always gated.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-reddit-image-agent",
+      "status": "existing",
+      "current_declared_role": "Reddit visual asset creation",
+      "target_upgraded_role": "Reddit visual asset creation",
+      "cluster": "Reddit Channel",
+      "channel_or_surface": "reddit",
+      "langgraph_pattern": "visual worker + QA",
+      "responsibilities": "Generate brand-gated image cards for Reddit profile posts.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-reddit-profile-discovery-agent",
+      "status": "existing",
+      "current_declared_role": "Reddit profile and community discovery",
+      "target_upgraded_role": "Reddit profile and community discovery",
+      "cluster": "Reddit Channel",
+      "channel_or_surface": "reddit",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Find relevant subreddits and accounts, score fit, enqueue recommendations.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-reddit-analytics-agent",
+      "status": "existing",
+      "current_declared_role": "Reddit performance analytics",
+      "target_upgraded_role": "Reddit performance analytics",
+      "cluster": "Reddit Channel",
+      "channel_or_surface": "reddit",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Read Reddit profile post metrics and subreddit engagement stats. Recommend iteration.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-community-drops-head",
+      "status": "existing",
+      "current_declared_role": "owned Telegram and Discord channels",
+      "target_upgraded_role": "owned Telegram and Discord channels",
+      "cluster": "Community",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "supervisor/router",
+      "responsibilities": "Publish useful owned community drops in Telegram and Discord without spam.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-whop-commerce-head",
+      "status": "existing",
+      "current_declared_role": "Whop marketplace and commerce readiness",
+      "target_upgraded_role": "Whop marketplace and commerce readiness",
+      "cluster": "Whop",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "supervisor/router",
+      "responsibilities": "Keep Whop marketplace copy/assets/conversion assets ready while financial/provider mutations stay gated.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-email-partnership-drafts-head",
+      "status": "existing",
+      "current_declared_role": "email, newsletters, creator partnerships",
+      "target_upgraded_role": "email, newsletters, creator partnerships",
+      "cluster": "Email / Partnerships",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Prepare send-ready packets but never send without gate.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-opportunity-research-head",
+      "status": "existing",
+      "current_declared_role": "market and channel opportunity research",
+      "target_upgraded_role": "market and channel opportunity research",
+      "cluster": "GTM / Control",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Find demand, objections, creator/video patterns, and channel opportunities for other heads.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-compliance-linter-head",
+      "status": "existing",
+      "current_declared_role": "content and action policy",
+      "target_upgraded_role": "Claim/policy linter",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator-optimizer",
+      "responsibilities": "Block unsafe claims, missing caveats, excluded channels, and missing gates before any asset leaves the system.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-data-pipeline-sentinel",
+      "status": "existing",
+      "current_declared_role": "data pipeline, freshness, evidence truth",
+      "target_upgraded_role": "Evidence truth and freshness gate",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Ensure marketing never outruns product/data truth.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-orchestrator-head",
+      "status": "existing",
+      "current_declared_role": "Hermes Workplane, Kanban, receipts, and master-state",
+      "target_upgraded_role": "Runtime supervisor and workflow learning owner",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "supervisor/router",
+      "responsibilities": "Coordinate agents, enforce Prompt 0 gates, maintain receipts, and keep master-state truthful.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-architect-head",
+      "status": "existing",
+      "current_declared_role": "system architecture and canonical structure",
+      "target_upgraded_role": "Architecture simplification and learning-delta designer",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Keep runtime, workplane, provider, and framework architecture simple, explicit, and production-aligned.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-implementer-head",
+      "status": "existing",
+      "current_declared_role": "bounded implementation and tests",
+      "target_upgraded_role": "Bounded implementation worker for approved deltas",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Make small, tested, receipt-backed changes without damaging active runtime.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-reviewer-head",
+      "status": "existing",
+      "current_declared_role": "parent verification and quality review",
+      "target_upgraded_role": "Final evidence/receipt verifier and learning-event verifier",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator-optimizer",
+      "responsibilities": "Verify claims, receipts, tests, and runtime health before any phase is called complete.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-safety-head",
+      "status": "existing",
+      "current_declared_role": "deletion, provider, DB, deploy, and secret safety",
+      "target_upgraded_role": "deletion, provider, DB, deploy, and secret safety",
+      "cluster": "GTM / Control",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Prevent irreversible or unsafe actions while allowing forward progress when evidence is sufficient.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-trust-head",
+      "status": "existing",
+      "current_declared_role": "non-founder review, evidence trust, and public claim safety",
+      "target_upgraded_role": "Public claim and trust evaluator",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator-optimizer",
+      "responsibilities": "Ensure public claims, marketing packets, and product statements are evidence-backed and non-founder reviewed when required.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-gemma-transcript-head",
+      "status": "existing",
+      "current_declared_role": "Gemma/Ollama transcript shadow and promotion gates",
+      "target_upgraded_role": "Local Model Shadow Runtime Guardian",
+      "cluster": "Learning / Control / Trust",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Maintain VM/local/shadow/main transcript architecture and stop shadow results from contaminating production without gates.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-channel-agent-worker-head",
+      "status": "existing",
+      "current_declared_role": "channel-agent worker runtime",
+      "target_upgraded_role": "channel-agent worker runtime",
+      "cluster": "GTM / Control",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Track channel-worker health, queues, receipts, and safe task execution boundaries.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-youtube-discovery-head",
+      "status": "existing",
+      "current_declared_role": "YouTube creator discovery and video discovery",
+      "target_upgraded_role": "YouTube discovery and research head",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "youtube",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Find new crypto YouTube creators and enqueue their recent videos for pipeline processing.",
+      "current_gap": "Only explicit original YouTube agent; too thin for full video channel.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-transcript-scraper-head",
+      "status": "existing",
+      "current_declared_role": "video transcript scraping and transcript storage",
+      "target_upgraded_role": "video transcript scraping and transcript storage",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Scrape transcripts from enqueued videos using yt-dlp, validate completeness, and mark ready for extraction.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-llm-extractor-head",
+      "status": "existing",
+      "current_declared_role": "LLM price-call extraction from transcripts",
+      "target_upgraded_role": "LLM price-call extraction from transcripts",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Extract structured price calls (bullish/bearish/neutral, symbol, target price, timeframe, confidence) from validated transcripts using configured LLM providers.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-price-matcher-head",
+      "status": "existing",
+      "current_declared_role": "price-call to candle-data matching",
+      "target_upgraded_role": "price-call to candle-data matching",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Match extracted price calls against one-minute and daily candle data to compute correctness and alpha.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-scorer-head",
+      "status": "existing",
+      "current_declared_role": "creator accuracy scoring and scoring pipeline",
+      "target_upgraded_role": "creator accuracy scoring and scoring pipeline",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Compute per-creator accuracy scores, win rates, alpha metrics, and leaderboard inputs from matched call data.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-consensus-head",
+      "status": "existing",
+      "current_declared_role": "multi-model score consensus and merge",
+      "target_upgraded_role": "Model disagreement / drift evaluator",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator-optimizer",
+      "responsibilities": "Merge and reconcile scores across extraction providers (Gemini, Ollama, shadow models) into a canonical consensus.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-ml-verifier-head",
+      "status": "existing",
+      "current_declared_role": "Gemma/Ollama ML verification of extracted calls",
+      "target_upgraded_role": "ML Quality & Verification Head",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator-optimizer",
+      "responsibilities": "Run Gemma and Ollama verification batches over extracted calls to validate extraction confidence, reject false positives, and identify shadow-promotion candidates.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-candle-refresher-head",
+      "status": "existing",
+      "current_declared_role": "market data candle refresh and data source health",
+      "target_upgraded_role": "market data candle refresh and data source health",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Keep one-minute and daily candle data fresh, detect data gaps, and enqueue refreshes before match jobs can proceed.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-candidate-admission-head",
+      "status": "existing",
+      "current_declared_role": "new creator and candidate admission pipeline",
+      "target_upgraded_role": "new creator and candidate admission pipeline",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "evaluator/worker",
+      "responsibilities": "Evaluate new creator candidates for pipeline admission, check eligibility (news channel exclusion, focus alignment), and enqueue for discovery.",
+      "current_gap": "Needs runtime-enforced receipts and graph placement.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-markov-trajectory-head",
+      "status": "existing",
+      "current_declared_role": "creator trajectory prediction and transition intelligence",
+      "target_upgraded_role": "Prediction & Learning Head",
+      "cluster": "Data / YouTube / Evidence Pipeline",
+      "channel_or_surface": "cross-channel",
+      "langgraph_pattern": "prediction/evaluator",
+      "responsibilities": "Consume transition snapshot data to build Hidden Markov Models, predict creator trajectory states, and feed trajectory intelligence to GTM heads and the data-pipeline-sentinel.",
+      "current_gap": "Scoped too narrowly to creator trajectory; must learn from whole system.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "no",
+      "new_agent_reason": "n/a"
+    },
+    {
+      "agent_id": "callscore-youtube-head",
+      "status": "proposed_new_required",
+      "current_declared_role": "YouTube channel coordination and production packaging",
+      "target_upgraded_role": "YouTube channel head",
+      "cluster": "YouTube Production Cluster",
+      "channel_or_surface": "youtube",
+      "langgraph_pattern": "supervisor/router",
+      "responsibilities": "Coordinate YouTube script, packaging, thumbnail, publish-readiness, comments, and analytics without collapsing production into discovery.",
+      "current_gap": "Required because YouTube is production pipeline plus publishing channel.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "yes",
+      "new_agent_reason": "Independent YouTube state, receipts, cadence, and failure modes."
+    },
+    {
+      "agent_id": "callscore-youtube-script-agent",
+      "status": "proposed_new_required",
+      "current_declared_role": "YouTube scripts, storyboards, and retention structure",
+      "target_upgraded_role": "YouTube script/storyboard worker",
+      "cluster": "YouTube Production Cluster",
+      "channel_or_surface": "youtube",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Convert approved topics and evidence hooks into concise scripts, storyboards, and retention-aware video outlines.",
+      "current_gap": "Required because YouTube is production pipeline plus publishing channel.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "yes",
+      "new_agent_reason": "Independent YouTube state, receipts, cadence, and failure modes."
+    },
+    {
+      "agent_id": "callscore-youtube-packaging-agent",
+      "status": "proposed_new_required",
+      "current_declared_role": "YouTube title, description, chapters, CTA, and packaging coherence",
+      "target_upgraded_role": "YouTube title/description/packaging worker",
+      "cluster": "YouTube Production Cluster",
+      "channel_or_surface": "youtube",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Produce title, description, chapters, CTA, and title-thumbnail briefs that are accurate, specific, and non-clickbait.",
+      "current_gap": "Required because YouTube is production pipeline plus publishing channel.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "yes",
+      "new_agent_reason": "Independent YouTube state, receipts, cadence, and failure modes."
+    },
+    {
+      "agent_id": "callscore-youtube-thumbnail-agent",
+      "status": "proposed_new_required",
+      "current_declared_role": "YouTube thumbnail concepts, prompts, assets, and visual QA",
+      "target_upgraded_role": "YouTube thumbnail worker",
+      "cluster": "YouTube Production Cluster",
+      "channel_or_surface": "youtube",
+      "langgraph_pattern": "visual worker + QA",
+      "responsibilities": "Produce thumbnail concepts, prompts, rendered asset receipts, and title-thumbnail coherence checks for CallScore video packages.",
+      "current_gap": "Required because YouTube is production pipeline plus publishing channel.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "yes",
+      "new_agent_reason": "Independent YouTube state, receipts, cadence, and failure modes."
+    },
+    {
+      "agent_id": "callscore-youtube-publishing-agent",
+      "status": "proposed_new_required",
+      "current_declared_role": "YouTube publish package readiness and upload handoff",
+      "target_upgraded_role": "YouTube publishing/upload worker",
+      "cluster": "YouTube Production Cluster",
+      "channel_or_surface": "youtube",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Assemble YouTube script, packaging, thumbnail, trust, compliance, and safety receipts into a publish-ready handoff without weakening existing gates.",
+      "current_gap": "Required because YouTube is production pipeline plus publishing channel.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "yes",
+      "new_agent_reason": "Independent YouTube state, receipts, cadence, and failure modes."
+    },
+    {
+      "agent_id": "callscore-youtube-commenting-agent",
+      "status": "proposed_new_required",
+      "current_declared_role": "YouTube comments and community reply drafts",
+      "target_upgraded_role": "YouTube community/comment worker",
+      "cluster": "YouTube Production Cluster",
+      "channel_or_surface": "youtube",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Draft safe YouTube replies and community engagement packets; live engagement remains gated.",
+      "current_gap": "Required because YouTube is production pipeline plus publishing channel.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "yes",
+      "new_agent_reason": "Independent YouTube state, receipts, cadence, and failure modes."
+    },
+    {
+      "agent_id": "callscore-youtube-analytics-agent",
+      "status": "proposed_new_required",
+      "current_declared_role": "YouTube CTR, retention, packaging, and thumbnail analytics",
+      "target_upgraded_role": "YouTube analytics/CTR/retention worker",
+      "cluster": "YouTube Production Cluster",
+      "channel_or_surface": "youtube",
+      "langgraph_pattern": "worker",
+      "responsibilities": "Read YouTube performance, CTR, retention, title-thumbnail performance, and feed packaging and learning loops.",
+      "current_gap": "Required because YouTube is production pipeline plus publishing channel.",
+      "upgrade_action": "Add/require canonical receipts, tests, audit coverage, and graph route alignment.",
+      "new_agent_required": "yes",
+      "new_agent_reason": "Independent YouTube state, receipts, cadence, and failure modes."
+    }
+  ],
+  "required_receipts": [
+    "editorial_angle_receipt.v1",
+    "platform_fit_receipt.v1",
+    "visual_brief_receipt.v1",
+    "visual_qa_receipt.v1",
+    "copy_visual_coherence_receipt.v1",
+    "same_shit_memory_receipt.v1",
+    "learning_event.v1",
+    "agent_performance_ledger.v1",
+    "learning_delta.v1",
+    "experiment_result.v1"
+  ],
+  "new_agent_summary": {
+    "existing_agents": 44,
+    "proposed_new_required": 7,
+    "total_mapped": 51,
+    "new_agents": [
+      "callscore-youtube-head",
+      "callscore-youtube-script-agent",
+      "callscore-youtube-packaging-agent",
+      "callscore-youtube-thumbnail-agent",
+      "callscore-youtube-publishing-agent",
+      "callscore-youtube-commenting-agent",
+      "callscore-youtube-analytics-agent"
+    ],
+    "explicitly_not_added": [
+      "callscore-copy-chief",
+      "callscore-ml-head",
+      "callscore-learning-head",
+      "callscore-visual-qa-agent",
+      "callscore-community-image-agent",
+      "callscore-whop-asset-agent",
+      "callscore-email-asset-agent"
+    ]
+  },
+  "channel_flows": {
+    "global": [
+      {
+        "from": "Data / social / market signal",
+        "to": "callscore-opportunity-research-head",
+        "label": "research intelligence"
+      },
+      {
+        "from": "Data / social / market signal",
+        "to": "callscore-data-pipeline-sentinel",
+        "label": "evidence freshness"
+      },
+      {
+        "from": "callscore-opportunity-research-head",
+        "to": "callscore-artofwar-strategist",
+        "label": "angle thesis"
+      },
+      {
+        "from": "callscore-data-pipeline-sentinel",
+        "to": "callscore-artofwar-strategist",
+        "label": "fresh evidence"
+      },
+      {
+        "from": "callscore-artofwar-strategist",
+        "to": "callscore-cmo-head",
+        "label": "campaign angle"
+      },
+      {
+        "from": "callscore-cmo-head",
+        "to": "Channel Router",
+        "label": "platform allocation"
+      },
+      {
+        "from": "Channel Router",
+        "to": "Channel Cluster",
+        "label": "dispatch"
+      },
+      {
+        "from": "Channel Cluster",
+        "to": "callscore-reviewer-head",
+        "label": "receipts verification"
+      },
+      {
+        "from": "callscore-reviewer-head",
+        "to": "callscore-trust-head",
+        "label": "evidence/trust"
+      },
+      {
+        "from": "callscore-trust-head",
+        "to": "callscore-compliance-linter-head",
+        "label": "policy"
+      },
+      {
+        "from": "callscore-compliance-linter-head",
+        "to": "callscore-safety-head",
+        "label": "hard safety"
+      },
+      {
+        "from": "callscore-safety-head",
+        "to": "Existing publication/action gates",
+        "label": "handoff only"
+      }
+    ],
+    "youtube": [
+      {
+        "from": "callscore-youtube-discovery-head",
+        "to": "callscore-youtube-head",
+        "label": "creator/video candidates"
+      },
+      {
+        "from": "callscore-transcript-scraper-head",
+        "to": "callscore-youtube-script-agent",
+        "label": "transcript evidence"
+      },
+      {
+        "from": "callscore-llm-extractor-head",
+        "to": "callscore-youtube-script-agent",
+        "label": "call evidence"
+      },
+      {
+        "from": "callscore-price-matcher-head",
+        "to": "callscore-youtube-script-agent",
+        "label": "market truth"
+      },
+      {
+        "from": "callscore-scorer-head",
+        "to": "callscore-youtube-packaging-agent",
+        "label": "score hooks"
+      },
+      {
+        "from": "callscore-cmo-head",
+        "to": "callscore-youtube-head",
+        "label": "editorial allocation"
+      },
+      {
+        "from": "callscore-youtube-head",
+        "to": "callscore-youtube-script-agent",
+        "label": "script brief"
+      },
+      {
+        "from": "callscore-youtube-head",
+        "to": "callscore-youtube-packaging-agent",
+        "label": "packaging brief"
+      },
+      {
+        "from": "callscore-youtube-packaging-agent",
+        "to": "callscore-youtube-thumbnail-agent",
+        "label": "title-thumbnail brief"
+      },
+      {
+        "from": "callscore-youtube-script-agent",
+        "to": "callscore-youtube-publishing-agent",
+        "label": "script/video package"
+      },
+      {
+        "from": "callscore-youtube-thumbnail-agent",
+        "to": "callscore-youtube-publishing-agent",
+        "label": "thumbnail receipt"
+      },
+      {
+        "from": "callscore-youtube-publishing-agent",
+        "to": "callscore-reviewer-head",
+        "label": "publish package receipts"
+      },
+      {
+        "from": "callscore-reviewer-head",
+        "to": "callscore-trust-head",
+        "label": "evidence/trust"
+      },
+      {
+        "from": "callscore-trust-head",
+        "to": "callscore-compliance-linter-head",
+        "label": "policy"
+      },
+      {
+        "from": "callscore-compliance-linter-head",
+        "to": "callscore-safety-head",
+        "label": "safety"
+      },
+      {
+        "from": "callscore-safety-head",
+        "to": "Existing YouTube publication gate",
+        "label": "handoff"
+      },
+      {
+        "from": "Existing YouTube publication gate",
+        "to": "callscore-youtube-analytics-agent",
+        "label": "performance data"
+      },
+      {
+        "from": "callscore-youtube-analytics-agent",
+        "to": "callscore-youtube-head",
+        "label": "feedback"
+      },
+      {
+        "from": "Existing YouTube publication gate",
+        "to": "callscore-youtube-commenting-agent",
+        "label": "community opportunities"
+      }
+    ],
+    "learning": [
+      {
+        "from": "System event / user feedback / failed output",
+        "to": "callscore-reviewer-head",
+        "label": "verify event"
+      },
+      {
+        "from": "callscore-reviewer-head",
+        "to": "learning_event.v1",
+        "label": "durable event"
+      },
+      {
+        "from": "learning_event.v1",
+        "to": "callscore-markov-trajectory-head",
+        "label": "prediction & learning"
+      },
+      {
+        "from": "learning_event.v1",
+        "to": "callscore-ml-verifier-head",
+        "label": "model/prompt quality"
+      },
+      {
+        "from": "learning_event.v1",
+        "to": "callscore-cmo-head",
+        "label": "editorial/channel learning"
+      },
+      {
+        "from": "learning_event.v1",
+        "to": "callscore-orchestrator-head",
+        "label": "workflow/agent telemetry"
+      },
+      {
+        "from": "callscore-markov-trajectory-head",
+        "to": "learning_delta.v1",
+        "label": "proposed delta"
+      },
+      {
+        "from": "callscore-ml-verifier-head",
+        "to": "learning_delta.v1",
+        "label": "model delta"
+      },
+      {
+        "from": "callscore-cmo-head",
+        "to": "learning_delta.v1",
+        "label": "editorial delta"
+      },
+      {
+        "from": "callscore-orchestrator-head",
+        "to": "agent_performance_ledger.v1",
+        "label": "agent performance"
+      },
+      {
+        "from": "learning_delta.v1",
+        "to": "callscore-trust-head",
+        "label": "trust validation"
+      },
+      {
+        "from": "callscore-trust-head",
+        "to": "callscore-architect-head",
+        "label": "architecture plan"
+      },
+      {
+        "from": "callscore-architect-head",
+        "to": "callscore-implementer-head",
+        "label": "tested implementation"
+      },
+      {
+        "from": "callscore-implementer-head",
+        "to": "callscore-reviewer-head",
+        "label": "verify improvement"
+      }
+    ],
+    "x": [
+      {
+        "from": "callscore-cmo-head",
+        "to": "callscore-x-head",
+        "label": "channel allocation"
+      },
+      {
+        "from": "callscore-x-head",
+        "to": "callscore-x-posting-agent",
+        "label": "copy task"
+      },
+      {
+        "from": "callscore-x-head",
+        "to": "callscore-x-image-agent",
+        "label": "visual task"
+      },
+      {
+        "from": "callscore-x-posting-agent",
+        "to": "callscore-reviewer-head",
+        "label": "copy receipt"
+      },
+      {
+        "from": "callscore-x-image-agent",
+        "to": "callscore-reviewer-head",
+        "label": "visual receipt"
+      },
+      {
+        "from": "callscore-reviewer-head",
+        "to": "callscore-trust-head",
+        "label": "claim/trust"
+      },
+      {
+        "from": "callscore-trust-head",
+        "to": "callscore-compliance-linter-head",
+        "label": "policy"
+      },
+      {
+        "from": "callscore-compliance-linter-head",
+        "to": "callscore-safety-head",
+        "label": "safety"
+      },
+      {
+        "from": "callscore-safety-head",
+        "to": "Existing X publication gate",
+        "label": "handoff"
+      },
+      {
+        "from": "Existing X publication gate",
+        "to": "callscore-x-analytics-agent",
+        "label": "feedback"
+      }
+    ],
+    "linkedin": [
+      {
+        "from": "callscore-cmo-head",
+        "to": "callscore-linkedin-head",
+        "label": "channel allocation"
+      },
+      {
+        "from": "callscore-linkedin-head",
+        "to": "callscore-linkedin-posting-agent",
+        "label": "copy task"
+      },
+      {
+        "from": "callscore-linkedin-head",
+        "to": "callscore-linkedin-image-agent",
+        "label": "visual task"
+      },
+      {
+        "from": "callscore-linkedin-posting-agent",
+        "to": "callscore-reviewer-head",
+        "label": "copy receipt"
+      },
+      {
+        "from": "callscore-linkedin-image-agent",
+        "to": "callscore-reviewer-head",
+        "label": "visual receipt"
+      },
+      {
+        "from": "callscore-reviewer-head",
+        "to": "callscore-trust-head",
+        "label": "claim/trust"
+      },
+      {
+        "from": "callscore-trust-head",
+        "to": "callscore-compliance-linter-head",
+        "label": "policy"
+      },
+      {
+        "from": "callscore-compliance-linter-head",
+        "to": "callscore-safety-head",
+        "label": "safety"
+      },
+      {
+        "from": "callscore-safety-head",
+        "to": "Existing LinkedIn publication gate",
+        "label": "handoff"
+      },
+      {
+        "from": "Existing LinkedIn publication gate",
+        "to": "callscore-linkedin-analytics-agent",
+        "label": "feedback"
+      }
+    ],
+    "reddit": [
+      {
+        "from": "callscore-cmo-head",
+        "to": "callscore-reddit-head",
+        "label": "channel allocation"
+      },
+      {
+        "from": "callscore-reddit-head",
+        "to": "callscore-reddit-posting-agent",
+        "label": "owned profile post"
+      },
+      {
+        "from": "callscore-reddit-head",
+        "to": "callscore-reddit-commenting-agent",
+        "label": "gated comment draft"
+      },
+      {
+        "from": "callscore-reddit-head",
+        "to": "callscore-reddit-image-agent",
+        "label": "visual task"
+      },
+      {
+        "from": "callscore-reddit-head",
+        "to": "callscore-reddit-profile-discovery-agent",
+        "label": "community/rules research"
+      },
+      {
+        "from": "callscore-reddit-profile-discovery-agent",
+        "to": "callscore-compliance-linter-head",
+        "label": "rule context"
+      },
+      {
+        "from": "callscore-reddit-posting-agent",
+        "to": "callscore-reviewer-head",
+        "label": "copy receipt"
+      },
+      {
+        "from": "callscore-reddit-image-agent",
+        "to": "callscore-reviewer-head",
+        "label": "visual receipt"
+      },
+      {
+        "from": "callscore-reviewer-head",
+        "to": "callscore-trust-head",
+        "label": "claim/trust"
+      },
+      {
+        "from": "callscore-trust-head",
+        "to": "callscore-compliance-linter-head",
+        "label": "policy"
+      },
+      {
+        "from": "callscore-compliance-linter-head",
+        "to": "callscore-safety-head",
+        "label": "safety"
+      },
+      {
+        "from": "callscore-safety-head",
+        "to": "Existing Reddit gate",
+        "label": "handoff"
+      },
+      {
+        "from": "Existing Reddit gate",
+        "to": "callscore-reddit-analytics-agent",
+        "label": "feedback"
+      }
+    ],
+    "support_surfaces": [
+      {
+        "from": "callscore-cmo-head",
+        "to": "callscore-community-drops-head",
+        "label": "community allocation"
+      },
+      {
+        "from": "callscore-community-drops-head",
+        "to": "callscore-reviewer-head",
+        "label": "community copy + visual receipts"
+      },
+      {
+        "from": "callscore-cmo-head",
+        "to": "callscore-whop-commerce-head",
+        "label": "commerce allocation"
+      },
+      {
+        "from": "callscore-whop-commerce-head",
+        "to": "callscore-reviewer-head",
+        "label": "listing/copy/asset receipts"
+      },
+      {
+        "from": "callscore-cmo-head",
+        "to": "callscore-email-partnership-drafts-head",
+        "label": "partnership allocation"
+      },
+      {
+        "from": "callscore-email-partnership-drafts-head",
+        "to": "callscore-reviewer-head",
+        "label": "draft/asset approval packet"
+      },
+      {
+        "from": "callscore-reviewer-head",
+        "to": "callscore-trust-head",
+        "label": "trust"
+      },
+      {
+        "from": "callscore-trust-head",
+        "to": "callscore-compliance-linter-head",
+        "label": "policy"
+      },
+      {
+        "from": "callscore-compliance-linter-head",
+        "to": "callscore-safety-head",
+        "label": "safety"
+      },
+      {
+        "from": "callscore-safety-head",
+        "to": "Existing gated action paths",
+        "label": "handoff"
+      }
+    ]
+  }
+}

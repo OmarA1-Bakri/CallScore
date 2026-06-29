@@ -1,0 +1,11 @@
+flowchart TD
+    callscore_cmo_head["callscore-cmo-head"] -->|community allocation| callscore_community_drops_head["callscore-community-drops-head"]
+    callscore_community_drops_head["callscore-community-drops-head"] -->|community copy + visual receipts| callscore_reviewer_head["callscore-reviewer-head"]
+    callscore_cmo_head["callscore-cmo-head"] -->|commerce allocation| callscore_whop_commerce_head["callscore-whop-commerce-head"]
+    callscore_whop_commerce_head["callscore-whop-commerce-head"] -->|listing/copy/asset receipts| callscore_reviewer_head["callscore-reviewer-head"]
+    callscore_cmo_head["callscore-cmo-head"] -->|partnership allocation| callscore_email_partnership_drafts_head["callscore-email-partnership-drafts-head"]
+    callscore_email_partnership_drafts_head["callscore-email-partnership-drafts-head"] -->|draft/asset approval packet| callscore_reviewer_head["callscore-reviewer-head"]
+    callscore_reviewer_head["callscore-reviewer-head"] -->|trust| callscore_trust_head["callscore-trust-head"]
+    callscore_trust_head["callscore-trust-head"] -->|policy| callscore_compliance_linter_head["callscore-compliance-linter-head"]
+    callscore_compliance_linter_head["callscore-compliance-linter-head"] -->|safety| callscore_safety_head["callscore-safety-head"]
+    callscore_safety_head["callscore-safety-head"] -->|handoff| Existing_gated_action_paths["Existing gated action paths"]

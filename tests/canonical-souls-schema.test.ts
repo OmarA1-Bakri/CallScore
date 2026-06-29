@@ -97,8 +97,8 @@ test("canonical channel-head souls YAML satisfies its Zod schema", () => {
     parsed.success ? "schema valid" : JSON.stringify(parsed.error.issues.slice(0, 12), null, 2),
   );
   if (parsed.success) {
-    assert.equal(parsed.data.agents.length, 44);
-    assert.equal(new Set(parsed.data.agents.map((agent) => agent.agent_id)).size, 44);
+    assert.equal(parsed.data.agents.length, 51);
+    assert.equal(new Set(parsed.data.agents.map((agent) => agent.agent_id)).size, 51);
   }
 });
 
