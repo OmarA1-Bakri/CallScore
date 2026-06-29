@@ -100,8 +100,8 @@ describe("revenue_now live_owned_public graph-owned publish routing", () => {
 
     assert.equal(result.mutation_flags.provider_mutation_performed, false);
     assert.equal(result.mutation_flags.public_publish_performed, false);
-    assert.ok(result.blockers.includes("graph_owned_provider_publish_missing"), result.blockers.join(","));
-    assert.match(JSON.stringify(result.node_results), /graph_owned_provider_publish_missing/);
+    assert.ok(result.blockers.includes("graph_owned_provider_publish_pending"), result.blockers.join(","));
+    assert.match(JSON.stringify(result.node_results), /graph_owned_provider_publish_pending/);
     assert.doesNotMatch(JSON.stringify(result.node_results), /overgovernance-correction|connected Composio fallback/i);
   });
 });

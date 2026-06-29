@@ -96,8 +96,8 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
     if (state.config.mode === "live_owned_public" && hasOwnedPublicFinalDraft(state.artifacts) && !graphOwnedPublishInputPresent) {
       return {
         status: "blocked" as const,
-        summary: "Owned-public provider publish blocked: graph-owned X/LinkedIn provider implementation missing; parent fallback forbidden.",
-        blockers: ["graph_owned_provider_publish_missing"],
+        summary: "Owned-public provider publish pending: graph mutation inputs were not supplied; parent fallback forbidden.",
+        blockers: ["graph_owned_provider_publish_pending"],
         warnings: [],
         detail: {
           campaign_id: campaignId,
