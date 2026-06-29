@@ -41,14 +41,24 @@ function scriptFor(format: VideoFormat, creator: CreatorScore): ScriptPackage {
   const callLine = call
     ? `A recent ${call.direction} ${call.symbol} call resolved as ${call.outcome}, with a CallScore record score of ${Math.round(call.score)}.`
     : "The next step is to watch new resolved calls before making a stronger creator breakdown.";
-  const voiceover = [
+  const voiceoverLines = [
     hook,
     `${creator.name} currently has ${creator.totalCalls} tracked calls in CallScore data.`,
     `The available win rate is ${formatPercent(creator.winRate)}, and the current CallScore alpha score is ${formatAlpha(creator.alphaScore)}.`,
     callLine,
     "This is not financial advice. It is an accountability record built from tracked calls and resolved outcomes.",
     "Check the full record on CallScore before trusting any crypto caller.",
-  ].join(" ");
+  ];
+
+  if (format === "weekly_investigation") {
+    voiceoverLines.splice(4, 0,
+      "For the weekly investigation format, the useful question is not whether one call looked impressive in isolation. The useful question is whether the pattern holds across repeated public calls, changing market conditions, and resolved outcomes.",
+      "Follower count, confidence, and production quality can make a creator look authoritative. CallScore separates that presentation layer from the measurable record, so the ranking is anchored in repeatable evidence instead of personality or hype.",
+      "That makes the investigation slower than a price prediction, but more useful for anyone trying to understand which voices have earned attention over time.",
+    );
+  }
+
+  const voiceover = voiceoverLines.join(" ");
   return {
     format,
     title: `${creator.name} CallScore update`,
