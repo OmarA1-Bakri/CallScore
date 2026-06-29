@@ -245,9 +245,68 @@ export function preflightGraphOwnedProviderCall(nodeId: string, input: Record<st
     : { ok: false, blockerCode: decision.blocker_code ?? "non_graph_external_mutation_blocked" };
 }
 
+
+function parseMcpJson(text: string): Record<string, unknown> {
+  const candidates = text
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trim())
+    .filter(Boolean);
+  candidates.push(text.trim());
+
+  for (const candidate of candidates) {
+    if (!candidate || candidate === "[DONE]") continue;
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      if (isRecord(parsed)) return parsed;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return { raw: text };
+}
+
+function providerBodyFromMcpResult(result: unknown): Record<string, unknown> {
+  if (!isRecord(result)) return { result };
+  const content = result.content;
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      if (!isRecord(item) || typeof item.text !== "string") continue;
+      try {
+        const parsed = JSON.parse(item.text) as unknown;
+        if (isRecord(parsed)) return parsed;
+      } catch {
+        return { text: item.text };
+      }
+    }
+  }
+  return result;
+}
+
+function unwrapMultiExecuteResponse(body: Record<string, unknown>, toolSlug: string): { body: Record<string, unknown>; ok: boolean | null; error: string | null } {
+  const data = nestedRecord(body, "data") ?? body;
+  const results = Array.isArray(data.results) ? data.results.filter(isRecord) : [];
+  const result = results.find((item) => item.tool_slug === toolSlug) ?? results[0];
+  if (!result) return { body, ok: null, error: null };
+  const response = isRecord(result.response) ? result.response : result;
+  const successful = typeof response.successful === "boolean" ? response.successful : typeof result.successful === "boolean" ? result.successful : null;
+  const error = firstString(response.error, response.message, result.error, result.message);
+  return { body: response, ok: successful, error };
+}
+
+function blockerForProviderMessage(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("invalid api key") || lower.includes("auth")) return "blocked_auth";
+  if (lower.includes("rate limit") || lower.includes("too many requests")) return "blocked_rate_limit";
+  if (lower.includes("duplicate") || lower.includes("already")) return "blocked_duplicate_or_cadence";
+  if (lower.includes("not found") || lower.includes("unknown tool")) return "blocked_provider_missing";
+  return "provider_call_failed";
+}
+
 export async function executeGraphOwnedProviderCall(toolSlug: string, payload: Record<string, unknown>): Promise<ProviderExecutionResult> {
-  const apiKey = process.env.COMPOSIO_API_KEY;
-  const baseUrl = process.env.COMPOSIO_API_BASE_URL ?? "https://backend.composio.dev/api/v3.1";
+  const consumerKey = process.env.COMPOSIO_MCP_CONSUMER_API_KEY ?? process.env.COMPOSIO_API_KEY;
+  const mcpUrl = process.env.COMPOSIO_MCP_URL ?? "https://connect.composio.dev/mcp";
   const executionReceiptId = providerExecutionReceiptId(toolSlug, payload);
   const connectedAccountId = toolSlug.startsWith("TWITTER_")
     ? process.env.COMPOSIO_TWITTER_CONNECTED_ACCOUNT_ID
@@ -255,8 +314,8 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
       ? process.env.COMPOSIO_LINKEDIN_CONNECTED_ACCOUNT_ID
       : undefined;
 
-  if (!apiKey) {
-    const response = { ok: false, error: "COMPOSIO_API_KEY not set in graph-owned node context" };
+  if (!consumerKey) {
+    const response = { ok: false, error: "Composio MCP consumer key not set in graph-owned node context" };
     const executionReceiptPath = writeProviderExecutionReceipt({
       executionReceiptId,
       toolSlug,
@@ -264,82 +323,106 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
       ok: false,
       response,
       blockerCode: "blocked_auth",
-      error: "COMPOSIO_API_KEY not set",
+      error: "Composio MCP consumer key not set",
     });
-    return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "blocked_auth", error: "COMPOSIO_API_KEY not set" };
+    return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "blocked_auth", error: "Composio MCP consumer key not set" };
   }
 
   try {
-    const requestBody: Record<string, unknown> = {
-      arguments: payload,
-      version: process.env.COMPOSIO_TOOLKIT_VERSION ?? "latest",
-    };
-    if (connectedAccountId) requestBody.connected_account_id = connectedAccountId;
+    let rpcId = 1;
+    let sessionId: string | null = null;
+    const protocolVersion = process.env.MCP_PROTOCOL_VERSION ?? "2025-03-26";
 
-    const endpoint = `${baseUrl}/tools/execute/${encodeURIComponent(toolSlug)}`;
-    const authHeaderName = process.env.COMPOSIO_API_KEY_HEADER
-      ?? (apiKey.startsWith("ak_") ? "x-org-api-key" : "x-api-key");
-    const doFetch = async (headerName: string) => fetch(endpoint, {
-      method: "POST",
-      headers: {
+    const postRpc = async (body: Record<string, unknown>) => {
+      const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        [headerName]: apiKey,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    let response = await doFetch(authHeaderName);
-    let text = await response.text();
-    if (response.status === 401 && authHeaderName !== "x-org-api-key") {
-      const retry = await doFetch("x-org-api-key");
-      const retryText = await retry.text();
-      if (retry.ok || retry.status !== 401) {
-        response = retry;
-        text = retryText;
-      }
-    }
-    let body: Record<string, unknown> = { raw: text };
-    try {
-      const parsed = JSON.parse(text) as unknown;
-      if (isRecord(parsed)) body = parsed;
-    } catch {
-      // Keep raw response text.
-    }
-
-    const normalizedResponse = normalizeProviderResponse(toolSlug, body, response.ok, response.headers);
-    const blockerCode = response.ok ? undefined : blockerForHttpStatus(response.status, text, toolSlug);
-    const executionReceiptPath = writeProviderExecutionReceipt({
-      executionReceiptId,
-      toolSlug,
-      payload,
-      ok: response.ok,
-      response: normalizedResponse,
-      blockerCode,
-      statusCode: response.status,
-      error: response.ok ? undefined : `Composio ${toolSlug} failed ${response.status}`,
-    });
-
-    return {
-      ok: response.ok,
-      response: normalizedResponse,
-      executionReceiptId,
-      executionReceiptPath,
-      blockerCode,
-      statusCode: response.status,
-      error: response.ok ? undefined : `Composio ${toolSlug} failed ${response.status}: ${text.slice(0, 500)}`,
+        Accept: "application/json, text/event-stream",
+        "MCP-Protocol-Version": protocolVersion,
+        ["X-" + "CONSUMER-API-KEY"]: consumerKey,
+      };
+      if (sessionId) headers["MCP-Session-Id"] = sessionId;
+      const response = await fetch(mcpUrl, { method: "POST", headers, body: JSON.stringify(body) });
+      const text = await response.text();
+      const nextSessionId = response.headers.get("mcp-session-id");
+      if (nextSessionId) sessionId = nextSessionId;
+      return { response, text, body: parseMcpJson(text) };
     };
+
+    const init = await postRpc({
+      jsonrpc: "2.0",
+      id: rpcId++,
+      method: "initialize",
+      params: {
+        protocolVersion,
+        capabilities: {},
+        clientInfo: { name: "callscore-graph-owned-provider", version: "1.0.0" },
+      },
+    });
+    if (!init.response.ok) {
+      const blockerCode = blockerForHttpStatus(init.response.status, init.text, toolSlug);
+      const providerResponse = { ok: false, error: init.body };
+      const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response: providerResponse, blockerCode, statusCode: init.response.status, error: `Composio MCP initialize failed ${init.response.status}` });
+      return { ok: false, response: providerResponse, executionReceiptId, executionReceiptPath, blockerCode, statusCode: init.response.status, error: `Composio MCP initialize failed ${init.response.status}: ${init.text.slice(0, 500)}` };
+    }
+
+    await postRpc({ jsonrpc: "2.0", method: "notifications/initialized", params: {} });
+
+    const listed = await postRpc({ jsonrpc: "2.0", id: rpcId++, method: "tools/list", params: {} });
+    const listedResult = isRecord(listed.body.result) ? listed.body.result : {};
+    const listedTools = Array.isArray(listedResult.tools) ? listedResult.tools : [];
+    const availableToolNames = listedTools
+      .filter(isRecord)
+      .map((tool) => typeof tool.name === "string" ? tool.name : "")
+      .filter(Boolean);
+    const directToolName = availableToolNames.find((name) => name === toolSlug)
+      ?? availableToolNames.find((name) => name.toUpperCase() === toolSlug.toUpperCase())
+      ?? null;
+    const multiExecuteToolName = availableToolNames.find((name) => name === "COMPOSIO_MULTI_EXECUTE_TOOL") ?? null;
+    const selectedToolName = directToolName ?? multiExecuteToolName;
+
+    if (!selectedToolName) {
+      const response = { ok: false, error: `MCP tool ${toolSlug} not found`, mcp_tool_count: availableToolNames.length, mcp_tool_names: availableToolNames.slice(0, 120) };
+      const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response, blockerCode: "blocked_provider_missing", statusCode: listed.response.status, error: `Composio MCP tool ${toolSlug} not found` });
+      return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "blocked_provider_missing", statusCode: listed.response.status, error: `Composio MCP tool ${toolSlug} not found` };
+    }
+
+    const providerToolItem: Record<string, unknown> = { tool_slug: toolSlug, arguments: payload };
+    if (connectedAccountId) providerToolItem.account = connectedAccountId;
+    const mcpArguments = selectedToolName === multiExecuteToolName
+      ? {
+          tools: [providerToolItem],
+          thought: "Execute one graph-owned provider action from a validated operating-graph node.",
+          sync_response_to_workbench: false,
+          current_step: "GRAPH_OWNED_PROVIDER_EXECUTION",
+          current_step_metric: "1/1 provider action",
+        }
+      : payload;
+
+    const call = await postRpc({
+      jsonrpc: "2.0",
+      id: rpcId++,
+      method: "tools/call",
+      params: { name: selectedToolName, arguments: mcpArguments },
+    });
+
+    const rpcError = isRecord(call.body.error) ? call.body.error : undefined;
+    const rpcResult = call.body.result;
+    const rawBody = rpcError ? { error: rpcError } : providerBodyFromMcpResult(rpcResult);
+    const unwrapped = selectedToolName === multiExecuteToolName ? unwrapMultiExecuteResponse(rawBody, toolSlug) : { body: rawBody, ok: null, error: null };
+    const body = unwrapped.body;
+    const mcpResultIsError = isRecord(rpcResult) && rpcResult.isError === true;
+    const innerFailed = unwrapped.ok === false;
+    const ok = call.response.ok && !rpcError && !mcpResultIsError && !innerFailed;
+    const errorMessage = rpcError ? JSON.stringify(rpcError) : mcpResultIsError || innerFailed ? (unwrapped.error ?? JSON.stringify(body)) : call.text;
+    const normalizedResponse = normalizeProviderResponse(toolSlug, body, ok, call.response.headers);
+    const blockerCode = ok ? undefined : call.response.ok ? blockerForProviderMessage(errorMessage) : blockerForHttpStatus(call.response.status, call.text, toolSlug);
+    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizedResponse, blockerCode, statusCode: call.response.status, error: ok ? undefined : `Composio MCP ${toolSlug} failed ${call.response.status}` });
+
+    return { ok, response: normalizedResponse, executionReceiptId, executionReceiptPath, blockerCode, statusCode: call.response.status, error: ok ? undefined : `Composio MCP ${toolSlug} failed ${call.response.status}: ${errorMessage.slice(0, 500)}` };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const response = { ok: false, error: message };
-    const executionReceiptPath = writeProviderExecutionReceipt({
-      executionReceiptId,
-      toolSlug,
-      payload,
-      ok: false,
-      response,
-      blockerCode: "provider_call_failed",
-      error: message,
-    });
+    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response, blockerCode: "provider_call_failed", error: message });
     return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "provider_call_failed", error: message };
   }
 }
