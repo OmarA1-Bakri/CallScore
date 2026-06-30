@@ -12,6 +12,7 @@
 import { createCallScoreGraph, setGraphInputs } from "../lib/autonomy/channel-head-graph";
 import type { ChannelHeadDecisionContext } from "../lib/autonomy/channel-head-decision";
 import { createHash } from "node:crypto";
+import { loadCanonicalAgentIds } from "../lib/canonical-agent-registry";
 
 function sha256(value: string): `sha256:${string}` {
   return `sha256:${createHash("sha256").update(value).digest("hex")}`;
@@ -63,30 +64,8 @@ function sampleContext(agentId: string, channelId: string): ChannelHeadDecisionC
   };
 }
 
-/** Agent IDs from the canonical souls file. */
-const AGENT_IDS = [
-  "callscore-architect-head",
-  "callscore-artofwar-strategist",
-  "callscore-candidate-admission-head",
-  "callscore-candle-refresher-head",
-  "callscore-channel-agent-worker-head",
-  "callscore-community-drops-head",
-  "callscore-compliance-linter-head",
-  "callscore-consensus-head",
-  "callscore-data-pipeline-sentinel",
-  "callscore-email-partnership-drafts-head",
-  "callscore-markov-trajectory-head",
-  "callscore-ml-verifier-head",
-  "callscore-opportunity-research-head",
-  "callscore-price-matcher-head",
-  "callscore-scoring-head",
-  "callscore-supervisor-head",
-  "callscore-transcript-scraper-head",
-  "callscore-whop-commerce-head",
-  "callscore-x-writer-head",
-  "callscore-youtube-discovery-head",
-  "callscore-llm-extractor-head",
-];
+/** Agent IDs loaded from the canonical 51-agent souls registry. */
+const AGENT_IDS = loadCanonicalAgentIds();
 
 export async function runGraphDryRun(): Promise<{ ok: boolean; summary: string; graphResult: unknown }> {
   const contexts = AGENT_IDS.map((id) => {
