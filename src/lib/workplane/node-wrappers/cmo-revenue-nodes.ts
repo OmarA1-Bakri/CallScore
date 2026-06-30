@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { wrapDirectFunctionNode } from "../operating-node-utils";
 import { DEFAULT_OPERATING_MUTATION_FLAGS } from "../operating-graph-schemas";
 import { readArtOfWarCampaignContext } from "./art-of-war-nodes";
+import { evaluateCanonicalOperationalPackage } from "../../autonomy/canonical-operational-runtime";
 
 const SAFE_CHANNELS = ["x", "linkedin", "reddit"] as const;
 const REVENUE_ARTIFACT_DIR = ".tmp/workflow-receipts/callscore_operating_graph/revenue";
@@ -57,6 +58,11 @@ function hasOwnedPublicFinalDraft(artifacts: Record<string, unknown>): boolean {
   return quality?.ok === true || isRecord(draft.drafts);
 }
 
+function canonicalPackageFromArtifacts(artifacts: Record<string, unknown>) {
+  const raw = artifacts.canonical_operational_package;
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Parameters<typeof evaluateCanonicalOperationalPackage>[0] : null;
+}
+
 export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
   nodeId: "revenue_goal_loop",
   domain: "revenue",
@@ -93,6 +99,37 @@ export const cmoRevenueGoalLoopNode = wrapDirectFunctionNode({
 
     const graphMutationInputs = graphMutationInputsFromArtifacts(state.artifacts);
     const graphOwnedPublishInputPresent = isRecord(graphMutationInputs.x_owned_publish_node) || isRecord(graphMutationInputs.linkedin_owned_publish_node);
+    const canonicalPackage = canonicalPackageFromArtifacts(state.artifacts);
+    if (state.config.mode === "live_owned_public" && graphOwnedPublishInputPresent && !canonicalPackage) {
+      return {
+        status: "blocked" as const,
+        summary: "Owned-public provider publish blocked: canonical operational package missing.",
+        blockers: ["canonical_operational_package_missing"],
+        warnings: [],
+        detail: {
+          campaign_id: campaignId,
+          required_next: "provide editorial, platform-fit, visual, coherence, and same-shit receipts before graph-owned provider handoff",
+        },
+        mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+      };
+    }
+    if (state.config.mode === "live_owned_public" && graphOwnedPublishInputPresent && canonicalPackage) {
+      const canonicalDecision = evaluateCanonicalOperationalPackage(canonicalPackage);
+      if (canonicalDecision.status !== "approved") {
+        return {
+          status: "blocked" as const,
+          summary: "Owned-public provider publish blocked by canonical operational package.",
+          blockers: [...canonicalDecision.blockers],
+          warnings: [],
+          detail: {
+            campaign_id: campaignId,
+            canonical_operational_package_status: canonicalDecision.status,
+            canonical_operational_package_blockers: canonicalDecision.blockers,
+          },
+          mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+        };
+      }
+    }
     if (state.config.mode === "live_owned_public" && hasOwnedPublicFinalDraft(state.artifacts) && !graphOwnedPublishInputPresent) {
       return {
         status: "blocked" as const,
