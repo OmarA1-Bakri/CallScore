@@ -14,6 +14,10 @@ export const CHANNEL_AGENT_TASK_TYPES = [
   "opportunity_research_brief",
   "compliance_lint_gate",
   "data_pipeline_freshness_sentinel",
+  "cmo_strategy_review",
+  "x_specialist_dispatch",
+  "linkedin_specialist_dispatch",
+  "reddit_specialist_dispatch",
 ] as const;
 
 export type ChannelAgentTaskType = (typeof CHANNEL_AGENT_TASK_TYPES)[number];
@@ -109,6 +113,14 @@ export function channelTaskWorkplaneJobType(taskType: string): WorkplaneJobType 
       return "artofwar_publish_approval_review";
     case "data_pipeline_freshness_sentinel":
       return "automation_health_check";
+    case "cmo_strategy_review":
+      return "artofwar_strategy_brief";
+    case "x_specialist_dispatch":
+      return "artofwar_content_queue_dry_run";
+    case "linkedin_specialist_dispatch":
+      return "artofwar_content_queue_dry_run";
+    case "reddit_specialist_dispatch":
+      return "artofwar_audience_research_dry_run";
     default:
       throw new Error(`Unsupported channel agent task type: ${taskType}`);
   }
