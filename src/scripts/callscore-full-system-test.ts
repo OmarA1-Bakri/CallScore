@@ -384,16 +384,9 @@ async function checkGraphTopology(): Promise<void> {
 
 async function checkGraphAllAgents(): Promise<void> {
   const { createCallScoreGraph, setGraphInputs } = await import("../lib/autonomy/channel-head-graph");
+  const { loadCanonicalAgentIds } = await import("../lib/canonical-agent-registry");
 
-  const AGENTS = [
-    "callscore-architect-head", "callscore-artofwar-strategist", "callscore-candidate-admission-head",
-    "callscore-candle-refresher-head", "callscore-channel-agent-worker-head", "callscore-community-drops-head",
-    "callscore-compliance-linter-head", "callscore-consensus-head", "callscore-data-pipeline-sentinel",
-    "callscore-email-partnership-drafts-head", "callscore-markov-trajectory-head", "callscore-ml-verifier-head",
-    "callscore-opportunity-research-head", "callscore-price-matcher-head", "callscore-scoring-head",
-    "callscore-supervisor-head", "callscore-transcript-scraper-head", "callscore-whop-commerce-head",
-    "callscore-x-writer-head", "callscore-youtube-discovery-head", "callscore-llm-extractor-head",
-  ];
+  const AGENTS = loadCanonicalAgentIds();
 
   const contexts = AGENTS.map((id) => makeContext({
     channelHeadSoul: { agentId: id, channelId: id.includes("artofwar") ? "art_of_war" : "general", soulVersion: "callscore_channel_head_souls.v1", purpose: `Test ${id}` },
@@ -402,12 +395,12 @@ async function checkGraphAllAgents(): Promise<void> {
   setGraphInputs({ dryRun: true }, { mockData: true }, { contexts: contexts as never });
 
   const graph = createCallScoreGraph();
-  const result = await graph.invoke({ run_id: `test-21-${Date.now()}`, started_at: new Date().toISOString() });
+  const result = await graph.invoke({ run_id: `test-51-${Date.now()}`, started_at: new Date().toISOString() });
 
   const decisions = result.channel_head_results ?? [];
   const receipts = result.receipts ?? [];
-  if (decisions.length !== 21) throw new Error(`Expected 21 decisions, got ${decisions.length}`);
-  if (receipts.length !== 21) throw new Error(`Expected 21 receipts, got ${receipts.length}`);
+  if (decisions.length !== 51) throw new Error(`Expected 51 decisions, got ${decisions.length}`);
+  if (receipts.length !== 51) throw new Error(`Expected 51 receipts, got ${receipts.length}`);
   if ((result.errors ?? []).length > 0) throw new Error(`Expected 0 errors, got ${result.errors.length}`);
 }
 
@@ -553,7 +546,7 @@ async function main(): Promise<void> {
   // ── 5 ──
   console.log("\n5. LangGraph StateGraph");
   test("Graph pass path, 1 agent", checkGraphTopology);
-  test("Graph pass path, 21 agents", checkGraphAllAgents);
+  test("Graph pass path, 51 canonical agents", checkGraphAllAgents);
   await runAll();
 
   // ── 6 ──
