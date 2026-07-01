@@ -1,0 +1,125 @@
+execution_receipt_summary:
+  schema: callscore.cmo_head_read_only_intelligence_canary.v1
+  status: COMPLETED_READ_ONLY
+  generated_at_utc: 2026-07-01T17:44:08Z
+  acting_identity:
+    agent_id: callscore-cmo-head
+    role: CallScore Chief Marketing Officer
+    class: cmo_head
+    workflow_owned: cmo_strategy
+    authority: strategy/router only; no direct publishing/provider mutation
+    owns:
+      - cross-channel marketing strategy
+      - channel priority allocation
+      - campaign theme sequencing
+      - interpretation of X/LinkedIn/Reddit channel receipts
+      - production of channel_priority_receipt and campaign_theme_allocation_receipt
+    forbidden:
+      - publish directly to any channel
+      - call provider APIs from parent/CMO prompt
+      - mutate provider, financial, DB, deploy, infra, or secret state
+
+  workflow_basis:
+    canonical_mapping:
+      file: /opt/crypto-tuber-ranked/docs/ops/canonical-agent-mapping/callscore_canonical_agent_mapping.source.json
+      evidence: callscore-cmo-head exists as supervisor/router; target role is Editorial Supervisor / Copy Chief equivalent; no new agent required.
+    gtm_registry:
+      file: /opt/crypto-tuber-ranked/docs/ops/callscore-gtm-agent-registry.json
+      evidence: CONTROLLED_FULL; X and LinkedIn lanes are ready_public_owned, but provider/public mutation still must be graph-owned and receipt-backed.
+    runtime_audit:
+      command: /usr/bin/python3 /srv/agents/hermes/scripts/callscore-canonical-agent-audit.py
+      result:
+        canonical_existing_agents: 44
+        canonical_new_agents: 7
+        canonical_total_mapped: 51
+        souls_agent_count: 51
+        runtime_exists: true
+        youtube_cluster_complete: true
+        status: blocked
+        blocker: profile_skill_ok=false because config_prompt_canonical_operational=false
+    workplane_status:
+      command: npm run workplane:status -- --json
+      result: exited 0
+      notable_output: next_recommended_autonomous_action=run_owned_public_artifact_canary; allowed=true; next_private_infra_action waits on laptop collector cooldown.
+
+  next_useful_non_public_artifact:
+    artifact_type: channel_priority_receipt.v1
+    proposed_path: /opt/crypto-tuber-ranked/.tmp/canary-receipts/cmo-channel-priority-receipt.json
+    why:
+      - It is an independent CMO output declared by the CMO head workflow.
+      - It does not require public/provider mutation.
+      - It would rank X vs LinkedIn vs Reddit for the next safe owned-public artifact wave.
+      - It can cite current blockers and decide whether the next useful work is draft-only, cooldown receipt, visual brief, or graph-owned handoff once gates pass.
+    minimum_contents:
+      - channel priority stack: X, LinkedIn, Reddit, explicit skips
+      - campaign theme allocation
+      - latest channel-head receipt references
+      - cooldown/auth/media blockers
+      - required canonical receipt package status
+      - mutation_flags all false
+      - next wake trigger
+
+  blockers_or_missing_data:
+    - id: canonical_profile_skill_block
+      severity: BLOCKER_FOR_CANONICAL_GREEN
+      evidence: canonical audit returned status=blocked and profile_skill_ok=false.
+      missing_or_bad: config_prompt_canonical_operational=false.
+      next_action: repair/update profile canonical prompt config separately; read-only canary did not mutate it.
+
+    - id: graph_provider_auth_block_observed
+      severity: BLOCKER_FOR_X_PUBLISH_ONLY
+      evidence: /opt/crypto-tuber-ranked/.tmp/intelligence-canary/callscore-x-head-canary-20260701T143000Z.json contains graph_status=blocked and graph_blockers=["blocked_auth"].
+      next_action: provider auth/Composio connection maintenance; CMO can still produce non-public strategy receipts.
+
+    - id: canonical_operational_package_not_verified_for_handoff
+      severity: BLOCKER_FOR_PUBLIC_HANDOFF
+      required_receipts:
+        - editorial_angle_receipt.v1
+        - platform_fit_receipt.v1
+        - visual_brief_receipt.v1
+        - visual_qa_receipt.v1
+        - copy_visual_coherence_receipt.v1
+        - same_shit_memory_receipt.v1
+      next_action: before any graph-owned public handoff, verify all required receipts are present, fresh, passing, and hash-backed.
+
+    - id: analytics_receipts_missing_or_not_current
+      severity: DEGRADED_STRATEGY
+      evidence: prior CMO canary noted no recent analytics-agent receipts; current quick search only found canary references, not fresh cross-channel analytics artifacts.
+      impact: CMO can produce a priority receipt, but cross-channel performance interpretation will be weaker until X/LinkedIn analytics agents produce receipts.
+
+    - id: reddit_visual_media_gap
+      severity: GATE_FOR_REDDIT
+      evidence: existing CMO canary reports Reddit blocked_no_media/no_text_only; social discipline requires visual assets for relevant posts.
+      next_action: produce visual_brief_receipt and visual_qa_receipt before considering Reddit owned-profile artifact handoff.
+
+  mutation_flags:
+    external_mutation_performed: false
+    provider_api_called: false
+    publish_or_post_performed: false
+    db_write_performed: false
+    deploy_or_infra_mutation_performed: false
+    secrets_read_or_printed: false
+    files_modified: false
+    delegate_task_used: false
+    delegate_task_reason: not needed; read-only local evidence was enough.
+
+  evidence_read:
+    - /opt/crypto-tuber-ranked/docs/ops/canonical-agent-mapping/callscore_canonical_agent_mapping.source.json
+    - /opt/crypto-tuber-ranked/docs/ops/callscore-gtm-agent-registry.json
+    - /opt/crypto-tuber-ranked/docs/plans/2026-06-25-cmo-specialist-hierarchy.md
+    - /opt/crypto-tuber-ranked/src/lib/autonomy/cmo-campaign-graph.ts
+    - /opt/crypto-tuber-ranked/.tmp/canary-receipts/callscore-cmo-head-intelligence-canary-2026-07-01.json
+    - /opt/crypto-tuber-ranked/.tmp/callscore-cmo-draft-20260628T030254Z.json
+    - /opt/crypto-tuber-ranked/.tmp/social-runs/20260623T0001Z-specialist-cmo/20260623T0001Z-specialist-cmo-combined-final-draft.json
+
+  commands_run:
+    - date -u +%Y-%m-%dT%H:%M:%SZ
+    - /usr/bin/python3 /srv/agents/hermes/scripts/callscore-canonical-agent-audit.py
+    - npm run workplane:status -- --json
+    - git status --short
+
+  final_decision:
+    ready_to_publish: false
+    ready_to_call_provider_api: false
+    ready_for_non_public_intelligence_artifact: true
+    next_action: produce channel_priority_receipt.v1 as a read-only CMO strategy artifact, then use it to route channel-head work without weakening graph-owned publish gates.
