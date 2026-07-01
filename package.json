@@ -82,7 +82,8 @@
     "video:mcp-proof": "node --import tsx src/video/cli/video-mcp-proof.ts",
     "pipeline:guard": "node --import tsx src/scripts/pipeline-guard-report.ts",
     "transition:report": "node --import tsx src/scripts/transition-snapshot-report.ts",
-    "storm:evidence": "node --import tsx src/scripts/storm-evidence-pack.ts"
+    "storm:evidence": "node --import tsx src/scripts/storm-evidence-pack.ts",
+    "team-memory:init": "node --import tsx src/scripts/callscore-team-memory-init.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
