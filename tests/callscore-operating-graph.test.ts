@@ -128,6 +128,50 @@ describe("callscore operating graph", () => {
     assert.equal(result.mutation_flags.provider_mutation_performed, false);
   });
 
+  test("live owned-public graph can route a rollback delete mutation to the explicit X delete node", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const result = await graph.invoke(
+      buildInitialOperatingState({
+        goal: "revenue_now",
+        mode: "live_owned_public",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "approval-delete-x-graph",
+        testFixtures: true,
+        artifacts: {
+          graph_mutation_inputs: {
+            x_post_delete_node: {
+              graph_context: {
+                operating_graph_run_id: "graph-run-delete-x",
+                graph_node_id: "x_post_delete_node",
+                goal: "revenue_now",
+                platform: "x",
+                mutation_family: "provider_mutation",
+                acting_agent_id: "callscore-x-head",
+                authority: "owned_public_publish",
+                approval_receipt_id: "approval-delete-x-graph",
+                approved_payload_hash: "sha256:d8f1f63c672cf4198ab7f5f7677a0de54d2920ff071a26bc3327f4f678e0920d",
+                provider_execution_receipt_id: "provider-delete-x-graph",
+                dry_run: false,
+                parent_receipt_id: "approval-delete-x-graph",
+              },
+              provider_tool: "TWITTER_POST_DELETE_BY_POST_ID",
+              payload: { id: "2071866502773432642" },
+              provider_execution_receipt_id: "provider-delete-x-graph",
+              provider_response: { ok: true, id: "2071866502773432642", deleted: true },
+            },
+          },
+        },
+      }),
+      { configurable: { thread_id: "operating-x-delete-node-test" } },
+    );
+
+    const deleteNode = result.node_results.find((item) => item.node_id === "x_post_delete_node");
+    assert.equal(deleteNode?.status, "ok");
+    assert.equal(result.mutation_flags.provider_mutation_performed, true);
+    assert.equal(result.mutation_flags.public_publish_performed, false);
+  });
+
   test("every non-revenue operating goal reaches a concrete wrapper node with no mutation", async () => {
     const cases = [
       { goal: "refresh_data", nodeId: "data_goal_loop", key: "data_pipeline_stage_count", predicate: (value: unknown) => Number(value) >= 18 },

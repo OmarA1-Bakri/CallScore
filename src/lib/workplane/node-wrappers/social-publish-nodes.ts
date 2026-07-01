@@ -30,6 +30,32 @@ export function runLinkedInOwnedPublishNode(input: Record<string, unknown>): Soc
   });
 }
 
+export function runXPostDeleteNode(input: Record<string, unknown>): SocialPublishNodeDecision {
+  return runGraphOwnedMutationNode({
+    input,
+    nodeId: "x_post_delete_node",
+    platform: "x",
+    mutationFamily: "provider_mutation",
+    mode: "live_owned_public",
+    requestedAction: "provider_mutation",
+    missingProviderBlocker: "x_delete_provider_tool_missing",
+    wrongNodeBlocker: "non_graph_publish_blocked",
+  });
+}
+
+export function runLinkedInPostDeleteNode(input: Record<string, unknown>): SocialPublishNodeDecision {
+  return runGraphOwnedMutationNode({
+    input,
+    nodeId: "linkedin_post_delete_node",
+    platform: "linkedin",
+    mutationFamily: "provider_mutation",
+    mode: "live_owned_public",
+    requestedAction: "provider_mutation",
+    missingProviderBlocker: "linkedin_delete_provider_tool_missing",
+    wrongNodeBlocker: "non_graph_publish_blocked",
+  });
+}
+
 export function runRedditOwnedProfilePublishNode(input: Record<string, unknown>): SocialPublishNodeDecision {
   return runGraphOwnedMutationNode({
     input,

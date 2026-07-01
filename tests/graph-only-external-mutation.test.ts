@@ -20,6 +20,8 @@ type PublishDecision = {
 type SocialPublishNodesModule = {
   runXOwnedPublishNode: (input: Record<string, unknown>) => PublishDecision | Promise<PublishDecision>;
   runLinkedInOwnedPublishNode: (input: Record<string, unknown>) => PublishDecision | Promise<PublishDecision>;
+  runXPostDeleteNode: (input: Record<string, unknown>) => PublishDecision | Promise<PublishDecision>;
+  runLinkedInPostDeleteNode: (input: Record<string, unknown>) => PublishDecision | Promise<PublishDecision>;
   runRedditCommunityMutationNode: (input: Record<string, unknown>) => PublishDecision | Promise<PublishDecision>;
 };
 
@@ -91,6 +93,48 @@ describe("graph-only social external mutation RED contract", () => {
     assert.equal(decision.status, "ok");
     assert.equal(decision.provider_call_permitted, true);
     assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
+  });
+
+  test("X and LinkedIn rollback deletes are graph-owned provider mutations, not parent deletes", async () => {
+    const nodes = await loadSocialNodes();
+
+    const xDelete = await nodes.runXPostDeleteNode({
+      graph_context: {
+        ...approvalContext,
+        graph_node_id: "x_post_delete_node",
+        platform: "x",
+        mutation_family: "provider_mutation",
+        approved_payload_hash: "sha256:d8f1f63c672cf4198ab7f5f7677a0de54d2920ff071a26bc3327f4f678e0920d",
+      },
+      provider_tool: "TWITTER_POST_DELETE_BY_POST_ID",
+      payload: { id: "2071866502773432642" },
+      provider_execution_receipt_id: "provider-delete-x-001",
+      provider_response: { ok: true, id: "2071866502773432642", deleted: true },
+    });
+
+    assert.equal(xDelete.status, "ok");
+    assert.equal(xDelete.provider_call_permitted, true);
+    assert.equal(xDelete.mutation_flags?.provider_mutation_performed, true);
+    assert.equal(xDelete.mutation_flags?.public_publish_performed, false);
+
+    const linkedInDelete = await nodes.runLinkedInPostDeleteNode({
+      graph_context: {
+        ...approvalContext,
+        graph_node_id: "linkedin_post_delete_node",
+        platform: "linkedin",
+        mutation_family: "provider_mutation",
+        approved_payload_hash: "sha256:a66b1315688dfd874a30eea550a655dbf4bf9eecb47b68ceac8da066f1c1df10",
+      },
+      provider_tool: "LINKEDIN_DELETE_POST",
+      payload: { post_urn: "urn:li:share:7474081425663610880" },
+      provider_execution_receipt_id: "provider-delete-linkedin-001",
+      provider_response: { ok: true, id: "urn:li:share:7474081425663610880", deleted: true },
+    });
+
+    assert.equal(linkedInDelete.status, "ok");
+    assert.equal(linkedInDelete.provider_call_permitted, true);
+    assert.equal(linkedInDelete.mutation_flags?.provider_mutation_performed, true);
+    assert.equal(linkedInDelete.mutation_flags?.public_publish_performed, false);
   });
 
   test("Reddit public subreddit action is open by default when graph-owned and target exists", async () => {

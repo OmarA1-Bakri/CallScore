@@ -33,6 +33,7 @@ import { createEvidenceResearchGoalNode } from "./node-wrappers/evidence-researc
 import { createWorkerDispatchOnceNode, type WorkerDispatchNodeDeps } from "./node-wrappers/worker-dispatch-nodes";
 import {
   runLinkedInOwnedPublishNode,
+  runLinkedInPostDeleteNode,
   runLinkedInPublicCommentNode,
   runLinkedInPublicReactionNode,
   runRedditCommunityMutationNode,
@@ -40,6 +41,7 @@ import {
   runRedditPublicUpvoteNode,
   runXFollowUserNode,
   runXOwnedPublishNode,
+  runXPostDeleteNode,
   runXPublicLikeNode,
   runXPublicReplyNode,
   runYoutubePublicLikeNode,
@@ -120,6 +122,8 @@ function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
     for (const nodeId of [
       "x_owned_publish_node",
       "linkedin_owned_publish_node",
+      "x_post_delete_node",
+      "linkedin_post_delete_node",
       "x_public_reply_node",
       "x_follow_user_node",
       "linkedin_public_comment_node",
@@ -177,9 +181,11 @@ export const externalMutationPreflightNode = wrapDirectFunctionNode({
         provider_mutation_allowed_outside_graph: false,
         graph_owned_mutation_nodes: [
           "x_owned_publish_node",
+          "x_post_delete_node",
           "x_public_reply_node",
           "x_follow_user_node",
           "linkedin_owned_publish_node",
+          "linkedin_post_delete_node",
           "linkedin_public_comment_node",
           "reddit_owned_publish_node",
           "reddit_public_comment_node",
@@ -581,9 +587,11 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("hard_gate_preflight", hardGatePreflightNode)
     .addNode("external_mutation_preflight", externalMutationPreflightNode)
     .addNode("x_owned_publish_node", graphOwnedMutationWrapperNode("x_owned_publish_node", runXOwnedPublishNode))
+    .addNode("x_post_delete_node", graphOwnedMutationWrapperNode("x_post_delete_node", runXPostDeleteNode))
     .addNode("x_public_reply_node", graphOwnedMutationWrapperNode("x_public_reply_node", runXPublicReplyNode))
     .addNode("x_follow_user_node", graphOwnedMutationWrapperNode("x_follow_user_node", runXFollowUserNode))
     .addNode("linkedin_owned_publish_node", graphOwnedMutationWrapperNode("linkedin_owned_publish_node", runLinkedInOwnedPublishNode))
+    .addNode("linkedin_post_delete_node", graphOwnedMutationWrapperNode("linkedin_post_delete_node", runLinkedInPostDeleteNode))
     .addNode("linkedin_public_comment_node", graphOwnedMutationWrapperNode("linkedin_public_comment_node", runLinkedInPublicCommentNode))
     .addNode("reddit_owned_publish_node", graphOwnedMutationWrapperNode("reddit_owned_publish_node", runRedditOwnedProfilePublishNode))
     .addNode("reddit_public_comment_node", graphOwnedMutationWrapperNode("reddit_public_comment_node", runRedditCommunityMutationNode))
@@ -634,10 +642,12 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       alert_goal_loop: "alert_goal_loop",
       evidence_goal_loop: "evidence_goal_loop",
       x_owned_publish_node: "x_owned_publish_node",
+      x_post_delete_node: "x_post_delete_node",
       x_public_reply_node: "x_public_reply_node",
       x_follow_user_node: "x_follow_user_node",
       linkedin_owned_publish_node: "linkedin_owned_publish_node",
       linkedin_public_comment_node: "linkedin_public_comment_node",
+      linkedin_post_delete_node: "linkedin_post_delete_node",
       reddit_owned_publish_node: "reddit_owned_publish_node",
       reddit_public_comment_node: "reddit_public_comment_node",
       youtube_publish_node: "youtube_publish_node",
@@ -675,9 +685,11 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "trust_goal_loop",
     "alert_goal_loop",
     "evidence_goal_loop",
+    "x_post_delete_node",
     "x_public_reply_node",
     "x_follow_user_node",
     "linkedin_public_comment_node",
+    "linkedin_post_delete_node",
     "reddit_owned_publish_node",
     "reddit_public_comment_node",
     "youtube_publish_node",

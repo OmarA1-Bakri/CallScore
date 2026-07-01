@@ -57,6 +57,16 @@ function validateKnownProviderPayload(toolSlug: string, payload: Record<string, 
     if (!/^[0-9]{1,19}$/.test(targetUserId)) return "payload_missing";
   }
 
+  if (toolSlug === "TWITTER_POST_DELETE_BY_POST_ID") {
+    const id = typeof payload.id === "string" ? payload.id.trim() : "";
+    if (!/^[0-9]{1,19}$/.test(id)) return "payload_missing";
+  }
+
+  if (toolSlug === "LINKEDIN_DELETE_POST") {
+    const postUrn = typeof payload.post_urn === "string" ? payload.post_urn.trim() : "";
+    if (!/^urn:li:(share|ugcPost):[0-9A-Za-z_-]+$/.test(postUrn)) return "payload_missing";
+  }
+
   if (toolSlug === "LINKEDIN_CREATE_LINKED_IN_POST") {
     const author = typeof payload.author === "string" ? payload.author.trim() : "";
     const commentary = typeof payload.commentary === "string" ? payload.commentary.trim() : "";
@@ -436,6 +446,18 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
       normalizedResponse.id = normalizedResponse.id ?? payload.target_user_id;
       normalizedResponse.external_object_id = normalizedResponse.external_object_id ?? payload.target_user_id;
       normalizedResponse.url = normalizedResponse.url ?? `https://x.com/i/user/${payload.target_user_id}`;
+    }
+    if (ok && toolSlug === "TWITTER_POST_DELETE_BY_POST_ID" && typeof payload.id === "string") {
+      const handle = (process.env.CALLSCORE_X_HANDLE ?? process.env.X_USERNAME ?? "0marbakri").replace(/^@/, "");
+      normalizedResponse.id = normalizedResponse.id ?? payload.id;
+      normalizedResponse.external_object_id = normalizedResponse.external_object_id ?? payload.id;
+      normalizedResponse.url = normalizedResponse.url ?? `https://x.com/${handle}/status/${payload.id}`;
+    }
+    if (ok && toolSlug === "LINKEDIN_DELETE_POST" && typeof payload.post_urn === "string") {
+      normalizedResponse.id = normalizedResponse.id ?? payload.post_urn;
+      normalizedResponse.external_object_id = normalizedResponse.external_object_id ?? payload.post_urn;
+      normalizedResponse.x_restli_id = normalizedResponse.x_restli_id ?? payload.post_urn;
+      normalizedResponse.url = normalizedResponse.url ?? `https://www.linkedin.com/feed/update/${payload.post_urn}/`;
     }
     const blockerCode = ok ? undefined : call.response.ok ? blockerForProviderMessage(errorMessage) : blockerForHttpStatus(call.response.status, call.text, toolSlug);
     const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizedResponse, blockerCode, statusCode: call.response.status, error: ok ? undefined : `Composio MCP ${toolSlug} failed ${call.response.status}` });
