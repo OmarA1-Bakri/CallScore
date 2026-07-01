@@ -1,4 +1,5 @@
 import * as assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 
@@ -29,6 +30,19 @@ type LegacyBlockerModule = {
   assertLegacyCallScoreMutationBlocked: (input: Record<string, unknown>) => PublishDecision | Promise<PublishDecision>;
 };
 
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, val) => {
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      return Object.fromEntries(Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)));
+    }
+    return val;
+  });
+}
+
+function payloadHash(payload: unknown): string {
+  return `sha256:${createHash("sha256").update(stableJson(payload)).digest("hex")}`;
+}
+
 async function loadSocialNodes(): Promise<SocialPublishNodesModule> {
   return await import(socialNodesModulePath) as SocialPublishNodesModule;
 }
@@ -50,6 +64,23 @@ const approvalContext = {
   mutation_family: "public_publish",
   dry_run: false,
 };
+
+const canonicalReceipts = [
+  "editorial_angle_receipt.v1",
+  "platform_fit_receipt.v1",
+  "visual_brief_receipt.v1",
+  "visual_qa_receipt.v1",
+  "copy_visual_coherence_receipt.v1",
+  "same_shit_memory_receipt.v1",
+].map((schema) => ({
+  schema,
+  receipt_id: `${schema}:test`,
+  created_at: "2026-07-01T00:00:00.000Z",
+  agent_id: "callscore-cmo-head",
+  decision: "approved",
+  evidence_hash: "sha256:" + "a".repeat(64),
+  blockers: [],
+}));
 
 describe("graph-only social external mutation RED contract", () => {
   test("X publish can call provider only inside x_owned_publish_node", async () => {
@@ -88,6 +119,106 @@ describe("graph-only social external mutation RED contract", () => {
       payload: { text: "CallScore evidence update" },
       provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
       provider_response: { ok: true, id: "li-post-001", url: "https://linkedin.com/feed/update/li-post-001" },
+    });
+
+    assert.equal(decision.status, "ok");
+    assert.equal(decision.provider_call_permitted, true);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
+  });
+
+  test("X owned publish blocks text-only payload when media is required", async () => {
+    const nodes = await loadSocialNodes();
+    const payload = { text: "CallScore evidence update" };
+    const decision = await nodes.runXOwnedPublishNode({
+      graph_context: { ...approvalContext, graph_node_id: "x_owned_publish_node", platform: "x", approved_payload_hash: payloadHash(payload) },
+      payload,
+      provider_tool: "TWITTER_CREATION_OF_A_POST",
+      provider_response: { ok: true, id: "post-visual-missing" },
+      canonical_receipts: canonicalReceipts,
+      media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
+    });
+
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.blocker_code, "required_media_missing");
+    assert.equal(decision.provider_call_permitted, false);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, false);
+  });
+
+  test("LinkedIn owned publish blocks text-only payload when media is required", async () => {
+    const nodes = await loadSocialNodes();
+    const payload = {
+      author: "urn:li:person:abc123",
+      commentary: "CallScore evidence update",
+      visibility: "PUBLIC",
+      lifecycleState: "PUBLISHED",
+    };
+    const decision = await nodes.runLinkedInOwnedPublishNode({
+      graph_context: { ...approvalContext, graph_node_id: "linkedin_owned_publish_node", platform: "linkedin", approved_payload_hash: payloadHash(payload) },
+      payload,
+      provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
+      provider_response: { ok: true, id: "li-visual-missing" },
+      canonical_receipts: canonicalReceipts,
+      media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
+    });
+
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.blocker_code, "required_media_missing");
+    assert.equal(decision.provider_call_permitted, false);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, false);
+  });
+
+  test("owned publish blocks when canonical operational package is missing same-shit receipt", async () => {
+    const nodes = await loadSocialNodes();
+    const missingSameShit = canonicalReceipts.filter((receipt) => receipt.schema !== "same_shit_memory_receipt.v1");
+    const payload = { text: "CallScore evidence update", media_media_ids: ["1455952740635586573"] };
+    const decision = await nodes.runXOwnedPublishNode({
+      graph_context: { ...approvalContext, graph_node_id: "x_owned_publish_node", platform: "x", approved_payload_hash: payloadHash(payload) },
+      payload,
+      provider_tool: "TWITTER_CREATION_OF_A_POST",
+      provider_response: { ok: true, id: "post-missing-same-shit" },
+      canonical_receipts: missingSameShit,
+      media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
+    });
+
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.blocker_code, "missing_same_shit_memory_receipt.v1");
+    assert.equal(decision.provider_call_permitted, false);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, false);
+  });
+
+  test("X owned publish with provider media id and canonical receipts can pass", async () => {
+    const nodes = await loadSocialNodes();
+    const payload = { text: "CallScore evidence update", media_media_ids: ["1455952740635586573"] };
+    const decision = await nodes.runXOwnedPublishNode({
+      graph_context: { ...approvalContext, graph_node_id: "x_owned_publish_node", platform: "x", approved_payload_hash: payloadHash(payload) },
+      payload,
+      provider_tool: "TWITTER_CREATION_OF_A_POST",
+      provider_response: { ok: true, id: "post-media-ok", url: "https://x.com/callscore/status/post-media-ok" },
+      canonical_receipts: canonicalReceipts,
+      media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
+    });
+
+    assert.equal(decision.status, "ok");
+    assert.equal(decision.provider_call_permitted, true);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
+  });
+
+  test("LinkedIn owned publish with image object and canonical receipts can pass", async () => {
+    const nodes = await loadSocialNodes();
+    const payload = {
+      author: "urn:li:person:abc123",
+      commentary: "CallScore evidence update",
+      visibility: "PUBLIC",
+      lifecycleState: "PUBLISHED",
+      images: [{ name: "callscore-proof.png", mimetype: "image/png", s3key: "composio/callscore/proof.png" }],
+    };
+    const decision = await nodes.runLinkedInOwnedPublishNode({
+      graph_context: { ...approvalContext, graph_node_id: "linkedin_owned_publish_node", platform: "linkedin", approved_payload_hash: payloadHash(payload) },
+      payload,
+      provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
+      provider_response: { ok: true, id: "li-media-ok", url: "https://linkedin.com/feed/update/li-media-ok" },
+      canonical_receipts: canonicalReceipts,
+      media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 
     assert.equal(decision.status, "ok");

@@ -4,6 +4,7 @@ import {
 } from "../operating-graph-schemas";
 import { evaluateExternalMutationRequest, finalizeExternalMutationReceipt } from "../external-mutation-guard";
 import { OperatingGraphMutationContextSchema } from "../external-mutation-schemas";
+import { evaluateCanonicalOperationalPackage } from "../../autonomy/canonical-operational-runtime";
 import type {
   ExternalMutationFamilySchema,
   ExternalMutationModeSchema,
@@ -53,6 +54,52 @@ function blankFlags(): MutationFlags {
 
 function hasOwn(input: Record<string, unknown>, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(input, key);
+}
+
+function mediaGateRequiresMedia(input: Record<string, unknown>): boolean {
+  const gate = input.media_gate;
+  if (!isRecord(gate)) return false;
+  const visualRequired = gate.visual_required === true || gate.required === true;
+  const mediaPlan = typeof gate.media_plan === "string" ? gate.media_plan.trim().toLowerCase() : "";
+  return visualRequired || ["image", "visual", "media"].includes(mediaPlan);
+}
+
+function providerPayloadHasRequiredMedia(toolSlug: string, payload: unknown): boolean {
+  if (!isRecord(payload)) return false;
+  if (toolSlug === "TWITTER_CREATION_OF_A_POST") {
+    return Array.isArray(payload.media_media_ids)
+      && payload.media_media_ids.some((id) => typeof id === "string" && /^[0-9]{1,19}$/.test(id.trim()));
+  }
+  if (toolSlug === "LINKEDIN_CREATE_LINKED_IN_POST") {
+    return Array.isArray(payload.images)
+      && payload.images.some((image) => isRecord(image)
+        && typeof image.name === "string"
+        && image.name.trim().length > 0
+        && typeof image.mimetype === "string"
+        && /^image\//.test(image.mimetype.trim())
+        && typeof image.s3key === "string"
+        && image.s3key.trim().length > 0);
+  }
+  return true;
+}
+
+function canonicalReceiptBlocker(input: Record<string, unknown>, platform: ExternalMutationPlatform): string | null {
+  if (!hasOwn(input, "canonical_receipts") && !hasOwn(input, "canonical_operational_package") && !mediaGateRequiresMedia(input)) return null;
+  const rawPackage = input.canonical_operational_package;
+  const packageRecord = isRecord(rawPackage) ? rawPackage : null;
+  const receipts = hasOwn(input, "canonical_receipts") ? input.canonical_receipts : packageRecord?.receipts;
+  if (!Array.isArray(receipts)) return "canonical_operational_package_missing";
+  try {
+    const decision = evaluateCanonicalOperationalPackage({
+      package_id: typeof packageRecord?.package_id === "string" ? packageRecord.package_id : `owned-public-${platform}`,
+      channel: typeof packageRecord?.channel === "string" ? packageRecord.channel : platform,
+      created_at: typeof packageRecord?.created_at === "string" ? packageRecord.created_at : new Date().toISOString(),
+      receipts,
+    });
+    return decision.status === "approved" ? null : (decision.blockers[0] ?? "canonical_operational_package_blocked");
+  } catch {
+    return "canonical_operational_package_invalid";
+  }
 }
 
 function stableJson(value: unknown): string {
@@ -159,6 +206,15 @@ export function runGraphOwnedMutationNode(options: GraphOwnedMutationNodeOptions
   const providerPayload = hasOwn(options.input, "provider_payload") ? options.input.provider_payload : options.input.payload;
   if (hasOwn(options.input, "provider_payload") && hasOwn(options.input, "payload") && stableJson(options.input.provider_payload) !== stableJson(options.input.payload)) {
     return blocked(options.nodeId, "approved_payload_hash_mismatch");
+  }
+
+  const canonicalBlocker = canonicalReceiptBlocker(options.input, options.platform);
+  if (canonicalBlocker) {
+    return blocked(options.nodeId, canonicalBlocker);
+  }
+
+  if (mediaGateRequiresMedia(options.input) && !providerPayloadHasRequiredMedia(providerTool, providerPayload)) {
+    return blocked(options.nodeId, "required_media_missing");
   }
 
   const preflight = evaluateExternalMutationRequest({
