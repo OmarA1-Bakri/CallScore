@@ -24,6 +24,7 @@ test("initializeTeamMemoryVault creates shared SQLite vault and artifact tree", 
     assert.match(tables, /team_memory_receipts/);
     assert.match(tables, /team_memory_learning_events/);
     assert.match(tables, /team_memory_agent_messages/);
+    assert.match(tables, /team_memory_agent_message_acks/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

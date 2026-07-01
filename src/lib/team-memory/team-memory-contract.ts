@@ -56,10 +56,22 @@ CREATE TABLE IF NOT EXISTS team_memory_agent_messages (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS team_memory_agent_message_acks (
+  ack_id TEXT PRIMARY KEY,
+  schema TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  acking_agent TEXT NOT NULL,
+  status TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  refs_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_team_memory_assets_channel ON team_memory_assets(channel);
 CREATE INDEX IF NOT EXISTS idx_team_memory_receipts_type ON team_memory_receipts(receipt_type);
 CREATE INDEX IF NOT EXISTS idx_team_memory_learning_event_type ON team_memory_learning_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_team_memory_messages_to_status ON team_memory_agent_messages(to_agent, status);
+CREATE INDEX IF NOT EXISTS idx_team_memory_message_acks_message ON team_memory_agent_message_acks(message_id);
 `;
 
 export interface BuildTeamMemoryArtifactRefInput {
