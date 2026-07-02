@@ -5,6 +5,7 @@ import { describe, test } from "node:test";
 
 const socialNodesModulePath = "../src/lib/workplane/node-wrappers/" + "social-publish-nodes";
 const legacyBlockerModulePath = "../src/lib/workplane/" + "legacy-external-mutation-blockers";
+const graphProviderAdapterModulePath = "../src/lib/workplane/node-wrappers/" + "graph-owned-provider-adapter";
 
 type PublishDecision = {
   readonly status: "ok" | "blocked" | "failed";
@@ -30,6 +31,10 @@ type LegacyBlockerModule = {
   assertLegacyCallScoreMutationBlocked: (input: Record<string, unknown>) => PublishDecision | Promise<PublishDecision>;
 };
 
+type GraphProviderAdapterModule = {
+  preflightGraphOwnedProviderCall: (nodeId: string, input: Record<string, unknown>) => { readonly ok: boolean; readonly blockerCode?: string };
+};
+
 function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, val) => {
     if (val && typeof val === "object" && !Array.isArray(val)) {
@@ -49,6 +54,10 @@ async function loadSocialNodes(): Promise<SocialPublishNodesModule> {
 
 async function loadLegacyBlockers(): Promise<LegacyBlockerModule> {
   return await import(legacyBlockerModulePath) as LegacyBlockerModule;
+}
+
+async function loadGraphProviderAdapter(): Promise<GraphProviderAdapterModule> {
+  return await import(graphProviderAdapterModulePath) as GraphProviderAdapterModule;
 }
 
 const approvalContext = {
@@ -142,6 +151,23 @@ describe("graph-only social external mutation RED contract", () => {
     assert.equal(decision.blocker_code, "required_media_missing");
     assert.equal(decision.provider_call_permitted, false);
     assert.equal(decision.mutation_flags?.provider_mutation_performed, false);
+  });
+
+  test("graph-owned provider preflight blocks before X provider call when required media is absent", async () => {
+    const adapter = await loadGraphProviderAdapter();
+    const payload = { text: "CallScore evidence update" };
+    const decision = adapter.preflightGraphOwnedProviderCall("x_owned_publish_node", {
+      graph_context: { ...approvalContext, graph_node_id: "x_owned_publish_node", platform: "x", approved_payload_hash: payloadHash(payload) },
+      provider_tool: "TWITTER_CREATION_OF_A_POST",
+      provider_payload: payload,
+      payload,
+      approved: true,
+      approval_receipt_id: "approval-social-001",
+      media_gate: { visual_required: true, media_plan: "image", content_type: "proof_post" },
+    });
+
+    assert.equal(decision.ok, false);
+    assert.equal(decision.blockerCode, "required_media_missing");
   });
 
   test("LinkedIn owned publish blocks text-only payload when media is required", async () => {

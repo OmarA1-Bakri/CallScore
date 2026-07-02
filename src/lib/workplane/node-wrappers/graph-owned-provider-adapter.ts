@@ -89,6 +89,33 @@ function validateKnownProviderPayload(toolSlug: string, payload: Record<string, 
   return null;
 }
 
+function mediaGateRequiresMedia(input: Record<string, unknown>): boolean {
+  const gate = input.media_gate;
+  if (!isRecord(gate)) return false;
+  const visualRequired = gate.visual_required === true || gate.required === true;
+  const mediaPlan = typeof gate.media_plan === "string" ? gate.media_plan.trim().toLowerCase() : "";
+  return visualRequired || ["image", "visual", "media"].includes(mediaPlan);
+}
+
+function providerPayloadHasRequiredMedia(toolSlug: string, payload: unknown): boolean {
+  if (!isRecord(payload)) return false;
+  if (toolSlug === "TWITTER_CREATION_OF_A_POST") {
+    return Array.isArray(payload.media_media_ids)
+      && payload.media_media_ids.some((id) => typeof id === "string" && /^[0-9]{1,19}$/.test(id.trim()));
+  }
+  if (toolSlug === "LINKEDIN_CREATE_LINKED_IN_POST") {
+    return Array.isArray(payload.images)
+      && payload.images.some((image) => isRecord(image)
+        && typeof image.name === "string"
+        && image.name.trim().length > 0
+        && typeof image.mimetype === "string"
+        && /^image\//.test(image.mimetype.trim())
+        && typeof image.s3key === "string"
+        && image.s3key.trim().length > 0);
+  }
+  return true;
+}
+
 function requestedActionFromMutationFamily(family: unknown): "publish_owned_public" | "public_engagement" | "send_or_outreach" | "provider_mutation" | "whop_mutation" {
   switch (family) {
     case "public_publish":
@@ -249,6 +276,9 @@ export function preflightGraphOwnedProviderCall(nodeId: string, input: Record<st
   if (!isRecord(providerPayload) || Object.keys(providerPayload).length === 0) return { ok: false, blockerCode: "payload_missing" };
   const providerPayloadBlocker = validateKnownProviderPayload(providerTool, providerPayload);
   if (providerPayloadBlocker) return { ok: false, blockerCode: providerPayloadBlocker };
+  if (mediaGateRequiresMedia(input) && !providerPayloadHasRequiredMedia(providerTool, providerPayload)) {
+    return { ok: false, blockerCode: "required_media_missing" };
+  }
   if (hasOwn(input, "payload") && stableJson(input.payload) !== stableJson(providerPayload)) {
     return { ok: false, blockerCode: "approved_payload_hash_mismatch" };
   }
