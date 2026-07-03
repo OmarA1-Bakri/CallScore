@@ -114,9 +114,36 @@ test("canonical validator passes receipt-complete agent artifact not marked publ
   assert.deepEqual(decision.blocker_codes, []);
 });
 
-test("summary marks only canonical artifacts publish eligible", () => {
+test("summary does not promote canonical artifacts without explicit public-ready intent", () => {
   const summary = summarizeCanonicalPublicArtifact({ ...receiptComplete });
   assert.equal(summary.canonical_public_artifact, true);
+  assert.equal(summary.ok, true);
+  assert.equal(summary.publish_candidate_allowed, false);
+});
+
+test("summary does not promote draft artifacts to publish candidates", () => {
+  const summary = summarizeCanonicalPublicArtifact({
+    ...receiptComplete,
+    artifact_stage: "draft",
+    status: "draft",
+  });
+  assert.equal(summary.canonical_public_artifact, true);
+  assert.equal(summary.ok, true);
+  assert.equal(summary.publish_candidate_allowed, false);
+});
+
+test("summary allows publish candidates only when explicit public-ready receipt contract passes", () => {
+  const summary = summarizeCanonicalPublicArtifact({
+    ...receiptComplete,
+    publish_candidate_ready: true,
+    editorial_angle_receipt_id: "editorial-angle-1",
+    platform_fit_receipt_id: "platform-fit-1",
+    taste_brief_receipt_id: "taste-brief-1",
+    taste_critique_receipt_id: "taste-critique-1",
+    creative_package_approval_receipt_id: "creative-package-1",
+  });
+  assert.equal(summary.canonical_public_artifact, true);
+  assert.equal(summary.ok, true);
   assert.equal(summary.publish_candidate_allowed, true);
 });
 

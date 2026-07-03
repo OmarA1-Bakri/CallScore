@@ -50,14 +50,14 @@ External runtime script, if regression proves a gap:
 `evaluateCreativeTasteGate(input: Record<string, unknown>): CreativeTasteGateDecision`
 
 Recognized fields:
-- Copy text sources: `copy`, `exact_copy`, `body`, `post`, `title`, `description`.
+- Copy text sources: `copy`, `exact_copy`, `body`, `post`, `title`, `description`, plus nested channel packet fields under `x`, `linkedin`, `reddit`, `youtube`, `drafts.x`, `drafts.linkedin`, `drafts.reddit`, and `drafts.youtube` using the same copy field names.
 - Channel/stage: `channel`, `platform`, `artifact_type`, `artifact_stage`, `stage`, `status`, `public_ready`.
 - Evidence arrays: `evidence_refs`, `shared_evidence_refs`, `data_refs`.
 - Concrete evidence ref prefixes: `creator:`, `call:`, `stat:`, `score:`, `discourse:`, `product:`, `leaderboard:`, `screenshot:`, `market:`, `video:`.
 - Concrete evidence scalar fields: `creator_id`, `call_id`, `stat_id`, `product_screenshot_path`, `leaderboard_snapshot_id`, `discourse_reference_id`.
-- Visual proof: `visual_asset.rendered_png_path` or `visual_asset.png_path`, plus 64-hex `visual_asset.png_sha256`.
-- Mock visual signals: `visual_asset.is_mock`, `visual_asset.class`, `visual_asset.asset_class`, `visual_asset.visual_class`, `visual_asset.title`, `visual_asset.source`.
-- YouTube package: `youtube_package.full_script`, `youtube_package.thumbnail.rendered_png_path|png_path`, `youtube_package.thumbnail.png_sha256`.
+- Visual proof: `visual_asset.rendered_png_path`, `visual_asset.png_path`, or `visual_asset.path`, plus 64-hex `visual_asset.png_sha256`, `visual_asset.sha256`, or `visual_asset.hash`.
+- Mock/clipped visual signals: `visual_asset.is_mock`, `visual_asset.class`, `visual_asset.asset_class`, `visual_asset.visual_class`, `visual_asset.title`, `visual_asset.source`, `visual_asset.render_status`, `visual_asset.status`, `visual_asset.alt_text`, and `visual_asset.alt`.
+- YouTube package: `youtube_package.full_script`, `youtube_package.thumbnail.rendered_png_path|png_path|path`, `youtube_package.thumbnail.png_sha256|sha256|hash`.
 - Repetition memory: `recent_phrase_memory`.
 
 Public-ready means any of:

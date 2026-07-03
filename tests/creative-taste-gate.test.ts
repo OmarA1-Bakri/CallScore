@@ -150,6 +150,45 @@ describe("creative taste gate RED contract", () => {
     assert.equal(decision.blocker_codes.includes("youtube_rendered_thumbnail_required"), true);
   });
 
+  test("inspects nested channel draft exact copy for public blockers", async () => {
+    const decision = await evaluate({
+      ...productionContext,
+      drafts: {
+        x: {
+          exact_copy: "DRAFT TEST ONLY: CallScore is an evidence layer for crypto creator calls.",
+        },
+      },
+      evidence_refs: ["creator:alpha", "call:btc-breakout-2026-07-03"],
+      visual_asset: {
+        class: "product_screenshot",
+        rendered_png_path: "/tmp/callscore-alpha-nested.png",
+        png_sha256: "3".repeat(64),
+      },
+    });
+
+    assert.equal(decision.ok, false);
+    assert.equal(decision.blocker_codes.includes("generic_product_manifesto_blocked"), true);
+    assert.equal(decision.blocker_codes.includes("public_draft_disclaimer_blocked"), true);
+  });
+
+  test("blocks clipped visual metadata for public-ready artifacts", async () => {
+    const decision = await evaluate({
+      ...productionContext,
+      copy: "A ranking without receipts is just market theatre. This week CallScore tracked creator:alpha after call:btc-breakout-2026-07-03 resolved outside the claimed window; check the product screenshot for the timestamp, entry zone, and outcome trail.",
+      evidence_refs: ["creator:alpha", "call:btc-breakout-2026-07-03", "stat:creator-alpha-window-miss"],
+      visual_asset: {
+        class: "product_screenshot",
+        render_status: "clipped",
+        alt_text: "CallScore screenshot with headline clipped at the right edge",
+        rendered_png_path: "/tmp/callscore-alpha-clipped.png",
+        png_sha256: "4".repeat(64),
+      },
+    });
+
+    assert.equal(decision.ok, false);
+    assert.equal(decision.blocker_codes.includes("mock_or_placeholder_visual_blocked"), true);
+  });
+
   test("blocks public-ready artifacts below the creative score threshold", async () => {
     const decision = await evaluate({
       ...productionContext,
@@ -166,6 +205,22 @@ describe("creative taste gate RED contract", () => {
     assert.equal(decision.ok, false);
     assert.equal(decision.score < 32, true, `expected score < 32, got ${decision.score}`);
     assert.equal(decision.blocker_codes.includes("creative_score_below_threshold"), true);
+  });
+
+  test("accepts canonical visual proof shape with path and sha256", async () => {
+    const decision = await evaluate({
+      ...productionContext,
+      copy: "A ranking without receipts is just market theatre. This week CallScore tracked creator:alpha after call:btc-breakout-2026-07-03 resolved outside the claimed window; check the product screenshot for the timestamp, entry zone, and outcome trail.",
+      evidence_refs: ["creator:alpha", "call:btc-breakout-2026-07-03", "stat:creator-alpha-window-miss"],
+      visual_asset: {
+        class: "product_screenshot",
+        path: "/tmp/callscore-alpha-canonical-proof.png",
+        sha256: "5".repeat(64),
+      },
+    });
+
+    assert.equal(decision.ok, true, decision.blocker_codes.join(","));
+    assert.deepEqual(decision.blocker_codes, []);
   });
 
   test("allows a strong evidence-backed rendered public artifact", async () => {

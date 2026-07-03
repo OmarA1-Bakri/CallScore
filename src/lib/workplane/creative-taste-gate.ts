@@ -32,11 +32,25 @@ function add(blockers: string[], code: string): void {
   if (!blockers.includes(code)) blockers.push(code);
 }
 
-function copyText(input: CreativeTasteGateInput): string {
-  return [input.copy, input.exact_copy, input.body, input.post, input.title, input.description]
+function copyFields(record: Record<string, unknown>): readonly string[] {
+  return [record.copy, record.exact_copy, record.body, record.post, record.title, record.description]
     .map(asString)
-    .filter(Boolean)
-    .join("\n");
+    .filter(Boolean);
+}
+
+function copyText(input: CreativeTasteGateInput): string {
+  const drafts = asRecord(input.drafts);
+  return [
+    ...copyFields(input),
+    ...copyFields(asRecord(input.x)),
+    ...copyFields(asRecord(input.linkedin)),
+    ...copyFields(asRecord(input.reddit)),
+    ...copyFields(asRecord(input.youtube)),
+    ...copyFields(asRecord(drafts.x)),
+    ...copyFields(asRecord(drafts.linkedin)),
+    ...copyFields(asRecord(drafts.reddit)),
+    ...copyFields(asRecord(drafts.youtube)),
+  ].join("\n");
 }
 
 function isPublicReady(input: CreativeTasteGateInput): boolean {
@@ -66,16 +80,22 @@ function visualAsset(input: CreativeTasteGateInput): Record<string, unknown> {
 }
 
 function hasRenderedProof(asset: Record<string, unknown>): boolean {
-  return Boolean(asString(asset.rendered_png_path) || asString(asset.png_path)) && /^[a-f0-9]{64}$/i.test(asString(asset.png_sha256));
+  const path = asString(asset.rendered_png_path || asset.png_path || asset.path);
+  const hash = asString(asset.png_sha256 || asset.sha256 || asset.hash);
+  return Boolean(path) && /^[a-f0-9]{64}$/i.test(hash);
 }
 
 function visualLooksMock(asset: Record<string, unknown>): boolean {
   const klass = lower(asset.class || asset.asset_class || asset.visual_class);
   const title = lower(asset.title);
   const source = lower(asset.source);
+  const renderStatus = lower(asset.render_status || asset.status);
+  const altText = lower(asset.alt_text || asset.alt);
   return asset.is_mock === true
-    || /mock|placeholder|generic_evidence_card|local_svg_preview|svg_preview/.test(klass)
-    || /mock|placeholder|local svg preview|evidence card/.test(title)
+    || /mock|placeholder|generic_evidence_card|local_svg_preview|svg_preview|clipped/.test(klass)
+    || /mock|placeholder|local svg preview|evidence card|clipped|cropped|cut off/.test(title)
+    || /mock|placeholder|clipped|cropped|cut off/.test(renderStatus)
+    || /mock|placeholder|clipped|cropped|cut off/.test(altText)
     || /packet_scaffold|local_preview/.test(source);
 }
 

@@ -120,4 +120,19 @@ describe("CallScore social content quality gate regressions", () => {
     assert.notEqual(result.code, 0, JSON.stringify(result.parsed));
     assert.ok(result.parsed.failures.includes("thought_leadership_clipped_or_mock_visual_banned"), JSON.stringify(result.parsed));
   });
+
+  test("thought leadership render_status clipped fails even when title and alt text are clean", () => {
+    const result = runGate(baseDraft({
+      visual_asset: {
+        required: true,
+        png_sha256: "f".repeat(64),
+        title: "Product-specific editorial proof render",
+        alt_text: "CallScore product screenshot showing a creator call trail with timestamp and outcome window.",
+        render_status: "clipped",
+      },
+    }));
+
+    assert.notEqual(result.code, 0, JSON.stringify(result.parsed));
+    assert.ok(result.parsed.failures.includes("thought_leadership_clipped_or_mock_visual_banned"), JSON.stringify(result.parsed));
+  });
 });

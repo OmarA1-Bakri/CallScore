@@ -106,6 +106,6 @@ export function summarizeCanonicalPublicArtifact(input: unknown): CanonicalPubli
   return {
     ...decision,
     canonical_public_artifact: artifact.canonical_public_artifact === true,
-    publish_candidate_allowed: decision.ok,
+    publish_candidate_allowed: decision.ok && artifactRequiresTasteReceipts(artifact),
   };
 }
