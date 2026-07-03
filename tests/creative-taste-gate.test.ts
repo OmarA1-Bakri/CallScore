@@ -150,6 +150,24 @@ describe("creative taste gate RED contract", () => {
     assert.equal(decision.blocker_codes.includes("youtube_rendered_thumbnail_required"), true);
   });
 
+  test("blocks public-ready artifacts below the creative score threshold", async () => {
+    const decision = await evaluate({
+      ...productionContext,
+      copy: "Check the CallScore snapshot for the latest creator ranking update.",
+      evidence_refs: ["creator:alpha"],
+      visual_asset: {
+        class: "product_screenshot",
+        title: "CallScore product screenshot showing creator Alpha ranking update",
+        rendered_png_path: "/tmp/callscore-alpha-ranking-update.png",
+        png_sha256: "2".repeat(64),
+      },
+    });
+
+    assert.equal(decision.ok, false);
+    assert.equal(decision.score < 32, true, `expected score < 32, got ${decision.score}`);
+    assert.equal(decision.blocker_codes.includes("creative_score_below_threshold"), true);
+  });
+
   test("allows a strong evidence-backed rendered public artifact", async () => {
     const decision = await evaluate({
       ...productionContext,

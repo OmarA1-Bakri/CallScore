@@ -74,10 +74,26 @@ test("canonical validator requires taste receipts for public-ready publish candi
   assert.ok(decision.blocker_codes.includes("creative_package_approval_receipt_required"));
 });
 
-test("canonical validator passes public-ready artifact with taste receipts", () => {
+test("canonical validator requires canonical editorial and platform receipts for public-ready publish candidates", () => {
   const decision = validateCanonicalPublicArtifact({
     ...receiptComplete,
     publish_candidate_ready: true,
+    taste_brief_receipt_id: "taste-brief-1",
+    taste_critique_receipt_id: "taste-critique-1",
+    creative_package_approval_receipt_id: "creative-package-1",
+  });
+
+  assert.equal(decision.ok, false);
+  assert.ok(decision.blocker_codes.includes("editorial_angle_receipt_required"));
+  assert.ok(decision.blocker_codes.includes("platform_fit_receipt_required"));
+});
+
+test("canonical validator passes public-ready artifact with canonical and taste receipts", () => {
+  const decision = validateCanonicalPublicArtifact({
+    ...receiptComplete,
+    publish_candidate_ready: true,
+    editorial_angle_receipt_id: "editorial-angle-1",
+    platform_fit_receipt_id: "platform-fit-1",
     taste_brief_receipt_id: "taste-brief-1",
     taste_critique_receipt_id: "taste-critique-1",
     creative_package_approval_receipt_id: "creative-package-1",

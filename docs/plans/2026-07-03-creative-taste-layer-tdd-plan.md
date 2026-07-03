@@ -1,276 +1,269 @@
 # CallScore Creative Taste Layer TDD Implementation Plan
 
-> **For Hermes:** Use subagent-driven-development skill to implement this plan task-by-task after three-agent plan validation passes.
+Revision: 2026-07-03 reviewer-remediation
+Status: First standalone gate slice implemented; production graph wiring remains explicitly out of scope until a separate RED/GREEN integration slice.
 
-**Goal:** Add a graph-owned creative/taste gate that prevents safe-but-drab CallScore public artifacts from being treated as production-ready.
+Goal: prevent safe-but-drab CallScore public artifacts from being treated as production-ready, without bypassing canonical 51-agent runtime or graph-owned provider gates.
 
-**Architecture:** Upgrade existing canonical owners first: CMO as Creative Director/Taste Manager, Art of War strategist as Angle Editor, opportunity research as reference scout, channel heads as writers, existing image/YouTube thumbnail agents as visual workers, reviewer head as final taste/receipt auditor. Do not add new agents in this slice. Add typed gates/receipts and RED/GREEN tests so boring, generic, clipped, or evidence-free content is blocked before public handoff.
-
-**Tech Stack:** TypeScript, Node test runner, tsx, existing Workplane/LangGraph operating graph, canonical public artifact provenance, social originality gate, content quality gate.
-
----
-
-## Task-router classification
-
-**Categories:** testing, backend, frontend/design, ml/llm workflow, documentation, observability/governance.
-
-**Complexity:** High.
-
-**Primary skills:** task-router, writing-plans, subagent-driven-development, test-driven-development, callscore-canonical-runtime, parent-verification-of-agent-output.
-
-**Supporting skills:** social-media/callscore-social-posting-discipline, marketing/callscore-marketing-engine, mlops/langgraph-workplane, media/youtube-content, github/committing-user-work-safely.
+Architecture: upgrade existing canonical owners first. CMO acts as Creative Director/Taste Manager, Art of War strategist as Angle Editor, opportunity research as reference scout, channel heads as writers, existing image/YouTube thumbnail agents as visual workers, reviewer head as final taste/receipt auditor. No new agents in this slice.
 
 ## Hard constraints
 
 - No live public/provider/social mutation.
 - No DB writes, deploys, Whop/payment/customer/provider mutation, or secrets.
 - Do not add new agents in this first slice.
+- Do not edit canonical agent mapping, souls, registry, or runtime agent-count files in this slice:
+  - `docs/ops/canonical-agent-mapping/callscore_canonical_agent_mapping.source.json`
+  - `docs/ops/callscore-channel-head-souls.yaml`
+  - `src/lib/autonomy/canonical-operational-runtime.ts`
 - Existing owners must be upgraded/remapped first.
-- New agent creation is allowed only after a failing receipt proves no existing owner can absorb the function.
+- Future new-agent creation requires a separate plan and receipt proving an existing owner cannot absorb the function.
 - No direct parent publish/provider calls.
-- Any public-ready artifact must remain graph-owned and receipt-backed.
-- Strict TDD: every behavior starts with RED, then minimal GREEN.
+- Any public-ready artifact remains graph-owned and receipt-backed.
+- Strict vertical TDD: one behavior RED, minimal GREEN, verify, then next behavior.
 - Do not stage or overwrite unrelated dirty files currently in the repo.
+- First slice is standalone gate/helper hardening only. Do not claim production graph enforcement until a separate integration test proves the actual owned-public handoff path calls the gate/helper.
 
-## Existing dirty checkout caveat
+## Task-router classification
 
-As of plan creation, the checkout already has unrelated modified/untracked files. This plan must stage only its own files unless the user explicitly approves broader staging.
+Categories: testing, backend, frontend/design, workflow governance, documentation.
+Complexity: High.
+Primary skills: task-router, writing-plans, subagent-driven-development, test-driven-development, callscore-canonical-runtime, parent-verification-of-agent-output.
+Supporting skills: social-media/callscore-social-posting-discipline, marketing/callscore-marketing-engine, mlops/langgraph-workplane, media/youtube-content, github/committing-user-work-safely.
 
-## Expected files for first slice
+## Files
 
-Create:
+Create/modify in repo:
 - `src/lib/workplane/creative-taste-gate.ts`
 - `tests/creative-taste-gate.test.ts`
-
-Modify, if tests justify it:
 - `src/lib/workplane/public-artifact-provenance.ts`
 - `tests/public-artifact-provenance.test.ts`
-- `src/lib/workplane/social-originality-gate.ts`
 - `tests/content-quality-gate-regression.test.ts`
+- `tests/gtm-complete-execution.test.ts` only if live receipt tests fail from stale/blocked receipt selection.
 
-Do not modify graph wiring until the standalone gate is green and reviewed.
+External runtime script, if regression proves a gap:
+- `/srv/agents/hermes/scripts/callscore-content-quality-gate.py`
+- Changes here are additive/fail-closed only, must include sha256 in kanban/review notes, and cannot be represented as covered by repo git alone.
 
-## Acceptance criteria for first slice
+## Exact creative gate input contract
 
-- New creative taste gate exports `evaluateCreativeTasteGate(input)`.
-- Gate returns `{ ok, blocker_codes, warnings, score, max_score, dimension_scores }`.
-- Generic product manifesto is blocked.
-- Missing concrete evidence/live seed is blocked.
-- Repeated `receipts > vibes` style scaffold is blocked when overused.
-- Mock/clipped/draft-disclaimer visual is blocked for production/public-ready visual artifacts.
-- YouTube production package without full script and rendered thumbnail proof is blocked.
-- Draft/test artifacts can still be classified as non-public without claiming production readiness.
-- Public artifact provenance can require taste receipts for public-ready owned-public artifacts without weakening existing canonical receipt requirements.
-- Relevant tests pass in parent session.
+`evaluateCreativeTasteGate(input: Record<string, unknown>): CreativeTasteGateDecision`
 
-## Verification commands
+Recognized fields:
+- Copy text sources: `copy`, `exact_copy`, `body`, `post`, `title`, `description`.
+- Channel/stage: `channel`, `platform`, `artifact_type`, `artifact_stage`, `stage`, `status`, `public_ready`.
+- Evidence arrays: `evidence_refs`, `shared_evidence_refs`, `data_refs`.
+- Concrete evidence ref prefixes: `creator:`, `call:`, `stat:`, `score:`, `discourse:`, `product:`, `leaderboard:`, `screenshot:`, `market:`, `video:`.
+- Concrete evidence scalar fields: `creator_id`, `call_id`, `stat_id`, `product_screenshot_path`, `leaderboard_snapshot_id`, `discourse_reference_id`.
+- Visual proof: `visual_asset.rendered_png_path` or `visual_asset.png_path`, plus 64-hex `visual_asset.png_sha256`.
+- Mock visual signals: `visual_asset.is_mock`, `visual_asset.class`, `visual_asset.asset_class`, `visual_asset.visual_class`, `visual_asset.title`, `visual_asset.source`.
+- YouTube package: `youtube_package.full_script`, `youtube_package.thumbnail.rendered_png_path|png_path`, `youtube_package.thumbnail.png_sha256`.
+- Repetition memory: `recent_phrase_memory`.
 
-Run after each relevant task:
+Public-ready means any of:
+- `public_ready === true`
+- `artifact_stage|stage|status` equals `production_ready`, `publish_candidate`, or `public_ready`.
 
-```bash
-node --import tsx --test tests/creative-taste-gate.test.ts
-node --import tsx --test tests/public-artifact-provenance.test.ts tests/content-quality-gate-regression.test.ts tests/social-originality-gate.test.ts
-npm run typecheck
-/usr/bin/python3 /srv/agents/hermes/scripts/callscore-canonical-agent-audit.py
+## Exact creative gate output contract
+
+```
+type CreativeTasteGateDecision = {
+  readonly ok: boolean;
+  readonly blocker_codes: readonly string[];
+  readonly warnings: readonly string[];
+  readonly score: number;
+  readonly max_score: 45;
+  readonly dimension_scores: Record<string, number>;
+}
 ```
 
-Full regression when first slice is complete:
+`dimension_scores` keys must be exactly:
+- `specificity`
+- `surprise`
+- `evidence_density`
+- `channel_native`
+- `visual_force`
+- `brand_voice`
+- `conversion_job`
+- `originality`
+- `safety`
 
-```bash
-npm test
-npm run typecheck
-```
+Score threshold:
+- `PUBLIC_READY_SCORE_THRESHOLD = 32`.
+- A public-ready artifact with no other blockers but score `< 32` must receive `creative_score_below_threshold` and `ok=false`.
+- Non-public/draft artifacts may use score diagnostically but are not promoted to public-ready.
 
----
-
-## Task 0: Plan validation and kanban setup
-
-**Objective:** Validate this plan before implementation and create a durable task chain.
-
-**Files:**
-- Create: `docs/plans/2026-07-03-creative-taste-layer-tdd-plan.md`
-
-**Steps:**
-1. Save this plan.
-2. Stage and commit only this plan file if safe.
-3. Create kanban tasks for Task 1 through Task 6 with parent dependencies.
-4. Dispatch three plan reviewers:
-   - spec/contract reviewer;
-   - implementation/code reviewer;
-   - security/risk reviewer.
-5. Do not implement until plan validation has no blocking findings, or parent-equivalent validation patches this plan.
-
-**Verification:**
-- `git diff --cached --name-only` shows only this plan file before commit.
-- `hermes kanban list --board callscore-creative-taste` shows dependency chain.
-
----
-
-## Task 1: RED tests for creative taste gate hard blockers
-
-**Objective:** Add failing tests that define the creative/taste gate behavior.
-
-**Files:**
-- Create: `tests/creative-taste-gate.test.ts`
-
-**Step 1: Write failing tests**
-
-Tests should import `evaluateCreativeTasteGate` from `../src/lib/workplane/creative-taste-gate` and assert blockers for:
-
+Blocker order is deterministic insertion order:
 1. `generic_product_manifesto_blocked`
 2. `concrete_evidence_required`
 3. `overused_receipts_vibes_scaffold`
-4. `mock_or_placeholder_visual_blocked`
-5. `visual_render_proof_required`
-6. `public_draft_disclaimer_blocked`
+4. `public_draft_disclaimer_blocked`
+5. `mock_or_placeholder_visual_blocked`
+6. `visual_render_proof_required`
 7. `youtube_full_script_required`
 8. `youtube_rendered_thumbnail_required`
+9. `creative_score_below_threshold`
 
-**Step 2: Run RED**
+## Exact public artifact provenance contract
 
-```bash
-node --import tsx --test tests/creative-taste-gate.test.ts
+`validateCanonicalPublicArtifact(input)` is a standalone helper in this slice, not proof of production graph wiring.
+
+Base required fields for canonical generated public artifact:
+- `content_source_type`: `agent_generated` or `workflow_generated`
+- `canonical_public_artifact: true`
+- `generated_by_designated_workflow: true`
+- `workflow_id`
+- `agent_id`
+- `child_run_id` or `graph_node_run_id`
+- `generation_prompt_hash`
+- `generation_model_or_agent_run_id`
+- `shared_memory_read_receipt_id`
+- `shared_memory_write_receipt_id`
+- `originality_receipt_id`
+- `same_shit_memory_receipt_id`
+- `role_voice_guidance_receipt_id`
+- `quality_gate_receipt_id`
+
+Non-public source types always block public readiness:
+- `fixture`
+- `static_example`
+- `script_generated`
+- `blocked_context_only`
+
+Visual/video/image package extras:
+- `visual_brief_receipt_id`
+- `visual_qa_receipt_id`
+- `copy_visual_coherence_receipt_id`
+
+Generated public-ready/publish-candidate extras:
+- canonical `editorial_angle_receipt_id` mapping to `editorial_angle_receipt.v1`
+- canonical `platform_fit_receipt_id` mapping to `platform_fit_receipt.v1`
+- supplemental `taste_brief_receipt_id`
+- supplemental `taste_critique_receipt_id`
+- supplemental `creative_package_approval_receipt_id`
+
+Supplemental taste receipts do not replace canonical operational package receipts. Graph handoff remains blocked if any canonical receipt is missing, rejected, blocked, or stale.
+
+## Vertical TDD task list
+
+### T0 plan validation and kanban
+- Save plan.
+- Commit only plan file.
+- Create kanban chain.
+- Dispatch spec/code/security plan reviewers.
+- If reviewers fail, patch plan before further implementation.
+
+### T1.1 generic manifesto blocker
+RED: one test expects `generic_product_manifesto_blocked`.
+GREEN: minimal regex/heuristic.
+Verify: `node --import tsx --test tests/creative-taste-gate.test.ts`.
+
+### T1.2 concrete evidence blocker
+RED: one public-ready test with no accepted evidence refs expects `concrete_evidence_required`.
+GREEN: accept concrete ref prefixes/scalar fields.
+Verify focused test.
+
+### T1.3 overused phrase blocker
+RED: one test with repeated receipts/vibes phrases expects `overused_receipts_vibes_scaffold`.
+GREEN: count phrase matches in copy plus recent memory.
+Verify focused test.
+
+### T1.4 mock visual blocker
+RED: one public-ready visual test with mock/placeholder metadata expects `mock_or_placeholder_visual_blocked`.
+GREEN: mock visual detector.
+Verify focused test.
+
+### T1.5 rendered visual proof blocker
+RED: one public-ready visual test with only SVG/source path expects `visual_render_proof_required`.
+GREEN: require rendered PNG path and sha256.
+Verify focused test.
+
+### T1.6 draft disclaimer blocker
+RED: one public-facing copy test with DRAFT/TEST ONLY/NOT FOR PUBLICATION expects `public_draft_disclaimer_blocked`.
+GREEN: disclaimer detector.
+Verify focused test.
+
+### T1.7 YouTube full script blocker
+RED: one YouTube package with outline/no full script expects `youtube_full_script_required`.
+GREEN: require `youtube_package.full_script`.
+Verify focused test.
+
+### T1.8 YouTube rendered thumbnail blocker
+RED: one YouTube package with SVG thumbnail only expects `youtube_rendered_thumbnail_required`.
+GREEN: require rendered thumbnail PNG path and sha256.
+Verify focused test.
+
+### T1.9 creative score threshold blocker
+RED: one public-ready artifact with concrete evidence/rendered visual but score `<32` expects `creative_score_below_threshold`.
+GREEN: add threshold after scoring.
+Verify focused test.
+
+### T2 strong pass case
+RED: one strong evidence-backed rendered public artifact must pass with score `>=32` and no blockers.
+GREEN: minimal scoring calibration.
+Verify focused test and typecheck.
+
+### T3.1 public-ready supplemental taste receipt blockers
+RED: public-ready generated artifact missing supplemental taste receipts expects:
+- `taste_brief_receipt_required`
+- `taste_critique_receipt_required`
+- `creative_package_approval_receipt_required`
+GREEN: add checks only for generated public-ready/publish-candidate artifacts.
+Verify provenance test.
+
+### T3.2 canonical editorial/platform receipt blockers
+RED: public-ready generated artifact with supplemental taste receipts but no canonical editorial/platform receipts expects:
+- `editorial_angle_receipt_required`
+- `platform_fit_receipt_required`
+GREEN: require both for generated public-ready/publish-candidate artifacts.
+Verify provenance test.
+
+### T3.3 visual canonical receipt preservation
+RED/GREEN: visual/video/image package tests prove existing visual receipt blockers remain intact:
+- `visual_brief_receipt_required`
+- `visual_qa_receipt_required`
+- `copy_visual_coherence_receipt_required`
+
+### T3.4 non-public artifact non-promotion
+RED/GREEN: fixture/static/script/blocked-context artifacts fail public readiness and are not silently promoted.
+
+### T4 content quality regressions
+One behavior at a time:
+- T4.1 public draft/test disclaimer.
+- T4.2 clipped/mock visual metadata.
+- T4.3 text-only thought leadership without media proof if not already covered.
+- T4.4 repeated generic evidence slogan if not already covered.
+
+If `/srv/agents/hermes/scripts/callscore-content-quality-gate.py` is modified:
+- Additive/fail-closed only.
+- Record sha256.
+- Focused regression must pass.
+
+### T5 live-receipt test helper hardening
+Only if full tests fail from stale live receipts:
+- RED: failing GTM schema probe selects blocked/single-channel receipt as full final draft.
+- GREEN: helper selects newest non-blocked, non-single-channel final draft by mtime and does not require optional X timing.
+
+### T6 parent verification
+Run:
 ```
-
-Expected: FAIL because `src/lib/workplane/creative-taste-gate.ts` does not exist.
-
----
-
-## Task 2: GREEN minimal creative taste gate implementation
-
-**Objective:** Implement only enough gate logic to pass Task 1 tests.
-
-**Files:**
-- Create: `src/lib/workplane/creative-taste-gate.ts`
-- Test: `tests/creative-taste-gate.test.ts`
-
-**Implementation requirements:**
-- Export type `CreativeTasteGateDecision`.
-- Export function `evaluateCreativeTasteGate(input: Record<string, unknown>): CreativeTasteGateDecision`.
-- Use defensive parsing only; no external calls.
-- Return deterministic blockers and score.
-- Keep no provider/public mutation path.
-
-**Step 1: Run GREEN target**
-
-```bash
-node --import tsx --test tests/creative-taste-gate.test.ts
-```
-
-Expected: PASS.
-
-**Step 2: Run typecheck**
-
-```bash
+node --import tsx --test tests/creative-taste-gate.test.ts tests/public-artifact-provenance.test.ts tests/content-quality-gate-regression.test.ts tests/social-originality-gate.test.ts tests/gtm-complete-execution.test.ts
 npm run typecheck
+npm test
+/usr/bin/python3 /srv/agents/hermes/scripts/callscore-canonical-agent-audit.py
 ```
 
-Expected: PASS or only documented unrelated pre-existing failure. If unrelated failure appears, classify clearly and run focused tests.
+Completion criteria:
+- Parent session reproduces claimed tests.
+- `npm test` passes or any unrelated failure is isolated with exact evidence.
+- Canonical audit reports exactly 51 mapped agents and status `ok`.
+- No public/provider mutation occurred.
+- Git staged files are focused.
+- Three implementation reviewers PASS, or every FAIL has a patch plus rerun evidence.
 
----
-
-## Task 3: RED/GREEN production-ready pass case
-
-**Objective:** Prove the taste gate does not block strong, evidence-backed, rendered public artifacts.
-
-**Files:**
-- Modify: `tests/creative-taste-gate.test.ts`
-- Modify: `src/lib/workplane/creative-taste-gate.ts`
-
-**RED behavior:**
-Add a test where a production-ready X or LinkedIn artifact includes:
-- concrete creator/call/stat evidence;
-- non-generic channel-native copy;
-- rendered visual proof path and sha256;
-- no draft disclaimer;
-- visual class allowed;
-- taste receipts present.
-
-Run test and verify it fails until implementation supports pass case.
-
-**GREEN behavior:**
-Update scoring/required fields so the strong artifact passes.
-
-**Verification:**
-```bash
-node --import tsx --test tests/creative-taste-gate.test.ts
-```
-
----
-
-## Task 4: RED/GREEN provenance integration for taste receipts
-
-**Objective:** Require taste receipts before public-ready owned-public artifacts can be approved, without weakening existing provenance rules.
-
-**Files:**
-- Modify: `src/lib/workplane/public-artifact-provenance.ts`
-- Modify: `tests/public-artifact-provenance.test.ts`
-
-**RED behavior:**
-Add tests proving:
-- public-ready owned-public artifact without `taste_brief_receipt_id` is blocked;
-- without `taste_critique_receipt_id` is blocked;
-- without `creative_package_approval_receipt_id` is blocked;
-- blocked/draft/context-only artifacts still fail public readiness and are not silently promoted;
-- existing visual receipt blockers remain intact.
-
-**GREEN behavior:**
-Add taste receipt checks only for generated public artifacts intended as publish candidates.
-
-**Verification:**
-```bash
-node --import tsx --test tests/public-artifact-provenance.test.ts
-node --import tsx --test tests/creative-taste-gate.test.ts
-```
-
----
-
-## Task 5: RED/GREEN content quality regression coverage
-
-**Objective:** Ensure existing quality gate regressions capture the latest drab-output failures from the tmux review package.
-
-**Files:**
-- Modify: `tests/content-quality-gate-regression.test.ts`
-- Modify only if needed: `/srv/agents/hermes/scripts/callscore-content-quality-gate.py`
-
-**RED behavior:**
-Add regression tests for:
-- draft/test disclaimer in public copy;
-- text-only thought leadership without media proof;
-- clipped/mock visual metadata if represented in packet;
-- repeated generic evidence slogan.
-
-**GREEN behavior:**
-Update the quality gate only if the tests show a real gap not already covered by `creative-taste-gate.ts`.
-
-**Verification:**
-```bash
-node --import tsx --test tests/content-quality-gate-regression.test.ts
-```
-
----
-
-## Task 6: Parent verification and three-agent review
-
-**Objective:** Verify implementation directly and with independent reviewers before claiming completion.
-
-**Files:**
-- All changed files from Tasks 1-5.
-
-**Steps:**
-1. Inspect diff directly.
-2. Run focused tests:
-   ```bash
-   node --import tsx --test tests/creative-taste-gate.test.ts tests/public-artifact-provenance.test.ts tests/content-quality-gate-regression.test.ts tests/social-originality-gate.test.ts
-   ```
-3. Run `npm run typecheck`.
-4. Run canonical agent audit.
-5. Dispatch three reviewers: spec, implementation, security/risk.
-6. Patch any blocker and rerun gates.
-7. Commit focused implementation only if verification is clean.
-
-**Completion criteria:**
-- Parent session reproduces all claimed tests.
-- Three review lanes PASS or parent-equivalent review remediates all findings.
-- No public/provider mutations occurred.
-- Git diff is focused and excludes unrelated dirty files.
+### T7 future production wiring slice, not part of this first slice
+Required before claiming operational production enforcement:
+- RED integration test proving actual owned-public graph/readiness handoff calls `evaluateCreativeTasteGate` and `validateCanonicalPublicArtifact`.
+- GREEN graph wiring through LangGraph/Workplane only.
+- Receipt evidence that blocked/drab artifacts stop before provider handoff.
+- No parent/provider direct mutation.

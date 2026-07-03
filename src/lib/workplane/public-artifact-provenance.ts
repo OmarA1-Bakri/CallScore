@@ -90,6 +90,8 @@ export function validateCanonicalPublicArtifact(input: unknown): CanonicalPublic
   }
 
   if (artifactRequiresTasteReceipts(artifact)) {
+    if (!isPresent(artifact.editorial_angle_receipt_id)) add(blockers, "editorial_angle_receipt_required");
+    if (!isPresent(artifact.platform_fit_receipt_id)) add(blockers, "platform_fit_receipt_required");
     if (!isPresent(artifact.taste_brief_receipt_id)) add(blockers, "taste_brief_receipt_required");
     if (!isPresent(artifact.taste_critique_receipt_id)) add(blockers, "taste_critique_receipt_required");
     if (!isPresent(artifact.creative_package_approval_receipt_id)) add(blockers, "creative_package_approval_receipt_required");

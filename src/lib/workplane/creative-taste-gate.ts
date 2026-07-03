@@ -10,6 +10,7 @@ export type CreativeTasteGateDecision = {
 type CreativeTasteGateInput = Record<string, unknown>;
 
 const MAX_SCORE = 45;
+const PUBLIC_READY_SCORE_THRESHOLD = 32;
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -148,6 +149,9 @@ export function evaluateCreativeTasteGate(input: CreativeTasteGateInput): Creati
 
   const scores = dimensionScores(input, blockers);
   const score = Object.values(scores).reduce((sum, value) => sum + value, 0);
+  if (publicReady && blockers.length === 0 && score < PUBLIC_READY_SCORE_THRESHOLD) {
+    add(blockers, "creative_score_below_threshold");
+  }
 
   return {
     ok: blockers.length === 0,
