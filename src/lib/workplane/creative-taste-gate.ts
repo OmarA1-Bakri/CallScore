@@ -103,7 +103,7 @@ function dimensionScores(input: CreativeTasteGateInput, blockers: readonly strin
     surprise: /\b(just another|without receipts|stop trusting|ranking without)\b/i.test(text) ? 3 : 1,
     evidence_density: Math.min(5, evidenceRefs(input).length + (hasConcreteEvidence(input) ? 2 : 0)),
     channel_native: asString(input.channel || input.platform) ? 3 : 1,
-    visual_force: hasRenderedProof(visualAsset(input)) ? 3 : 0,
+    visual_force: hasRenderedProof(visualAsset(input)) ? 4 : 0,
     brand_voice: blockers.includes("generic_product_manifesto_blocked") ? 1 : 3,
     conversion_job: /\b(check|read|compare|open|see|review)\b/i.test(text) ? 3 : 1,
     originality: blockers.includes("overused_receipts_vibes_scaffold") ? 0 : 3,

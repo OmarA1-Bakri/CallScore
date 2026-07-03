@@ -149,4 +149,25 @@ describe("creative taste gate RED contract", () => {
     assert.equal(decision.ok, false);
     assert.equal(decision.blocker_codes.includes("youtube_rendered_thumbnail_required"), true);
   });
+
+  test("allows a strong evidence-backed rendered public artifact", async () => {
+    const decision = await evaluate({
+      ...productionContext,
+      copy: "A ranking without receipts is just market theatre. This week CallScore tracked creator:alpha after call:btc-breakout-2026-07-03 resolved outside the claimed window; check the product screenshot for the timestamp, entry zone, and outcome trail.",
+      evidence_refs: ["creator:alpha", "call:btc-breakout-2026-07-03", "stat:creator-alpha-window-miss"],
+      visual_asset: {
+        class: "product_screenshot",
+        title: "CallScore product screenshot showing creator Alpha BTC call trail",
+        rendered_png_path: "/tmp/callscore-alpha-btc-call-trail.png",
+        png_sha256: "1".repeat(64),
+      },
+      taste_brief_receipt_id: "taste-brief-1",
+      taste_critique_receipt_id: "taste-critique-1",
+      creative_package_approval_receipt_id: "creative-package-1",
+    });
+
+    assert.equal(decision.ok, true);
+    assert.deepEqual(decision.blocker_codes, []);
+    assert.equal(decision.score >= 32, true, `expected score >= 32, got ${decision.score}`);
+  });
 });
