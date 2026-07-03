@@ -64,6 +64,28 @@ hermes skills list | grep -E 'callscore-system-activation|callscore-startup|call
 
 Acceptance: all required skills load; any stale CallScore-profile skill is patched before workflow execution; receipt exists under the run directory; no default-profile skills/memory/config are modified.
 
+## Required codebase-memory MCP preparation review
+
+Before tmux execution, the Orchestrator must use `mcp/codebase-memory-mcp` as structural code intelligence and write `codebase_memory_preparation_review_receipt.v1`. This is the final preparation gate to ensure the supervisor is up to speed on the live codebase, not operating from stale memory.
+
+Required coverage:
+- Project `opt-crypto-tuber-ranked` exists and index status is `ready` with at least 10,000 nodes and 20,000 edges.
+- Codebase index is refreshed via `/opt/crypto-tuber-ranked/scripts/index-codebase.py`.
+- Git hooks exist and are executable: `post-commit`, `post-merge`, `post-checkout`, `post-rewrite`.
+- Hourly cron exists: `codebase-memory re-index watch` / `callscore-index-codebase.sh`.
+- MCP architecture/schema/search evidence covers:
+  - `createCallscoreOperatingGraph` and graph-owned mutation wrapper/placeholder nodes
+  - channel-head heartbeat/task dispatch and child proof surfaces
+  - canonical agent registry/action-authority/router surfaces
+  - public artifact provenance, visual/taste gates, and canonical receipts
+  - YouTube production/publish/thumbnail/video surfaces
+  - email send/draft/gated sender surfaces
+  - safety/mutation blocker paths
+- Any graph gap or stale index blocks tmux execution until repaired.
+
+Receipt path:
+`/srv/agents/hermes/profiles/callscore/orchestrators/tmux-public-output-test/prep/latest-codebase-memory-prep-review.json`
+
 ## Hard constraints
 
 - Test/dry-run only.
@@ -265,6 +287,27 @@ hermes skills list | grep -E 'callscore-system-activation|callscore-startup|call
 
 **Acceptance:** required skills load; stale CallScore-profile skills are patched; `profile-skill-update-receipt.json` exists; no default-profile or cross-profile skills/config/memory are modified.
 
+### T0.6: Review codebase-memory MCP and graph coverage
+
+**Objective:** Refresh and query `mcp/codebase-memory-mcp` so the Orchestrator is up to speed on the operating graph, channel-head workflow surfaces, public artifact provenance, YouTube production paths, email send/draft blockers, and safety gates before tmux execution.
+
+**Files/artifacts:**
+- Create/update: `/srv/agents/hermes/profiles/callscore/orchestrators/tmux-public-output-test/prep/latest-codebase-memory-prep-review.json`
+- Include in final ZIP under `orchestrator/codebase-memory/`
+
+**Required evidence:**
+```text
+project=opt-crypto-tuber-ranked
+index_status=ready
+nodes>=10000
+edges>=20000
+hooks=post-commit,post-merge,post-checkout,post-rewrite ok
+cron=codebase-memory re-index watch present
+queries=list_projects,index_status,architecture,schema,operating_graph_search,channel_head_search,public_artifact_search,youtube_search,email_sender_search,graph_owned_mutation_search,code_snippets
+```
+
+**Acceptance:** receipt exists; all required surfaces are covered; stale/missing graph blocks execution; no provider/public/social/send/DB/deploy mutation occurs.
+
 ### T1: Create Hermes-owned tmux control plane
 
 **Objective:** Create the durable run directory, tmux session manifest, run manifest, and lane queue.
@@ -415,7 +458,7 @@ tailscale file cp --name callscore-tmux-public-output-test-<run-id>.zip \
 
 ### T13: Final report
 
-**Objective:** Report only the package path, Windows target path, SHA256, receipt path, profile/skill update receipt path, and any blocked media/video lanes.
+**Objective:** Report only the package path, Windows target path, SHA256, receipt path, profile/skill update receipt path, codebase-memory preparation review receipt path, and any blocked media/video lanes.
 
 **Acceptance:** terse final response; no “ready” claim without actual artifacts and transfer receipt.
 
