@@ -219,6 +219,36 @@ export function isCanonicalChannelHead(agentId: string): boolean {
 
 const REVIEW_CHAIN = ["callscore-reviewer-head", "callscore-trust-head", "callscore-compliance-linter-head", "callscore-safety-head"];
 
+export const AGENT_SKILL_FRAMEWORK_ASSIGNMENTS: Record<string, string[]> = {
+  "callscore-youtube-script-agent": ["callscore-youtube-retention-script", "callscore-ai-video-prompting"],
+  "callscore-youtube-packaging-agent": ["callscore-youtube-packaging"],
+  "callscore-youtube-thumbnail-agent": ["callscore-youtube-thumbnail", "callscore-social-proof-image"],
+  "callscore-youtube-publishing-agent": ["callscore-ai-video-prompting"],
+  "callscore-youtube-commenting-agent": ["callscore-community-comment-reply"],
+  "callscore-x-posting-agent": ["callscore-x-post-thread-comment", "callscore-social-hook-engine", "callscore-copy-humanizer"],
+  "callscore-x-commenting-agent": ["callscore-community-comment-reply"],
+  "callscore-x-image-agent": ["callscore-social-proof-image"],
+  "callscore-linkedin-posting-agent": [
+    "callscore-linkedin-thought-leadership",
+    "callscore-linkedin-carousel-document",
+    "callscore-social-hook-engine",
+    "callscore-copy-humanizer",
+  ],
+  "callscore-linkedin-commenting-agent": ["callscore-community-comment-reply"],
+  "callscore-linkedin-image-agent": ["callscore-social-proof-image", "callscore-linkedin-carousel-document"],
+  "callscore-reddit-posting-agent": ["callscore-community-comment-reply", "callscore-copy-humanizer"],
+  "callscore-reddit-commenting-agent": ["callscore-community-comment-reply"],
+  "callscore-reddit-image-agent": ["callscore-social-proof-image"],
+  "callscore-community-drops-head": ["callscore-community-comment-reply", "callscore-social-proof-image"],
+  "callscore-whop-commerce-head": ["callscore-social-proof-image"],
+  "callscore-email-partnership-drafts-head": ["callscore-cold-email-partnership", "callscore-copy-humanizer"],
+  "callscore-cmo-head": ["callscore-social-hook-engine", "callscore-copy-humanizer"],
+};
+
+function withSkillFrameworks(agentId: string, skills: string[]): string[] {
+  return Array.from(new Set([...skills, ...(AGENT_SKILL_FRAMEWORK_ASSIGNMENTS[agentId] ?? [])]));
+}
+
 const SOCIAL_CHILD_TOOLS = [
   ...COMMON_DRAFT_DELEGABLE_TOOLS,
   "platform-constraint-checker",
@@ -247,7 +277,7 @@ function channelContract(input: {
     current_skills_observed: [],
     current_delegable_tools_observed: [],
     required_tools: input.required_tools,
-    required_skills: input.required_skills,
+    required_skills: withSkillFrameworks(input.agent_id, input.required_skills),
     delegable_tools_to_children: input.delegable_tools_to_children ?? [...COMMON_DRAFT_DELEGABLE_TOOLS],
     non_delegable_tools: [...RESTRICTED_TOOLS, "unrestricted-shell-mutation"],
     may_spawn_child_agents: true,
@@ -444,7 +474,7 @@ function defaultContractFor(agent: MappingConfig["agents"][number]): AgentToolbo
     current_skills_observed: [],
     current_delegable_tools_observed: [],
     required_tools,
-    required_skills,
+    required_skills: withSkillFrameworks(agent.agent_id, required_skills),
     delegable_tools_to_children: [],
     non_delegable_tools: [...RESTRICTED_TOOLS],
     may_spawn_child_agents: false,
