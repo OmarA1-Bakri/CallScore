@@ -203,29 +203,65 @@ RED: one strong evidence-backed rendered public artifact must pass with score `>
 GREEN: minimal scoring calibration.
 Verify focused test and typecheck.
 
-### T3.1 public-ready supplemental taste receipt blockers
-RED: public-ready generated artifact missing supplemental taste receipts expects:
-- `taste_brief_receipt_required`
-- `taste_critique_receipt_required`
-- `creative_package_approval_receipt_required`
-GREEN: add checks only for generated public-ready/publish-candidate artifacts.
+### T3.1 supplemental taste brief receipt blocker
+RED: public-ready generated artifact missing only `taste_brief_receipt_id` expects `taste_brief_receipt_required`.
+GREEN: add the `taste_brief_receipt_id` check only for generated public-ready/publish-candidate artifacts.
 Verify provenance test.
 
-### T3.2 canonical editorial/platform receipt blockers
-RED: public-ready generated artifact with supplemental taste receipts but no canonical editorial/platform receipts expects:
-- `editorial_angle_receipt_required`
-- `platform_fit_receipt_required`
-GREEN: require both for generated public-ready/publish-candidate artifacts.
+### T3.2 supplemental taste critique receipt blocker
+RED: public-ready generated artifact with `taste_brief_receipt_id` but missing `taste_critique_receipt_id` expects `taste_critique_receipt_required`.
+GREEN: add the `taste_critique_receipt_id` check only for generated public-ready/publish-candidate artifacts.
 Verify provenance test.
 
-### T3.3 visual canonical receipt preservation
-RED/GREEN: visual/video/image package tests prove existing visual receipt blockers remain intact:
-- `visual_brief_receipt_required`
-- `visual_qa_receipt_required`
-- `copy_visual_coherence_receipt_required`
+### T3.3 supplemental creative package approval receipt blocker
+RED: public-ready generated artifact with taste brief/critique receipts but missing `creative_package_approval_receipt_id` expects `creative_package_approval_receipt_required`.
+GREEN: add the `creative_package_approval_receipt_id` check only for generated public-ready/publish-candidate artifacts.
+Verify provenance test.
 
-### T3.4 non-public artifact non-promotion
-RED/GREEN: fixture/static/script/blocked-context artifacts fail public readiness and are not silently promoted.
+### T3.4 canonical editorial angle receipt blocker
+RED: public-ready generated artifact with all supplemental taste receipts but missing `editorial_angle_receipt_id` expects `editorial_angle_receipt_required`.
+GREEN: require `editorial_angle_receipt_id` for generated public-ready/publish-candidate artifacts.
+Verify provenance test.
+
+### T3.5 canonical platform fit receipt blocker
+RED: public-ready generated artifact with all supplemental taste receipts and editorial angle receipt but missing `platform_fit_receipt_id` expects `platform_fit_receipt_required`.
+GREEN: require `platform_fit_receipt_id` for generated public-ready/publish-candidate artifacts.
+Verify provenance test.
+
+### T3.6 visual brief receipt preservation
+RED: visual/video/image artifact missing only `visual_brief_receipt_id` expects `visual_brief_receipt_required`.
+GREEN: preserve/add the `visual_brief_receipt_id` check for visual/video/image packages.
+Verify provenance test.
+
+### T3.7 visual QA receipt preservation
+RED: visual/video/image artifact with visual brief receipt but missing `visual_qa_receipt_id` expects `visual_qa_receipt_required`.
+GREEN: preserve/add the `visual_qa_receipt_id` check for visual/video/image packages.
+Verify provenance test.
+
+### T3.8 copy/visual coherence receipt preservation
+RED: visual/video/image artifact with visual brief and visual QA receipts but missing `copy_visual_coherence_receipt_id` expects `copy_visual_coherence_receipt_required`.
+GREEN: preserve/add the `copy_visual_coherence_receipt_id` check for visual/video/image packages.
+Verify provenance test.
+
+### T3.9 fixture source-type non-public blocker
+RED: artifact with `content_source_type: "fixture"` expects `canonical_agent_generated_artifact_required` and cannot be publish eligible.
+GREEN: preserve/add fixture as non-public source type.
+Verify provenance test.
+
+### T3.10 static example source-type non-public blocker
+RED: artifact with `content_source_type: "static_example"` expects `canonical_agent_generated_artifact_required` and cannot be publish eligible.
+GREEN: preserve/add static example as non-public source type.
+Verify provenance test.
+
+### T3.11 script-generated source-type non-public blocker
+RED: artifact with `content_source_type: "script_generated"` expects `canonical_agent_generated_artifact_required` and cannot be publish eligible.
+GREEN: preserve/add script-generated as non-public source type.
+Verify provenance test.
+
+### T3.12 blocked-context source-type non-public blocker
+RED: artifact with `content_source_type: "blocked_context_only"` expects `canonical_agent_generated_artifact_required` and cannot be publish eligible.
+GREEN: preserve/add blocked-context as non-public source type.
+Verify provenance test.
 
 ### T4 content quality regressions
 One behavior at a time:
