@@ -32,6 +32,9 @@ test("canonical runtime package requires every operational receipt before handof
   assert.equal(missing.status, "blocked");
   assert.ok(missing.blockers.includes("missing_platform_fit_receipt.v1"));
   assert.ok(missing.blockers.includes("missing_visual_qa_receipt.v1"));
+  assert.ok(missing.blockers.includes("missing_callscore.task_router_receipt.v1"));
+  assert.ok(missing.blockers.includes("missing_callscore.tool_inheritance_receipt.v1"));
+  assert.ok(missing.blockers.includes("missing_callscore.media_artifact_receipt.v1"));
 
   const complete = evaluateCanonicalOperationalPackage({
     package_id: "pkg-complete",

@@ -9,6 +9,9 @@ export const REQUIRED_CANONICAL_RECEIPT_TYPES = [
   "visual_qa_receipt.v1",
   "copy_visual_coherence_receipt.v1",
   "same_shit_memory_receipt.v1",
+  "callscore.task_router_receipt.v1",
+  "callscore.tool_inheritance_receipt.v1",
+  "callscore.media_artifact_receipt.v1",
 ] as const;
 
 export const REQUIRED_YOUTUBE_RECEIPT_TYPES = [

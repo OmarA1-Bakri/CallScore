@@ -81,6 +81,9 @@ const canonicalReceipts = [
   "visual_qa_receipt.v1",
   "copy_visual_coherence_receipt.v1",
   "same_shit_memory_receipt.v1",
+  "callscore.task_router_receipt.v1",
+  "callscore.tool_inheritance_receipt.v1",
+  "callscore.media_artifact_receipt.v1",
 ].map((schema) => ({
   schema,
   receipt_id: `${schema}:test`,
