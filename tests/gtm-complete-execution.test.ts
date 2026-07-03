@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync, unlinkSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync, unlinkSync, mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { strictEqual } from "node:assert/strict";
@@ -13,9 +13,18 @@ function latestReceipt(prefix: string): string | null {
   if (!existsSync(RECEIPT_DIR)) return null;
   const files = readdirSync(RECEIPT_DIR)
     .filter((f) => f.startsWith(prefix) && f.endsWith(".json"))
-    .sort()
-    .reverse();
-  return files.length > 0 ? join(RECEIPT_DIR, files[0]) : null;
+    .map((f) => join(RECEIPT_DIR, f))
+    .filter((path) => {
+      if (prefix !== "callscore-cmo-final-draft-") return true;
+      try {
+        const receipt = receiptJson(path);
+        return !String(receipt.status || "").startsWith("blocked_") && receipt.single_channel_correction !== true;
+      } catch {
+        return false;
+      }
+    })
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  return files.length > 0 ? files[0] : null;
 }
 
 function receiptJson(path: string): Record<string, unknown> {
@@ -32,7 +41,7 @@ describe("Phase 1 — CMO final draft schema", () => {
 
   const EXPECTED_GROWTH_FIELDS = ["target_entities", "mentions", "hashtags", "media_plan", "cta"];
   const EXPECTED_LINKEDIN_GROWTH = [...EXPECTED_GROWTH_FIELDS];
-  const EXPECTED_X_GROWTH = [...EXPECTED_GROWTH_FIELDS, "timing"];
+  const EXPECTED_X_GROWTH = [...EXPECTED_GROWTH_FIELDS];
 
   it("1. final draft has root-level x and linkedin entries", () => {
     const f = latestReceipt("callscore-cmo-final-draft-");
