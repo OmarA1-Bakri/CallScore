@@ -15,14 +15,14 @@ Hard constraints:
 - Default concurrency 1; hard cap 3 cognitive channel lanes.
 
 Canonical email-agent identities for ZohoMail / Composio:
-- community@call-score.com — primary/community mailbox; use for community/inbound/general identity, not outbound human outreach.
-- noreply@call-score.com — no-reply/system identity; never use for human outreach.
+- community@call-score.com — newsletters, community broadcasts, and broad community communications; not outbound human outreach.
+- noreply@call-score.com — customer service/system no-reply identity; not outbound human outreach.
 - sarah.collins@call-score.com — canonical human outreach sender alias.
 - zoe.miller@call-score.com — canonical human outreach sender alias.
 
 Outreach sender rule:
 - The two human outreach emails MUST be the aliases `sarah.collins@call-score.com` and `zoe.miller@call-score.com`.
-- The email workflow must not use `community@call-score.com` or `noreply@call-score.com` for outreach/persona sends or outreach drafts.
+- The email workflow must not use `community@call-score.com` or `noreply@call-score.com` for outreach/persona sends or outreach drafts; community is reserved for newsletters/community broadcasts, and noreply is reserved for customer-service/system no-reply flows.
 - In this no-send test run, generated outreach drafts must show one of the two alias senders above in `fromAddress` and must write a no-send receipt.
 
 Composio evidence:
