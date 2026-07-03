@@ -31,6 +31,38 @@ Supporting skills:
 - `commerce/art-of-war-operations`
 - `devops/workplane-status`
 - `mlops/langgraph-workplane`
+- `orchestration/callscore-system-activation` (the canonical CallScore activation skill; treat "callscore-activation" wording as this skill)
+- `mcp/codebase-memory-mcp`
+- `devops/workplane-diagnostics`
+- `mlops/hmm-markov-creator-trajectory`
+- `software-development/inspect-before-acting-on-behalf`
+- `software-development/parent-verification-of-agent-output`
+- `github/github-operations`
+- `github/committing-user-work-safely`
+- `autonomous-ai-agents/hermes-agent` for CallScore profile/skill/profile-config work
+
+## Required CallScore profile and skill updates before execution
+
+Before any tmux workflow execution, the Orchestrator must verify and, if stale, update the active CallScore profile and skill bundle. This is a planned pre-run gate, not optional documentation.
+
+Required checks/updates:
+- Active Hermes profile must be `callscore`; do not write to another profile unless Omar explicitly directs it.
+- CallScore profile must have the startup/activation skills available and loadable from `/srv/agents/hermes/profiles/callscore/skills/`.
+- `orchestration/callscore-system-activation` must mention/cover this tmux channel-head public-output test pattern, including public-output artifacts, tmux transcripts, child-subagent proof, safety scans, and Taildrop packaging. If it does not, patch that skill in the CallScore profile before execution.
+- `orchestration/callscore-startup` must mention/cover sequential tmux workflow testing and public-output package requirements. If it does not, patch that skill in the CallScore profile before execution.
+- `callscore-canonical-runtime` must mention/cover visible public-output artifact reruns and the hardcoded-public-output autonomy contract. If stale, patch it before execution.
+- Required execution skills must be present and loadable: `task-router`, `orchestration/hermes-orchestrator`, `callscore-autopilot`, `callscore-sentinel`, `devops/workplane-status`, `devops/workplane-diagnostics`, `mlops/langgraph-workplane`, `mlops/hmm-markov-creator-trajectory`, `commerce/art-of-war-operations`, `social-media/callscore-social-posting-discipline`, `media/youtube-content`, `marketing/callscore-marketing-engine`, `software-development/persistent-background-orchestration`, `software-development/inspect-before-acting-on-behalf`, `software-development/parent-verification-of-agent-output`, `research/last30days`, `devops/tailscale-windows-download-zip`, `mcp/codebase-memory-mcp`, `autonomous-ai-agents/hermes-agent`.
+- Write `profile-skill-update-receipt.json` with which skills were checked, which were patched, and a no-cross-profile-write assertion.
+
+Verification commands for this gate:
+
+```bash
+hermes profile show callscore
+hermes config path
+hermes skills list | grep -E 'callscore-system-activation|callscore-startup|callscore-canonical-runtime|persistent-background-orchestration|tailscale-windows-download-zip'
+```
+
+Acceptance: all required skills load; any stale CallScore-profile skill is patched before workflow execution; receipt exists under the run directory; no default-profile skills/memory/config are modified.
 
 ## Hard constraints
 
@@ -216,6 +248,23 @@ command -v tmux
 
 **Acceptance:** clean or explicitly recorded dirty state; canonical audit passes with 51 agents; tmux available.
 
+### T0.5: Update CallScore profile and activation/required skills
+
+**Objective:** Verify and update the active CallScore profile, `orchestration/callscore-system-activation`, `orchestration/callscore-startup`, `callscore-canonical-runtime`, and all required execution skills so this tmux public-output test pattern is durable before execution.
+
+**Files/artifacts:**
+- Create: `/srv/agents/hermes/profiles/callscore/orchestrators/tmux-public-output-test/runs/<run-id>/profile/profile-skill-update-receipt.json`
+- Modify if stale: CallScore-profile skill files only under `/srv/agents/hermes/profiles/callscore/skills/`
+
+**Commands:**
+```bash
+hermes profile show callscore
+hermes config path
+hermes skills list | grep -E 'callscore-system-activation|callscore-startup|callscore-canonical-runtime|persistent-background-orchestration|tailscale-windows-download-zip'
+```
+
+**Acceptance:** required skills load; stale CallScore-profile skills are patched; `profile-skill-update-receipt.json` exists; no default-profile or cross-profile skills/config/memory are modified.
+
 ### T1: Create Hermes-owned tmux control plane
 
 **Objective:** Create the durable run directory, tmux session manifest, run manifest, and lane queue.
@@ -366,7 +415,7 @@ tailscale file cp --name callscore-tmux-public-output-test-<run-id>.zip \
 
 ### T13: Final report
 
-**Objective:** Report only the package path, Windows target path, SHA256, receipt path, and any blocked media/video lanes.
+**Objective:** Report only the package path, Windows target path, SHA256, receipt path, profile/skill update receipt path, and any blocked media/video lanes.
 
 **Acceptance:** terse final response; no “ready” claim without actual artifacts and transfer receipt.
 
