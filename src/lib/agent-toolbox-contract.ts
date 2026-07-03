@@ -1,5 +1,16 @@
 import { readFileSync } from "node:fs";
 import yaml from "js-yaml";
+import {
+  CANONICAL_DESIGN_BUNDLE_PATH,
+  FRONTEND_DESIGN_SKILL_PATH,
+  REQUIRED_DESIGN_RECEIPTS,
+  REQUIRED_DESIGN_SKILLS,
+  type BrandingReceiptV2,
+  type DesignBundleReferenceReceipt,
+  type WebsiteDesignAlignmentReceipt,
+  validateBrandLockupOcclusionCheck,
+  validateMediaDesignCompliance,
+} from "./design-bundle-enforcement";
 
 export const EXECUTION_MODES = ["read_only_verify", "draft_ready", "live_owned_public", "post_publish_closeout"] as const;
 export type ExecutionMode = (typeof EXECUTION_MODES)[number];
@@ -220,29 +231,43 @@ export function isCanonicalChannelHead(agentId: string): boolean {
 const REVIEW_CHAIN = ["callscore-reviewer-head", "callscore-trust-head", "callscore-compliance-linter-head", "callscore-safety-head"];
 
 export const AGENT_SKILL_FRAMEWORK_ASSIGNMENTS: Record<string, string[]> = {
-  "callscore-youtube-script-agent": ["callscore-youtube-retention-script", "callscore-ai-video-prompting"],
-  "callscore-youtube-packaging-agent": ["callscore-youtube-packaging"],
-  "callscore-youtube-thumbnail-agent": ["callscore-youtube-thumbnail", "callscore-social-proof-image"],
-  "callscore-youtube-publishing-agent": ["callscore-ai-video-prompting"],
-  "callscore-youtube-commenting-agent": ["callscore-community-comment-reply"],
-  "callscore-x-posting-agent": ["callscore-x-post-thread-comment", "callscore-social-hook-engine", "callscore-copy-humanizer"],
+  "callscore-youtube-script-agent": ["frontend-design", "callscore-youtube-retention-script", "callscore-ai-video-prompting"],
+  "callscore-youtube-packaging-agent": ["frontend-design", "callscore-youtube-packaging"],
+  "callscore-youtube-thumbnail-agent": ["frontend-design", "callscore-youtube-thumbnail", "callscore-social-proof-image"],
+  "callscore-youtube-publishing-agent": ["frontend-design", "callscore-ai-video-prompting"],
+  "callscore-youtube-commenting-agent": ["frontend-design", "callscore-community-comment-reply"],
+  "callscore-x-posting-agent": ["frontend-design", "callscore-x-post-thread-comment", "callscore-social-hook-engine", "callscore-copy-humanizer"],
   "callscore-x-commenting-agent": ["callscore-community-comment-reply"],
-  "callscore-x-image-agent": ["callscore-social-proof-image"],
+  "callscore-x-image-agent": ["frontend-design", "callscore-social-proof-image"],
   "callscore-linkedin-posting-agent": [
+    "frontend-design",
     "callscore-linkedin-thought-leadership",
     "callscore-linkedin-carousel-document",
     "callscore-social-hook-engine",
     "callscore-copy-humanizer",
   ],
   "callscore-linkedin-commenting-agent": ["callscore-community-comment-reply"],
-  "callscore-linkedin-image-agent": ["callscore-social-proof-image", "callscore-linkedin-carousel-document"],
-  "callscore-reddit-posting-agent": ["callscore-community-comment-reply", "callscore-copy-humanizer"],
+  "callscore-linkedin-image-agent": ["frontend-design", "callscore-social-proof-image", "callscore-linkedin-carousel-document"],
+  "callscore-reddit-posting-agent": ["frontend-design", "callscore-community-comment-reply", "callscore-copy-humanizer"],
   "callscore-reddit-commenting-agent": ["callscore-community-comment-reply"],
-  "callscore-reddit-image-agent": ["callscore-social-proof-image"],
-  "callscore-community-drops-head": ["callscore-community-comment-reply", "callscore-social-proof-image"],
-  "callscore-whop-commerce-head": ["callscore-social-proof-image"],
-  "callscore-email-partnership-drafts-head": ["callscore-cold-email-partnership", "callscore-copy-humanizer"],
-  "callscore-cmo-head": ["callscore-social-hook-engine", "callscore-copy-humanizer"],
+  "callscore-reddit-image-agent": ["frontend-design", "callscore-social-proof-image"],
+  "callscore-community-drops-head": ["frontend-design", "callscore-community-comment-reply", "callscore-social-proof-image"],
+  "callscore-whop-commerce-head": ["frontend-design", "callscore-social-proof-image"],
+  "callscore-email-partnership-drafts-head": ["frontend-design", "callscore-cold-email-partnership", "callscore-copy-humanizer"],
+  "callscore-cmo-head": ["frontend-design", "callscore-social-hook-engine", "callscore-copy-humanizer"],
+  "callscore-x-head": ["frontend-design"],
+  "callscore-linkedin-head": ["frontend-design"],
+  "callscore-reddit-head": ["frontend-design"],
+  "callscore-youtube-head": ["frontend-design"],
+  "callscore-youtube-analytics-agent": ["frontend-design"],
+  "callscore-reviewer-head": ["frontend-design"],
+  "callscore-trust-head": ["frontend-design"],
+  "callscore-compliance-linter-head": ["frontend-design"],
+  "callscore-safety-head": ["frontend-design"],
+  "callscore-artofwar-strategist": ["frontend-design"],
+  "callscore-markov-trajectory-head": ["frontend-design"],
+  "callscore-ml-verifier-head": ["frontend-design"],
+  "callscore-orchestrator-head": ["frontend-design"],
 };
 
 function withSkillFrameworks(agentId: string, skills: string[]): string[] {
@@ -838,6 +863,8 @@ const COMMON_IMAGE_MEDIA_RECEIPTS = [
   "visual_brief_receipt.v1",
   "visual_qa_receipt.v1",
   "copy_visual_coherence_receipt.v1",
+  "callscore.design_bundle_reference_receipt.v1",
+  "callscore.website_design_alignment_receipt.v1",
   "callscore.media_artifact_receipt.v1",
 ];
 
@@ -1086,6 +1113,11 @@ export interface MediaTaskEnvelopeInput {
   readonly visual_brief_ref: string;
   readonly platform_constraints: { readonly dimensions: string; readonly max_file_size: string; readonly format: string };
   readonly required_tools: string[];
+  readonly design_bundle_path?: string;
+  readonly frontend_design_skill_path?: string;
+  readonly required_skills?: string[];
+  readonly required_receipts?: string[];
+  readonly content_reference_mode?: "paths_ids_hashes_only" | string;
   readonly output_schema: "callscore.media_artifact.v1" | string;
   readonly execution_mode: "read_only_verify" | "draft_ready" | "live_owned_public";
 }
@@ -1094,6 +1126,11 @@ export interface MediaTaskEnvelope extends MediaTaskEnvelopeInput {
   readonly schema: "callscore.media_task_envelope.v1";
   readonly granted_tools: string[];
   readonly forbidden_tools: string[];
+  readonly design_bundle_path: string;
+  readonly frontend_design_skill_path: string;
+  readonly required_skills: string[];
+  readonly required_receipts: string[];
+  readonly content_reference_mode: "paths_ids_hashes_only" | string;
   readonly mutation_allowed: false;
 }
 
@@ -1103,6 +1140,11 @@ export function buildMediaTaskEnvelope(input: MediaTaskEnvelopeInput): MediaTask
     ...input,
     granted_tools: [],
     forbidden_tools: [...RESTRICTED_TOOLS, ...MEDIA_TOOL_CLASSES.forbidden_parent_harness_tools],
+    design_bundle_path: input.design_bundle_path ?? CANONICAL_DESIGN_BUNDLE_PATH,
+    frontend_design_skill_path: input.frontend_design_skill_path ?? FRONTEND_DESIGN_SKILL_PATH,
+    required_skills: Array.from(new Set([...(input.required_skills ?? []), ...REQUIRED_DESIGN_SKILLS])),
+    required_receipts: Array.from(new Set([...(input.required_receipts ?? []), ...REQUIRED_DESIGN_RECEIPTS, "visual_qa_receipt.v1", "copy_visual_coherence_receipt.v1"])),
+    content_reference_mode: input.content_reference_mode ?? "paths_ids_hashes_only",
     mutation_allowed: false,
   };
 }
@@ -1134,6 +1176,9 @@ export interface MediaToolInheritanceReceipt {
   readonly execution_mode: "read_only_verify" | "draft_ready" | "live_owned_public";
   readonly may_write_artifact_files: boolean;
   readonly provider_public_mutation_allowed: false;
+  readonly frontend_design_granted: boolean;
+  readonly design_bundle_read_access_granted: boolean;
+  readonly parent_harness_render_tools_granted: false;
   readonly created_at_utc: string;
   readonly status: "granted" | "blocked";
 }
@@ -1157,13 +1202,16 @@ export function buildMediaToolInheritanceReceipt(input: MediaToolInheritanceRece
     execution_mode: input.execution_mode,
     may_write_artifact_files: Boolean(toolbox?.may_render_files),
     provider_public_mutation_allowed: false,
+    frontend_design_granted: true,
+    design_bundle_read_access_granted: true,
+    parent_harness_render_tools_granted: false,
     created_at_utc: new Date().toISOString(),
     status: denied.length === 0 && Boolean(toolbox) ? "granted" : "blocked",
   };
 }
 
 export interface MediaArtifactReceipt {
-  readonly schema: "callscore.media_artifact_receipt.v1";
+  readonly schema: "callscore.media_artifact_receipt.v1" | "callscore.media_artifact_receipt.v2";
   readonly artifact_id: string;
   readonly media_artifact_id: string;
   readonly created_by_agent_id: string;
@@ -1189,6 +1237,10 @@ export interface MediaArtifactReceipt {
   readonly alt_text: string;
   readonly visual_qa_receipt_id: string | null;
   readonly copy_visual_coherence_receipt_id: string | null;
+  readonly design_bundle_reference_receipt?: DesignBundleReferenceReceipt | null;
+  readonly website_design_alignment_receipt?: WebsiteDesignAlignmentReceipt | null;
+  readonly branding_receipt?: BrandingReceiptV2 | null;
+  readonly brand_lockup_occlusion_check?: unknown;
   readonly visual_proof_object_present?: boolean;
   readonly youtube_cluster_receipts?: string[];
   readonly hardcoded_runtime_media: boolean;
@@ -1200,6 +1252,9 @@ export interface MediaValidationResult {
   readonly canonical_media_valid: boolean;
   readonly publish_candidate_ready: boolean;
   readonly failure_reasons: string[];
+  readonly status: "passed" | "blocked_brand_lockup_missing" | "blocked_incomplete_canonical_design_pack" | "failed";
+  readonly normalized_status: "passed" | "blocked";
+  readonly status_reason: string | null;
 }
 
 const MEDIA_OWNER_BY_CHANNEL_TYPE: Record<string, string[]> = {
@@ -1278,6 +1333,10 @@ export function validateCanonicalMediaArtifact(artifact: Partial<MediaArtifactRe
   if (!artifact.source_visual_brief_id) failures.push("missing_visual_brief_receipt");
   if (!artifact.visual_qa_receipt_id) failures.push("missing_visual_qa_receipt");
   if (artifact.source_copy_artifact_id && !artifact.copy_visual_coherence_receipt_id) failures.push("missing_copy_visual_coherence_receipt");
+  for (const failure of validateMediaDesignCompliance(artifact)) failures.push(failure);
+  if (artifact.schema === "callscore.media_artifact_receipt.v2") {
+    for (const failure of validateBrandLockupOcclusionCheck(artifact.brand_lockup_occlusion_check as never)) failures.push(failure);
+  }
   if (!artifact.output_paths || artifact.output_paths.length === 0) failures.push("missing_output_file_path");
   if (!artifact.sha256 || !/^[a-f0-9]{64}$/i.test(artifact.sha256)) failures.push("missing_sha256");
   if (!artifact.mime_type) failures.push("missing_mime_type");
@@ -1298,9 +1357,27 @@ export function validateCanonicalMediaArtifact(artifact: Partial<MediaArtifactRe
     const missing = REQUIRED_YOUTUBE_MEDIA_CLUSTER_RECEIPTS.filter((receipt) => !have.has(receipt));
     if (missing.length > 0) failures.push("youtube_cluster_media_receipts_incomplete");
   }
+  const uniqueFailures = Array.from(new Set(failures));
+  const status = uniqueFailures.length === 0
+    ? "passed"
+    : uniqueFailures.some((failure) => failure.includes("design_bundle") || failure.includes("design_md") || failure.includes("canonical_logo"))
+      ? "blocked_incomplete_canonical_design_pack"
+      : uniqueFailures.some((failure) => failure.includes("brand") || failure.includes("logo") || failure.includes("wordmark"))
+        ? "blocked_brand_lockup_missing"
+        : "failed";
+  const statusReason = status === "passed"
+    ? null
+    : status === "blocked_incomplete_canonical_design_pack"
+      ? "DESIGN.md_and_logo_missing_from_design_pack"
+      : status === "blocked_brand_lockup_missing"
+        ? "public_media_requires_canonical_design_pack_lockup"
+        : uniqueFailures[0] ?? "canonical_media_validation_failed";
   return {
-    canonical_media_valid: failures.length === 0,
-    publish_candidate_ready: failures.length === 0,
-    failure_reasons: failures,
+    canonical_media_valid: uniqueFailures.length === 0,
+    publish_candidate_ready: uniqueFailures.length === 0,
+    failure_reasons: uniqueFailures,
+    status,
+    normalized_status: uniqueFailures.length === 0 ? "passed" : "blocked",
+    status_reason: statusReason,
   };
 }

@@ -1,0 +1,805 @@
+{
+  "agents": [
+    {
+      "agent_id": "callscore-x-image-agent",
+      "allowed_design_actions": [
+        "read-design-bundle-and-render-authorized-local-media"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": true,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-x-posting-agent",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "render-final-media",
+        "parent-harness-rendering",
+        "provider-public-mutation"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-x-head",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief",
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-linkedin-image-agent",
+      "allowed_design_actions": [
+        "read-design-bundle-and-render-authorized-local-media"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": true,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-linkedin-posting-agent",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "render-final-media",
+        "parent-harness-rendering",
+        "provider-public-mutation"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-linkedin-head",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief",
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-reddit-image-agent",
+      "allowed_design_actions": [
+        "read-design-bundle-and-render-authorized-local-media"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": true,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-reddit-posting-agent",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "render-final-media",
+        "parent-harness-rendering",
+        "provider-public-mutation"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-reddit-head",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief",
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-community-drops-head",
+      "allowed_design_actions": [
+        "read-design-bundle-and-render-authorized-local-media",
+        "write-canonical-visual-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": true,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-whop-commerce-head",
+      "allowed_design_actions": [
+        "read-design-bundle-and-render-authorized-local-media",
+        "write-canonical-visual-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": true,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-email-partnership-drafts-head",
+      "allowed_design_actions": [
+        "read-design-bundle-and-render-authorized-local-media",
+        "write-canonical-visual-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": true,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-youtube-head",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief",
+        "write-canonical-video-brief",
+        "write-canonical-thumbnail-brief",
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": true,
+      "may_write_video_brief": true,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-youtube-script-agent",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief",
+        "write-canonical-video-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": true,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-youtube-packaging-agent",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief",
+        "write-canonical-video-brief",
+        "write-canonical-thumbnail-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": true,
+      "may_write_video_brief": true,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-youtube-thumbnail-agent",
+      "allowed_design_actions": [
+        "read-design-bundle-and-render-authorized-local-media",
+        "write-canonical-thumbnail-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": true,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": true,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-youtube-publishing-agent",
+      "allowed_design_actions": [
+        "read-design-bundle-and-render-authorized-local-media",
+        "write-canonical-video-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": true,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": true,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-youtube-commenting-agent",
+      "allowed_design_actions": [
+        "read-design-bundle-for-brand-aligned-copy-or-learning"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-youtube-analytics-agent",
+      "allowed_design_actions": [
+        "read-design-bundle-for-brand-aligned-copy-or-learning"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-reviewer-head",
+      "allowed_design_actions": [
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-trust-head",
+      "allowed_design_actions": [
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-compliance-linter-head",
+      "allowed_design_actions": [
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-safety-head",
+      "allowed_design_actions": [
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-cmo-head",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief",
+        "write-canonical-video-brief",
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": true,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-artofwar-strategist",
+      "allowed_design_actions": [
+        "write-canonical-visual-brief"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": true,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-markov-trajectory-head",
+      "allowed_design_actions": [
+        "read-design-bundle-for-brand-aligned-copy-or-learning"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": false,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-ml-verifier-head",
+      "allowed_design_actions": [
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    },
+    {
+      "agent_id": "callscore-orchestrator-head",
+      "allowed_design_actions": [
+        "review-design-alignment"
+      ],
+      "canonical_51": true,
+      "design_bundle_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/",
+      "design_md_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_md_bundle/DESIGN.md",
+      "forbidden_design_actions": [
+        "provider-public-mutation",
+        "live-publish-in-draft-ready",
+        "copy-example-images-as-final-output",
+        "use-old-noncanonical-style"
+      ],
+      "may_render_final_media": false,
+      "may_review_design_alignment": true,
+      "may_write_thumbnail_brief": false,
+      "may_write_video_brief": false,
+      "may_write_visual_brief": false,
+      "required_receipts": [
+        "callscore.design_bundle_reference_receipt.v1",
+        "callscore.website_design_alignment_receipt.v1",
+        "callscore.branding_receipt.v2",
+        "callscore.brand_lockup_occlusion_check.v1"
+      ],
+      "status": "complete",
+      "uses_frontend_design_skill": true
+    }
+  ],
+  "design_bundle_install_receipt_path": "/srv/agents/hermes/profiles/callscore/design/callscore_design_bundle_install_receipt.json",
+  "frontend_design_skill_path": "/srv/agents/hermes/profiles/callscore/skills/toby-frontend-design-pro/SKILL.md",
+  "generated_at_utc": "2026-07-03T19:12:32Z",
+  "schema": "callscore.agent_design_skill_matrix.v1"
+}
