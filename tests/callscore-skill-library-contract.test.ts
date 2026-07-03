@@ -245,26 +245,25 @@ test("canonical toolbox contracts assign skill frameworks to the correct agents"
   }
 });
 
-test("audit package generator emits no-mutation inspection bundle", () => {
+function runGenerator(timestamp: string): { status: number | null; stdout: string; stderr: string; output?: { run_path: string; zip_path: string; sha256: string; mutation_audit: { provider_public_mutation: boolean; public_publish: boolean; db_mutation: boolean; deploy_mutation: boolean; destructive_mutation: boolean }; credential_scan: { findings: unknown[] } } } {
   const scriptPath = join(process.cwd(), "src/scripts/generate-github-skill-prompt-import.ts");
   assert.equal(existsSync(scriptPath), true, "missing github skill prompt import generator");
-  const result = spawnSync(process.execPath, ["--import", "tsx", scriptPath, "--timestamp", "test-smoke"], {
+  const result = spawnSync(process.execPath, ["--import", "tsx", scriptPath, "--timestamp", timestamp], {
     cwd: process.cwd(),
     encoding: "utf8",
   });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
-  const output = JSON.parse(result.stdout) as {
-    run_path: string;
-    zip_path: string;
-    mutation_audit: {
-      provider_public_mutation: boolean;
-      public_publish: boolean;
-      db_mutation: boolean;
-      deploy_mutation: boolean;
-      destructive_mutation: boolean;
-    };
-    credential_scan: { findings: unknown[] };
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    output: result.status === 0 ? JSON.parse(result.stdout) : undefined,
   };
+}
+
+test("audit package generator emits no-mutation inspection bundle", () => {
+  const result = runGenerator("test-smoke");
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const output = result.output!;
   assert.equal(existsSync(output.run_path), true);
   assert.equal(existsSync(output.zip_path), true);
   assert.equal(output.mutation_audit.provider_public_mutation, false);
@@ -273,4 +272,31 @@ test("audit package generator emits no-mutation inspection bundle", () => {
   assert.equal(output.mutation_audit.deploy_mutation, false);
   assert.equal(output.mutation_audit.destructive_mutation, false);
   assert.deepEqual(output.credential_scan.findings, []);
+});
+
+test("audit package includes package and verification summaries inside ZIP and SHA manifest", () => {
+  const result = runGenerator("summary-smoke");
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const output = result.output!;
+  const zipList = spawnSync("unzip", ["-l", output.zip_path], { encoding: "utf8" });
+  assert.equal(zipList.status, 0, zipList.stderr || zipList.stdout);
+  assert.match(zipList.stdout, /package-summary\.json/);
+  assert.match(zipList.stdout, /verification-summary\.json/);
+  const shaManifest = readFileSync(join(output.run_path, "SHA256SUMS"), "utf8");
+  assert.match(shaManifest, /package-summary\.json/);
+  assert.match(shaManifest, /verification-summary\.json/);
+});
+
+test("audit package generator is deterministic for the same safe timestamp", () => {
+  const first = runGenerator("determinism-smoke");
+  assert.equal(first.status, 0, first.stderr || first.stdout);
+  const second = runGenerator("determinism-smoke");
+  assert.equal(second.status, 0, second.stderr || second.stdout);
+  assert.equal(second.output!.sha256, first.output!.sha256);
+});
+
+test("audit package generator rejects unsafe timestamp path traversal before cleanup", () => {
+  const bad = runGenerator("../escape");
+  assert.notEqual(bad.status, 0, "path traversal timestamp must fail");
+  assert.match(`${bad.stderr}${bad.stdout}`, /unsafe timestamp/i);
 });
