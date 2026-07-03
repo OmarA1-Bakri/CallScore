@@ -81,4 +81,43 @@ describe("CallScore social content quality gate regressions", () => {
     const result = runGate(baseDraft({ content_type: "data_snapshot" }));
     assert.equal(result.parsed.failures.includes("thought_leadership_generic_scorecard_visual_banned"), false, JSON.stringify(result.parsed));
   });
+
+  test("public-facing draft or test disclaimer fails", () => {
+    const result = runGate(baseDraft({
+      drafts: {
+        x: {
+          exact_copy: "This week, crypto trust debates keep stopping at disclosure. DRAFT TEST ONLY: CallScore tracked a BTC call with a timestamp and outcome.",
+          growth_mechanics: goodCopy.x.growth_mechanics,
+        },
+        linkedin: {
+          exact_copy: "This week, crypto trust debates keep stopping at disclosure. DRAFT TEST ONLY: CallScore tracked a BTC call with a timestamp, entry zone, and outcome window.",
+          growth_mechanics: goodCopy.linkedin.growth_mechanics,
+        },
+      },
+      visual_asset: {
+        required: true,
+        png_sha256: "d".repeat(64),
+        svg_path: "/tmp/product-specific-editorial-visual.svg",
+        alt_text: "Product-specific editorial proof visual",
+      },
+    }));
+
+    assert.notEqual(result.code, 0, JSON.stringify(result.parsed));
+    assert.ok(result.parsed.failures.includes("public_draft_disclaimer_blocked"), JSON.stringify(result.parsed));
+  });
+
+  test("thought leadership clipped mock visual metadata fails", () => {
+    const result = runGate(baseDraft({
+      visual_asset: {
+        required: true,
+        png_sha256: "e".repeat(64),
+        title: "Local SVG preview with clipped headline",
+        alt_text: "Mock preview card. Headline clipped at the right edge. Not a production render.",
+        render_status: "clipped",
+      },
+    }));
+
+    assert.notEqual(result.code, 0, JSON.stringify(result.parsed));
+    assert.ok(result.parsed.failures.includes("thought_leadership_clipped_or_mock_visual_banned"), JSON.stringify(result.parsed));
+  });
 });
