@@ -1,5 +1,8 @@
 import * as assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, test } from "node:test";
 
 import {
@@ -33,6 +36,42 @@ function fixtureNode(overrides: Partial<OperatingNodeResult>): OperatingNodeResu
     detail: {},
     ...overrides,
   };
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(value, (_key, val) => {
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      return Object.fromEntries(Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)));
+    }
+    return val;
+  });
+}
+
+function payloadHash(payload: unknown): string {
+  return `sha256:${createHash("sha256").update(stableJson(payload)).digest("hex")}`;
+}
+
+function approvedCanonicalReceipts(agentId = "callscore-test-agent") {
+  const schemas = [
+    "editorial_angle_receipt.v1",
+    "platform_fit_receipt.v1",
+    "visual_brief_receipt.v1",
+    "visual_qa_receipt.v1",
+    "copy_visual_coherence_receipt.v1",
+    "same_shit_memory_receipt.v1",
+    "callscore.task_router_receipt.v1",
+    "callscore.tool_inheritance_receipt.v1",
+    "callscore.media_artifact_receipt.v1",
+  ];
+  return schemas.map((schema) => ({
+    schema,
+    receipt_id: `${schema.replace(/[^a-z0-9]+/gi, "-")}-approved`,
+    created_at: "2026-06-25T12:00:00.000Z",
+    agent_id: agentId,
+    decision: "approved" as const,
+    evidence_hash: `sha256:${createHash("sha256").update(schema).digest("hex")}`,
+    blockers: [],
+  }));
 }
 
 describe("callscore operating graph", () => {
@@ -170,6 +209,148 @@ describe("callscore operating graph", () => {
     assert.equal(deleteNode?.status, "ok");
     assert.equal(result.mutation_flags.provider_mutation_performed, true);
     assert.equal(result.mutation_flags.public_publish_performed, false);
+  });
+
+  test("live owned-public X publish bridges provider-uploadable media before graph-owned create", async () => {
+    const previousMode = process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+    const previousMock = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+    const previousFileUploadMode = process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE;
+    process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = "1";
+    process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE = "1";
+    process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = JSON.stringify({
+      TWITTER_UPLOAD_MEDIA: { ok: true, data: { id: "1455952740635586573" } },
+      TWITTER_CREATION_OF_A_POST: { ok: true, data: { id: "2071866502773432642" } },
+    });
+    try {
+      const graph = createCallscoreOperatingGraph();
+      const textOnlyPayload = { text: "Graph-owned publish with required media." };
+      const localPath = join(mkdtempSync(join(tmpdir(), "callscore-x-media-")), "final-x-visual.png");
+      writeFileSync(localPath, "fixture-image-bytes");
+      const result = await graph.invoke(
+        buildInitialOperatingState({
+          goal: "revenue_now",
+          mode: "live_owned_public",
+          dryRun: false,
+          approved: true,
+          approvalReceiptId: "approval-x-media-bridge",
+          testFixtures: true,
+          artifacts: {
+            canonical_operational_package: {
+              package_id: "canonical-x-media-bridge",
+              channel: "x",
+              created_at: "2026-06-25T12:00:00.000Z",
+              receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
+            },
+            graph_mutation_inputs: {
+              x_owned_publish_node: {
+                graph_context: {
+                  operating_graph_run_id: "graph-run-x-media-bridge",
+                  graph_node_id: "x_owned_publish_node",
+                  goal: "revenue_now",
+                  platform: "x",
+                  mutation_family: "public_publish",
+                  acting_agent_id: "callscore-x-posting-agent",
+                  authority: "owned_public_publish",
+                  approval_receipt_id: "approval-x-media-bridge",
+                  evidence_receipt_id: "evidence-x-media-bridge",
+                  originality_receipt_id: "originality-x-media-bridge",
+                  approved_payload_hash: payloadHash(textOnlyPayload),
+                  provider_execution_receipt_id: "provider-create-x-media-bridge",
+                  dry_run: false,
+                  parent_receipt_id: "approval-x-media-bridge",
+                },
+                approved: true,
+                canonical_operational_package: {
+                  package_id: "canonical-x-media-bridge",
+                  channel: "x",
+                  created_at: "2026-06-25T12:00:00.000Z",
+                  receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
+                },
+                provider_tool: "TWITTER_CREATION_OF_A_POST",
+                provider_payload: textOnlyPayload,
+                payload: textOnlyPayload,
+                media_gate: {
+                  visual_required: true,
+                  media_plan: "image",
+                  local_path: localPath,
+                  mimetype: "image/png",
+                },
+              },
+            },
+          },
+        }),
+        { configurable: { thread_id: "operating-x-media-bridge-test" } },
+      );
+
+      const xNode = result.node_results.find((item) => item.node_id === "x_owned_publish_node");
+      assert.equal(xNode?.status, "ok");
+      const providerCall = (xNode?.detail.provider_calls as Array<{ payload?: Record<string, unknown> }> | undefined)?.[0];
+      assert.deepEqual(providerCall?.payload?.media_media_ids, ["1455952740635586573"]);
+      assert.equal(result.mutation_flags.provider_mutation_performed, true);
+      assert.equal(result.mutation_flags.public_publish_performed, true);
+    } finally {
+      if (previousMode === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+      else process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = previousMode;
+      if (previousMock === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+      else process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = previousMock;
+      if (previousFileUploadMode === undefined) delete process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE;
+      else process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE = previousFileUploadMode;
+    }
+  });
+
+  test("live owned-public graph routes explicit YouTube publish mutation input to youtube publish node", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const payload = {
+      video_path: "/tmp/rendered-callscore-video.mp4",
+      title: "CallScore proof package",
+      description: "Operator-approved proof package.",
+      thumbnail_path: "/tmp/final-youtube-thumbnail.png",
+    };
+    const result = await graph.invoke(
+      buildInitialOperatingState({
+        goal: "produce_video",
+        mode: "live_owned_public",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "approval-youtube-publish-route",
+        testFixtures: true,
+        artifacts: {
+          graph_mutation_inputs: {
+            youtube_publish_node: {
+              graph_context: {
+                operating_graph_run_id: "graph-run-youtube-publish-route",
+                graph_node_id: "youtube_publish_node",
+                goal: "produce_video",
+                platform: "youtube",
+                mutation_family: "video_publish",
+                acting_agent_id: "callscore-youtube-publishing-agent",
+                authority: "owned_public_publish",
+                approval_receipt_id: "approval-youtube-publish-route",
+                evidence_receipt_id: "evidence-youtube-publish-route",
+                originality_receipt_id: "originality-youtube-publish-route",
+                approved_payload_hash: payloadHash(payload),
+                provider_execution_receipt_id: "provider-youtube-publish-route",
+                dry_run: false,
+                parent_receipt_id: "approval-youtube-publish-route",
+              },
+              approved: true,
+              provider_tool: "YOUTUBE_UPLOAD_VIDEO",
+              payload,
+              provider_execution_receipt_id: "provider-youtube-publish-route",
+              provider_response: { ok: true, id: "yt-video-001", url: "https://youtube.com/watch?v=yt-video-001" },
+              thumbnail_required: true,
+            },
+          },
+        },
+      }),
+      { configurable: { thread_id: "operating-youtube-publish-route-test" } },
+    );
+
+    const youtubeNode = result.node_results.find((item) => item.node_id === "youtube_publish_node");
+    assert.equal(youtubeNode?.status, "ok");
+    assert.equal(result.node_results.some((item) => item.node_id === "video_goal_loop"), false);
+    assert.equal(result.mutation_flags.provider_mutation_performed, true);
+    assert.equal(result.mutation_flags.public_publish_performed, true);
   });
 
   test("every non-revenue operating goal reaches a concrete wrapper node with no mutation", async () => {

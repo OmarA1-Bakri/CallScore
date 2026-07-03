@@ -54,7 +54,7 @@ import {
 } from "./node-wrappers/video-publish-nodes";
 import type { GraphOwnedMutationDecision } from "./node-wrappers/external-mutation-node-utils";
 import { validatePublishedReceiptIntegrity } from "./external-mutation-guard";
-import { executeGraphOwnedProviderCall, needsProviderCall, preflightGraphOwnedProviderCall } from "./node-wrappers/graph-owned-provider-adapter";
+import { bridgeGraphOwnedProviderMedia, executeGraphOwnedProviderCall, needsProviderCall, preflightGraphOwnedProviderCall } from "./node-wrappers/graph-owned-provider-adapter";
 
 function replace<T>() {
   return (_left: T | undefined, right: T): T => right;
@@ -130,7 +130,10 @@ function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
       "linkedin_public_reaction_node",
       "reddit_owned_publish_node",
       "reddit_public_comment_node",
+      "youtube_publish_node",
       "youtube_public_comment_node",
+      "youtube_thumbnail_update_node",
+      "youtube_metadata_update_node",
       "x_public_like_node",
       "reddit_public_upvote_node",
       "youtube_public_like_node",
@@ -255,6 +258,26 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
               provider_response: null,
               receipt: null,
               blocker_code: "draft_only_external_mutation_blocked",
+            },
+            mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+          };
+        }
+
+        const mediaBridge = await bridgeGraphOwnedProviderMedia(input);
+        if (!mediaBridge.ok) {
+          return {
+            status: "blocked" as const,
+            summary: `${nodeId} did not call provider: ${mediaBridge.blockerCode ?? "provider_media_bridge_failed"}.`,
+            blockers: [mediaBridge.blockerCode ?? "provider_media_bridge_failed"],
+            detail: {
+              node_id: nodeId,
+              provider_call_permitted: false,
+              provider_calls: [],
+              provider_response: null,
+              provider_execution_receipt_ids: mediaBridge.providerExecutionReceiptIds ?? [],
+              provider_execution_receipt_paths: mediaBridge.providerExecutionReceiptPaths ?? [],
+              receipt: null,
+              blocker_code: mediaBridge.blockerCode ?? "provider_media_bridge_failed",
             },
             mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
           };

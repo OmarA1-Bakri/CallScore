@@ -33,6 +33,8 @@ __pycache__/
 # Local AI tool profiles
 .openclaude-profile.json
 artifacts/
+!src/video/artifacts/
+!src/video/artifacts/*.ts
 backtest-page-rendered.png
 home-*-alpha-nav.png
 

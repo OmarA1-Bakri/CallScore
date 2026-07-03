@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
 import { evaluateExternalMutationRequest } from "../external-mutation-guard";
 import { DEFAULT_OPERATING_MUTATION_FLAGS } from "../operating-graph-schemas";
@@ -18,6 +18,13 @@ export interface ProviderExecutionResult {
 export interface ProviderCallPreflightResult {
   readonly ok: boolean;
   readonly blockerCode?: string;
+}
+
+export interface ProviderMediaBridgeResult {
+  readonly ok: boolean;
+  readonly blockerCode?: string;
+  readonly providerExecutionReceiptIds?: readonly string[];
+  readonly providerExecutionReceiptPaths?: readonly string[];
 }
 
 function stableJson(value: unknown): string {
@@ -301,6 +308,159 @@ export function preflightGraphOwnedProviderCall(nodeId: string, input: Record<st
     : { ok: false, blockerCode: decision.blocker_code ?? "non_graph_external_mutation_blocked" };
 }
 
+function graphContextRecord(input: Record<string, unknown>): Record<string, unknown> | null {
+  return isRecord(input.graph_context) ? input.graph_context : null;
+}
+
+function mediaGateRecord(input: Record<string, unknown>): Record<string, unknown> | null {
+  return isRecord(input.media_gate) ? input.media_gate : null;
+}
+
+function uploadableFromGate(gate: Record<string, unknown>): Record<string, unknown> | null {
+  const candidates = [gate.provider_uploadable, gate.provider_image, gate.composio_uploadable, gate.file_uploadable];
+  for (const candidate of candidates) {
+    if (!isRecord(candidate)) continue;
+    if (typeof candidate.name === "string" && typeof candidate.mimetype === "string" && typeof candidate.s3key === "string") return candidate;
+  }
+  return null;
+}
+
+function localMediaPathFromGate(gate: Record<string, unknown>): string | null {
+  return firstString(gate.local_path, gate.local_media_path, gate.path, gate.media_path, gate.image_path, gate.source_path);
+}
+
+function mimetypeFromGateOrPath(gate: Record<string, unknown>, localPath: string): string {
+  const explicit = firstString(gate.mimetype, gate.mime_type, gate.media_type);
+  if (explicit?.startsWith("image/")) return explicit;
+  const lower = localPath.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".webp")) return "image/webp";
+  return "image/png";
+}
+
+async function stageLocalFileForComposio(input: {
+  readonly localPath: string;
+  readonly mimetype: string;
+  readonly toolSlug: string;
+  readonly toolkitSlug: string;
+}): Promise<{ ok: true; uploadable: Record<string, unknown> } | { ok: false; blockerCode: string; error?: string }> {
+  if (!existsSync(input.localPath)) return { ok: false, blockerCode: "provider_media_bridge_missing", error: `local media not found: ${input.localPath}` };
+  const name = basename(input.localPath);
+  if (process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE === "1") {
+    return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: `test/${input.toolSlug}/${name}` } };
+  }
+  const apiKey = process.env.COMPOSIO_API_KEY;
+  if (!apiKey) return { ok: false, blockerCode: "blocked_auth", error: "COMPOSIO_API_KEY missing for graph-owned media bridge" };
+  const content = readFileSync(input.localPath);
+  const md5 = createHash("md5").update(content).digest("hex");
+  const request = await fetch("https://backend.composio.dev/api/v3.1/files/upload/request", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      toolkit_slug: input.toolkitSlug,
+      tool_slug: input.toolSlug,
+      filename: name,
+      mimetype: input.mimetype,
+      md5,
+    }),
+  });
+  const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+  if (!request.ok) return { ok: false, blockerCode: blockerForHttpStatus(request.status, JSON.stringify(body), input.toolSlug), error: JSON.stringify(body).slice(0, 500) };
+  const data = nestedRecord(body, "data") ?? body;
+  const uploadUrl = firstString(data.new_presigned_url, data.newPresignedUrl, body.new_presigned_url, body.newPresignedUrl);
+  const key = firstString(data.key, body.key, data.s3key, body.s3key);
+  const storageBackend = nestedRecord(data, "metadata")?.storage_backend ?? nestedRecord(body, "metadata")?.storage_backend;
+  if (!uploadUrl || !key) return { ok: false, blockerCode: "provider_media_bridge_failed", error: JSON.stringify(body).slice(0, 500) };
+  const uploadHeaders: Record<string, string> = { "Content-Type": input.mimetype };
+  if (storageBackend === "azure_blob_storage") uploadHeaders["x-ms-blob-type"] = "BlockBlob";
+  const upload = await fetch(uploadUrl, { method: "PUT", headers: uploadHeaders, body: content });
+  if (!upload.ok) return { ok: false, blockerCode: blockerForHttpStatus(upload.status, await upload.text(), input.toolSlug), error: `file upload failed ${upload.status}` };
+  return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: key } };
+}
+
+async function uploadableOrStageFromGate(gate: Record<string, unknown>, input: { readonly uploadToolSlug: string; readonly toolkitSlug: string }): Promise<{ ok: true; uploadable: Record<string, unknown> } | { ok: false; blockerCode: string; error?: string }> {
+  const uploadable = uploadableFromGate(gate);
+  if (uploadable) return { ok: true, uploadable };
+  const localPath = localMediaPathFromGate(gate);
+  if (!localPath) return { ok: false, blockerCode: "provider_media_bridge_missing" };
+  return stageLocalFileForComposio({
+    localPath,
+    mimetype: mimetypeFromGateOrPath(gate, localPath),
+    toolSlug: input.uploadToolSlug,
+    toolkitSlug: input.toolkitSlug,
+  });
+}
+
+function providerMediaIdsFromGate(gate: Record<string, unknown>): string[] {
+  const raw = Array.isArray(gate.provider_media_ids) ? gate.provider_media_ids : Array.isArray(gate.media_media_ids) ? gate.media_media_ids : [];
+  return raw.filter((id): id is string => typeof id === "string" && /^[0-9]{1,19}$/.test(id.trim()));
+}
+
+function extractProviderMediaId(response: Record<string, unknown>): string | null {
+  const data = nestedRecord(response, "data") ?? response;
+  const innerData = nestedRecord(data, "data") ?? data;
+  return firstString(innerData.id, innerData.media_id_string, innerData.media_id, data.id, data.media_id_string, data.media_id, response.id, response.media_id_string, response.media_id);
+}
+
+function mutateProviderPayload(input: Record<string, unknown>, nextPayload: Record<string, unknown>): void {
+  input.provider_payload = nextPayload;
+  if (hasOwn(input, "payload")) input.payload = nextPayload;
+  const graphContext = graphContextRecord(input);
+  if (graphContext) graphContext.approved_payload_hash = payloadHash(nextPayload);
+}
+
+function appendChildProviderReceipt(input: Record<string, unknown>, receiptId: string, receiptPath: string | null): void {
+  const childIds = Array.isArray(input.child_receipt_ids) ? input.child_receipt_ids.filter((item): item is string => typeof item === "string") : [];
+  input.child_receipt_ids = [...new Set([...childIds, receiptId])];
+  const paths = Array.isArray(input.provider_execution_receipt_paths) ? input.provider_execution_receipt_paths.filter((item): item is string => typeof item === "string") : [];
+  if (receiptPath) input.provider_execution_receipt_paths = [...new Set([...paths, receiptPath])];
+}
+
+export async function bridgeGraphOwnedProviderMedia(input: Record<string, unknown>): Promise<ProviderMediaBridgeResult> {
+  if (!mediaGateRequiresMedia(input)) return { ok: true };
+  const providerTool = safeString(input.provider_tool);
+  const providerPayload = isRecord(input.provider_payload) ? input.provider_payload : null;
+  if (!providerTool || !providerPayload) return { ok: false, blockerCode: "payload_missing" };
+  if (providerPayloadHasRequiredMedia(providerTool, providerPayload)) return { ok: true };
+
+  const gate = mediaGateRecord(input);
+  if (!gate) return { ok: false, blockerCode: "provider_media_bridge_missing" };
+
+  if (providerTool === "TWITTER_CREATION_OF_A_POST") {
+    const mediaIds = providerMediaIdsFromGate(gate);
+    if (mediaIds.length > 0) {
+      mutateProviderPayload(input, { ...providerPayload, media_media_ids: mediaIds });
+      return { ok: true };
+    }
+    const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "TWITTER_UPLOAD_MEDIA", toolkitSlug: "twitter" });
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode };
+    const uploadPayload = {
+      media: staged.uploadable,
+      media_type: typeof staged.uploadable.mimetype === "string" ? staged.uploadable.mimetype : "image/png",
+      media_category: "tweet_image",
+    };
+    const uploadResult = await executeGraphOwnedProviderCall("TWITTER_UPLOAD_MEDIA", uploadPayload);
+    appendChildProviderReceipt(input, uploadResult.executionReceiptId, uploadResult.executionReceiptPath);
+    if (!uploadResult.ok) return { ok: false, blockerCode: uploadResult.blockerCode ?? "provider_media_bridge_failed", providerExecutionReceiptIds: [uploadResult.executionReceiptId], providerExecutionReceiptPaths: uploadResult.executionReceiptPath ? [uploadResult.executionReceiptPath] : [] };
+    const mediaId = extractProviderMediaId(uploadResult.response);
+    if (!mediaId) return { ok: false, blockerCode: "provider_media_bridge_missing", providerExecutionReceiptIds: [uploadResult.executionReceiptId], providerExecutionReceiptPaths: uploadResult.executionReceiptPath ? [uploadResult.executionReceiptPath] : [] };
+    mutateProviderPayload(input, { ...providerPayload, media_media_ids: [mediaId] });
+    return { ok: true, providerExecutionReceiptIds: [uploadResult.executionReceiptId], providerExecutionReceiptPaths: uploadResult.executionReceiptPath ? [uploadResult.executionReceiptPath] : [] };
+  }
+
+  if (providerTool === "LINKEDIN_CREATE_LINKED_IN_POST") {
+    const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "LINKEDIN_CREATE_LINKED_IN_POST", toolkitSlug: "linkedin" });
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode };
+    mutateProviderPayload(input, { ...providerPayload, images: [staged.uploadable] });
+    return { ok: true };
+  }
+
+  return { ok: true };
+}
+
 
 function parseMcpJson(text: string): Record<string, unknown> {
   const candidates = text
@@ -362,9 +522,19 @@ function blockerForProviderMessage(message: string): string {
 }
 
 export async function executeGraphOwnedProviderCall(toolSlug: string, payload: Record<string, unknown>): Promise<ProviderExecutionResult> {
+  const executionReceiptId = providerExecutionReceiptId(toolSlug, payload);
+  if (process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE === "1") {
+    const mocked = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+    const parsed = mocked ? JSON.parse(mocked) as Record<string, unknown> : {};
+    const response = (isRecord(parsed[toolSlug]) ? parsed[toolSlug] : { ok: false, error: `missing mock for ${toolSlug}` }) as Record<string, unknown>;
+    const ok = response.ok === true || response.success === true;
+    const blockerCode = ok ? undefined : blockerForProviderMessage(firstString(response.error, response.message) ?? `missing mock for ${toolSlug}`);
+    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizeProviderResponse(toolSlug, response, ok), blockerCode, error: ok ? undefined : JSON.stringify(response).slice(0, 500) });
+    return { ok, response: normalizeProviderResponse(toolSlug, response, ok), executionReceiptId, executionReceiptPath, blockerCode, error: ok ? undefined : JSON.stringify(response).slice(0, 500) };
+  }
+
   const consumerKey = process.env.COMPOSIO_MCP_CONSUMER_API_KEY ?? process.env.COMPOSIO_API_KEY;
   const mcpUrl = process.env.COMPOSIO_MCP_URL ?? "https://connect.composio.dev/mcp";
-  const executionReceiptId = providerExecutionReceiptId(toolSlug, payload);
   const connectedAccountId = toolSlug.startsWith("TWITTER_")
     ? process.env.COMPOSIO_TWITTER_CONNECTED_ACCOUNT_ID
     : toolSlug.startsWith("LINKEDIN_")
