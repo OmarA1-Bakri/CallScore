@@ -38,10 +38,22 @@ import type {
 import { getCreatorConfidenceTier } from "@/lib/creator-stats-eligibility";
 
 export const metadata: Metadata = {
-  title: "Crypto Market Calls Tracker | Score Alpha. Find Edge — CallScore",
+  title: "Crypto Creator Accuracy Tracker",
   description:
-    "CallScore is the crypto market calls tracker that scores every prediction against real price data. Ranked alpha. Transparent methodology. No noise.",
+    "CallScore tracks public crypto creator market calls, scores predictions against real price data, and ranks creators by alpha, accuracy, consistency, and self-correction.",
   alternates: { canonical: "/" },
+  openGraph: {
+    title: "CallScore — Crypto Creator Accuracy Tracker",
+    description:
+      "Track crypto creator market calls against real price data. Transparent scoring, creator rankings, methodology, alerts, backtests, API access, and webhooks.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CallScore — Crypto Creator Accuracy Tracker",
+    description:
+      "Track crypto creator market calls against real price data. Transparent scoring, creator rankings, methodology, alerts, backtests, API access, and webhooks.",
+  },
 };
 
 const VALID_PERIODS: readonly Period[] = ["12m", "all_time", "90d", "30d"];
@@ -379,10 +391,13 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
               Market calls, <em className="italic font-normal text-accent">measured.</em>
             </h1>
             <h2 className="font-sans text-[16px] tab:text-[18px] text-ink-600 font-medium leading-relaxed max-w-[760px] mb-8">
-              The crypto market calls tracker that scores alpha against real price data.
+              The crypto creator accuracy tracker that scores public market calls against real price data.
             </h2>
             <p className="font-serif text-[21px] tab:text-[24px] text-ink-700 leading-relaxed max-w-[760px] mb-8">
-              Track crypto creators&apos; market calls against real price data. Score every eligible call. Rank signal, not noise.
+              CallScore tracks public crypto market calls, scores predictions against real price data, and ranks creators by alpha, accuracy, consistency, and self-correction.
+            </p>
+            <p className="font-serif text-[17px] text-ink-600 leading-relaxed max-w-[680px] mb-8">
+              Built for traders, researchers, and crypto users who want evidence instead of hype. Informational analytics only, not financial advice.
             </p>
             <div className="flex flex-col tab:flex-row gap-3 mb-7">
               <Link href="#leaderboard" className="inline-flex items-center justify-center gap-3 bg-accent hover:bg-accent-dim text-ink-0 font-mono text-[13px] tracking-caps uppercase px-7 py-4 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent" style={{ borderRadius: 2 }}>
@@ -423,6 +438,37 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
         </div>
         <HeroFeatureRail />
       </section>
+
+      <EditorialSection
+        index="Guide"
+        title={
+          <>
+            What is <em className="italic text-accent">CallScore</em>?
+          </>
+        }
+        meta={<>crypto creator accuracy tracker · transparent market-call scoring</>}
+      >
+        <div className="grid gap-8 desk:grid-cols-3">
+          <div className="font-serif text-[17px] text-ink-700 leading-relaxed">
+            <h2 className="font-mono text-[12px] tracking-caps uppercase text-accent mb-3">What it does</h2>
+            <p>
+              CallScore is a crypto creator accuracy tracker. It monitors public market calls from crypto creators, extracts eligible predictions, measures outcomes against real market prices, and publishes transparent creator rankings. The goal is simple: make crypto commentary measurable.
+            </p>
+          </div>
+          <div className="font-serif text-[17px] text-ink-700 leading-relaxed">
+            <h2 className="font-mono text-[12px] tracking-caps uppercase text-accent mb-3">How calls are scored</h2>
+            <p>
+              Each eligible call is tied to source evidence, timestamped, matched to a price window, and scored using a published methodology. CallScore evaluates more than raw win rate; it also considers alpha, consistency, specificity, and whether creators correct themselves when calls go wrong.
+            </p>
+          </div>
+          <div className="font-serif text-[17px] text-ink-700 leading-relaxed">
+            <h2 className="font-mono text-[12px] tracking-caps uppercase text-accent mb-3">Who it is for</h2>
+            <p>
+              CallScore is for crypto users, researchers, analysts, and builders who want a more evidence-based way to evaluate public crypto commentary. It is not financial advice and does not recommend buying or selling crypto assets.
+            </p>
+          </div>
+        </div>
+      </EditorialSection>
 
       <EditorialSection index="01" title={<><em className="italic text-accent">The premise</em>, sourced.</>} meta={<>three claims · <b className="text-ink-900">peer-reviewed</b><br />one signature signal · <b className="text-ink-900">self-correction</b></>}>
         <ul className="border-y border-ink-150">
@@ -469,10 +515,10 @@ function HeroTrustItem({ label }: { readonly label: string }): ReactElement {
 
 function HeroFeatureRail(): ReactElement {
   const features = [
-    { mark: "01", title: "Track Every Eligible Call", body: "We extract market calls from creator videos." },
-    { mark: "02", title: "Score with Evidence", body: "Objective scoring based on real market outcomes." },
+    { mark: "01", title: "Track Every Eligible Call", body: "We extract eligible public market calls from creator videos." },
+    { mark: "02", title: "Score with Evidence", body: "Predictions are measured against real market price outcomes." },
     { mark: "03", title: "Rank by Signal, Not Noise", body: "Creators ranked by alpha, consistency and accuracy." },
-    { mark: "04", title: "See Who Adapts", body: "We score corrections and course changes." },
+    { mark: "04", title: "See Who Adapts", body: "Self-correction is tracked separately from raw accuracy." },
     { mark: "05", title: "Unlock More Power", body: "Alerts, exports, backtests, API access and webhooks." },
   ] as const;
   return (
