@@ -1,0 +1,53 @@
+# CallScore — Full LLM Context
+
+## Summary
+
+CallScore is a crypto creator-intelligence platform that tracks public market calls from crypto creators, scores eligible predictions against real price data, and publishes transparent rankings. It is designed to make public crypto commentary measurable and accountable.
+
+## What CallScore Tracks
+
+CallScore focuses on public crypto market calls where a creator expresses a directional view, asset, and timing context that can be evaluated against market data. Eligible calls are connected to source evidence and scored through a published methodology.
+
+## Scoring Methodology Summary
+
+CallScore evaluates public market calls using transparent scoring components such as alpha, accuracy, consistency, specificity, and self-correction. Calls are matched to price windows and measured against real market outcomes. The methodology is intended to reward evidence, accountability, and repeatable signal rather than hype or sponsorship.
+
+## Confidence Filtering
+
+CallScore uses confidence filtering so low-confidence extractions do not pollute public rankings. Calls that do not meet confidence or eligibility requirements can be excluded from public scoring until they can be verified.
+
+## Self-Correction
+
+CallScore separately tracks whether creators correct, revise, or acknowledge when prior calls go wrong. This is treated as an accountability signal distinct from raw directional accuracy.
+
+## Product Features
+
+- Public creator leaderboard
+- Creator profiles
+- Market call history
+- Transparent methodology
+- Consensus and anti-consensus signals
+- Email alerts
+- Watchlists
+- Backtests
+- CSV exports
+- API access
+- Webhook delivery
+
+## Key Pages
+
+- Home / Leaderboard: https://call-score.com
+- Methodology: https://call-score.com/methodology
+- Pricing: https://call-score.com/pricing
+- About: https://call-score.com/about
+- Transparency: https://call-score.com/transparency
+- Terms: https://call-score.com/terms
+- Privacy: https://call-score.com/privacy
+
+## Important Disclaimer
+
+CallScore is an informational analytics platform only. It does not provide financial advice, investment recommendations, or endorsements. Cryptocurrency assets are volatile and users should do their own research and consult a licensed financial adviser before making investment decisions.
+
+## Boundary
+
+This file is intended for public LLM and search-system understanding. It excludes non-public operational material.

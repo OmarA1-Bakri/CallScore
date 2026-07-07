@@ -1,0 +1,36 @@
+# CallScore
+
+> CallScore is a crypto creator-intelligence platform that tracks public crypto market calls, scores predictions against real price data, and ranks creators by alpha, accuracy, consistency, and self-correction.
+
+## What CallScore Does
+
+CallScore extracts eligible market calls from public crypto creator content, connects each call to timestamped evidence, evaluates the outcome against real market price data, and publishes transparent creator rankings. It is designed for users who want evidence-based accountability around crypto YouTubers, crypto influencers, and public market predictions.
+
+## Core Features
+
+- Crypto creator leaderboard
+- Creator profiles
+- Market call history
+- Transparent scoring methodology
+- Alpha and accuracy scoring
+- Self-correction signal
+- Consensus and anti-consensus signals
+- Alerts
+- Backtests
+- API access
+- Webhooks
+- CSV exports
+
+## Important Disclaimer
+
+CallScore is an informational analytics platform. It does not provide financial advice, investment recommendations, or endorsements. Crypto assets are volatile and users should do their own research.
+
+## Key Pages
+
+- [Home / Leaderboard](https://call-score.com)
+- [Methodology](https://call-score.com/methodology)
+- [Pricing](https://call-score.com/pricing)
+- [About](https://call-score.com/about)
+- [Transparency](https://call-score.com/transparency)
+- [Terms](https://call-score.com/terms)
+- [Privacy](https://call-score.com/privacy)
