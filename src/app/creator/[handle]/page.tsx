@@ -62,15 +62,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   try {
     const creator = await getCreatorByHandle(handle);
     if (!creator) {
-      return { title: "Creator Not Found | CryptoTubers Ranked" };
+      return { title: "Creator Not Found | CallScore" };
     }
     return {
-      title: `${creator.name} — Creator Profile | CryptoTubers Ranked`,
-      description: `See ${creator.name}'s crypto call track record, alpha score, win rate, and full call history on CryptoTubers Ranked.`,
+      title: `${creator.name} Crypto Call Track Record — CallScore`,
+      description: `See ${creator.name}'s crypto call track record, alpha score, win rate, and full call history on CallScore.`,
       alternates: { canonical: `/creator/${creatorHandlePath(creator.youtube_handle)}` },
     };
   } catch {
-    return { title: "Creator Not Found | CryptoTubers Ranked" };
+    return { title: "Creator Not Found | CallScore" };
   }
 }
 
