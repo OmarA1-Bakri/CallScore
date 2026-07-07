@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { appendPipelineJobEvent, claimNextPipelineJob, completePipelineJob, retryOrFailPipelineJob, type PipelineJob } from "../lib/pipeline";
+import { appendPipelineJobEvent, claimNextPipelineJob, completePipelineJob, retryOrFailPipelineJob, updatePipelineJobHeartbeat, DEFAULT_PIPELINE_JOB_LEASE_SECONDS, JOB_LEASE_OVERRIDES, type PipelineJob } from "../lib/pipeline";
 import { closeDatabasePoolForTests, query } from "../lib/db";
 import { loadEnv } from "./script-helpers";
 
@@ -74,6 +74,16 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       await appendPipelineJobEvent({ runId: job.run_id, jobId: job.id, eventType: "laptop_runner_failed", status: "failed", message: status, payload: metrics });
     }
     console.log(JSON.stringify({ ok: true, job_id: jobId, status }));
+    return;
+  }
+
+  if (command === "heartbeat") {
+    const jobId = Number(argValue(argv, "--job-id"));
+    if (!Number.isInteger(jobId) || jobId <= 0) throw new Error("--job-id is required");
+    const job = await loadJob(jobId);
+    const effectiveLease = JOB_LEASE_OVERRIDES[job.type] ?? DEFAULT_PIPELINE_JOB_LEASE_SECONDS;
+    await updatePipelineJobHeartbeat(job, { worker_id: job.locked_by, source: "laptop_runner" }, effectiveLease);
+    console.log(JSON.stringify({ ok: true, job_id: jobId, status: "heartbeat", lease_seconds: effectiveLease }));
     return;
   }
 

@@ -119,6 +119,15 @@ const DEFAULT_MATCH_PRICES_LIMIT = 1000;
 const DEFAULT_MATCH_PRICES_BATCH_SIZE = 200;
 const DEFAULT_STUCK_JOB_SECONDS = 30 * 60;
 export const DEFAULT_PIPELINE_JOB_LEASE_SECONDS = 10 * 60;
+
+/** Per-job-type lease override in seconds for long-running job types that exceed
+ * the default 10-minute lease. Jobs whose expected runtime exceeds the default
+ * lease MUST be registered here so stale-reset recovery does not trigger during
+ * legitimate processing. */
+export const JOB_LEASE_OVERRIDES: Record<string, number> = {
+  transcript_collect_laptop: 3600,
+};
+
 const FRESH_CANDLE_SECONDS = 2 * 60 * 60;
 const CANDLE_FRESHNESS_SYMBOLS = Array.from(new Set([...TRACKED_SYMBOLS, "XLMUSDT"]));
 
@@ -407,14 +416,16 @@ RETURNING *`;
 export async function updatePipelineJobHeartbeat(
   job: Pick<PipelineJob, "id" | "run_id" | "locked_by">,
   payload: Record<string, unknown> = {},
+  leaseSeconds?: number,
 ): Promise<void> {
+  const effectiveLease = leaseSeconds ?? DEFAULT_PIPELINE_JOB_LEASE_SECONDS;
   await query(
     `UPDATE pipeline_jobs
      SET heartbeat_at = NOW(),
          lease_expires_at = NOW() + ($2::int * INTERVAL '1 second'),
          updated_at = NOW()
      WHERE id = $1`,
-    [job.id, DEFAULT_PIPELINE_JOB_LEASE_SECONDS],
+    [job.id, effectiveLease],
   );
 
   await appendPipelineJobEvent({
@@ -498,6 +509,18 @@ export async function claimNextPipelineJob(input: ClaimNextJobInput): Promise<Pi
     message: `Claimed by ${input.workerId}`,
     payload: { worker_id: input.workerId, attempts: job.attempts },
   });
+
+  // Apply per-type lease override for long-running job types
+  const leaseOverride = JOB_LEASE_OVERRIDES[job.type];
+  if (leaseOverride) {
+    await query(
+      `UPDATE pipeline_jobs
+       SET lease_expires_at = NOW() + ($1::int * INTERVAL '1 second'),
+           updated_at = NOW()
+       WHERE id = $2`,
+      [leaseOverride, job.id],
+    );
+  }
 
   return normalizeJob(job);
 }

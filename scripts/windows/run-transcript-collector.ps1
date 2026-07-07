@@ -303,6 +303,15 @@ function Complete-WorkplaneJob([string]$status) {
   Invoke-HhSsh "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane -- complete --job-id $JobId --status $status --state-path .tmp/laptop-collector/latest-state.json" | Out-Host
 }
 
+function Send-WorkplaneHeartbeat {
+  if (-not $JobId) { return }
+  try {
+    Invoke-HhSsh "cd $HhRepo && set -a && source .env.hermes && set +a && npm run --silent workplane -- heartbeat --job-id $JobId 2>&1" | Out-Null
+  } catch {
+    # heartbeat is best-effort; job may already be complete
+  }
+}
+
 function Claim-WorkplaneJob {
   if (-not $Workplane -or $JobId) { return }
   $runner = "laptop-$($env:COMPUTERNAME)-$PID"
@@ -478,6 +487,10 @@ foreach ($item in $items) {
   }
 
   if ($stopBatch) { break }
+
+  # Send heartbeat to HH workplane to prevent stale-reset during long processing
+  Send-WorkplaneHeartbeat
+
   $sleepSeconds = Get-Random -Minimum $MinGapSeconds -Maximum ($MaxGapSeconds + 1)
   Write-Host "collector_sleep_seconds=$sleepSeconds"
   Start-Sleep -Seconds $sleepSeconds
