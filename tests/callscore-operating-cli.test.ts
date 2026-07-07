@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { buildRunnableConfig, buildRunnableConfigWithRuntimeContext } from "../src/scripts/callscore-operating-goal";
+
+const repoRoot = process.cwd();
 function writeFakeScout(root: string): { command: string; markerPath: string; receiptPath: string } {
   const command = join(root, "fake-scout.sh");
   const markerPath = join(root, "fake-scout-invoked.txt");
@@ -146,7 +148,7 @@ test("callscore-operating-goal CLI evidence_research read-live accepts gate cont
     heartbeatPath,
     "--creator-growth-scout-command",
     fake.command,
-  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8" });
+  ], { cwd: repoRoot, encoding: "utf8" });
 
   const parsed = JSON.parse(stdout) as { status: string; blockers: string[]; latest_receipt_path: string };
   assert.equal(parsed.status, "ok");
@@ -171,7 +173,7 @@ test("callscore-operating-goal CLI runs monitor dry-run and prints JSON summary"
     "monitor",
     "--dry-run",
     "--test-fixtures",
-  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8" });
+  ], { cwd: repoRoot, encoding: "utf8" });
 
   const parsed = JSON.parse(stdout) as { goal: string; status: string; node_count: number; blockers: string[] };
   assert.equal(parsed.goal, "monitor");
@@ -187,7 +189,7 @@ test("callscore-operating-goal CLI fails closed for unknown goals", () => {
     "src/scripts/callscore-operating-goal.ts",
     "--goal",
     "not_a_goal",
-  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8", stdio: "pipe" }), /Command failed/);
+  ], { cwd: repoRoot, encoding: "utf8", stdio: "pipe" }), /Command failed/);
 });
 
 test("callscore-operating-goal CLI refresh_data bounded dry-run writes a real receipt", () => {
@@ -202,7 +204,7 @@ test("callscore-operating-goal CLI refresh_data bounded dry-run writes a real re
     "--max-items",
     "1",
     "--test-fixtures",
-  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8" });
+  ], { cwd: repoRoot, encoding: "utf8" });
 
   const jsonStart = stdout.indexOf("{");
   const parsed = JSON.parse(stdout.slice(jsonStart)) as {

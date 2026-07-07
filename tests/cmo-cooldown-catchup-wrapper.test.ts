@@ -6,12 +6,13 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 const WATCHER = "/srv/agents/hermes/scripts/callscore-cmo-cooldown-catchup.sh";
+const watcherExists = existsSync(WATCHER);
 
 function read(path: string): string {
   return readFileSync(path, "utf8");
 }
 
-test("CMO cooldown catch-up watcher wakes only the canonical revenue_now job", () => {
+test("CMO cooldown catch-up watcher wakes only the canonical revenue_now job", { skip: !watcherExists }, () => {
   assert.equal(existsSync(WATCHER), true);
   const source = read(WATCHER);
   assert.match(source, /MAIN_JOB_ID="\$\{CALLSCORE_CMO_JOB_ID:-9c03a6eea969\}"/);
@@ -23,7 +24,7 @@ test("CMO cooldown catch-up watcher wakes only the canonical revenue_now job", (
   assert.doesNotMatch(source, /cron (create|schedule)/);
 });
 
-test("CMO cooldown catch-up watcher is a no-op when no social receipts exist", () => {
+test("CMO cooldown catch-up watcher is a no-op when no social receipts exist", { skip: !watcherExists }, () => {
   const root = mkdtempSync(join(tmpdir(), "cmo-catchup-noop-"));
   const receiptDir = join(root, "receipts");
   const stateDir = join(root, "state");
@@ -43,7 +44,7 @@ test("CMO cooldown catch-up watcher is a no-op when no social receipts exist", (
 });
 
 
-test("current cooldown receipts with nested prior verified posts do not trigger stale wakeups", () => {
+test("current cooldown receipts with nested prior verified posts do not trigger stale wakeups", { skip: !watcherExists }, () => {
   const root = mkdtempSync(join(tmpdir(), "cmo-catchup-current-cooldown-"));
   const receiptDir = join(root, "receipts");
   const stateDir = join(root, "state");

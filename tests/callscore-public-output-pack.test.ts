@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const builder = "/opt/crypto-tuber-ranked/scripts/callscore-build-public-output-pack.py";
+const repoRoot = process.cwd();
+const builder = join(repoRoot, "scripts/callscore-build-public-output-pack.py");
 const png1x1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=", "base64");
 
 test("public output pack dedupes text and images with source map", () => {

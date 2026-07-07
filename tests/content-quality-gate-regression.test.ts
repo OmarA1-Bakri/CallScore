@@ -1,11 +1,12 @@
 import * as assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, test } from "node:test";
 
 const gate = "/srv/agents/hermes/scripts/callscore-content-quality-gate.py";
+const gateExists = existsSync(gate);
 
 function runGate(packet: Record<string, unknown>) {
   const dir = mkdtempSync(join(tmpdir(), "callscore-quality-"));
@@ -42,7 +43,7 @@ function baseDraft(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("CallScore social content quality gate regressions", () => {
+describe("CallScore social content quality gate regressions", { skip: !gateExists }, () => {
   test("thought_leadership with generic evidence card visual fails", () => {
     const result = runGate(baseDraft());
     assert.notEqual(result.code, 0, JSON.stringify(result.parsed));

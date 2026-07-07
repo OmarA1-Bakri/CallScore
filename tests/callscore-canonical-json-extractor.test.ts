@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const extractor = "/opt/crypto-tuber-ranked/scripts/callscore-extract-canonical-json.py";
+const repoRoot = process.cwd();
+const extractor = join(repoRoot, "scripts/callscore-extract-canonical-json.py");
 
 function runExtract(rawText: string, expectedSchema = "callscore.workflow_canonical_output.v1") {
   const dir = mkdtempSync(join(tmpdir(), "callscore-extract-"));
