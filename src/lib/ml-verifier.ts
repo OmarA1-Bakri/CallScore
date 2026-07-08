@@ -5,7 +5,7 @@ import type { PipelineJob } from "./pipeline";
 
 export const ML_VERIFIER_PROMPT_VERSION = "ml-verifier-v1";
 export const DEFAULT_ML_VERIFIER_PROVIDER = "ollama";
-export const DEFAULT_ML_VERIFIER_MODEL = "qwen2.5:3b";
+export const DEFAULT_ML_VERIFIER_MODEL = "qwen3:4b-instruct-2507-q4_K_M";
 export const DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434";
 export const OLLAMA_CLOUD_HOST = "https://ollama.com";
 export const DEFAULT_ML_VERIFIER_TIMEOUT_MS = 180_000;

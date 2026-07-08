@@ -170,7 +170,7 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
   }),
   gemma_shadow_extract: safeReportSpec("gemma_shadow_extract", {
     input_payload: {
-      model: "callscore-gemma4-extractor:latest",
+      model: "qwen3:4b-instruct-2507-q4_K_M",
       provider: "ollama",
       ollama_host: "http://127.0.0.1:11434",
       limit: 10,
@@ -192,7 +192,7 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
     output_artifact: "/tmp/callscore-shadow-extractions/<run-id>.jsonl",
     success_criteria: ["reads existing transcripts only", "writes shadow artifact rows only", "does not write calls or creator_stats", "records parser/schema/latency evidence"],
     failure_classification: ["invalid_json", "schema_invalid", "timeout", "ollama_unavailable", "manual_review"],
-    default_safe_command: "npm run shadow:extract -- --execute --provider ollama --ollama-host http://127.0.0.1:11434 --model callscore-gemma4-extractor:latest --limit 10 --video-agents 1 --chunk-agents 1 --model-attempts 1 --prompt-profile shadow-compact --chunk-chars 350 --chunk-overlap 50 --max-chunks 1 --num-predict 350 --request-timeout-ms 45000",
+    default_safe_command: "npm run shadow:extract -- --execute --provider ollama --ollama-host http://127.0.0.1:11434 --model qwen3:4b-instruct-2507-q4_K_M --limit 10 --video-agents 1 --chunk-agents 1 --model-attempts 1 --prompt-profile shadow-compact --chunk-chars 512 --chunk-overlap 50 --max-chunks 1 --num-predict 512 --request-timeout-ms 60000",
   }),
   ml_extraction_eval: safeReportSpec("ml_extraction_eval", {
     input_payload: { fixtures: "data/eval/call-extraction-fixtures.jsonl", shadow_in: "/tmp/callscore-shadow-extractions/<run-id>.jsonl", diff_in: "/tmp/callscore-shadow-extractions/<run-id>.diff.jsonl" },
@@ -517,7 +517,7 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
     default_safe_command: "cd /srv/agents/repos/Claude_Code_Automations && python3 scripts/art_of_war.py campaign-loop --dry-run --campaign-id callscore-receipts-proof --output /tmp/callscore-art-of-war-campaign-loop-latest.json",
   }),
   artofwar_campaign_gemma_eval: safeReportSpec("artofwar_campaign_gemma_eval", {
-    input_payload: { dry_run: true, model: "callscore-gemma4-extractor:latest", role: "evaluate_optimize_classify_recommend", public_action: false },
+    input_payload: { dry_run: true, model: "qwen3:4b-instruct-2507-q4_K_M", role: "evaluate_optimize_classify_recommend", public_action: false },
     execution_location: "HH",
     max_batch_size: 3,
     concurrency: 1,
@@ -757,7 +757,7 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
       "--execute",
       "--provider", "ollama",
       "--ollama-host", String(payload.ollama_host ?? "http://127.0.0.1:11434"),
-      "--model", String(payload.model ?? "callscore-gemma4-extractor:latest"),
+      "--model", String(payload.model ?? "qwen3:4b-instruct-2507-q4_K_M"),
       "--limit", String(Math.min(Number(payload.limit ?? 10), 10)),
       "--video-agents", "1",
       "--chunk-agents", "1",

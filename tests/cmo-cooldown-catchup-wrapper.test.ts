@@ -19,7 +19,9 @@ test("CMO cooldown catch-up watcher wakes only the canonical revenue_now job", {
   assert.match(source, /hermes cron run --accept-hooks "\$MAIN_JOB_ID"/);
   assert.match(source, /python3 - "\$RECEIPT_DIR" "\$STATE_FILE" "\$GRACE_SECONDS" "\$STALE_AFTER_SECONDS" "\$EXTERNAL_BLOCKER_GRACE_SECONDS" "\$MAIN_JOB_ID"/);
   assert.doesNotMatch(source, /'job_id':'9c03a6eea969'/);
-  assert.doesNotMatch(source, /callscore-genuine-social-packet\.sh/);
+  assert.match(source, /if no_agent and script == 'callscore-genuine-social-packet\.sh':/);
+  assert.match(source, /assert_no_direct_provider\(script_text, 'script'\)/);
+  assert.match(source, /required_terms = \['npm run operating:goal', '--goal revenue_now', '--draft-only'\]/);
   assert.doesNotMatch(source, /TWITTER_CREATION_OF_A_POST|LINKEDIN_CREATE_LINKED_IN_POST|REDDIT_CREATE_REDDIT_POST/);
   assert.doesNotMatch(source, /cron (create|schedule)/);
 });

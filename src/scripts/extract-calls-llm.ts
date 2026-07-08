@@ -420,23 +420,36 @@ export function compactShadowPrompt(
     ? `Chunk ${chunk.index + 1}/${chunk.total}; offsets ${chunk.start}-${chunk.end}\n`
     : `Chunk 1/1; offsets 0-${transcript.length}\n`;
 
-  return `Return ONLY a JSON array. No markdown. No prose.
-Task: extract creator-owned, forward-looking, actionable crypto market calls from this transcript chunk.
-If there is no clear tracked-coin call, return [].
+  return `Extract crypto trading calls as JSON array. No prose. No markdown.
 
-Allowed symbols: ${symbols}
+Allowed symbols (ONLY these — do not use any other): ${symbols}
 ${symbolHint}Title: ${title ?? "unknown"}
 ${chunkContext}
 
-Schema for each item:
+Item schema:
 {"symbol":"BTCUSDT","direction":"bullish|bearish|neutral","call_type":"buy|sell|hold|watch|avoid","entry_price":number|null,"target_price":number|null,"stop_loss":number|null,"timeframe":string|null,"confidence":"high|medium|low","strategy_type":"technical_analysis|fundamental|narrative|contrarian","raw_quote":"exact quote","extraction_confidence":0.0-1.0}
 
-Rules:
-- Extract only the creator's own active view/trade idea/level/target/risk warning.
-- Reject news, education, aggregation, guest calls, quoted third-party calls, vague hype, promos, jokes, and retrospective-only claims.
-- Do not invent prices, symbols, or quotes. Use null when a numeric field is absent.
-- If unsure, return [].
+Example 1 — bullish call found:
+Transcript: "if Bitcoin holds above 80,000 then we can see the next leg up"
+Output: [{"symbol":"BTCUSDT","direction":"bullish","call_type":"watch","entry_price":80000,"target_price":null,"stop_loss":null,"timeframe":null,"confidence":"medium","strategy_type":"technical_analysis","raw_quote":"if Bitcoin holds above 80,000 then we can see the next leg up","extraction_confidence":0.85}]
 
+Example 2 — no actionable calls:
+Transcript: "Bitcoin is the future of money, BlackRock filed an ETF, liquidity is improving"
+Output: []
+
+Example 3 — non-allowed tokens ignored:
+Transcript: "CRO will go to $10. ALGO has great tech."
+Output: []
+
+Rules:
+- Extract only creator's own active view/trade idea/level/target/risk warning.
+- Reject news, education, aggregation, guest/3rd-party calls, vague hype, promos, jokes, retrospective-only.
+- symbol MUST be one of the listed Allowed symbols. Never use a symbol not in the list.
+- Use null for absent numeric fields. Do not invent prices or symbols.
+- raw_quote must be exact transcript text containing coin context + directional signal.
+- If no call for an allowed symbol is found, return [].
+
+Transcript:
 ${formatUntrustedTranscriptBlock(transcript)}`;
 }
 

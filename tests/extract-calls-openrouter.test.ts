@@ -187,8 +187,8 @@ test("compact shadow prompt keeps bounded real-transcript extraction JSON-focuse
     "BTC update",
   );
 
-  assert.match(compactPrompt, /Return ONLY a JSON array/);
-  assert.match(compactPrompt, /If there is no clear tracked-coin call, return \[\]/);
+  assert.match(compactPrompt, /Extract crypto trading calls as JSON array/);
+  assert.match(compactPrompt, /If no call for an allowed symbol is found, return \[\]/);
   assert.match(compactPrompt, /UNTRUSTED_TRANSCRIPT_BEGIN/);
   assert.ok(compactPrompt.length < fullPrompt.length);
 });
@@ -206,8 +206,8 @@ test("Ollama chat body can use compact shadow prompt profile", () => {
 
   assert.deepEqual(body.options, { temperature: 0, num_predict: 350 });
   const messages = body.messages as Array<{ role: string; content: string }>;
-  assert.match(messages[1]?.content ?? "", /Task: extract creator-owned/);
-  assert.doesNotMatch(messages[1]?.content ?? "", /POSITIVE EXAMPLES/);
+  assert.match(messages[1]?.content ?? "", /Extract crypto trading calls as JSON array/);
+  assert.match(messages[1]?.content ?? "", /Example 3 — non-allowed tokens ignored/);
 });
 
 test("unknown extraction provider is rejected instead of silently falling back", () => {

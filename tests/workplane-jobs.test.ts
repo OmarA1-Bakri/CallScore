@@ -74,7 +74,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   assert.equal(gemma.max_batch_size, 10);
   assert.equal(gemma.production_db_writes_allowed, false);
   assert.equal(gemma.production_call_writes_allowed, false);
-  assert.match(gemma.default_safe_command, /callscore-gemma4-extractor:latest/);
+  assert.match(gemma.default_safe_command, /qwen3:4b-instruct-2507-q4_K_M/);
 
   const ingest = getWorkplaneJobSpec("transcript_ingest_result");
   assert.equal(ingest.production_db_writes_allowed, true);
@@ -635,8 +635,8 @@ test("existing enqueue script can safely enqueue bounded workplane jobs", () => 
   assert.match(enqueueScript, /isWorkplaneJobType/);
   assert.match(enqueueScript, /getWorkplaneJobSpec/);
   assert.match(enqueueScript, /transcript_collect_laptop/);
-  assert.match(enqueueScript, /--limit >5 is not supported by this safe workplane enqueue path/);
-  assert.match(enqueueScript, /allow_large_batch: false/);
+  assert.match(enqueueScript, /--limit >5 requires --allow-large-batch/);
+  assert.match(enqueueScript, /allow_large_batch: args\.allowLargeBatch === true/);
   assert.match(enqueueScript, /production_call_writes_allowed: spec\.production_call_writes_allowed/);
   assert.match(enqueueScript, /public_ranking_impact_allowed: spec\.public_ranking_impact_allowed/);
 });
