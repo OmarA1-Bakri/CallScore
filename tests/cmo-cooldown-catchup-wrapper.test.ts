@@ -17,7 +17,9 @@ test("CMO cooldown catch-up watcher wakes only the canonical revenue_now job", {
   const source = read(WATCHER);
   assert.match(source, /MAIN_JOB_ID="\$\{CALLSCORE_CMO_JOB_ID:-9c03a6eea969\}"/);
   assert.match(source, /hermes cron run --accept-hooks "\$MAIN_JOB_ID"/);
-  assert.match(source, /python3 - "\$RECEIPT_DIR" "\$STATE_FILE" "\$GRACE_SECONDS" "\$STALE_AFTER_SECONDS" "\$EXTERNAL_BLOCKER_GRACE_SECONDS" "\$MAIN_JOB_ID"/);
+  assert.match(source, /python3 - "\$RECEIPT_DIR" "\$STATE_FILE" "\$GRACE_SECONDS" "\$STALE_AFTER_SECONDS" "\$STALE_RETRY_SECONDS" "\$EXTERNAL_BLOCKER_GRACE_SECONDS" "\$MAIN_JOB_ID"/);
+  assert.match(source, /CALLSCORE_CMO_STALE_RETRY_SECONDS:-43200/);
+  assert.doesNotMatch(source, /hour_bucket/);
   assert.doesNotMatch(source, /'job_id':'9c03a6eea969'/);
   assert.match(source, /if no_agent and script == 'callscore-genuine-social-packet\.sh':/);
   assert.match(source, /assert_no_direct_provider\(script_text, 'script'\)/);
@@ -90,4 +92,42 @@ test("current cooldown receipts with nested prior verified posts do not trigger 
   assert.equal(parsed.reason, "no_due_trigger");
   assert.equal(parsed.latest_verified?.x, "2099-01-01T00:00:00Z");
   assert.equal(parsed.latest_verified?.linkedin, "2099-01-01T00:00:00Z");
+});
+
+test("stale provider wakeups are globally deduplicated across channels for the retry window", { skip: !watcherExists }, () => {
+  const root = mkdtempSync(join(tmpdir(), "cmo-catchup-stale-dedupe-"));
+  const receiptDir = join(root, "receipts");
+  const stateDir = join(root, "state");
+  const fs = require("node:fs");
+  const crypto = require("node:crypto");
+  fs.mkdirSync(receiptDir, { recursive: true });
+  fs.mkdirSync(stateDir, { recursive: true });
+  for (const channel of ["linkedin", "x"]) {
+    fs.writeFileSync(join(receiptDir, `20000101T000000Z-${channel}-published_verified.json`), JSON.stringify({
+      channel,
+      status: "published_verified",
+      provider_verified: true,
+      created_at_utc: "2000-01-01T00:00:00Z",
+    }));
+  }
+  const material = "stale_batch:linkedin:2000-01-01T00:00:00+00:00|x:2000-01-01T00:00:00+00:00";
+  fs.writeFileSync(join(stateDir, "callscore-cmo-cooldown-catchup.json"), JSON.stringify({
+    last_stale_trigger_key: crypto.createHash("sha256").update(material).digest("hex"),
+    last_stale_trigger_at_utc: new Date().toISOString(),
+  }));
+  const output = execFileSync(WATCHER, {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VERBOSE: "1",
+      CALLSCORE_CMO_RECEIPT_DIR: receiptDir,
+      CALLSCORE_CMO_CATCHUP_STATE_DIR: stateDir,
+      CALLSCORE_CMO_JOB_ID: "must-not-run",
+      CALLSCORE_CMO_STALE_AFTER_SECONDS: "0",
+      CALLSCORE_CMO_STALE_RETRY_SECONDS: "43200",
+    },
+  });
+  const parsed = JSON.parse(output) as { action: string; reason: string };
+  assert.equal(parsed.action, "none");
+  assert.equal(parsed.reason, "no_due_trigger");
 });

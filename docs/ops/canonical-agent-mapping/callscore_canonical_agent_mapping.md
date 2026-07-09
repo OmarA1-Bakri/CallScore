@@ -15,13 +15,13 @@ callscore_canonical_agent_mapping.source.json
   "total_mapped": 51,
   "documentation_format": "markdown_only",
   "diagram_format": "mermaid_only",
-  "canonical_rule": "44 agents are the baseline. Upgrade/remap existing agents first. Create new agents only when a real role gap remains after mapping."
+  "canonical_rule": "51 agents are canonical at runtime: 44 retained baseline agents plus 7 justified YouTube production agents. Upgrade/remap existing agents first; create additional agents only when a real role gap remains after mapping."
 }
 ```
 
 ## Core conclusions
 
-1. The 44 agents are canonical baseline agents.
+1. The current runtime has 51 canonical agents/souls: 44 retained baseline agents plus 7 justified YouTube production agents.
 2. Most gaps are solved by upgrading/remapping existing agents.
 3. YouTube is the justified exception: it needs 7 new production-channel agents.
 4. No new Copy Chief, ML Head, Learning Head, Visual QA Agent, Community Image Agent, Whop Asset Agent, or Email Asset Agent is justified yet.
