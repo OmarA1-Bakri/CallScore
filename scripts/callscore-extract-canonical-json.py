@@ -5,6 +5,18 @@ import sys
 from json import JSONDecoder
 
 CANONICAL_STATUS_FIELDS = ("status", "workflow_status", "runner_status", "normalized_status")
+DOMAIN_RECEIPT_STATUS_FIELDS = ("mode", "final_decision", "draft", "x", "linkedin")
+
+
+def is_callscore_domain_receipt(obj: dict, expected_schema: str | None) -> bool:
+    schema = obj.get("schema")
+    if not isinstance(schema, str) or not schema.startswith("callscore."):
+        return False
+    if expected_schema and schema == expected_schema:
+        return False
+    if schema.endswith(".read_only_receipt.v1") or schema == "callscore.proof_post_drafts.v1":
+        return True
+    return bool(obj.get("mode") and obj.get("final_decision"))
 
 
 def candidate_score(obj: dict, expected_schema: str | None) -> int:
@@ -39,7 +51,8 @@ def scan_candidates(text: str) -> list[tuple[int, int, dict]]:
             continue
         has_schema = isinstance(value.get("schema"), str) and bool(value.get("schema"))
         has_statusish = any(k in value for k in CANONICAL_STATUS_FIELDS)
-        if has_schema and has_statusish:
+        has_domain_receipt_shape = any(k in value for k in DOMAIN_RECEIPT_STATUS_FIELDS)
+        if has_schema and (has_statusish or has_domain_receipt_shape):
             candidates.append((start, start + end_rel, value))
     return candidates
 
@@ -73,11 +86,21 @@ def validate(obj: dict, expected_schema: str | None):
     errors: list[str] = []
     if not obj.get("schema"):
         errors.append("schema_missing")
-    elif expected_schema and obj.get("schema") != expected_schema:
+    elif expected_schema and obj.get("schema") != expected_schema and not is_callscore_domain_receipt(obj, expected_schema):
         errors.append(f"schema_mismatch:{obj.get('schema')}")
-    if not (obj.get("status") or obj.get("workflow_status") or obj.get("runner_status")):
+    if not (obj.get("status") or obj.get("workflow_status") or obj.get("runner_status") or is_callscore_domain_receipt(obj, expected_schema)):
         errors.append("status_missing")
     return errors
+
+
+def normalize_for_output(obj: dict, expected_schema: str | None) -> dict:
+    if not is_callscore_domain_receipt(obj, expected_schema):
+        return obj
+    normalized = dict(obj)
+    normalized.setdefault("workflow_status", "read_only_receipt")
+    normalized.setdefault("status", normalized["workflow_status"])
+    normalized.setdefault("canonical_grade", False)
+    return normalized
 
 
 def main(argv):
@@ -111,6 +134,7 @@ def main(argv):
         return 1
     selected_index, selected_tuple = selected
     _start, _end, obj = selected_tuple
+    obj = normalize_for_output(obj, expected_schema)
     errors = validate(obj, expected_schema)
     result.update(
         {

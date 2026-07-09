@@ -75,6 +75,22 @@ test("canonical extractor ignores nested partial object after canonical output",
   assert.equal(JSON.parse(readFileSync(canonical, "utf8")).schema, "callscore.workflow_canonical_output.v1");
 });
 
+test("canonical extractor accepts CallScore read-only domain receipts as runner outputs", () => {
+  const receipt = {
+    schema: "callscore.linkedin.read_only_receipt.v1",
+    agent: "callscore-linkedin-agent",
+    mode: "READ_ONLY_NO_PUBLISH_NO_PROVIDER_MUTATION",
+    final_decision: { publication_readiness: "NOT_READY_TO_PUBLISH" },
+    draft: { exact_copy: "Why do scored calls matter?" },
+  };
+  const { result, canonical, meta } = runExtract(JSON.stringify(receipt));
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(meta.canonical_json_valid, true);
+  const parsed = JSON.parse(readFileSync(canonical, "utf8"));
+  assert.equal(parsed.schema, "callscore.linkedin.read_only_receipt.v1");
+  assert.equal(parsed.workflow_status, "read_only_receipt");
+});
+
 test("canonical extractor removes stale out file on failed extraction", () => {
   const dir = mkdtempSync(join(tmpdir(), "callscore-extract-stale-"));
   const raw = join(dir, "run.raw.txt");
