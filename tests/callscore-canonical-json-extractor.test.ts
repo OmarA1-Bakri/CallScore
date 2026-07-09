@@ -132,6 +132,27 @@ test("canonical extractor normalizes live receipt_type aliases", () => {
   assert.equal(parsed.workflow_status, "read_only_receipt");
 });
 
+test("canonical extractor forces non-string workflow_status to scalar", () => {
+  const receipt = {
+    schema: "callscore.linkedin.read_only_specialist_receipt.v1",
+    status: "blocked_read_only_no_provider_mutation",
+    workflow_status: { read_only_check_completed: true },
+    agent: "callscore-linkedin-agent",
+    mode: "READ_ONLY_NO_PROVIDER_MUTATION",
+    provider_mutation_performed: false,
+    public_publish_performed: false,
+    draft: {
+      exact_copy: "Crypto has a disclosure problem. It also has a measurement problem.",
+    },
+  };
+  const { result, canonical, meta } = runExtract(JSON.stringify(receipt));
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(meta.workflow_status, "blocked_read_only_no_provider_mutation");
+  const parsed = JSON.parse(readFileSync(canonical, "utf8"));
+  assert.equal(parsed.workflow_status, "blocked_read_only_no_provider_mutation");
+  assert.equal(parsed.status, "blocked_read_only_no_provider_mutation");
+});
+
 test("canonical extractor removes stale out file on failed extraction", () => {
   const dir = mkdtempSync(join(tmpdir(), "callscore-extract-stale-"));
   const raw = join(dir, "run.raw.txt");

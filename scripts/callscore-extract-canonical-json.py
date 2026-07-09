@@ -115,8 +115,12 @@ def normalize_for_output(obj: dict, expected_schema: str | None) -> dict:
     if not is_callscore_domain_receipt(obj, expected_schema):
         return obj
     normalized = dict(obj)
-    normalized.setdefault("workflow_status", "read_only_receipt")
-    normalized.setdefault("status", normalized["workflow_status"])
+    workflow_status = normalized.get("workflow_status")
+    status = normalized.get("status")
+    if not isinstance(workflow_status, str) or not workflow_status:
+        normalized["workflow_status"] = status if isinstance(status, str) and status else "read_only_receipt"
+    if not isinstance(status, str) or not status:
+        normalized["status"] = normalized["workflow_status"]
     normalized.setdefault("canonical_grade", False)
     return normalized
 
