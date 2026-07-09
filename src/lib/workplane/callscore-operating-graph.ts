@@ -250,8 +250,11 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
       const input = graphMutationInputFor(state, nodeId);
 
       // ── Graph-owned provider execution ──
-      // Provider calls may happen only after the same graph guard proves that
-      // this node has valid graph context, payload hash, platform, and action.
+      // Provider calls may happen only after the graph-owned mutation runner has
+      // proved non-provider gates first. This is intentionally before the media
+      // bridge: media upload is itself a provider mutation and must not happen
+      // when canonical package, approval, graph context, or payload hash gates
+      // would block the final publish.
       if (needsProviderCall(input)) {
         if (state.config.dryRun) {
           return {
@@ -267,6 +270,26 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
               blocker_code: "draft_only_external_mutation_blocked",
             },
             mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+          };
+        }
+
+        const preliminaryDecision = runner(input);
+        const provisionalProviderBlockers = new Set(["provider_execution_receipt_required", "required_media_missing", "provider_success_required_before_mutation_flags"]);
+        if (preliminaryDecision.status !== "ok" && !provisionalProviderBlockers.has(preliminaryDecision.blocker_code ?? "")) {
+          const blocker = preliminaryDecision.blocker_code ? [preliminaryDecision.blocker_code] : [];
+          return {
+            status: preliminaryDecision.status,
+            summary: `${nodeId} did not call provider: ${preliminaryDecision.blocker_code ?? preliminaryDecision.status}.`,
+            blockers: blocker,
+            detail: {
+              node_id: nodeId,
+              provider_call_permitted: preliminaryDecision.provider_call_permitted,
+              provider_calls: preliminaryDecision.provider_calls,
+              provider_response: preliminaryDecision.provider_response ?? null,
+              receipt: preliminaryDecision.receipt ?? null,
+              blocker_code: preliminaryDecision.blocker_code ?? null,
+            },
+            mutation_flags: preliminaryDecision.mutation_flags,
           };
         }
 
