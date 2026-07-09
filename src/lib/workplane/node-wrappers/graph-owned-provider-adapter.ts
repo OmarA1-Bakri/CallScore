@@ -649,7 +649,11 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
       ?? availableToolNames.find((name) => name.toUpperCase() === toolSlug.toUpperCase())
       ?? null;
     const multiExecuteToolName = availableToolNames.find((name) => name === "COMPOSIO_MULTI_EXECUTE_TOOL") ?? null;
-    const selectedToolName = directToolName ?? multiExecuteToolName;
+    // Prefer Composio's multi-execute wrapper when available so graph-owned calls
+    // can pass explicit connected-account binding. Direct MCP app tools do not
+    // accept the `account` selector, which can route mutations through the wrong
+    // enrolled/provider billing context even when read-only lookup succeeds.
+    const selectedToolName = multiExecuteToolName ?? directToolName;
 
     if (!selectedToolName) {
       const response = { ok: false, error: `MCP tool ${toolSlug} not found`, mcp_tool_count: availableToolNames.length, mcp_tool_names: availableToolNames.slice(0, 120) };
