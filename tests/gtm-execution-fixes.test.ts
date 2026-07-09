@@ -96,7 +96,7 @@ test("Phase 1.3 — CMO cron prompt requires writing draft before graph handoff"
 
 test("Phase 1.4 — CMO packet stdout fits within pipe buffer", { skip: !hermesScriptsExist }, () => {
   // Simulate running the packet script and check stdout size
-  const result = execSync("bash /srv/agents/hermes/scripts/callscore-genuine-social-packet.sh 2>/dev/null || true", {
+  const result = execSync("CALLSCORE_CMO_SPECIALIST_DRAFT_BRIDGE=/bin/true bash /srv/agents/hermes/scripts/callscore-genuine-social-packet.sh 2>/dev/null || true", {
     cwd: REPO,
     encoding: "utf-8",
     timeout: 60000,
