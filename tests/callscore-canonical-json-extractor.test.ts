@@ -91,6 +91,26 @@ test("canonical extractor accepts CallScore read-only domain receipts as runner 
   assert.equal(parsed.workflow_status, "read_only_receipt");
 });
 
+test("canonical extractor accepts live X read-only review/status receipts", () => {
+  const receipt = {
+    schema: "callscore.x.read_only_review_receipt.v1",
+    agent: "callscore-x-agent",
+    mode: "READ_ONLY",
+    provider_mutation_performed: false,
+    public_publish_performed: false,
+    recommended_x_asset: {
+      draft_text_not_posted: "BTC is back near $63K, but creator calls still need receipts.",
+    },
+  };
+  const { result, canonical, meta } = runExtract(JSON.stringify(receipt));
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(meta.canonical_json_valid, true);
+  const parsed = JSON.parse(readFileSync(canonical, "utf8"));
+  assert.equal(parsed.schema, "callscore.x.read_only_review_receipt.v1");
+  assert.equal(parsed.status, "read_only_receipt");
+  assert.equal(parsed.workflow_status, "read_only_receipt");
+});
+
 test("canonical extractor removes stale out file on failed extraction", () => {
   const dir = mkdtempSync(join(tmpdir(), "callscore-extract-stale-"));
   const raw = join(dir, "run.raw.txt");

@@ -14,7 +14,7 @@ def is_callscore_domain_receipt(obj: dict, expected_schema: str | None) -> bool:
         return False
     if expected_schema and schema == expected_schema:
         return False
-    if schema.endswith(".read_only_receipt.v1") or schema == "callscore.proof_post_drafts.v1":
+    if schema.endswith(".read_only_receipt.v1") or ".read_only_" in schema or "_read_only_" in schema or schema == "callscore.proof_post_drafts.v1":
         return True
     return bool(obj.get("mode") and obj.get("final_decision"))
 
