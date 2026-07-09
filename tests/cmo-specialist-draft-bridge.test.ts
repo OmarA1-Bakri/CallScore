@@ -31,7 +31,7 @@ test("CMO specialist draft bridge turns child-agent receipts into platform draft
 set -euo pipefail
 role="$1"; prompt="$2"; out="$3"
 if grep -qi 'platform: x' "$prompt"; then
-  text='Why do crypto creator receipts beat vibes? 16,078 price-backed calls across 93 ranked creators gives the market a scoreboard, not another opinion feed. call-score.com'
+  text='Why do crypto creator receipts beat vibes? 16,078 price-backed calls across 93 ranked creators gives the market a scoreboard — not another opinion feed. call-score.com'
   schema='callscore.x.read_only_receipt.v1'
   platform='x'
 else
@@ -72,6 +72,7 @@ PY
   assert.equal(existsSync(liPath), true, "LinkedIn draft file should be written from child receipt");
   const x = readFileSync(xPath, "utf8").trim();
   assert.ok(x.length > 40 && x.length <= 280, `X draft must be non-empty and <=280 chars, got ${x.length}`);
+  assert.doesNotMatch(x, /[—–]/, "bridge must mechanically normalize unicode dashes before finalizer quality gate");
   const receipt = JSON.parse(readFileSync(join(dir, "cmo-agent-draft-files.json"), "utf8"));
   assert.equal(receipt.status, "drafts_written");
   assert.equal(receipt.draft_files_written, true);
