@@ -100,7 +100,6 @@ test("Phase 1.4 — CMO packet stdout fits within pipe buffer", { skip: !hermesS
   const tempDir = mkdtempSync(join(tmpdir(), "callscore-cmo-stdout-"));
   const command = [
     `CALLSCORE_SOCIAL_OPERATING_DIR=${JSON.stringify(tempDir)}`,
-    "CALLSCORE_CMO_SPECIALIST_DRAFT_BRIDGE=/bin/true",
     "CALLSCORE_CMO_FINALIZER=/bin/true",
     "bash /srv/agents/hermes/scripts/callscore-genuine-social-packet.sh 2>/dev/null || true",
   ].join(" ");
