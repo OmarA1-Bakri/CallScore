@@ -16,7 +16,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, statSync, readdirSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, statSync, readdirSync, mkdirSync, writeFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 
@@ -96,7 +97,14 @@ test("Phase 1.3 — CMO cron prompt requires writing draft before graph handoff"
 
 test("Phase 1.4 — CMO packet stdout fits within pipe buffer", { skip: !hermesScriptsExist }, () => {
   // Simulate running the packet script and check stdout size
-  const result = execSync("CALLSCORE_CMO_SPECIALIST_DRAFT_BRIDGE=/bin/true bash /srv/agents/hermes/scripts/callscore-genuine-social-packet.sh 2>/dev/null || true", {
+  const tempDir = mkdtempSync(join(tmpdir(), "callscore-cmo-stdout-"));
+  const command = [
+    `CALLSCORE_SOCIAL_OPERATING_DIR=${JSON.stringify(tempDir)}`,
+    "CALLSCORE_CMO_SPECIALIST_DRAFT_BRIDGE=/bin/true",
+    "CALLSCORE_CMO_FINALIZER=/bin/true",
+    "bash /srv/agents/hermes/scripts/callscore-genuine-social-packet.sh 2>/dev/null || true",
+  ].join(" ");
+  const result = execSync(command, {
     cwd: REPO,
     encoding: "utf-8",
     timeout: 60000,
