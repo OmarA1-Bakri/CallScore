@@ -19,6 +19,8 @@ import {
 import { mergeMutationFlags, nodeResultToStatePatch, wrapDirectFunctionNode } from "./operating-node-utils";
 import { generateOperatingReceiptId, writeOperatingReceipt, buildOperatingReceiptPath, redactOperatingValue, buildOperatingSummaryPath, writeOperatingSummary } from "./operating-receipts";
 import { bootContextNode, hardGatePreflightNode } from "./node-wrappers/gating-nodes";
+import { runAttioWriteNode } from "./node-wrappers/crm-write-nodes";
+import { runZohoMailReplyNode, runZohoMailSendNode } from "./node-wrappers/email-reply-nodes";
 import {
   alertGoalLoopNode,
   dataGoalLoopNode,
@@ -137,6 +139,9 @@ function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
       "x_public_like_node",
       "reddit_public_upvote_node",
       "youtube_public_like_node",
+      "email_send_node",
+      "email_reply_node",
+      "attio_write_node",
     ] as const) {
       if (hasGraphMutationInput(parsed, nodeId) && !nodeAlreadyRan(parsed, nodeId)) return nodeId;
     }
@@ -196,6 +201,8 @@ export const externalMutationPreflightNode = wrapDirectFunctionNode({
           "youtube_public_comment_node",
           "youtube_thumbnail_update_node",
           "youtube_metadata_update_node",
+          "email_send_node",
+          "email_reply_node",
           "gmail_send_node",
           "resend_alert_send_node",
           "whop_mutation_node",
@@ -626,10 +633,12 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("youtube_public_like_node", graphOwnedMutationWrapperNode("youtube_public_like_node", runYoutubePublicLikeNode))
     .addNode("youtube_thumbnail_update_node", graphOwnedMutationWrapperNode("youtube_thumbnail_update_node", runYoutubeThumbnailUpdateNode))
     .addNode("youtube_metadata_update_node", graphOwnedMutationWrapperNode("youtube_metadata_update_node", runYoutubeMetadataUpdateNode))
+    .addNode("email_send_node", graphOwnedMutationWrapperNode("email_send_node", runZohoMailSendNode))
+    .addNode("email_reply_node", graphOwnedMutationWrapperNode("email_reply_node", runZohoMailReplyNode))
     .addNode("gmail_send_node", graphOwnedMutationPlaceholderNode("gmail_send_node"))
     .addNode("resend_alert_send_node", graphOwnedMutationPlaceholderNode("resend_alert_send_node"))
     .addNode("whop_mutation_node", graphOwnedMutationPlaceholderNode("whop_mutation_node"))
-    .addNode("attio_write_node", graphOwnedMutationPlaceholderNode("attio_write_node"))
+    .addNode("attio_write_node", graphOwnedMutationWrapperNode("attio_write_node", runAttioWriteNode))
     .addNode("posthog_write_node", graphOwnedMutationPlaceholderNode("posthog_write_node"))
     .addNode("revenue_goal_loop", revenueGoalLoopNode)
     .addNode("data_goal_loop", dataGoalLoopNode)
@@ -681,6 +690,8 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       linkedin_public_reaction_node: "linkedin_public_reaction_node",
       reddit_public_upvote_node: "reddit_public_upvote_node",
       youtube_public_like_node: "youtube_public_like_node",
+      email_send_node: "email_send_node",
+      email_reply_node: "email_reply_node",
       gmail_send_node: "gmail_send_node",
       resend_alert_send_node: "resend_alert_send_node",
       whop_mutation_node: "whop_mutation_node",
@@ -723,6 +734,8 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "linkedin_public_reaction_node",
     "reddit_public_upvote_node",
     "youtube_public_like_node",
+    "email_send_node",
+    "email_reply_node",
     "gmail_send_node",
     "resend_alert_send_node",
     "whop_mutation_node",

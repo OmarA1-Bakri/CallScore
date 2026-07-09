@@ -93,6 +93,48 @@ function validateKnownProviderPayload(toolSlug: string, payload: Record<string, 
     if (message.length > 1250) return "payload_too_long";
   }
 
+  if (toolSlug === "ZOHO_MAIL_MESSAGES_REPLY_TO_EMAIL") {
+    const accountId = typeof payload.accountId === "string" ? payload.accountId.trim() : "";
+    const messageId = typeof payload.messageId === "string" ? payload.messageId.trim() : "";
+    const fromAddress = typeof payload.fromAddress === "string" ? payload.fromAddress.trim() : "";
+    const toAddress = typeof payload.toAddress === "string" ? payload.toAddress.trim() : "";
+    const content = typeof payload.content === "string" ? payload.content.trim() : "";
+    if (!/^[0-9]{10,30}$/.test(accountId) || !/^[0-9]{10,30}$/.test(messageId)) return "payload_missing";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fromAddress) || !toAddress.includes("@")) return "payload_missing";
+    if (!content || content.length > 10000) return "payload_missing";
+  }
+
+  if (toolSlug === "ZOHO_MAIL_MESSAGES_SEND_EMAIL") {
+    const accountId = typeof payload.accountId === "string" ? payload.accountId.trim() : "";
+    const fromAddress = typeof payload.fromAddress === "string" ? payload.fromAddress.trim() : "";
+    const toAddress = typeof payload.toAddress === "string" ? payload.toAddress.trim() : "";
+    const subject = typeof payload.subject === "string" ? payload.subject.trim() : "";
+    const content = typeof payload.content === "string" ? payload.content.trim() : "";
+    if (!/^[0-9]{10,30}$/.test(accountId)) return "payload_missing";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fromAddress) || !toAddress.includes("@")) return "payload_missing";
+    if (!subject || subject.length > 300) return "payload_missing";
+    if (!content || content.length > 10000) return "payload_missing";
+  }
+
+  if (toolSlug === "ATTIO_CREATE_NOTE") {
+    const parentObject = typeof payload.parent_object === "string" ? payload.parent_object.trim() : "";
+    const parentRecordId = typeof payload.parent_record_id === "string" ? payload.parent_record_id.trim() : "";
+    const title = typeof payload.title === "string" ? payload.title.trim() : "";
+    const content = typeof payload.content === "string" ? payload.content.trim() : "";
+    if (!parentObject || !parentRecordId || !title || !content) return "payload_missing";
+  }
+
+  if (toolSlug === "ATTIO_ASSERT_PERSON") {
+    const values = isRecord(payload.values) ? payload.values : payload;
+    const emailAddresses = values.email_addresses;
+    const hasEmail = Array.isArray(emailAddresses)
+      ? emailAddresses.some((email) => (typeof email === "string" && email.includes("@"))
+        || (isRecord(email) && typeof email.email_address === "string" && email.email_address.includes("@")))
+      : typeof emailAddresses === "string" && emailAddresses.includes("@");
+    const matchingAttribute = typeof payload.matching_attribute === "string" ? payload.matching_attribute.trim() : "";
+    if (matchingAttribute !== "email_addresses" || !hasEmail) return "payload_missing";
+  }
+
   return null;
 }
 
@@ -146,6 +188,7 @@ function blockerForHttpStatus(status: number, text: string, toolSlug: string): s
   if (status === 401 || status === 403) return "blocked_auth";
   if (status === 404) return "blocked_provider_missing";
   if (status === 409 || haystack.includes("duplicate") || haystack.includes("already posted")) return "blocked_duplicate_or_cadence";
+  if (status === 402 || haystack.includes("creditsdepleted") || haystack.includes("credits depleted") || haystack.includes("payment required")) return "blocked_rate_limit";
   if (status === 429 || haystack.includes("rate limit") || haystack.includes("too many requests")) return "blocked_rate_limit";
   if (status >= 400 && haystack.includes("not found")) return "blocked_provider_missing";
   return "provider_call_failed";
@@ -515,6 +558,7 @@ function blockerForProviderMessage(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes("reply to this conversation is not allowed") || lower.includes("quoting this post is not allowed") || lower.includes("not allowed because you have not been mentioned")) return "blocked_platform_permission";
   if (lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("invalid api key") || lower.includes("auth")) return "blocked_auth";
+  if (lower.includes("creditsdepleted") || lower.includes("credits depleted") || lower.includes("payment required")) return "blocked_rate_limit";
   if (lower.includes("rate limit") || lower.includes("too many requests")) return "blocked_rate_limit";
   if (lower.includes("duplicate") || lower.includes("already")) return "blocked_duplicate_or_cadence";
   if (lower.includes("not found") || lower.includes("unknown tool")) return "blocked_provider_missing";

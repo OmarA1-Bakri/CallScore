@@ -298,6 +298,82 @@ describe("callscore operating graph", () => {
     }
   });
 
+  test("X provider credits depleted is classified as blocked_rate_limit", async () => {
+    const previousMode = process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+    const previousMock = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+    process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = "1";
+    process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = JSON.stringify({
+      TWITTER_CREATION_OF_A_POST: {
+        ok: false,
+        error: "Request failed error: {\"title\":\"CreditsDepleted\",\"detail\":\"Your enrolled account does not have any credits to fulfill this request.\",\"status\":402}",
+      },
+    });
+    try {
+      const graph = createCallscoreOperatingGraph();
+      const payload = { text: "CallScore quota-classification test" };
+      const result = await graph.invoke(
+        buildInitialOperatingState({
+          goal: "revenue_now",
+          mode: "live_owned_public",
+          dryRun: false,
+          approved: true,
+          approvalReceiptId: "approval-x-credits-depleted",
+          testFixtures: true,
+          artifacts: {
+            canonical_operational_package: {
+              package_id: "canonical-x-credits-depleted",
+              channel: "x",
+              created_at: "2026-06-25T12:00:00.000Z",
+              receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
+            },
+            graph_mutation_inputs: {
+              x_owned_publish_node: {
+                graph_context: {
+                  operating_graph_run_id: "graph-run-x-credits-depleted",
+                  graph_node_id: "x_owned_publish_node",
+                  goal: "revenue_now",
+                  platform: "x",
+                  mutation_family: "public_publish",
+                  acting_agent_id: "callscore-x-posting-agent",
+                  authority: "owned_public_publish",
+                  approval_receipt_id: "approval-x-credits-depleted",
+                  evidence_receipt_id: "evidence-x-credits-depleted",
+                  originality_receipt_id: "originality-x-credits-depleted",
+                  approved_payload_hash: payloadHash(payload),
+                  provider_execution_receipt_id: "provider-x-credits-depleted",
+                  dry_run: false,
+                  parent_receipt_id: "approval-x-credits-depleted",
+                },
+                approved: true,
+                canonical_operational_package: {
+                  package_id: "canonical-x-credits-depleted",
+                  channel: "x",
+                  created_at: "2026-06-25T12:00:00.000Z",
+                  receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
+                },
+                provider_tool: "TWITTER_CREATION_OF_A_POST",
+                provider_payload: payload,
+                payload,
+              },
+            },
+          },
+        }),
+        { configurable: { thread_id: "operating-x-credits-depleted-test" } },
+      );
+
+      const xNode = result.node_results.find((item) => item.node_id === "x_owned_publish_node");
+      assert.equal(xNode?.status, "blocked");
+      assert.equal(xNode?.detail.blocker_code, "blocked_rate_limit");
+      assert.equal(result.mutation_flags.provider_mutation_performed, false);
+      assert.equal(result.mutation_flags.public_publish_performed, false);
+    } finally {
+      if (previousMode === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+      else process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = previousMode;
+      if (previousMock === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+      else process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = previousMock;
+    }
+  });
+
   test("live owned-public graph routes explicit YouTube publish mutation input to youtube publish node", async () => {
     const graph = createCallscoreOperatingGraph();
     const payload = {
@@ -351,6 +427,118 @@ describe("callscore operating graph", () => {
     assert.equal(result.node_results.some((item) => item.node_id === "video_goal_loop"), false);
     assert.equal(result.mutation_flags.provider_mutation_performed, true);
     assert.equal(result.mutation_flags.public_publish_performed, true);
+  });
+
+  test("live owned-public graph routes explicit Zoho Mail reply mutation input to email reply node", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const payload = {
+      accountId: "5586367000000008002",
+      messageId: "1783039632062159400",
+      fromAddress: "sarah.collins@call-score.com",
+      toAddress: "creator@example.com",
+      content: "Thanks — sending the creator record now.",
+      mailFormat: "plaintext",
+    };
+    const result = await graph.invoke(
+      buildInitialOperatingState({
+        goal: "revenue_now",
+        mode: "live_owned_public",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "approval-email-reply-route",
+        testFixtures: true,
+        artifacts: {
+          graph_mutation_inputs: {
+            email_reply_node: {
+              graph_context: {
+                operating_graph_run_id: "graph-run-email-reply-route",
+                graph_node_id: "email_reply_node",
+                goal: "revenue_now",
+                platform: "gmail",
+                mutation_family: "email_send",
+                acting_agent_id: "callscore-email-reply-agent",
+                authority: "gated_external_send",
+                approval_receipt_id: "approval-email-reply-route",
+                approved_payload_hash: payloadHash(payload),
+                provider_execution_receipt_id: "provider-email-reply-route",
+                dry_run: false,
+                parent_receipt_id: "approval-email-reply-route",
+              },
+              approved: true,
+              provider_tool: "ZOHO_MAIL_MESSAGES_REPLY_TO_EMAIL",
+              payload,
+              provider_execution_receipt_id: "provider-email-reply-route",
+              provider_response: { ok: true, id: "zoho-reply-001" },
+              target_url_or_id: "1783039632062159400",
+            },
+          },
+        },
+      }),
+      { configurable: { thread_id: "operating-email-reply-route-test" } },
+    );
+
+    const emailNode = result.node_results.find((item) => item.node_id === "email_reply_node");
+    assert.equal(emailNode?.status, "ok");
+    assert.equal(result.node_results.some((item) => item.node_id === "revenue_goal_loop"), false);
+    assert.equal(result.mutation_flags.provider_mutation_performed, true);
+    assert.equal(result.mutation_flags.send_or_outreach_performed, true);
+    assert.equal(result.mutation_flags.public_publish_performed, false);
+  });
+
+  test("graph-owned Zoho outbound email uses explicit email_send_node route", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const payload = {
+      accountId: "5586367000000008002",
+      fromAddress: "sarah.collins@call-score.com",
+      toAddress: "desk@example.com",
+      subject: "Story packet for your crypto desk",
+      content: "Plain-text outbound pilot body.",
+      mailFormat: "plaintext",
+    };
+    const result = await graph.invoke(
+      buildInitialOperatingState({
+        goal: "revenue_now",
+        mode: "live_owned_public",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "approval-email-send-route",
+        testFixtures: true,
+        artifacts: {
+          graph_mutation_inputs: {
+            email_send_node: {
+              graph_context: {
+                operating_graph_run_id: "graph-run-email-send-route",
+                graph_node_id: "email_send_node",
+                goal: "revenue_now",
+                platform: "gmail",
+                mutation_family: "email_send",
+                acting_agent_id: "callscore-email-partnership-drafts-head",
+                authority: "gated_external_send",
+                approval_receipt_id: "approval-email-send-route",
+                approved_payload_hash: payloadHash(payload),
+                provider_execution_receipt_id: "provider-email-send-route",
+                dry_run: false,
+                parent_receipt_id: "approval-email-send-route",
+              },
+              approved: true,
+              provider_tool: "ZOHO_MAIL_MESSAGES_SEND_EMAIL",
+              payload,
+              provider_execution_receipt_id: "provider-email-send-route",
+              provider_response: { ok: true, id: "zoho-send-001" },
+              target_url_or_id: "desk@example.com",
+            },
+          },
+        },
+      }),
+      { configurable: { thread_id: "operating-email-send-route-test" } },
+    );
+
+    const emailNode = result.node_results.find((item) => item.node_id === "email_send_node");
+    assert.equal(emailNode?.status, "ok");
+    assert.equal(result.node_results.some((item) => item.node_id === "revenue_goal_loop"), false);
+    assert.equal(result.mutation_flags.provider_mutation_performed, true);
+    assert.equal(result.mutation_flags.send_or_outreach_performed, true);
+    assert.equal(result.mutation_flags.public_publish_performed, false);
   });
 
   test("every non-revenue operating goal reaches a concrete wrapper node with no mutation", async () => {

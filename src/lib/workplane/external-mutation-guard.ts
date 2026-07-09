@@ -89,6 +89,7 @@ function platformFromProviderTool(tool: string | null | undefined): string | nul
   if (!tool) return null;
   const prefix = tool.split("_")[0]?.toLowerCase();
   if (prefix === "twitter" || prefix === "x") return "x";
+  if (prefix === "zoho") return "gmail";
   if (["linkedin", "reddit", "youtube", "gmail", "resend", "whop", "attio", "posthog"].includes(prefix)) return prefix;
   return null;
 }
