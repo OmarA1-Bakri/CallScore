@@ -194,6 +194,7 @@ test("stale provider wakeups are globally deduplicated across channels for the r
   const crypto = require("node:crypto");
   // nosemgrep
   fs.mkdirSync(receiptDir, { recursive: true });
+  // nosemgrep
   fs.mkdirSync(stateDir, { recursive: true });
   for (const channel of ["linkedin", "x"]) {
     // nosemgrep
