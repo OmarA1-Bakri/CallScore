@@ -80,6 +80,12 @@ function approvedCanonicalReceipts(agentId = "callscore-test-agent") {
 }
 
 describe("callscore operating graph", () => {
+  const readyWorkplaneStatus = {
+    status: "OK",
+    automation_readiness: "CONTROLLED_FULL",
+    autonomous_revenue_status: "YES",
+    public_artifact_readiness: "READY_PUBLIC_OWNED",
+  } as const;
   test("boots and routes monitor goal to monitoring loop", async () => {
     const graph = createCallscoreOperatingGraph();
     const result = await graph.invoke(
@@ -99,7 +105,7 @@ describe("callscore operating graph", () => {
     const graph = createCallscoreOperatingGraph();
     const result = await graph.invoke(
       buildInitialOperatingState({ goal: "revenue_now", mode: "draft_only", testFixtures: true, campaignId: "campaign-operating-test" }),
-      { configurable: { thread_id: "operating-revenue-test" } },
+      { configurable: { thread_id: "operating-revenue-test", workplaneStatus: readyWorkplaneStatus } },
     );
 
     const revenueNode = result.node_results.find((item) => item.node_id === "revenue_goal_loop");
@@ -128,7 +134,7 @@ describe("callscore operating graph", () => {
     };
     const result = await graph.invoke(
       buildInitialOperatingState({ goal: "revenue_now", mode: "draft_only", testFixtures: true, campaignId: "campaign-social-packet-test" }),
-      { configurable: { thread_id: "operating-revenue-social-packet-test", socialPacket, socialPacketPath: "/tmp/social-packet.json" } },
+      { configurable: { thread_id: "operating-revenue-social-packet-test", socialPacket, socialPacketPath: "/tmp/social-packet.json", workplaneStatus: readyWorkplaneStatus } },
     );
 
     const revenueNode = result.node_results.find((item) => item.node_id === "revenue_goal_loop");
@@ -159,7 +165,7 @@ describe("callscore operating graph", () => {
       {
         configurable: {
           thread_id: "operating-revenue-provider-block-test",
-          workplaneStatus: { status: "OK", automation_readiness: "CONTROLLED_FULL", autonomous_revenue_status: "YES" },
+          workplaneStatus: readyWorkplaneStatus,
         },
       },
     );

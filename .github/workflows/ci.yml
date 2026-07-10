@@ -34,6 +34,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nextjs-
 
+      - name: Install media test dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -18,7 +18,7 @@ test("active task JSON normalizes null model to empty and arrays to comma-separa
   assert.equal(execFileSync("python3", [HELPER, file, "toolsets", "csv"], { encoding: "utf8" }), "terminal,file");
 });
 
-test("channel wrapper uses normalized JSON reader instead of Python repr", () => {
+test("channel wrapper uses normalized JSON reader instead of Python repr", { skip: !existsSync(WRAPPER) }, () => {
   const source = readFileSync(WRAPPER, "utf8");
   assert.match(source, /callscore-read-active-json\.py/);
   assert.doesNotMatch(source, /print\(json\.load\(open\('\$ACTIVE_FILE'\)\)\.get/);

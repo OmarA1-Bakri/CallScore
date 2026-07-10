@@ -60,13 +60,9 @@ export default function StructuredData() {
   return (
     <>
       {[websiteSchema, applicationSchema, organizationSchema].map((schema, index) => (
-        // JSON-LD is serialized with HTML-significant characters escaped above.
-        // nosemgrep: javascript.react.security.audit.react-dangerouslysetinnerhtml
-        <script
-          key={index}
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(schema) }}
-        />
+        <script key={index} type="application/ld+json">
+          {serializeJsonLd(schema)}
+        </script>
       ))}
     </>
   );

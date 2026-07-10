@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec, runWorkplaneJob } from "../src/lib/workplane-jobs";
@@ -473,7 +473,7 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
   assert.match(domains.art_of_war.safe_next_action ?? "", /owned-channel GTM loop/);
 });
 
-test("public artifact readiness stays open when unrelated private infra lane is blocked", async () => {
+test("public artifact readiness stays open when unrelated private infra lane is blocked", { skip: !existsSync("/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py") }, async () => {
   const { buildReadinessDomains } = await import("../src/lib/workplane-status");
   const root = mkdtempSync(join(tmpdir(), "callscore-public-artifact-readiness-"));
   mkdirSync(join(root, ".tmp", "workflow-receipts", "gemma_capacity_preflight"), { recursive: true });
