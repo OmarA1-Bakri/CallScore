@@ -2,6 +2,7 @@ import * as assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, test } from "node:test";
+import { validCanonicalMediaArtifact } from "./helpers/canonical-media-fixture";
 
 const socialNodesModulePath = "../src/lib/workplane/node-wrappers/" + "social-publish-nodes";
 const legacyBlockerModulePath = "../src/lib/workplane/" + "legacy-external-mutation-blockers";
@@ -83,7 +84,11 @@ const canonicalReceipts = [
   "same_shit_memory_receipt.v1",
   "callscore.task_router_receipt.v1",
   "callscore.tool_inheritance_receipt.v1",
-  "callscore.media_artifact_receipt.v1",
+  "callscore.design_bundle_reference_receipt.v1",
+  "callscore.website_design_alignment_receipt.v2",
+  "callscore.branding_receipt.v2",
+  "callscore.brand_lockup_occlusion_check.v1",
+  "callscore.media_artifact_receipt.v2",
 ].map((schema) => ({
   schema,
   receipt_id: `${schema}:test`,
@@ -206,6 +211,7 @@ describe("graph-only social external mutation RED contract", () => {
       provider_tool: "TWITTER_CREATION_OF_A_POST",
       provider_response: { ok: true, id: "post-missing-same-shit" },
       canonical_receipts: missingSameShit,
+      canonical_media_artifact: validCanonicalMediaArtifact("x"),
       media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 
@@ -224,6 +230,7 @@ describe("graph-only social external mutation RED contract", () => {
       provider_tool: "TWITTER_CREATION_OF_A_POST",
       provider_response: { ok: true, id: "post-media-ok", url: "https://x.com/callscore/status/post-media-ok" },
       canonical_receipts: canonicalReceipts,
+      canonical_media_artifact: validCanonicalMediaArtifact("x"),
       media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 
@@ -247,6 +254,7 @@ describe("graph-only social external mutation RED contract", () => {
       provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
       provider_response: { ok: true, id: "li-media-ok", url: "https://linkedin.com/feed/update/li-media-ok" },
       canonical_receipts: canonicalReceipts,
+      canonical_media_artifact: validCanonicalMediaArtifact("linkedin"),
       media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 

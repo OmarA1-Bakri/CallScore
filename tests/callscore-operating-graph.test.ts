@@ -15,6 +15,7 @@ import {
   type OperatingGraphState,
   type OperatingNodeResult,
 } from "../src/lib/workplane/operating-graph-schemas";
+import { validCanonicalMediaArtifact } from "./helpers/canonical-media-fixture";
 
 const nodeStartedAt = "2026-06-25T12:00:00.000Z";
 const nodeFinishedAt = "2026-06-25T12:00:01.000Z";
@@ -61,7 +62,11 @@ function approvedCanonicalReceipts(agentId = "callscore-test-agent") {
     "same_shit_memory_receipt.v1",
     "callscore.task_router_receipt.v1",
     "callscore.tool_inheritance_receipt.v1",
-    "callscore.media_artifact_receipt.v1",
+    "callscore.design_bundle_reference_receipt.v1",
+    "callscore.website_design_alignment_receipt.v2",
+    "callscore.branding_receipt.v2",
+    "callscore.brand_lockup_occlusion_check.v1",
+    "callscore.media_artifact_receipt.v2",
   ];
   return schemas.map((schema) => ({
     schema,
@@ -240,6 +245,7 @@ describe("callscore operating graph", () => {
               channel: "x",
               created_at: "2026-06-25T12:00:00.000Z",
               receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
+              media_artifact: validCanonicalMediaArtifact("x"),
             },
             graph_mutation_inputs: {
               x_owned_publish_node: {
@@ -265,6 +271,7 @@ describe("callscore operating graph", () => {
                   channel: "x",
                   created_at: "2026-06-25T12:00:00.000Z",
                   receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
+                  media_artifact: validCanonicalMediaArtifact("x"),
                 },
                 provider_tool: "TWITTER_CREATION_OF_A_POST",
                 provider_payload: textOnlyPayload,
@@ -325,6 +332,7 @@ describe("callscore operating graph", () => {
               channel: "x",
               created_at: "2026-06-25T12:00:00.000Z",
               receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
+              media_artifact: validCanonicalMediaArtifact("x"),
             },
             graph_mutation_inputs: {
               x_owned_publish_node: {
@@ -350,6 +358,7 @@ describe("callscore operating graph", () => {
                   channel: "x",
                   created_at: "2026-06-25T12:00:00.000Z",
                   receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
+                  media_artifact: validCanonicalMediaArtifact("x"),
                 },
                 provider_tool: "TWITTER_CREATION_OF_A_POST",
                 provider_payload: payload,

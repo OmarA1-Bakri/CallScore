@@ -18,6 +18,7 @@ export const CHANNEL_AGENT_TASK_TYPES = [
   "x_specialist_dispatch",
   "linkedin_specialist_dispatch",
   "reddit_specialist_dispatch",
+  "agent_observe",
 ] as const;
 
 export type ChannelAgentTaskType = (typeof CHANNEL_AGENT_TASK_TYPES)[number];
@@ -112,6 +113,7 @@ export function channelTaskWorkplaneJobType(taskType: string): WorkplaneJobType 
     case "compliance_lint_gate":
       return "artofwar_publish_approval_review";
     case "data_pipeline_freshness_sentinel":
+    case "agent_observe":
       return "automation_health_check";
     case "cmo_strategy_review":
       return "artofwar_strategy_brief";

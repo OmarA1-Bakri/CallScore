@@ -29,6 +29,8 @@ test("channel-head tasks map to safe Workplane report jobs", () => {
   assert.equal(channelTaskWorkplaneJobType("opportunity_research_brief"), "artofwar_strategy_brief");
   assert.equal(channelTaskWorkplaneJobType("compliance_lint_gate"), "artofwar_publish_approval_review");
   assert.equal(channelTaskWorkplaneJobType("data_pipeline_freshness_sentinel"), "automation_health_check");
+  assert.ok(CHANNEL_AGENT_TASK_TYPES.includes("agent_observe" as never));
+  assert.equal(channelTaskWorkplaneJobType("agent_observe"), "automation_health_check");
 });
 
 test("channel task result summary proves agent execution without external mutation", () => {

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { NonEmptyStringSchema } from "../validation/shared";
+import { validateCanonicalMediaArtifact, type MediaArtifactReceipt } from "../agent-toolbox-contract";
 
 export const REQUIRED_CANONICAL_RECEIPT_TYPES = [
   "editorial_angle_receipt.v1",
@@ -11,7 +12,11 @@ export const REQUIRED_CANONICAL_RECEIPT_TYPES = [
   "same_shit_memory_receipt.v1",
   "callscore.task_router_receipt.v1",
   "callscore.tool_inheritance_receipt.v1",
-  "callscore.media_artifact_receipt.v1",
+  "callscore.design_bundle_reference_receipt.v1",
+  "callscore.website_design_alignment_receipt.v2",
+  "callscore.branding_receipt.v2",
+  "callscore.brand_lockup_occlusion_check.v1",
+  "callscore.media_artifact_receipt.v2",
 ] as const;
 
 export const REQUIRED_YOUTUBE_RECEIPT_TYPES = [
@@ -52,6 +57,10 @@ export interface CanonicalPackageEvaluation {
   readonly package: CanonicalOperationalPackage;
 }
 
+export interface CanonicalOperationalPackageInput extends Omit<CanonicalOperationalPackage, "status" | "blockers"> {
+  readonly media_artifact?: Partial<MediaArtifactReceipt> | null;
+}
+
 function hasApprovedReceipt(receipts: readonly CanonicalReceipt[], schema: string): boolean {
   return receipts.some((r) => r.schema === schema && r.decision === "approved" && r.blockers.length === 0);
 }
@@ -66,9 +75,25 @@ function missingReceiptBlockers(receipts: readonly CanonicalReceipt[], required:
   return required.filter((schema) => !hasApprovedReceipt(receipts, schema)).map((schema) => `missing_${schema}`);
 }
 
-export function evaluateCanonicalOperationalPackage(input: Omit<CanonicalOperationalPackage, "status" | "blockers">): CanonicalPackageEvaluation {
-  const parsed = CanonicalOperationalPackageSchema.omit({ status: true, blockers: true }).parse(input);
-  const blockers = [...missingReceiptBlockers(parsed.receipts, REQUIRED_CANONICAL_RECEIPT_TYPES), ...receiptBlockers(parsed.receipts)];
+export function evaluateCanonicalOperationalPackage(input: CanonicalOperationalPackageInput): CanonicalPackageEvaluation {
+  const { media_artifact: mediaArtifact, ...packageInput } = input;
+  const parsed = CanonicalOperationalPackageSchema.omit({ status: true, blockers: true }).parse(packageInput);
+  const mediaBlockers: string[] = [];
+  if (!mediaArtifact) {
+    mediaBlockers.push("missing_canonical_media_artifact");
+  } else if (mediaArtifact.schema !== "callscore.media_artifact_receipt.v2") {
+    mediaBlockers.push("canonical_media_receipt_v2_required");
+  } else {
+    const mediaValidation = validateCanonicalMediaArtifact(mediaArtifact);
+    if (!mediaValidation.canonical_media_valid || !mediaValidation.publish_candidate_ready) {
+      mediaBlockers.push(...mediaValidation.failure_reasons.map((reason) => `canonical_media_${reason}`));
+    }
+  }
+  const blockers = [
+    ...missingReceiptBlockers(parsed.receipts, REQUIRED_CANONICAL_RECEIPT_TYPES),
+    ...receiptBlockers(parsed.receipts),
+    ...mediaBlockers,
+  ];
   const status = blockers.length === 0 ? "approved" : "blocked";
   return { status, blockers, package: { ...parsed, status, blockers } };
 }
@@ -135,10 +160,21 @@ export interface YoutubeProductionPackageInput {
   readonly package_id: string;
   readonly created_at: string;
   readonly receipts: readonly CanonicalReceipt[];
+  readonly media_artifact?: Partial<MediaArtifactReceipt> | null;
 }
 
 export function buildYoutubeProductionPackage(input: YoutubeProductionPackageInput) {
-  const blockers = [...missingReceiptBlockers(input.receipts, REQUIRED_YOUTUBE_RECEIPT_TYPES), ...receiptBlockers(input.receipts)];
+  const base = evaluateCanonicalOperationalPackage({
+    package_id: input.package_id,
+    channel: "youtube",
+    created_at: input.created_at,
+    receipts: [...input.receipts],
+    media_artifact: input.media_artifact,
+  });
+  const blockers = [
+    ...base.blockers,
+    ...missingReceiptBlockers(input.receipts, REQUIRED_YOUTUBE_RECEIPT_TYPES),
+  ];
   const status = blockers.length === 0 ? "approved" : "blocked";
   return {
     schema: "youtube_production_package.v1" as const,

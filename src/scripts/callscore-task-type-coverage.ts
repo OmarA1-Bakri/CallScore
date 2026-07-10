@@ -28,8 +28,8 @@ function defaultTaskType(agentId: string): string {
   return "agent_observe";
 }
 
-/** Task types that are intentionally NOT in CHANNEL_AGENT_TASK_TYPES. */
-const EXEMPT_TASK_TYPES = new Set(["agent_observe"]);
+/** Task types intentionally exempt from the worker contract. Keep empty unless a receipt-backed non-worker lane owns the task. */
+const EXEMPT_TASK_TYPES = new Set<string>();
 
 interface CoverageResult {
   all_agent_task_types: string[];

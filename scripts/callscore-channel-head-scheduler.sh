@@ -3,7 +3,7 @@ set -euo pipefail
 
 RUNTIME="${CALLSCORE_CHANNEL_ORCHESTRATOR_RUNTIME:-/srv/agents/hermes/runtime/channel-head-orchestrator}"
 ENABLED_FILE="${CALLSCORE_CHANNEL_SCHEDULER_ENABLED_FILE:-${RUNTIME}/scheduler.enabled}"
-ORCHESTRATOR="${CALLSCORE_CHANNEL_DAILY_ORCHESTRATOR:-/srv/agents/hermes/scripts/callscore-daily-orchestrator.sh}"
+ORCHESTRATOR="${CALLSCORE_CHANNEL_DAILY_ORCHESTRATOR:-/opt/crypto-tuber-ranked/scripts/callscore-daily-orchestrator.sh}"
 
 mkdir -p "$RUNTIME"/logs
 
