@@ -320,7 +320,7 @@ describe("graph-only social external mutation RED contract", () => {
     assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
   });
 
-  test("legacy Hermes social wrapper has no provider calls and only invokes operating graph", () => {
+  test("legacy Hermes social wrapper has no provider calls and only invokes operating graph", { skip: !existsSync("/srv/agents/hermes/scripts/callscore-genuine-social-packet.sh") }, () => {
     const wrapperPath = "/srv/agents/hermes/scripts/callscore-genuine-social-packet.sh";
     assert.equal(existsSync(wrapperPath), true);
     const source = readFileSync(wrapperPath, "utf8");

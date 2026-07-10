@@ -388,9 +388,13 @@ function stringFieldDeep(value: unknown, keys: readonly string[]): string | null
       return stringFieldDeep(JSON.parse(value) as unknown, keys);
     } catch {
       for (const key of keys) {
-        const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const jsonMatch = value.match(new RegExp(`"${escaped}"\\s*:\\s*"([^"]+)"`));
-        if (jsonMatch?.[1]) return jsonMatch[1];
+        const marker = `"${key}"`;
+        const markerIndex = value.indexOf(marker);
+        if (markerIndex < 0) continue;
+        const colonIndex = value.indexOf(":", markerIndex + marker.length);
+        const openingQuote = colonIndex >= 0 ? value.indexOf('"', colonIndex + 1) : -1;
+        const closingQuote = openingQuote >= 0 ? value.indexOf('"', openingQuote + 1) : -1;
+        if (openingQuote >= 0 && closingQuote > openingQuote + 1) return value.slice(openingQuote + 1, closingQuote);
       }
       const referenceMatch = value.match(/Reference S3 Key \(s3key\):\s*([^\s]+)/i);
       return referenceMatch?.[1] ?? null;

@@ -16,6 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Provide canonical CallScore repo path
+        run: |
+          sudo mkdir -p /opt
+          sudo ln -sfn "$GITHUB_WORKSPACE" /opt/crypto-tuber-ranked
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20

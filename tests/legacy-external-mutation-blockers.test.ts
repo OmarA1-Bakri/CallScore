@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { assertWhopBootstrapGraphContext } from "../src/scripts/bootstrap-whop";
 import { assertQueuedAlertSendGraphContext } from "../src/scripts/send-queued-alerts";
@@ -86,7 +86,7 @@ describe("legacy CallScore mutation path blockers", () => {
     assert.equal(decision.allowed_next_action, "call_operating_goal");
   });
 
-  test("legacy video rollback impl wrappers fail closed instead of direct TS provider-adjacent entrypoints", () => {
+  test("legacy video rollback impl wrappers fail closed instead of direct TS provider-adjacent entrypoints", { skip: !existsSync("/srv/agents/hermes/scripts/callscore-video-scheduler-impl.sh") }, () => {
     for (const script of [
       "/srv/agents/hermes/scripts/callscore-video-scheduler-impl.sh",
       "/srv/agents/hermes/scripts/callscore-video-queue-consumer-impl.sh",

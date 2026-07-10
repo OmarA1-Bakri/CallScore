@@ -3,6 +3,13 @@ import { SITE_URL } from "@/lib/site";
 const applicationDescription =
   "CallScore tracks public crypto creator market calls, scores predictions against real price data, and ranks creators by alpha, accuracy, consistency, and self-correction.";
 
+function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
 export default function StructuredData() {
   const websiteSchema = {
     "@context": "https://schema.org",
@@ -53,10 +60,12 @@ export default function StructuredData() {
   return (
     <>
       {[websiteSchema, applicationSchema, organizationSchema].map((schema, index) => (
+        // JSON-LD is serialized with HTML-significant characters escaped above.
+        // nosemgrep: javascript.react.security.audit.react-dangerouslysetinnerhtml
         <script
           key={index}
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(schema) }}
         />
       ))}
     </>

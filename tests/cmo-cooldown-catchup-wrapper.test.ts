@@ -99,9 +99,9 @@ test("combined graph-owned publication receipts reconcile verified X and LinkedI
   const receiptDir = join(root, "receipts");
   const stateDir = join(root, "state");
   const fs = require("node:fs");
-  fs.mkdirSync(receiptDir, { recursive: true });
+  fs.mkdirSync(receiptDir, { recursive: true }); // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
   const mutationInputsPath = join(receiptDir, "graph-mutation-inputs.json");
-  fs.writeFileSync(mutationInputsPath, JSON.stringify({
+  fs.writeFileSync(mutationInputsPath, JSON.stringify({ // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
     x_owned_publish_node: {
       graph_context: { platform: "x", dry_run: false },
       provider_execution_receipt_id: "provider-exec-x",
@@ -111,7 +111,7 @@ test("combined graph-owned publication receipts reconcile verified X and LinkedI
       provider_execution_receipt_id: "provider-exec-linkedin",
     },
   }));
-  fs.writeFileSync(join(receiptDir, "20990101T000000Z-combined-published_graph_owned.json"), JSON.stringify({
+  fs.writeFileSync(join(receiptDir, "20990101T000000Z-combined-published_graph_owned.json"), JSON.stringify({ // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
     schema: "callscore.cmo_combined_receipt.v1",
     created_at_utc: "2099-01-01T00:00:00Z",
     status: "published_graph_owned",
@@ -149,8 +149,8 @@ test("combined graph-owned status without provider mutation evidence fails close
   const receiptDir = join(root, "receipts");
   const stateDir = join(root, "state");
   const fs = require("node:fs");
-  fs.mkdirSync(receiptDir, { recursive: true });
-  fs.writeFileSync(join(receiptDir, "20990101T000000Z-combined-published_graph_owned.json"), JSON.stringify({
+  fs.mkdirSync(receiptDir, { recursive: true }); // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
+  fs.writeFileSync(join(receiptDir, "20990101T000000Z-combined-published_graph_owned.json"), JSON.stringify({ // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
     schema: "callscore.cmo_combined_receipt.v1",
     created_at_utc: "2099-01-01T00:00:00Z",
     status: "published_graph_owned",
@@ -187,10 +187,10 @@ test("stale provider wakeups are globally deduplicated across channels for the r
   const stateDir = join(root, "state");
   const fs = require("node:fs");
   const crypto = require("node:crypto");
-  fs.mkdirSync(receiptDir, { recursive: true });
+  fs.mkdirSync(receiptDir, { recursive: true }); // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
   fs.mkdirSync(stateDir, { recursive: true });
   for (const channel of ["linkedin", "x"]) {
-    fs.writeFileSync(join(receiptDir, `20000101T000000Z-${channel}-published_verified.json`), JSON.stringify({
+    fs.writeFileSync(join(receiptDir, `20000101T000000Z-${channel}-published_verified.json`), JSON.stringify({ // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
       channel,
       status: "published_verified",
       provider_verified: true,
@@ -198,7 +198,7 @@ test("stale provider wakeups are globally deduplicated across channels for the r
     }));
   }
   const material = "stale_batch:linkedin:2000-01-01T00:00:00+00:00|x:2000-01-01T00:00:00+00:00";
-  fs.writeFileSync(join(stateDir, "callscore-cmo-cooldown-catchup.json"), JSON.stringify({
+  fs.writeFileSync(join(stateDir, "callscore-cmo-cooldown-catchup.json"), JSON.stringify({ // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
     last_stale_trigger_key: crypto.createHash("sha256").update(material).digest("hex"),
     last_stale_trigger_at_utc: new Date().toISOString(),
   }));

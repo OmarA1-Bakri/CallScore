@@ -39,8 +39,8 @@ def main() -> int:
             existing_until = parse_time(str(existing.get("until_utc", "")))
             until = max(until, existing_until)
             source_runs = list(dict.fromkeys([*(existing.get("source_runs") or []), run_id]))
-        except Exception:
-            pass
+        except (OSError, ValueError, TypeError):
+            source_runs = [run_id]
     receipt = {
         "schema": "callscore.channel_head_provider_cooldown.v1",
         "created_at_utc": format_time(now),

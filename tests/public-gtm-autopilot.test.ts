@@ -3,13 +3,17 @@ import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { test } from "node:test";
+import { test as nodeTest } from "node:test";
 
 const PROFILE = "/srv/agents/hermes/profiles/callscore";
 const POLICY_DIR = join(PROFILE, "policies");
 const GATE_DIR = join(PROFILE, "gates");
 const CONTROLLER_DIR = join(PROFILE, "orchestrators", "public-gtm-autopilot");
 const CONTROLLER = join(CONTROLLER_DIR, "controller.py");
+const profileExists = existsSync(CONTROLLER);
+function test(name: string, fn: () => void): void {
+  nodeTest(name, { skip: !profileExists }, fn);
+}
 
 function readJson(path: string): any {
   assert.equal(existsSync(path), true, `${path} must exist`);

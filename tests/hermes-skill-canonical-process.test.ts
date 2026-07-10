@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import test from "node:test";
+import { existsSync, readFileSync } from "node:fs";
+import { test as nodeTest } from "node:test";
 
 const skillPaths = {
   "art-of-war-operations": "/srv/agents/hermes/skills/commerce/art-of-war-operations/SKILL.md",
@@ -11,7 +11,15 @@ const skillPaths = {
   xurl: "/srv/agents/hermes/skills/social-media/xurl/SKILL.md",
 } as const;
 
-const read = (path: string) => readFileSync(path, "utf8");
+const externalReferences = [
+  "/srv/agents/hermes/skills/commerce/whop-automation/references/composio-integration-state.md",
+  "/srv/whop-auto/plugin/agent_workflows/whop_auto/README.md",
+];
+const skillsExist = [...Object.values(skillPaths), ...externalReferences].every(existsSync);
+const read = (path: string) => existsSync(path) ? readFileSync(path, "utf8") : "";
+function test(name: string, fn: () => void): void {
+  nodeTest(name, { skip: !skillsExist }, fn);
+}
 const skillText = Object.fromEntries(Object.entries(skillPaths).map(([name, path]) => [name, read(path)]));
 const allSkillText = Object.values(skillText).join("\n");
 
