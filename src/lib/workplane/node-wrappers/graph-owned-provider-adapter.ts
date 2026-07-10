@@ -23,6 +23,7 @@ export interface ProviderCallPreflightResult {
 export interface ProviderMediaBridgeResult {
   readonly ok: boolean;
   readonly blockerCode?: string;
+  readonly error?: string;
   readonly providerExecutionReceiptIds?: readonly string[];
   readonly providerExecutionReceiptPaths?: readonly string[];
 }
@@ -381,6 +382,71 @@ function mimetypeFromGateOrPath(gate: Record<string, unknown>, localPath: string
   return "image/png";
 }
 
+function stringFieldDeep(value: unknown, keys: readonly string[]): string | null {
+  if (typeof value === "string") {
+    try {
+      return stringFieldDeep(JSON.parse(value) as unknown, keys);
+    } catch {
+      for (const key of keys) {
+        const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const jsonMatch = value.match(new RegExp(`"${escaped}"\\s*:\\s*"([^"]+)"`));
+        if (jsonMatch?.[1]) return jsonMatch[1];
+      }
+      const referenceMatch = value.match(/Reference S3 Key \(s3key\):\s*([^\s]+)/i);
+      return referenceMatch?.[1] ?? null;
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = stringFieldDeep(item, keys);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isRecord(value)) return null;
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+  }
+  for (const candidate of Object.values(value)) {
+    const found = stringFieldDeep(candidate, keys);
+    if (found) return found;
+  }
+  return null;
+}
+
+export function extractComposioS3Key(value: unknown): string | null {
+  return stringFieldDeep(value, ["s3key", "s3_key"]);
+}
+
+async function stageLocalFileViaGraphOwnedWorkbench(input: {
+  readonly localPath: string;
+  readonly mimetype: string;
+  readonly toolSlug: string;
+}): Promise<{ ok: true; uploadable: Record<string, unknown> } | { ok: false; blockerCode: string; error?: string }> {
+  const name = basename(input.localPath);
+  const encoded = readFileSync(input.localPath).toString("base64");
+  const remotePath = `/mnt/files/graph-owned-media/${name}`;
+  const code = [
+    "import base64, json, os",
+    `remote_path = ${JSON.stringify(remotePath)}`,
+    "os.makedirs(os.path.dirname(remote_path), exist_ok=True)",
+    `open(remote_path, 'wb').write(base64.b64decode(${JSON.stringify(encoded)}))`,
+    "result, error = upload_local_file(remote_path)",
+    "print(json.dumps({'ok': not bool(error), 'error': error or None, 'upload': result or {}}))",
+  ].join("\n");
+  const result = await executeGraphOwnedProviderCall("COMPOSIO_REMOTE_WORKBENCH", {
+    code_to_execute: code,
+    thought: "Stage one graph-owned CallScore media artifact for a gated owned-public provider action.",
+    current_step: "GRAPH_OWNED_MEDIA_STAGING",
+    current_step_metric: "1/1 media artifact",
+  });
+  if (!result.ok) return { ok: false, blockerCode: result.blockerCode ?? "provider_media_bridge_failed", error: result.error };
+  const key = extractComposioS3Key(result.response);
+  if (!key) return { ok: false, blockerCode: "provider_media_bridge_failed", error: "Composio workbench upload succeeded without s3key" };
+  return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: key } };
+}
+
 async function stageLocalFileForComposio(input: {
   readonly localPath: string;
   readonly mimetype: string;
@@ -392,8 +458,8 @@ async function stageLocalFileForComposio(input: {
   if (process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE === "1") {
     return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: `test/${input.toolSlug}/${name}` } };
   }
-  const apiKey = process.env.COMPOSIO_API_KEY;
-  if (!apiKey) return { ok: false, blockerCode: "blocked_auth", error: "COMPOSIO_API_KEY missing for graph-owned media bridge" };
+  const apiKey = process.env.COMPOSIO_FILE_UPLOAD_API_KEY ?? process.env.COMPOSIO_API_KEY;
+  if (!apiKey) return { ok: false, blockerCode: "blocked_auth", error: "Composio file-upload API key missing for graph-owned media bridge" };
   const content = readFileSync(input.localPath);
   const md5 = createHash("md5").update(content).digest("hex");
   const request = await fetch("https://backend.composio.dev/api/v3.1/files/upload/request", {
@@ -411,7 +477,13 @@ async function stageLocalFileForComposio(input: {
     }),
   });
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-  if (!request.ok) return { ok: false, blockerCode: blockerForHttpStatus(request.status, JSON.stringify(body), input.toolSlug), error: JSON.stringify(body).slice(0, 500) };
+  if (!request.ok) {
+    const blockerCode = blockerForHttpStatus(request.status, JSON.stringify(body), input.toolSlug);
+    if (blockerCode === "blocked_auth") {
+      return stageLocalFileViaGraphOwnedWorkbench(input);
+    }
+    return { ok: false, blockerCode, error: JSON.stringify(body).slice(0, 500) };
+  }
   const data = nestedRecord(body, "data") ?? body;
   const uploadUrl = firstString(data.new_presigned_url, data.newPresignedUrl, body.new_presigned_url, body.newPresignedUrl);
   const key = firstString(data.key, body.key, data.s3key, body.s3key);
@@ -479,7 +551,7 @@ export async function bridgeGraphOwnedProviderMedia(input: Record<string, unknow
       return { ok: true };
     }
     const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "TWITTER_UPLOAD_MEDIA", toolkitSlug: "twitter" });
-    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode };
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error };
     const uploadPayload = {
       media: staged.uploadable,
       media_type: typeof staged.uploadable.mimetype === "string" ? staged.uploadable.mimetype : "image/png",
@@ -496,7 +568,7 @@ export async function bridgeGraphOwnedProviderMedia(input: Record<string, unknow
 
   if (providerTool === "LINKEDIN_CREATE_LINKED_IN_POST") {
     const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "LINKEDIN_CREATE_LINKED_IN_POST", toolkitSlug: "linkedin" });
-    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode };
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error };
     mutateProviderPayload(input, { ...providerPayload, images: [staged.uploadable] });
     return { ok: true };
   }
@@ -649,11 +721,10 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
       ?? availableToolNames.find((name) => name.toUpperCase() === toolSlug.toUpperCase())
       ?? null;
     const multiExecuteToolName = availableToolNames.find((name) => name === "COMPOSIO_MULTI_EXECUTE_TOOL") ?? null;
-    // Prefer Composio's multi-execute wrapper when available so graph-owned calls
-    // can pass explicit connected-account binding. Direct MCP app tools do not
-    // accept the `account` selector, which can route mutations through the wrong
-    // enrolled/provider billing context even when read-only lookup succeeds.
-    const selectedToolName = multiExecuteToolName ?? directToolName;
+    // Meta tools such as COMPOSIO_REMOTE_WORKBENCH must be invoked directly.
+    // App tools prefer multi-execute so connected-account binding remains explicit.
+    const isComposioMetaTool = toolSlug.startsWith("COMPOSIO_");
+    const selectedToolName = isComposioMetaTool ? directToolName : (multiExecuteToolName ?? directToolName);
 
     if (!selectedToolName) {
       const response = { ok: false, error: `MCP tool ${toolSlug} not found`, mcp_tool_count: availableToolNames.length, mcp_tool_names: availableToolNames.slice(0, 120) };

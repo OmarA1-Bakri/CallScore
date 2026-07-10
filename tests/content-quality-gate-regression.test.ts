@@ -136,4 +136,31 @@ describe("CallScore social content quality gate regressions", { skip: !gateExist
     assert.notEqual(result.code, 0, JSON.stringify(result.parsed));
     assert.ok(result.parsed.failures.includes("thought_leadership_clipped_or_mock_visual_banned"), JSON.stringify(result.parsed));
   });
+
+  test("single-channel LinkedIn first-person I think hook is recognized as opinion", () => {
+    const copy = "I think most crypto creator vetting fails at the handoff between teams.\n\nRecent reporting makes the split hard to ignore. The operating question is whether attention, incentives, and reconstructable outcomes are joined into one auditable decision.";
+    const result = runGate({
+      single_channel_correction: true,
+      channel: "linkedin",
+      content_type: "thought_leadership",
+      drafts: {
+        linkedin: {
+          exact_copy: copy,
+          growth_mechanics: { media_plan: "image", cta: "Ask which ledger is missing", target_entities: ["crypto partnership teams"] },
+        },
+      },
+      visual_asset: {
+        required: true,
+        png_sha256: "9".repeat(64),
+        png_path: "/tmp/three-ledger-partnership-gate.png",
+        alt_text: "Three evidence ledgers feed one partnership approval decision, with an unknown outcome withholding approval.",
+      },
+      provider_payloads: {
+        linkedin: { images: ["/tmp/three-ledger-partnership-gate.png"] },
+      },
+    });
+
+    assert.equal(result.code, 0, JSON.stringify(result.parsed));
+    assert.equal(result.parsed.ok, true, JSON.stringify(result.parsed));
+  });
 });

@@ -94,6 +94,93 @@ test("current cooldown receipts with nested prior verified posts do not trigger 
   assert.equal(parsed.latest_verified?.linkedin, "2099-01-01T00:00:00Z");
 });
 
+test("combined graph-owned publication receipts reconcile verified X and LinkedIn cadence", { skip: !watcherExists }, () => {
+  const root = mkdtempSync(join(tmpdir(), "cmo-catchup-combined-publish-"));
+  const receiptDir = join(root, "receipts");
+  const stateDir = join(root, "state");
+  const fs = require("node:fs");
+  fs.mkdirSync(receiptDir, { recursive: true });
+  const mutationInputsPath = join(receiptDir, "graph-mutation-inputs.json");
+  fs.writeFileSync(mutationInputsPath, JSON.stringify({
+    x_owned_publish_node: {
+      graph_context: { platform: "x", dry_run: false },
+      provider_execution_receipt_id: "provider-exec-x",
+    },
+    linkedin_owned_publish_node: {
+      graph_context: { platform: "linkedin", dry_run: false },
+      provider_execution_receipt_id: "provider-exec-linkedin",
+    },
+  }));
+  fs.writeFileSync(join(receiptDir, "20990101T000000Z-combined-published_graph_owned.json"), JSON.stringify({
+    schema: "callscore.cmo_combined_receipt.v1",
+    created_at_utc: "2099-01-01T00:00:00Z",
+    status: "published_graph_owned",
+    graph_lane_invoked: true,
+    public_publish_performed: true,
+    provider_mutation_performed: true,
+    invoker_result: {
+      status: "published_graph_owned",
+      mutation_inputs_path: mutationInputsPath,
+      mutation_flags: {
+        public_publish_performed: true,
+        provider_mutation_performed: true,
+      },
+    },
+  }));
+  const output = execFileSync(WATCHER, {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VERBOSE: "1",
+      CALLSCORE_CMO_RECEIPT_DIR: receiptDir,
+      CALLSCORE_CMO_CATCHUP_STATE_DIR: stateDir,
+      CALLSCORE_CMO_JOB_ID: "must-not-run",
+    },
+  });
+  const parsed = JSON.parse(output) as { action: string; reason: string; latest_verified?: Record<string, string> };
+  assert.equal(parsed.action, "none");
+  assert.equal(parsed.reason, "no_due_trigger");
+  assert.equal(parsed.latest_verified?.x, "2099-01-01T00:00:00Z");
+  assert.equal(parsed.latest_verified?.linkedin, "2099-01-01T00:00:00Z");
+});
+
+test("combined graph-owned status without provider mutation evidence fails closed", { skip: !watcherExists }, () => {
+  const root = mkdtempSync(join(tmpdir(), "cmo-catchup-combined-unproved-"));
+  const receiptDir = join(root, "receipts");
+  const stateDir = join(root, "state");
+  const fs = require("node:fs");
+  fs.mkdirSync(receiptDir, { recursive: true });
+  fs.writeFileSync(join(receiptDir, "20990101T000000Z-combined-published_graph_owned.json"), JSON.stringify({
+    schema: "callscore.cmo_combined_receipt.v1",
+    created_at_utc: "2099-01-01T00:00:00Z",
+    status: "published_graph_owned",
+    graph_lane_invoked: true,
+    public_publish_performed: false,
+    provider_mutation_performed: false,
+    invoker_result: {
+      status: "published_graph_owned",
+      mutation_flags: {
+        public_publish_performed: false,
+        provider_mutation_performed: false,
+      },
+    },
+  }));
+  const output = execFileSync(WATCHER, {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VERBOSE: "1",
+      CALLSCORE_CMO_RECEIPT_DIR: receiptDir,
+      CALLSCORE_CMO_CATCHUP_STATE_DIR: stateDir,
+      CALLSCORE_CMO_JOB_ID: "must-not-run",
+    },
+  });
+  const parsed = JSON.parse(output) as { action: string; reason: string; latest_verified?: Record<string, string> };
+  assert.equal(parsed.action, "none");
+  assert.equal(parsed.reason, "no_social_receipts");
+  assert.equal(parsed.latest_verified, undefined);
+});
+
 test("stale provider wakeups are globally deduplicated across channels for the retry window", { skip: !watcherExists }, () => {
   const root = mkdtempSync(join(tmpdir(), "cmo-catchup-stale-dedupe-"));
   const receiptDir = join(root, "receipts");

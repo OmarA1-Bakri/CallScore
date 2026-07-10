@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { buildRunnableConfig, buildRunnableConfigWithRuntimeContext } from "../src/scripts/callscore-operating-goal";
+import { buildInitialArtifactsFromCliArgs, buildRunnableConfig, buildRunnableConfigWithRuntimeContext } from "../src/scripts/callscore-operating-goal";
 
 const repoRoot = process.cwd();
 function writeFakeScout(root: string): { command: string; markerPath: string; receiptPath: string } {
@@ -82,6 +82,28 @@ test("callscore-operating-goal CLI maps revenue_now social packet into runnable 
   assert.equal(config.socialPacketPath, packetPath);
   assert.equal((config.socialPacket as { schema: string }).schema, "callscore.genuine_social_packet.v3");
   assert.equal((config.socialPacket as { facts: { raw_calls: number } }).facts.raw_calls, 123);
+});
+
+test("callscore-operating-goal CLI loads a canonical operational package into graph artifacts", () => {
+  const root = mkdtempSync(join(tmpdir(), "operating-canonical-package-cli-test-"));
+  const packagePath = writeJson(join(root, "canonical-package.json"), {
+    package_id: "canonical-x-001",
+    channel: "x",
+    created_at: "2026-07-10T09:30:00Z",
+    receipts: [],
+    media_artifact: null,
+  });
+
+  const artifacts = buildInitialArtifactsFromCliArgs([
+    "--goal",
+    "revenue_now",
+    "--mode",
+    "live_owned_public",
+    "--canonical-operational-package-json",
+    packagePath,
+  ]);
+
+  assert.equal((artifacts.canonical_operational_package as { package_id: string }).package_id, "canonical-x-001");
 });
 
 test("callscore-operating-goal CLI maps produce_video scheduler flags into runnable config", () => {
