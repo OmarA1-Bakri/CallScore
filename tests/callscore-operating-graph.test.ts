@@ -80,6 +80,7 @@ function approvedCanonicalReceipts(agentId = "callscore-test-agent") {
 }
 
 describe("callscore operating graph", () => {
+  const artOfWarRuntimeExists = existsSync("/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py");
   const readyWorkplaneStatus = {
     status: "OK",
     automation_readiness: "CONTROLLED_FULL",
@@ -101,7 +102,7 @@ describe("callscore operating graph", () => {
     assert.equal(result.mutation_flags.external_mutation_performed, false);
   });
 
-  test("revenue_now dry-run routes to revenue loop without mutation", async () => {
+  test("revenue_now dry-run routes to revenue loop without mutation", { skip: !artOfWarRuntimeExists }, async () => {
     const graph = createCallscoreOperatingGraph();
     const result = await graph.invoke(
       buildInitialOperatingState({ goal: "revenue_now", mode: "draft_only", testFixtures: true, campaignId: "campaign-operating-test" }),
@@ -122,7 +123,7 @@ describe("callscore operating graph", () => {
     assert.equal(result.mutation_flags.public_publish_performed, false);
   });
 
-  test("revenue_now draft-only routes packet facts and visual metadata without public mutation", async () => {
+  test("revenue_now draft-only routes packet facts and visual metadata without public mutation", { skip: !artOfWarRuntimeExists }, async () => {
     const graph = createCallscoreOperatingGraph();
     const socialPacket = {
       ok: true,
@@ -150,7 +151,7 @@ describe("callscore operating graph", () => {
     assert.match(embedded.copy_rule, /ZERO COPY/);
   });
 
-  test("approved revenue publish with approval but no provider proof blocks instead of faking success", async () => {
+  test("approved revenue publish with approval but no provider proof blocks instead of faking success", { skip: !artOfWarRuntimeExists }, async () => {
     const graph = createCallscoreOperatingGraph();
     const result = await graph.invoke(
       buildInitialOperatingState({
