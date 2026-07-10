@@ -5,11 +5,39 @@ import sys
 from json import JSONDecoder
 
 CANONICAL_STATUS_FIELDS = ("status", "workflow_status", "runner_status", "normalized_status")
+DOMAIN_RECEIPT_STATUS_FIELDS = ("mode", "final_decision", "draft", "x", "linkedin")
+
+
+def schema_value(obj: dict) -> str | None:
+    for key in ("schema", "receipt_type", "receipt_schema"):
+        value = obj.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def normalize_schema_alias(obj: dict) -> dict:
+    schema = schema_value(obj)
+    if schema and not obj.get("schema"):
+        obj = dict(obj)
+        obj["schema"] = schema
+    return obj
+
+
+def is_callscore_domain_receipt(obj: dict, expected_schema: str | None) -> bool:
+    schema = schema_value(obj)
+    if not isinstance(schema, str) or not schema.startswith("callscore."):
+        return False
+    if expected_schema and schema == expected_schema:
+        return False
+    if schema.endswith(".read_only_receipt.v1") or ".read_only_" in schema or "_read_only_" in schema or schema == "callscore.proof_post_drafts.v1":
+        return True
+    return bool(obj.get("mode") and obj.get("final_decision"))
 
 
 def candidate_score(obj: dict, expected_schema: str | None) -> int:
     score = 0
-    schema = obj.get("schema")
+    schema = schema_value(obj)
     if schema:
         score += 10
     if expected_schema and schema == expected_schema:
@@ -37,9 +65,11 @@ def scan_candidates(text: str) -> list[tuple[int, int, dict]]:
             continue
         if not isinstance(value, dict):
             continue
+        value = normalize_schema_alias(value)
         has_schema = isinstance(value.get("schema"), str) and bool(value.get("schema"))
         has_statusish = any(k in value for k in CANONICAL_STATUS_FIELDS)
-        if has_schema and has_statusish:
+        has_domain_receipt_shape = any(k in value for k in DOMAIN_RECEIPT_STATUS_FIELDS)
+        if has_schema and (has_statusish or has_domain_receipt_shape):
             candidates.append((start, start + end_rel, value))
     return candidates
 
@@ -60,7 +90,7 @@ def select_candidate(candidates: list[tuple[int, int, dict]], expected_schema: s
         indexed,
         key=lambda item: (
             0 if is_nested(item[1], candidates) else 1,
-            1 if expected_schema and item[1][2].get("schema") == expected_schema else 0,
+            1 if expected_schema and schema_value(item[1][2]) == expected_schema else 0,
             candidate_score(item[1][2], expected_schema),
             item[1][1] - item[1][0],
             item[1][0],
@@ -71,13 +101,28 @@ def select_candidate(candidates: list[tuple[int, int, dict]], expected_schema: s
 
 def validate(obj: dict, expected_schema: str | None):
     errors: list[str] = []
-    if not obj.get("schema"):
+    if not schema_value(obj):
         errors.append("schema_missing")
-    elif expected_schema and obj.get("schema") != expected_schema:
-        errors.append(f"schema_mismatch:{obj.get('schema')}")
-    if not (obj.get("status") or obj.get("workflow_status") or obj.get("runner_status")):
+    elif expected_schema and schema_value(obj) != expected_schema and not is_callscore_domain_receipt(obj, expected_schema):
+        errors.append(f"schema_mismatch:{schema_value(obj)}")
+    if not (obj.get("status") or obj.get("workflow_status") or obj.get("runner_status") or is_callscore_domain_receipt(obj, expected_schema)):
         errors.append("status_missing")
     return errors
+
+
+def normalize_for_output(obj: dict, expected_schema: str | None) -> dict:
+    obj = normalize_schema_alias(obj)
+    if not is_callscore_domain_receipt(obj, expected_schema):
+        return obj
+    normalized = dict(obj)
+    workflow_status = normalized.get("workflow_status")
+    status = normalized.get("status")
+    if not isinstance(workflow_status, str) or not workflow_status:
+        normalized["workflow_status"] = status if isinstance(status, str) and status else "read_only_receipt"
+    if not isinstance(status, str) or not status:
+        normalized["status"] = normalized["workflow_status"]
+    normalized.setdefault("canonical_grade", False)
+    return normalized
 
 
 def main(argv):
@@ -111,6 +156,7 @@ def main(argv):
         return 1
     selected_index, selected_tuple = selected
     _start, _end, obj = selected_tuple
+    obj = normalize_for_output(obj, expected_schema)
     errors = validate(obj, expected_schema)
     result.update(
         {

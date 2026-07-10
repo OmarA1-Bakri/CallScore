@@ -19,6 +19,8 @@ import {
 import { mergeMutationFlags, nodeResultToStatePatch, wrapDirectFunctionNode } from "./operating-node-utils";
 import { generateOperatingReceiptId, writeOperatingReceipt, buildOperatingReceiptPath, redactOperatingValue, buildOperatingSummaryPath, writeOperatingSummary } from "./operating-receipts";
 import { bootContextNode, hardGatePreflightNode } from "./node-wrappers/gating-nodes";
+import { runAttioWriteNode } from "./node-wrappers/crm-write-nodes";
+import { runZohoMailReplyNode, runZohoMailSendNode } from "./node-wrappers/email-reply-nodes";
 import {
   alertGoalLoopNode,
   dataGoalLoopNode,
@@ -137,6 +139,9 @@ function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
       "x_public_like_node",
       "reddit_public_upvote_node",
       "youtube_public_like_node",
+      "email_send_node",
+      "email_reply_node",
+      "attio_write_node",
     ] as const) {
       if (hasGraphMutationInput(parsed, nodeId) && !nodeAlreadyRan(parsed, nodeId)) return nodeId;
     }
@@ -196,6 +201,8 @@ export const externalMutationPreflightNode = wrapDirectFunctionNode({
           "youtube_public_comment_node",
           "youtube_thumbnail_update_node",
           "youtube_metadata_update_node",
+          "email_send_node",
+          "email_reply_node",
           "gmail_send_node",
           "resend_alert_send_node",
           "whop_mutation_node",
@@ -243,8 +250,11 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
       const input = graphMutationInputFor(state, nodeId);
 
       // ── Graph-owned provider execution ──
-      // Provider calls may happen only after the same graph guard proves that
-      // this node has valid graph context, payload hash, platform, and action.
+      // Provider calls may happen only after the graph-owned mutation runner has
+      // proved non-provider gates first. This is intentionally before the media
+      // bridge: media upload is itself a provider mutation and must not happen
+      // when canonical package, approval, graph context, or payload hash gates
+      // would block the final publish.
       if (needsProviderCall(input)) {
         if (state.config.dryRun) {
           return {
@@ -260,6 +270,26 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
               blocker_code: "draft_only_external_mutation_blocked",
             },
             mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+          };
+        }
+
+        const preliminaryDecision = runner(input);
+        const provisionalProviderBlockers = new Set(["provider_execution_receipt_required", "required_media_missing", "provider_success_required_before_mutation_flags"]);
+        if (preliminaryDecision.status !== "ok" && !provisionalProviderBlockers.has(preliminaryDecision.blocker_code ?? "")) {
+          const blocker = preliminaryDecision.blocker_code ? [preliminaryDecision.blocker_code] : [];
+          return {
+            status: preliminaryDecision.status,
+            summary: `${nodeId} did not call provider: ${preliminaryDecision.blocker_code ?? preliminaryDecision.status}.`,
+            blockers: blocker,
+            detail: {
+              node_id: nodeId,
+              provider_call_permitted: preliminaryDecision.provider_call_permitted,
+              provider_calls: preliminaryDecision.provider_calls,
+              provider_response: preliminaryDecision.provider_response ?? null,
+              receipt: preliminaryDecision.receipt ?? null,
+              blocker_code: preliminaryDecision.blocker_code ?? null,
+            },
+            mutation_flags: preliminaryDecision.mutation_flags,
           };
         }
 
@@ -626,10 +656,12 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("youtube_public_like_node", graphOwnedMutationWrapperNode("youtube_public_like_node", runYoutubePublicLikeNode))
     .addNode("youtube_thumbnail_update_node", graphOwnedMutationWrapperNode("youtube_thumbnail_update_node", runYoutubeThumbnailUpdateNode))
     .addNode("youtube_metadata_update_node", graphOwnedMutationWrapperNode("youtube_metadata_update_node", runYoutubeMetadataUpdateNode))
+    .addNode("email_send_node", graphOwnedMutationWrapperNode("email_send_node", runZohoMailSendNode))
+    .addNode("email_reply_node", graphOwnedMutationWrapperNode("email_reply_node", runZohoMailReplyNode))
     .addNode("gmail_send_node", graphOwnedMutationPlaceholderNode("gmail_send_node"))
     .addNode("resend_alert_send_node", graphOwnedMutationPlaceholderNode("resend_alert_send_node"))
     .addNode("whop_mutation_node", graphOwnedMutationPlaceholderNode("whop_mutation_node"))
-    .addNode("attio_write_node", graphOwnedMutationPlaceholderNode("attio_write_node"))
+    .addNode("attio_write_node", graphOwnedMutationWrapperNode("attio_write_node", runAttioWriteNode))
     .addNode("posthog_write_node", graphOwnedMutationPlaceholderNode("posthog_write_node"))
     .addNode("revenue_goal_loop", revenueGoalLoopNode)
     .addNode("data_goal_loop", dataGoalLoopNode)
@@ -681,6 +713,8 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       linkedin_public_reaction_node: "linkedin_public_reaction_node",
       reddit_public_upvote_node: "reddit_public_upvote_node",
       youtube_public_like_node: "youtube_public_like_node",
+      email_send_node: "email_send_node",
+      email_reply_node: "email_reply_node",
       gmail_send_node: "gmail_send_node",
       resend_alert_send_node: "resend_alert_send_node",
       whop_mutation_node: "whop_mutation_node",
@@ -723,6 +757,8 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "linkedin_public_reaction_node",
     "reddit_public_upvote_node",
     "youtube_public_like_node",
+    "email_send_node",
+    "email_reply_node",
     "gmail_send_node",
     "resend_alert_send_node",
     "whop_mutation_node",

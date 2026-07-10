@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const extractor = "/opt/crypto-tuber-ranked/scripts/callscore-extract-canonical-json.py";
+const repoRoot = process.cwd();
+const extractor = join(repoRoot, "scripts/callscore-extract-canonical-json.py");
 
 function runExtract(rawText: string, expectedSchema = "callscore.workflow_canonical_output.v1") {
   const dir = mkdtempSync(join(tmpdir(), "callscore-extract-"));
@@ -72,6 +73,84 @@ test("canonical extractor ignores nested partial object after canonical output",
   const { result, canonical } = runExtract(`${JSON.stringify(final)}\nfragment {"public_or_provider_mutation_performed":false}\n`);
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(JSON.parse(readFileSync(canonical, "utf8")).schema, "callscore.workflow_canonical_output.v1");
+});
+
+test("canonical extractor accepts CallScore read-only domain receipts as runner outputs", () => {
+  const receipt = {
+    schema: "callscore.linkedin.read_only_receipt.v1",
+    agent: "callscore-linkedin-agent",
+    mode: "READ_ONLY_NO_PUBLISH_NO_PROVIDER_MUTATION",
+    final_decision: { publication_readiness: "NOT_READY_TO_PUBLISH" },
+    draft: { exact_copy: "Why do scored calls matter?" },
+  };
+  const { result, canonical, meta } = runExtract(JSON.stringify(receipt));
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(meta.canonical_json_valid, true);
+  const parsed = JSON.parse(readFileSync(canonical, "utf8"));
+  assert.equal(parsed.schema, "callscore.linkedin.read_only_receipt.v1");
+  assert.equal(parsed.workflow_status, "read_only_receipt");
+});
+
+test("canonical extractor accepts live X read-only review/status receipts", () => {
+  const receipt = {
+    schema: "callscore.x.read_only_review_receipt.v1",
+    agent: "callscore-x-agent",
+    mode: "READ_ONLY",
+    provider_mutation_performed: false,
+    public_publish_performed: false,
+    recommended_x_asset: {
+      draft_text_not_posted: "BTC is back near $63K, but creator calls still need receipts.",
+    },
+  };
+  const { result, canonical, meta } = runExtract(JSON.stringify(receipt));
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(meta.canonical_json_valid, true);
+  const parsed = JSON.parse(readFileSync(canonical, "utf8"));
+  assert.equal(parsed.schema, "callscore.x.read_only_review_receipt.v1");
+  assert.equal(parsed.status, "read_only_receipt");
+  assert.equal(parsed.workflow_status, "read_only_receipt");
+});
+
+test("canonical extractor normalizes live receipt_type aliases", () => {
+  const receipt = {
+    receipt_type: "callscore.linkedin.read_only_specialist_receipt.v1",
+    agent: "callscore-linkedin-agent",
+    mode: "READ_ONLY_NO_PROVIDER_MUTATION",
+    provider_mutation_performed: false,
+    public_publish_performed: false,
+    draft: {
+      exact_copy: "Crypto has a disclosure problem. It also has a measurement problem.",
+    },
+  };
+  const { result, canonical, meta } = runExtract(JSON.stringify(receipt));
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(meta.canonical_json_valid, true);
+  const parsed = JSON.parse(readFileSync(canonical, "utf8"));
+  assert.equal(parsed.schema, "callscore.linkedin.read_only_specialist_receipt.v1");
+  assert.equal(parsed.receipt_type, "callscore.linkedin.read_only_specialist_receipt.v1");
+  assert.equal(parsed.status, "read_only_receipt");
+  assert.equal(parsed.workflow_status, "read_only_receipt");
+});
+
+test("canonical extractor forces non-string workflow_status to scalar", () => {
+  const receipt = {
+    schema: "callscore.linkedin.read_only_specialist_receipt.v1",
+    status: "blocked_read_only_no_provider_mutation",
+    workflow_status: { read_only_check_completed: true },
+    agent: "callscore-linkedin-agent",
+    mode: "READ_ONLY_NO_PROVIDER_MUTATION",
+    provider_mutation_performed: false,
+    public_publish_performed: false,
+    draft: {
+      exact_copy: "Crypto has a disclosure problem. It also has a measurement problem.",
+    },
+  };
+  const { result, canonical, meta } = runExtract(JSON.stringify(receipt));
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.equal(meta.workflow_status, "blocked_read_only_no_provider_mutation");
+  const parsed = JSON.parse(readFileSync(canonical, "utf8"));
+  assert.equal(parsed.workflow_status, "blocked_read_only_no_provider_mutation");
+  assert.equal(parsed.status, "blocked_read_only_no_provider_mutation");
 });
 
 test("canonical extractor removes stale out file on failed extraction", () => {

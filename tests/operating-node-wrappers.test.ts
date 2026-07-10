@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+const repoRoot = process.cwd();
+
 import {
   DEFAULT_MUTATION_FLAGS,
   mergeMutationFlags,
@@ -120,7 +122,7 @@ test("wrapChildProcessNode records command output artifact and exit status", asy
     domain: "evidence_research",
     command: process.execPath,
     args: ["-e", "console.log('child-ok')"],
-    cwd: "/opt/crypto-tuber-ranked",
+    cwd: repoRoot,
     artifactDir,
     timeoutMs: 10_000,
   });

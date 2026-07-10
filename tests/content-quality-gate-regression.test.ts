@@ -1,11 +1,12 @@
 import * as assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { describe, test } from "node:test";
 
 const gate = "/srv/agents/hermes/scripts/callscore-content-quality-gate.py";
+const gateExists = existsSync(gate);
 
 function runGate(packet: Record<string, unknown>) {
   const dir = mkdtempSync(join(tmpdir(), "callscore-quality-"));
@@ -42,7 +43,7 @@ function baseDraft(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("CallScore social content quality gate regressions", () => {
+describe("CallScore social content quality gate regressions", { skip: !gateExists }, () => {
   test("thought_leadership with generic evidence card visual fails", () => {
     const result = runGate(baseDraft());
     assert.notEqual(result.code, 0, JSON.stringify(result.parsed));
@@ -134,5 +135,32 @@ describe("CallScore social content quality gate regressions", () => {
 
     assert.notEqual(result.code, 0, JSON.stringify(result.parsed));
     assert.ok(result.parsed.failures.includes("thought_leadership_clipped_or_mock_visual_banned"), JSON.stringify(result.parsed));
+  });
+
+  test("single-channel LinkedIn first-person I think hook is recognized as opinion", () => {
+    const copy = "I think most crypto creator vetting fails at the handoff between teams.\n\nRecent reporting makes the split hard to ignore. The operating question is whether attention, incentives, and reconstructable outcomes are joined into one auditable decision.";
+    const result = runGate({
+      single_channel_correction: true,
+      channel: "linkedin",
+      content_type: "thought_leadership",
+      drafts: {
+        linkedin: {
+          exact_copy: copy,
+          growth_mechanics: { media_plan: "image", cta: "Ask which ledger is missing", target_entities: ["crypto partnership teams"] },
+        },
+      },
+      visual_asset: {
+        required: true,
+        png_sha256: "9".repeat(64),
+        png_path: "/tmp/three-ledger-partnership-gate.png",
+        alt_text: "Three evidence ledgers feed one partnership approval decision, with an unknown outcome withholding approval.",
+      },
+      provider_payloads: {
+        linkedin: { images: ["/tmp/three-ledger-partnership-gate.png"] },
+      },
+    });
+
+    assert.equal(result.code, 0, JSON.stringify(result.parsed));
+    assert.equal(result.parsed.ok, true, JSON.stringify(result.parsed));
   });
 });

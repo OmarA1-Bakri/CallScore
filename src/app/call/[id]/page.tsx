@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   const callId = parseInt(id, 10);
   if (isNaN(callId)) {
-    return { title: "Call Not Found | CryptoTubers Ranked" };
+    return { title: "Call Not Found | CallScore" };
   }
 
   try {
@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     );
 
     if (calls.length === 0) {
-      return { title: "Call Not Found | CryptoTubers Ranked" };
+      return { title: "Call Not Found | CallScore" };
     }
 
     const call = serializeCall(calls[0]);
@@ -52,12 +52,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       call.public_score !== null ? `${call.public_score.toFixed(1)}/100` : call.score_status;
 
     return {
-      title: `${ticker} ${direction} Call — CryptoTubers Ranked`,
+      title: `${ticker} ${direction} Call — CallScore`,
       description: `Detailed breakdown of this ${ticker} ${call.direction} call: ${scoreText}, direction ${call.correct_direction ? "correct" : "wrong"}, with full alpha and regime analysis.`,
       alternates: { canonical: `/call/${id}` },
     };
   } catch {
-    return { title: "Call Not Found | CryptoTubers Ranked" };
+    return { title: "Call Not Found | CallScore" };
   }
 }
 

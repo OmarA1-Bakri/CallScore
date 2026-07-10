@@ -58,6 +58,18 @@ export default async function Header(): Promise<ReactElement> {
               METHODOLOGY
             </Link>
             <Link
+              href="/about"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
+            >
+              ABOUT
+            </Link>
+            <Link
+              href="/transparency"
+              className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
+            >
+              TRANSPARENCY
+            </Link>
+            <Link
               href="/pricing"
               className="border-b border-transparent py-1 text-ink-500 transition-colors hover:border-accent/60 hover:text-ink-900"
             >

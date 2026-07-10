@@ -16,6 +16,7 @@ type Args = {
   limit?: number;
   browser?: string;
   sinceDays?: number;
+  allowLargeBatch?: boolean;
   queuedBy: string;
 };
 
@@ -29,7 +30,8 @@ Options:
   --match-batch-size N           match only; default 200 schedule, 10 probe
   --ml-batch-size N              ml only; default 250 schedule, 1 probe
   --workplane-type TYPE          workplane only; required, e.g. transcript_collect_laptop
-  --limit N                      workplane transcript only; max 5 without explicit gated large-batch path
+  --limit N                      workplane transcript only; max 5 without --allow-large-batch
+  --allow-large-batch            workplane transcript only; allows limit >5 (up to spec.max_batch_size)
   --browser VALUE                workplane transcript only; default firefox
   --since-days N                 workplane transcript only; default 45
   --queued-by VALUE              metadata only; default local-hh-scheduler
@@ -103,6 +105,9 @@ function parseArgs(argv: string[]): Args {
       case "--since-days":
         args.sinceDays = positiveInt(next(), "--since-days");
         break;
+      case "--allow-large-batch":
+        args.allowLargeBatch = true;
+        break;
       case "--queued-by":
         args.queuedBy = next();
         break;
@@ -117,8 +122,8 @@ function parseArgs(argv: string[]): Args {
   if (!args.job) usage();
   if (args.job === "workplane" && !args.workplaneType) usage();
   if (args.job !== "workplane" && args.workplaneType) usage();
-  if (args.limit && args.limit > 5) {
-    throw new Error("--limit >5 is not supported by this safe workplane enqueue path");
+  if (args.limit && args.limit > 5 && !args.allowLargeBatch) {
+    throw new Error("--limit >5 requires --allow-large-batch");
   }
   return args;
 }
@@ -227,7 +232,7 @@ async function main() {
               limit: defaults.limit,
               browser: defaults.browser,
               since_days: defaults.sinceDays,
-              allow_large_batch: false,
+              allow_large_batch: args.allowLargeBatch === true,
               write_result_to_hh: true,
               workplane_claim: true,
             }

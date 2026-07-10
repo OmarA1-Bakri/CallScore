@@ -182,7 +182,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     latest_ml_verifier_quality_gate_run: latestMlVerifierQualityGate,
     model_currently_recommended: latestMlEval.exists && latestMlGate.eligible_for_write_canary !== true
       ? "rule_extractor_safe_fallback"
-      : "callscore-gemma4-extractor:shadow_only",
+      : "qwen3-4b-instruct-2507:shadow_only",
     production_default_changed: false,
     unsafe_source_ranks: unsafeSourceRanks,
     api_unsafe_official: unsafeOfficial,

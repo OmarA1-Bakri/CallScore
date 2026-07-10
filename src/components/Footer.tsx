@@ -63,6 +63,14 @@ export default function Footer() {
                   About
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/transparency"
+                  className="inline-flex min-h-9 items-center text-sm text-ink-600 transition-colors hover:text-ink-900"
+                >
+                  Transparency
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -111,8 +119,11 @@ export default function Footer() {
           </details>
           <div className="border-t border-ink-200 pt-5">
             <p className="text-xs text-ink-600">
-              &copy; {new Date().getFullYear()} CallScore. All rights
-              reserved.
+              Built by{" "}
+              <Link href="https://www.omarbakri.com" className="text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent">
+                Omar Al-Bakri
+              </Link>
+              . &copy; {new Date().getFullYear()} CallScore. All rights reserved.
             </p>
           </div>
         </div>

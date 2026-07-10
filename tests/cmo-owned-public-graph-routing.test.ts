@@ -1,5 +1,6 @@
 import * as assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { describe, test } from "node:test";
 
 import { buildInitialOperatingState, createCallscoreOperatingGraph } from "../src/lib/workplane/callscore-operating-graph";
@@ -82,7 +83,7 @@ describe("revenue_now live_owned_public graph-owned publish routing", () => {
     assert.equal(result.blockers.includes("graph_owned_provider_publish_missing"), false);
   });
 
-  test("missing graph-owned provider execution writes blocked receipt instead of parent fallback publish", async () => {
+  test("missing graph-owned provider execution writes blocked receipt instead of parent fallback publish", { skip: !existsSync("/srv/agents/repos/Claude_Code_Automations") }, async () => {
     const graph = createCallscoreOperatingGraph();
     const result = await graph.invoke(buildInitialOperatingState({
       goal: "revenue_now",

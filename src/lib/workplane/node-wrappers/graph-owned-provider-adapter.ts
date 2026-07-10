@@ -23,6 +23,7 @@ export interface ProviderCallPreflightResult {
 export interface ProviderMediaBridgeResult {
   readonly ok: boolean;
   readonly blockerCode?: string;
+  readonly error?: string;
   readonly providerExecutionReceiptIds?: readonly string[];
   readonly providerExecutionReceiptPaths?: readonly string[];
 }
@@ -93,6 +94,48 @@ function validateKnownProviderPayload(toolSlug: string, payload: Record<string, 
     if (message.length > 1250) return "payload_too_long";
   }
 
+  if (toolSlug === "ZOHO_MAIL_MESSAGES_REPLY_TO_EMAIL") {
+    const accountId = typeof payload.accountId === "string" ? payload.accountId.trim() : "";
+    const messageId = typeof payload.messageId === "string" ? payload.messageId.trim() : "";
+    const fromAddress = typeof payload.fromAddress === "string" ? payload.fromAddress.trim() : "";
+    const toAddress = typeof payload.toAddress === "string" ? payload.toAddress.trim() : "";
+    const content = typeof payload.content === "string" ? payload.content.trim() : "";
+    if (!/^[0-9]{10,30}$/.test(accountId) || !/^[0-9]{10,30}$/.test(messageId)) return "payload_missing";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fromAddress) || !toAddress.includes("@")) return "payload_missing";
+    if (!content || content.length > 10000) return "payload_missing";
+  }
+
+  if (toolSlug === "ZOHO_MAIL_MESSAGES_SEND_EMAIL") {
+    const accountId = typeof payload.accountId === "string" ? payload.accountId.trim() : "";
+    const fromAddress = typeof payload.fromAddress === "string" ? payload.fromAddress.trim() : "";
+    const toAddress = typeof payload.toAddress === "string" ? payload.toAddress.trim() : "";
+    const subject = typeof payload.subject === "string" ? payload.subject.trim() : "";
+    const content = typeof payload.content === "string" ? payload.content.trim() : "";
+    if (!/^[0-9]{10,30}$/.test(accountId)) return "payload_missing";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(fromAddress) || !toAddress.includes("@")) return "payload_missing";
+    if (!subject || subject.length > 300) return "payload_missing";
+    if (!content || content.length > 10000) return "payload_missing";
+  }
+
+  if (toolSlug === "ATTIO_CREATE_NOTE") {
+    const parentObject = typeof payload.parent_object === "string" ? payload.parent_object.trim() : "";
+    const parentRecordId = typeof payload.parent_record_id === "string" ? payload.parent_record_id.trim() : "";
+    const title = typeof payload.title === "string" ? payload.title.trim() : "";
+    const content = typeof payload.content === "string" ? payload.content.trim() : "";
+    if (!parentObject || !parentRecordId || !title || !content) return "payload_missing";
+  }
+
+  if (toolSlug === "ATTIO_ASSERT_PERSON") {
+    const values = isRecord(payload.values) ? payload.values : payload;
+    const emailAddresses = values.email_addresses;
+    const hasEmail = Array.isArray(emailAddresses)
+      ? emailAddresses.some((email) => (typeof email === "string" && email.includes("@"))
+        || (isRecord(email) && typeof email.email_address === "string" && email.email_address.includes("@")))
+      : typeof emailAddresses === "string" && emailAddresses.includes("@");
+    const matchingAttribute = typeof payload.matching_attribute === "string" ? payload.matching_attribute.trim() : "";
+    if (matchingAttribute !== "email_addresses" || !hasEmail) return "payload_missing";
+  }
+
   return null;
 }
 
@@ -146,6 +189,7 @@ function blockerForHttpStatus(status: number, text: string, toolSlug: string): s
   if (status === 401 || status === 403) return "blocked_auth";
   if (status === 404) return "blocked_provider_missing";
   if (status === 409 || haystack.includes("duplicate") || haystack.includes("already posted")) return "blocked_duplicate_or_cadence";
+  if (status === 402 || haystack.includes("creditsdepleted") || haystack.includes("credits depleted") || haystack.includes("payment required")) return "blocked_rate_limit";
   if (status === 429 || haystack.includes("rate limit") || haystack.includes("too many requests")) return "blocked_rate_limit";
   if (status >= 400 && haystack.includes("not found")) return "blocked_provider_missing";
   return "provider_call_failed";
@@ -338,6 +382,75 @@ function mimetypeFromGateOrPath(gate: Record<string, unknown>, localPath: string
   return "image/png";
 }
 
+function stringFieldDeep(value: unknown, keys: readonly string[]): string | null {
+  if (typeof value === "string") {
+    try {
+      return stringFieldDeep(JSON.parse(value) as unknown, keys);
+    } catch {
+      for (const key of keys) {
+        const marker = `"${key}"`;
+        const markerIndex = value.indexOf(marker);
+        if (markerIndex < 0) continue;
+        const colonIndex = value.indexOf(":", markerIndex + marker.length);
+        const openingQuote = colonIndex >= 0 ? value.indexOf('"', colonIndex + 1) : -1;
+        const closingQuote = openingQuote >= 0 ? value.indexOf('"', openingQuote + 1) : -1;
+        if (openingQuote >= 0 && closingQuote > openingQuote + 1) return value.slice(openingQuote + 1, closingQuote);
+      }
+      const referenceMatch = value.match(/Reference S3 Key \(s3key\):\s*([^\s]+)/i);
+      return referenceMatch?.[1] ?? null;
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = stringFieldDeep(item, keys);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (!isRecord(value)) return null;
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+  }
+  for (const candidate of Object.values(value)) {
+    const found = stringFieldDeep(candidate, keys);
+    if (found) return found;
+  }
+  return null;
+}
+
+export function extractComposioS3Key(value: unknown): string | null {
+  return stringFieldDeep(value, ["s3key", "s3_key"]);
+}
+
+async function stageLocalFileViaGraphOwnedWorkbench(input: {
+  readonly localPath: string;
+  readonly mimetype: string;
+  readonly toolSlug: string;
+}): Promise<{ ok: true; uploadable: Record<string, unknown> } | { ok: false; blockerCode: string; error?: string }> {
+  const name = basename(input.localPath);
+  const encoded = readFileSync(input.localPath).toString("base64");
+  const remotePath = `/mnt/files/graph-owned-media/${name}`;
+  const code = [
+    "import base64, json, os",
+    `remote_path = ${JSON.stringify(remotePath)}`,
+    "os.makedirs(os.path.dirname(remote_path), exist_ok=True)",
+    `open(remote_path, 'wb').write(base64.b64decode(${JSON.stringify(encoded)}))`,
+    "result, error = upload_local_file(remote_path)",
+    "print(json.dumps({'ok': not bool(error), 'error': error or None, 'upload': result or {}}))",
+  ].join("\n");
+  const result = await executeGraphOwnedProviderCall("COMPOSIO_REMOTE_WORKBENCH", {
+    code_to_execute: code,
+    thought: "Stage one graph-owned CallScore media artifact for a gated owned-public provider action.",
+    current_step: "GRAPH_OWNED_MEDIA_STAGING",
+    current_step_metric: "1/1 media artifact",
+  });
+  if (!result.ok) return { ok: false, blockerCode: result.blockerCode ?? "provider_media_bridge_failed", error: result.error };
+  const key = extractComposioS3Key(result.response);
+  if (!key) return { ok: false, blockerCode: "provider_media_bridge_failed", error: "Composio workbench upload succeeded without s3key" };
+  return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: key } };
+}
+
 async function stageLocalFileForComposio(input: {
   readonly localPath: string;
   readonly mimetype: string;
@@ -349,8 +462,8 @@ async function stageLocalFileForComposio(input: {
   if (process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE === "1") {
     return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: `test/${input.toolSlug}/${name}` } };
   }
-  const apiKey = process.env.COMPOSIO_API_KEY;
-  if (!apiKey) return { ok: false, blockerCode: "blocked_auth", error: "COMPOSIO_API_KEY missing for graph-owned media bridge" };
+  const apiKey = process.env.COMPOSIO_FILE_UPLOAD_API_KEY ?? process.env.COMPOSIO_API_KEY;
+  if (!apiKey) return { ok: false, blockerCode: "blocked_auth", error: "Composio file-upload API key missing for graph-owned media bridge" };
   const content = readFileSync(input.localPath);
   const md5 = createHash("md5").update(content).digest("hex");
   const request = await fetch("https://backend.composio.dev/api/v3.1/files/upload/request", {
@@ -368,7 +481,13 @@ async function stageLocalFileForComposio(input: {
     }),
   });
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-  if (!request.ok) return { ok: false, blockerCode: blockerForHttpStatus(request.status, JSON.stringify(body), input.toolSlug), error: JSON.stringify(body).slice(0, 500) };
+  if (!request.ok) {
+    const blockerCode = blockerForHttpStatus(request.status, JSON.stringify(body), input.toolSlug);
+    if (blockerCode === "blocked_auth") {
+      return stageLocalFileViaGraphOwnedWorkbench(input);
+    }
+    return { ok: false, blockerCode, error: JSON.stringify(body).slice(0, 500) };
+  }
   const data = nestedRecord(body, "data") ?? body;
   const uploadUrl = firstString(data.new_presigned_url, data.newPresignedUrl, body.new_presigned_url, body.newPresignedUrl);
   const key = firstString(data.key, body.key, data.s3key, body.s3key);
@@ -436,7 +555,7 @@ export async function bridgeGraphOwnedProviderMedia(input: Record<string, unknow
       return { ok: true };
     }
     const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "TWITTER_UPLOAD_MEDIA", toolkitSlug: "twitter" });
-    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode };
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error };
     const uploadPayload = {
       media: staged.uploadable,
       media_type: typeof staged.uploadable.mimetype === "string" ? staged.uploadable.mimetype : "image/png",
@@ -453,7 +572,7 @@ export async function bridgeGraphOwnedProviderMedia(input: Record<string, unknow
 
   if (providerTool === "LINKEDIN_CREATE_LINKED_IN_POST") {
     const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "LINKEDIN_CREATE_LINKED_IN_POST", toolkitSlug: "linkedin" });
-    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode };
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error };
     mutateProviderPayload(input, { ...providerPayload, images: [staged.uploadable] });
     return { ok: true };
   }
@@ -515,6 +634,7 @@ function blockerForProviderMessage(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes("reply to this conversation is not allowed") || lower.includes("quoting this post is not allowed") || lower.includes("not allowed because you have not been mentioned")) return "blocked_platform_permission";
   if (lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("invalid api key") || lower.includes("auth")) return "blocked_auth";
+  if (lower.includes("creditsdepleted") || lower.includes("credits depleted") || lower.includes("payment required")) return "blocked_rate_limit";
   if (lower.includes("rate limit") || lower.includes("too many requests")) return "blocked_rate_limit";
   if (lower.includes("duplicate") || lower.includes("already")) return "blocked_duplicate_or_cadence";
   if (lower.includes("not found") || lower.includes("unknown tool")) return "blocked_provider_missing";
@@ -605,7 +725,10 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
       ?? availableToolNames.find((name) => name.toUpperCase() === toolSlug.toUpperCase())
       ?? null;
     const multiExecuteToolName = availableToolNames.find((name) => name === "COMPOSIO_MULTI_EXECUTE_TOOL") ?? null;
-    const selectedToolName = directToolName ?? multiExecuteToolName;
+    // Meta tools such as COMPOSIO_REMOTE_WORKBENCH must be invoked directly.
+    // App tools prefer multi-execute so connected-account binding remains explicit.
+    const isComposioMetaTool = toolSlug.startsWith("COMPOSIO_");
+    const selectedToolName = isComposioMetaTool ? directToolName : (multiExecuteToolName ?? directToolName);
 
     if (!selectedToolName) {
       const response = { ok: false, error: `MCP tool ${toolSlug} not found`, mcp_tool_count: availableToolNames.length, mcp_tool_names: availableToolNames.slice(0, 120) };

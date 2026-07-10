@@ -14,10 +14,10 @@ type LegacyMutationRequest = {
   readonly graph_summary?: unknown;
 };
 
-const PROVIDER_WRITE_RE = /(?:TWITTER|LINKEDIN|REDDIT|YOUTUBE|GMAIL|RESEND|WHOP|ATTIO|POSTHOG)_(?:CREATE|SEND|UPLOAD|UPDATE|DELETE|COMMENT|FOLLOW|CAPTURE|TRACK|SYNC|MULTIPART|MUTATE)|COMPOSIO_MULTI_EXECUTE_TOOL|run_composio_tool|provider\.publish|xurl|x-cli/i;
+const PROVIDER_WRITE_RE = /(?:TWITTER|LINKEDIN|REDDIT|YOUTUBE|GMAIL|ZOHO_MAIL|RESEND|WHOP|ATTIO|POSTHOG)_(?:CREATE|SEND|UPLOAD|UPDATE|DELETE|COMMENT|FOLLOW|CAPTURE|TRACK|SYNC|MULTIPART|MUTATE|MESSAGES_REPLY)|COMPOSIO_MULTI_EXECUTE_TOOL|run_composio_tool|provider\.publish|xurl|x-cli/i;
 const PUBLIC_PUBLISH_RE = /(?:TWITTER|LINKEDIN|REDDIT)_(?:CREATE|UPLOAD|COMMENT)|publish|post|comment/i;
 const YOUTUBE_MUTATION_RE = /YOUTUBE_(?:UPLOAD|MULTIPART_UPLOAD|UPDATE|DELETE)|video[_ -]?(?:publish|upload|update)|thumbnail/i;
-const EMAIL_SEND_RE = /(?:GMAIL|RESEND)_(?:SEND|CREATE)|email[_ -]?send|newsletter/i;
+const EMAIL_SEND_RE = /(?:GMAIL|ZOHO_MAIL|RESEND)_(?:SEND|CREATE|MESSAGES_REPLY)|email[_ -]?(?:send|reply)|newsletter/i;
 const WHOP_MUTATION_RE = /WHOP_(?:CREATE|UPDATE|DELETE|MUTATE)|whop[_ -]?(?:mutation|product|plan|checkout|customer|payment)/i;
 const CRM_WRITE_RE = /(?:ATTIO|POSTHOG)_(?:CREATE|UPDATE|DELETE|CAPTURE|TRACK)|crm[_ -]?write|analytics[_ -]?write/i;
 

@@ -59,6 +59,8 @@ export function buildInitialArtifactsFromCliArgs(argv: readonly string[]): Recor
   if (finalDraftPath) artifacts.owned_public_final_draft = readJsonObject(finalDraftPath);
   const graphMutationInputsPath = valueAfter(argv, "--graph-mutation-inputs-json");
   if (graphMutationInputsPath) artifacts.graph_mutation_inputs = readJsonObject(graphMutationInputsPath);
+  const canonicalOperationalPackagePath = valueAfter(argv, "--canonical-operational-package-json");
+  if (canonicalOperationalPackagePath) artifacts.canonical_operational_package = readJsonObject(canonicalOperationalPackagePath);
   return artifacts;
 }
 

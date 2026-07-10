@@ -1,5 +1,13 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /settings/
+Disallow: /dashboard/
+Disallow: /login
+Disallow: /checkout/
 
 Sitemap: https://call-score.com/sitemap.xml
+
+# LLM-facing summaries
+# llms.txt: https://call-score.com/llms.txt
+# llms-full.txt: https://call-score.com/llms-full.txt

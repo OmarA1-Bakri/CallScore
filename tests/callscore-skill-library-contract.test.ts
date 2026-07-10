@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { describe } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -9,6 +9,7 @@ import { getAgentToolboxContract, isCanonicalAgentId } from "../src/lib/agent-to
 
 const PROFILE_SKILLS_ROOT = "/srv/agents/hermes/profiles/callscore/skills";
 const SKILL_BASE = join(PROFILE_SKILLS_ROOT, "callscore-autopilot");
+const skillsExist = existsSync(SKILL_BASE);
 
 const REQUIRED_SKILLS = [
   "callscore-youtube-retention-script",
@@ -54,6 +55,8 @@ function readSkill(skill: string): { raw: string; frontmatter: Record<string, un
   assert.ok(match, `${skill} SKILL.md must have YAML frontmatter`);
   return { raw, frontmatter: yaml.load(match[1]) as Record<string, unknown>, body: match[2] };
 }
+
+describe("CallScore skill library contract", { skip: !skillsExist }, () => {
 
 test("required CallScore channel skill folders exist with Hermes-compatible support files", () => {
   for (const skill of REQUIRED_SKILLS) {
@@ -300,3 +303,5 @@ test("audit package generator rejects unsafe timestamp path traversal before cle
   assert.notEqual(bad.status, 0, "path traversal timestamp must fail");
   assert.match(`${bad.stderr}${bad.stdout}`, /unsafe timestamp/i);
 });
+
+}); // describe("CallScore skill library contract"

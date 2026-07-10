@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec, runWorkplaneJob } from "../src/lib/workplane-jobs";
@@ -74,7 +74,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   assert.equal(gemma.max_batch_size, 10);
   assert.equal(gemma.production_db_writes_allowed, false);
   assert.equal(gemma.production_call_writes_allowed, false);
-  assert.match(gemma.default_safe_command, /callscore-gemma4-extractor:latest/);
+  assert.match(gemma.default_safe_command, /qwen3:4b-instruct-2507-q4_K_M/);
 
   const ingest = getWorkplaneJobSpec("transcript_ingest_result");
   assert.equal(ingest.production_db_writes_allowed, true);
@@ -473,7 +473,7 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
   assert.match(domains.art_of_war.safe_next_action ?? "", /owned-channel GTM loop/);
 });
 
-test("public artifact readiness stays open when unrelated private infra lane is blocked", async () => {
+test("public artifact readiness stays open when unrelated private infra lane is blocked", { skip: !existsSync("/srv/agents/repos/Claude_Code_Automations/scripts/art_of_war.py") }, async () => {
   const { buildReadinessDomains } = await import("../src/lib/workplane-status");
   const root = mkdtempSync(join(tmpdir(), "callscore-public-artifact-readiness-"));
   mkdirSync(join(root, ".tmp", "workflow-receipts", "gemma_capacity_preflight"), { recursive: true });
@@ -635,8 +635,8 @@ test("existing enqueue script can safely enqueue bounded workplane jobs", () => 
   assert.match(enqueueScript, /isWorkplaneJobType/);
   assert.match(enqueueScript, /getWorkplaneJobSpec/);
   assert.match(enqueueScript, /transcript_collect_laptop/);
-  assert.match(enqueueScript, /--limit >5 is not supported by this safe workplane enqueue path/);
-  assert.match(enqueueScript, /allow_large_batch: false/);
+  assert.match(enqueueScript, /--limit >5 requires --allow-large-batch/);
+  assert.match(enqueueScript, /allow_large_batch: args\.allowLargeBatch === true/);
   assert.match(enqueueScript, /production_call_writes_allowed: spec\.production_call_writes_allowed/);
   assert.match(enqueueScript, /public_ranking_impact_allowed: spec\.public_ranking_impact_allowed/);
 });

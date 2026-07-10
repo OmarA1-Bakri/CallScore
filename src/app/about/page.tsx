@@ -5,7 +5,7 @@ import { EditorialSection, MetaStrip } from "@/components/primitives";
 
 const TITLE = "About — CallScore";
 const DESCRIPTION =
-  "Why CallScore tracks market calls against real prices. No opinions, no sponsorships, no deletion.";
+  "Why CallScore tracks crypto creator market calls against real prices, who built it, and how its transparent scoring approach works.";
 const LINK_CLASS = "text-accent underline decoration-accent/60 underline-offset-4 hover:decoration-accent";
 
 export const metadata: Metadata = {
@@ -42,6 +42,11 @@ export default function AboutPage(): ReactElement {
         </p>
         <MetaStrip
           cells={[
+            { k: "built by", v: (
+              <Link href="https://www.omarbakri.com" className={LINK_CLASS}>
+                Omar Al-Bakri
+              </Link>
+            ) },
             { k: "started", v: "2026" },
             { k: "tracked", v: "20" },
             { k: "scored against", v: "18.7M candles" },
@@ -58,6 +63,13 @@ export default function AboutPage(): ReactElement {
             },
           ]}
         />
+        <p className="font-serif text-[17px] text-ink-700 leading-relaxed max-w-[760px] mt-8">
+          Built by{" "}
+          <Link href="https://www.omarbakri.com" className={LINK_CLASS}>
+            Omar Al-Bakri
+          </Link>
+          , an applied AI engineer and FinTech operator, as an evidence-first accountability layer for public crypto commentary.
+        </p>
       </section>
 
       <EditorialSection

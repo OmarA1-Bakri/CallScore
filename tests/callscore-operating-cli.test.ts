@@ -4,7 +4,9 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { buildRunnableConfig, buildRunnableConfigWithRuntimeContext } from "../src/scripts/callscore-operating-goal";
+import { buildInitialArtifactsFromCliArgs, buildRunnableConfig, buildRunnableConfigWithRuntimeContext } from "../src/scripts/callscore-operating-goal";
+
+const repoRoot = process.cwd();
 function writeFakeScout(root: string): { command: string; markerPath: string; receiptPath: string } {
   const command = join(root, "fake-scout.sh");
   const markerPath = join(root, "fake-scout-invoked.txt");
@@ -82,6 +84,28 @@ test("callscore-operating-goal CLI maps revenue_now social packet into runnable 
   assert.equal((config.socialPacket as { facts: { raw_calls: number } }).facts.raw_calls, 123);
 });
 
+test("callscore-operating-goal CLI loads a canonical operational package into graph artifacts", () => {
+  const root = mkdtempSync(join(tmpdir(), "operating-canonical-package-cli-test-"));
+  const packagePath = writeJson(join(root, "canonical-package.json"), {
+    package_id: "canonical-x-001",
+    channel: "x",
+    created_at: "2026-07-10T09:30:00Z",
+    receipts: [],
+    media_artifact: null,
+  });
+
+  const artifacts = buildInitialArtifactsFromCliArgs([
+    "--goal",
+    "revenue_now",
+    "--mode",
+    "live_owned_public",
+    "--canonical-operational-package-json",
+    packagePath,
+  ]);
+
+  assert.equal((artifacts.canonical_operational_package as { package_id: string }).package_id, "canonical-x-001");
+});
+
 test("callscore-operating-goal CLI maps produce_video scheduler flags into runnable config", () => {
   const root = mkdtempSync(join(tmpdir(), "operating-video-scheduler-cli-test-"));
   const artifactRoot = join(root, "artifacts");
@@ -146,7 +170,7 @@ test("callscore-operating-goal CLI evidence_research read-live accepts gate cont
     heartbeatPath,
     "--creator-growth-scout-command",
     fake.command,
-  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8" });
+  ], { cwd: repoRoot, encoding: "utf8" });
 
   const parsed = JSON.parse(stdout) as { status: string; blockers: string[]; latest_receipt_path: string };
   assert.equal(parsed.status, "ok");
@@ -171,7 +195,7 @@ test("callscore-operating-goal CLI runs monitor dry-run and prints JSON summary"
     "monitor",
     "--dry-run",
     "--test-fixtures",
-  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8" });
+  ], { cwd: repoRoot, encoding: "utf8" });
 
   const parsed = JSON.parse(stdout) as { goal: string; status: string; node_count: number; blockers: string[] };
   assert.equal(parsed.goal, "monitor");
@@ -187,7 +211,7 @@ test("callscore-operating-goal CLI fails closed for unknown goals", () => {
     "src/scripts/callscore-operating-goal.ts",
     "--goal",
     "not_a_goal",
-  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8", stdio: "pipe" }), /Command failed/);
+  ], { cwd: repoRoot, encoding: "utf8", stdio: "pipe" }), /Command failed/);
 });
 
 test("callscore-operating-goal CLI refresh_data bounded dry-run writes a real receipt", () => {
@@ -202,7 +226,7 @@ test("callscore-operating-goal CLI refresh_data bounded dry-run writes a real re
     "--max-items",
     "1",
     "--test-fixtures",
-  ], { cwd: "/opt/crypto-tuber-ranked", encoding: "utf8" });
+  ], { cwd: repoRoot, encoding: "utf8" });
 
   const jsonStart = stdout.indexOf("{");
   const parsed = JSON.parse(stdout.slice(jsonStart)) as {

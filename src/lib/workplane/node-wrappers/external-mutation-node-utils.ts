@@ -88,6 +88,7 @@ function canonicalReceiptBlocker(input: Record<string, unknown>, platform: Exter
   const rawPackage = input.canonical_operational_package;
   const packageRecord = isRecord(rawPackage) ? rawPackage : null;
   const receipts = hasOwn(input, "canonical_receipts") ? input.canonical_receipts : packageRecord?.receipts;
+  const mediaArtifact = input.canonical_media_artifact ?? input.media_artifact ?? packageRecord?.media_artifact;
   if (!Array.isArray(receipts)) return "canonical_operational_package_missing";
   try {
     const decision = evaluateCanonicalOperationalPackage({
@@ -95,6 +96,7 @@ function canonicalReceiptBlocker(input: Record<string, unknown>, platform: Exter
       channel: typeof packageRecord?.channel === "string" ? packageRecord.channel : platform,
       created_at: typeof packageRecord?.created_at === "string" ? packageRecord.created_at : new Date().toISOString(),
       receipts,
+      media_artifact: isRecord(mediaArtifact) ? mediaArtifact : null,
     });
     return decision.status === "approved" ? null : (decision.blockers[0] ?? "canonical_operational_package_blocked");
   } catch {
@@ -208,13 +210,13 @@ export function runGraphOwnedMutationNode(options: GraphOwnedMutationNodeOptions
     return blocked(options.nodeId, "approved_payload_hash_mismatch");
   }
 
+  if (mediaGateRequiresMedia(options.input) && !providerPayloadHasRequiredMedia(providerTool, providerPayload)) {
+    return blocked(options.nodeId, "required_media_missing");
+  }
+
   const canonicalBlocker = canonicalReceiptBlocker(options.input, options.platform);
   if (canonicalBlocker) {
     return blocked(options.nodeId, canonicalBlocker);
-  }
-
-  if (mediaGateRequiresMedia(options.input) && !providerPayloadHasRequiredMedia(providerTool, providerPayload)) {
-    return blocked(options.nodeId, "required_media_missing");
   }
 
   const preflight = evaluateExternalMutationRequest({

@@ -16,6 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Provide canonical CallScore repo path
+        run: |
+          sudo mkdir -p /opt
+          sudo ln -sfn "$GITHUB_WORKSPACE" /opt/crypto-tuber-ranked
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -28,6 +33,11 @@ jobs:
           key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json', 'package.json') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-
+
+      - name: Install media test dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
       - run: npm ci
       - run: npm run lint

@@ -8,6 +8,7 @@ import {
   buildYoutubeProductionPackage,
   REQUIRED_CANONICAL_RECEIPT_TYPES,
 } from "../src/lib/autonomy/canonical-operational-runtime";
+import { validCanonicalMediaArtifact } from "./helpers/canonical-media-fixture";
 
 const hash = `sha256:${"a".repeat(64)}`;
 
@@ -34,17 +35,40 @@ test("canonical runtime package requires every operational receipt before handof
   assert.ok(missing.blockers.includes("missing_visual_qa_receipt.v1"));
   assert.ok(missing.blockers.includes("missing_callscore.task_router_receipt.v1"));
   assert.ok(missing.blockers.includes("missing_callscore.tool_inheritance_receipt.v1"));
-  assert.ok(missing.blockers.includes("missing_callscore.media_artifact_receipt.v1"));
+  assert.ok(missing.blockers.includes("missing_callscore.design_bundle_reference_receipt.v1"));
+  assert.ok(missing.blockers.includes("missing_callscore.website_design_alignment_receipt.v2"));
+  assert.ok(missing.blockers.includes("missing_callscore.branding_receipt.v2"));
+  assert.ok(missing.blockers.includes("missing_callscore.brand_lockup_occlusion_check.v1"));
+  assert.ok(missing.blockers.includes("missing_callscore.media_artifact_receipt.v2"));
 
   const complete = evaluateCanonicalOperationalPackage({
     package_id: "pkg-complete",
     channel: "linkedin",
     created_at: "2026-06-30T00:00:00.000Z",
     receipts: REQUIRED_CANONICAL_RECEIPT_TYPES.map((type) => receipt(type)),
+    media_artifact: validCanonicalMediaArtifact("linkedin"),
   });
   assert.equal(complete.status, "approved");
   assert.deepEqual(complete.blockers, []);
   assert.doesNotThrow(() => CanonicalOperationalPackageSchema.parse(complete.package));
+});
+
+test("canonical runtime calls the media validator and blocks a forged receipt-only package", () => {
+  const forged = evaluateCanonicalOperationalPackage({
+    package_id: "pkg-forged-media",
+    channel: "x",
+    created_at: "2026-06-30T00:00:00.000Z",
+    receipts: REQUIRED_CANONICAL_RECEIPT_TYPES.map((type) => receipt(type)),
+    media_artifact: {
+      schema: "callscore.media_artifact_receipt.v2",
+      created_by_agent_id: "callscore-x-head",
+      channel_head_agent_id: "callscore-x-head",
+      media_type: "image",
+      status: "ready",
+    },
+  });
+  assert.equal(forged.status, "blocked");
+  assert.ok(forged.blockers.some((blocker) => blocker.startsWith("canonical_media_")));
 });
 test("canonical runtime rejects failed or blocked receipts", () => {
   const receipts = REQUIRED_CANONICAL_RECEIPT_TYPES.map((type) =>
@@ -79,7 +103,7 @@ test("learning event and delta schemas support runtime self-improvement loops", 
   assert.equal(delta.schema, "learning_delta.v1");
   assert.equal(delta.approved_for_implementation, false);
 });
-test("YouTube production package requires script, packaging, thumbnail, publish, and analytics receipts", () => {
+test("YouTube production package requires base canonical receipts plus script, packaging, thumbnail, publish, and analytics receipts", () => {
   const blocked = buildYoutubeProductionPackage({
     package_id: "yt-missing",
     created_at: "2026-06-30T00:00:00.000Z",
@@ -89,10 +113,11 @@ test("YouTube production package requires script, packaging, thumbnail, publish,
   assert.ok(blocked.blockers.includes("missing_youtube_packaging_receipt.v1"));
   assert.ok(blocked.blockers.includes("missing_youtube_thumbnail_receipt.v1"));
 
-  const ok = buildYoutubeProductionPackage({
+  const baseOnly = buildYoutubeProductionPackage({
     package_id: "yt-ok",
     created_at: "2026-06-30T00:00:00.000Z",
     receipts: [
+      ...REQUIRED_CANONICAL_RECEIPT_TYPES.map((type) => receipt(type)),
       receipt("youtube_script_receipt.v1"),
       receipt("youtube_packaging_receipt.v1"),
       receipt("youtube_thumbnail_receipt.v1"),
@@ -100,6 +125,6 @@ test("YouTube production package requires script, packaging, thumbnail, publish,
       receipt("youtube_analytics_receipt.v1"),
     ],
   });
-  assert.equal(ok.status, "approved");
-  assert.deepEqual(ok.blockers, []);
+  assert.equal(baseOnly.status, "blocked");
+  assert.ok(baseOnly.blockers.includes("missing_canonical_media_artifact"));
 });

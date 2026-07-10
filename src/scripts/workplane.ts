@@ -13,7 +13,7 @@ export function routeWorkplaneCommand(argv: readonly string[]): WorkplaneCommand
     const args = (command === "status" ? rest : argv).filter((arg) => arg !== "--status" && arg !== "--json");
     return { mode: "status", args };
   }
-  if (command === "claim" || command === "complete") {
+  if (command === "claim" || command === "complete" || command === "heartbeat") {
     return { mode: "laptop_job", args: argv };
   }
   throw new Error(`unsupported_workplane_command:${command}; use status, claim, or complete`);

@@ -151,7 +151,7 @@ test("Netlify schedules only graph-backed alert crons after O13 cutover", () => 
   }
 });
 
-test("active O13 shell wrappers enter operating goals before legacy implementations", () => {
+test("active O13 shell wrappers enter operating goals before legacy implementations", { skip: !existsSync("/srv/agents/hermes/scripts/callscore-daily-pipeline-operating.sh") }, () => {
   const wrappers = [
     ["/srv/agents/hermes/scripts/callscore-daily-pipeline-operating.sh", "refresh_data", /--refresh-data-command/],
     ["/srv/agents/hermes/scripts/callscore-cron-candles.sh", "refresh_data", /CALLSCORE_CANDLES_PRODUCER|callscore-enqueue-candles/],
@@ -173,7 +173,7 @@ test("active O13 shell wrappers enter operating goals before legacy implementati
   }
 });
 
-test("installed O13 systemd entrypoints use graph wrappers or canonical compose workers", () => {
+test("installed O13 systemd entrypoints use graph wrappers or canonical compose workers", { skip: !existsSync("/etc/systemd/system/callscore-control-plane-canary.service") }, () => {
   const canary = readAbsolute("/etc/systemd/system/callscore-control-plane-canary.service");
   const dailyDropIn = readAbsolute("/etc/systemd/system/callscore-daily-pipeline.service.d/o13-operating-graph.conf");
   const worker = readAbsolute("/etc/systemd/system/hermes-worker.service");

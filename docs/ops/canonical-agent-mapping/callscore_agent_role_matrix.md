@@ -6,7 +6,7 @@ Machine-readable source of truth: `callscore_canonical_agent_mapping.source.json
 
 ```json
 {
-  "canonical_rule": "44 agents are the baseline. Upgrade/remap existing agents first. Create new agents only when a real role gap remains after mapping.",
+  "canonical_rule": "51 agents are canonical at runtime: 44 retained baseline agents plus 7 justified YouTube production agents. Upgrade/remap existing agents first; create additional agents only when a real role gap remains after mapping.",
   "documentation_rule": "All documentation is Markdown. Flow diagrams are Mermaid. Machine-readable source of truth comes first.",
   "publication_gate_rule": "Do not redesign or touch publication gates in this mapping. This maps upstream agent, editorial, visual, learning, and channel responsibilities.",
   "new_agent_policy": {

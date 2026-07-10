@@ -12,15 +12,15 @@ type ShadowVideo = Video & { creator_id: number; creator_name: string; youtube_h
 
 const DEFAULT_VIDEO_AGENTS = 1;
 const MAX_VIDEO_AGENTS = 3;
-const DEFAULT_SHADOW_MODEL = "callscore-gemma4-extractor:latest";
+const DEFAULT_SHADOW_MODEL = "qwen3:4b-instruct-2507-q4_K_M";
 const DEFAULT_LOCAL_OLLAMA_HOST = "http://127.0.0.1:11434";
 const DEFAULT_SHADOW_PROMPT_PROFILE = "shadow-compact";
-const DEFAULT_SHADOW_CHUNK_CHARS = 350;
+const DEFAULT_SHADOW_CHUNK_CHARS = 512;
 const DEFAULT_SHADOW_CHUNK_OVERLAP = 50;
 const DEFAULT_SHADOW_MAX_CHUNKS = 1;
-const DEFAULT_SHADOW_NUM_PREDICT = 350;
-const DEFAULT_SHADOW_REQUEST_TIMEOUT_MS = 45_000;
-const SHADOW_PROMPT_VERSION = "callscore-gemma4-shadow-v2-compact";
+const DEFAULT_SHADOW_NUM_PREDICT = 512;
+const DEFAULT_SHADOW_REQUEST_TIMEOUT_MS = 60_000;
+const SHADOW_PROMPT_VERSION = "callscore-qwen3-shadow-v2-compact";
 
 export interface ShadowExtractArgs extends OpenRouterArgs {
   readonly execute: boolean;
