@@ -557,6 +557,50 @@ describe("callscore operating graph", () => {
     assert.equal(result.mutation_flags.public_publish_performed, false);
   });
 
+  test("bounded-write monitor run routes explicit PostHog input to the guarded analytics node", async () => {
+    const graph = createCallscoreOperatingGraph();
+    const payload = { event: "checkout_started", properties: { tier: "pro" } };
+    const result = await graph.invoke(
+      buildInitialOperatingState({
+        goal: "monitor",
+        mode: "bounded_write",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "approval-posthog-route",
+        testFixtures: true,
+        artifacts: {
+          graph_mutation_inputs: {
+            posthog_write_node: {
+              graph_context: {
+                operating_graph_run_id: "graph-run-posthog-route",
+                graph_node_id: "posthog_write_node",
+                goal: "monitor",
+                platform: "posthog",
+                mutation_family: "analytics_write",
+                acting_agent_id: "callscore-social-analytics-agent",
+                authority: "bounded_provider_write",
+                approval_receipt_id: "approval-posthog-route",
+                approved_payload_hash: payloadHash(payload),
+                dry_run: false,
+                parent_receipt_id: "approval-posthog-route",
+              },
+              approved: true,
+              payload,
+            },
+          },
+        },
+      }),
+      { configurable: { thread_id: "operating-posthog-route-test" } },
+    );
+
+    const posthogNode = result.node_results.find((item) => item.node_id === "posthog_write_node");
+    assert.equal(Boolean(posthogNode), true);
+    assert.equal(posthogNode?.status, "blocked");
+    assert.deepEqual(posthogNode?.blockers, ["posthog_provider_tool_missing"]);
+    assert.equal(result.node_results.some((item) => item.node_id === "monitoring_goal_loop"), false);
+    assert.equal(result.mutation_flags.provider_mutation_performed, false);
+  });
+
   test("every non-revenue operating goal reaches a concrete wrapper node with no mutation", async () => {
     const cases = [
       { goal: "refresh_data", nodeId: "data_goal_loop", key: "data_pipeline_stage_count", predicate: (value: unknown) => Number(value) >= 18 },

@@ -80,13 +80,14 @@ test("client instrumentation tracks delegated funnel interactions and views", ()
   assert.match(source, /capturePostHogEvent/);
   assert.match(source, /data-analytics-event/);
   assert.match(source, /IntersectionObserver/);
+  assert.match(source, /MutationObserver/);
   assert.match(source, /addEventListener\("click"/);
 });
 
 test("operating graph owns PostHog provider mutations through the real guarded wrapper", () => {
   const graph = read("src/lib/workplane/callscore-operating-graph.ts");
   assert.match(graph, /import \{ runPostHogWriteNode \} from "\.\/node-wrappers\/crm-analytics-nodes"/);
-  assert.match(graph, /"attio_write_node",\s+"posthog_write_node",/);
+  assert.match(graph, /mode === "bounded_write"[\s\S]*\["posthog_write_node"\]/);
   assert.match(graph, /addNode\("posthog_write_node", graphOwnedMutationWrapperNode\("posthog_write_node", runPostHogWriteNode\)\)/);
 });
 

@@ -44,6 +44,7 @@ function attribution(): Record<string, string> {
 if (config && typeof window !== "undefined") {
   const distinctId = visitorId();
   const capturedViews = new WeakSet<Element>();
+  const observedViews = new WeakSet<Element>();
 
   const captureElement = (element: HTMLElement): void => {
     const event = element.dataset.analyticsEvent;
@@ -61,24 +62,45 @@ if (config && typeof window !== "undefined") {
     if (element) captureElement(element);
   });
 
-  const observeViews = (): void => {
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting || capturedViews.has(entry.target)) continue;
-        capturedViews.add(entry.target);
-        captureElement(entry.target as HTMLElement);
-        observer.unobserve(entry.target);
-      }
-    }, { threshold: 0.35 });
+  const intersectionObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting || capturedViews.has(entry.target)) continue;
+      capturedViews.add(entry.target);
+      captureElement(entry.target as HTMLElement);
+      intersectionObserver.unobserve(entry.target);
+    }
+  }, { threshold: 0.35 });
 
-    for (const element of document.querySelectorAll<HTMLElement>("[data-analytics-event][data-analytics-trigger='view']")) {
-      observer.observe(element);
+  const observeViewElement = (element: HTMLElement): void => {
+    if (observedViews.has(element) || capturedViews.has(element)) return;
+    observedViews.add(element);
+    intersectionObserver.observe(element);
+  };
+
+  const observeViews = (root: ParentNode = document): void => {
+    if (root instanceof HTMLElement && root.matches("[data-analytics-event][data-analytics-trigger='view']")) {
+      observeViewElement(root);
+    }
+    for (const element of root.querySelectorAll<HTMLElement>("[data-analytics-event][data-analytics-trigger='view']")) {
+      observeViewElement(element);
     }
   };
 
+  const startViewTracking = (): void => {
+    observeViews(document);
+    const mutationObserver = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node instanceof HTMLElement) observeViews(node);
+        }
+      }
+    });
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+  };
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", observeViews, { once: true });
+    document.addEventListener("DOMContentLoaded", startViewTracking, { once: true });
   } else {
-    observeViews();
+    startViewTracking();
   }
 }

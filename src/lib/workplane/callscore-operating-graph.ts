@@ -121,32 +121,34 @@ function nodeAlreadyRan(state: OperatingGraphState, nodeId: string): boolean {
 function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
   const parsed = OperatingGraphStateSchema.parse(state);
   if (stateHasBlockingPreflight(parsed)) return "collect_receipts";
-  if (parsed.config.mode === "live_owned_public") {
-    for (const nodeId of [
-      "x_owned_publish_node",
-      "linkedin_owned_publish_node",
-      "x_post_delete_node",
-      "linkedin_post_delete_node",
-      "x_public_reply_node",
-      "x_follow_user_node",
-      "linkedin_public_comment_node",
-      "linkedin_public_reaction_node",
-      "reddit_owned_publish_node",
-      "reddit_public_comment_node",
-      "youtube_publish_node",
-      "youtube_public_comment_node",
-      "youtube_thumbnail_update_node",
-      "youtube_metadata_update_node",
-      "x_public_like_node",
-      "reddit_public_upvote_node",
-      "youtube_public_like_node",
-      "email_send_node",
-      "email_reply_node",
-      "attio_write_node",
-      "posthog_write_node",
-    ] as const) {
-      if (hasGraphMutationInput(parsed, nodeId) && !nodeAlreadyRan(parsed, nodeId)) return nodeId;
-    }
+  const mutationNodeIds: readonly string[] = parsed.config.mode === "live_owned_public"
+    ? [
+        "x_owned_publish_node",
+        "linkedin_owned_publish_node",
+        "x_post_delete_node",
+        "linkedin_post_delete_node",
+        "x_public_reply_node",
+        "x_follow_user_node",
+        "linkedin_public_comment_node",
+        "linkedin_public_reaction_node",
+        "reddit_owned_publish_node",
+        "reddit_public_comment_node",
+        "youtube_publish_node",
+        "youtube_public_comment_node",
+        "youtube_thumbnail_update_node",
+        "youtube_metadata_update_node",
+        "x_public_like_node",
+        "reddit_public_upvote_node",
+        "youtube_public_like_node",
+        "email_send_node",
+        "email_reply_node",
+        "attio_write_node",
+      ]
+    : parsed.config.mode === "bounded_write"
+      ? ["posthog_write_node"]
+      : [];
+  for (const nodeId of mutationNodeIds) {
+    if (hasGraphMutationInput(parsed, nodeId) && !nodeAlreadyRan(parsed, nodeId)) return nodeId;
   }
   return routeOperatingGoalToNode(parsed.config.goal);
 }
