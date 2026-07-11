@@ -1,3 +1,4 @@
+import { creatorHandlePath } from "../../lib/creator-handle-path";
 import type { RankedVideoCandidate } from "../data/rank-video-candidates";
 import { VideoFormatSchema, type CreatorScore, type ScenePlan, type ScriptPackage, type VideoFormat, type YoutubeMetadata } from "../schemas/video.schemas";
 import { countWords, validateScriptText } from "./validate-script";
@@ -27,6 +28,18 @@ function formatAlpha(value: number): string {
   return Math.round(value).toString();
 }
 
+function resolvedCallFor(creator: CreatorScore): CreatorScore["recentCalls"][number] | undefined {
+  return creator.recentCalls.find((call) => call.outcome !== "open");
+}
+
+function attributedCreatorUrl(creator: CreatorScore, format: VideoFormat): string {
+  const rawHandle = creator.youtubeHandle || creator.youtubeChannelId;
+  if (!rawHandle) throw new Error("Creator attribution requires a YouTube handle or channel ID");
+  const path = creatorHandlePath(rawHandle);
+  const content = `${format}_${creator.creatorId}`;
+  return `https://call-score.com/creator/${path}?utm_source=youtube&utm_medium=organic_video&utm_campaign=creator_accountability&utm_content=${content}`;
+}
+
 function chooseFormat(input: VideoPlanInput, creator: CreatorScore): VideoFormat {
   if (input.format) return VideoFormatSchema.parse(input.format);
   if (creator.recentCalls.length === 0 || creator.totalCalls < 3) return "leaderboard_update";
@@ -34,7 +47,7 @@ function chooseFormat(input: VideoPlanInput, creator: CreatorScore): VideoFormat
 }
 
 function scriptFor(format: VideoFormat, creator: CreatorScore): ScriptPackage {
-  const call = creator.recentCalls[0];
+  const call = resolvedCallFor(creator);
   const hook = format === "leaderboard_update"
     ? "The CallScore leaderboard just moved, and this is the creator to watch."
     : `We tracked ${creator.name}'s crypto calls. Here is what the available record shows.`;
@@ -65,14 +78,14 @@ function scriptFor(format: VideoFormat, creator: CreatorScore): ScriptPackage {
     hook,
     voiceover,
     wordCount: countWords(voiceover),
-    evidenceRefs: [`creator:${creator.creatorId}`, ...creator.recentCalls.slice(0, 3).map((c) => `call:${c.id}`)],
+    evidenceRefs: [`creator:${creator.creatorId}`, ...(call ? [`call:${call.id}`] : [])],
     disclaimers: ["Not financial advice", "Based on available CallScore data"],
     cta: "Check the full record on CallScore.",
   };
 }
 
 function scenesFor(format: VideoFormat, creator: CreatorScore, script: ScriptPackage): readonly ScenePlan[] {
-  const call = creator.recentCalls[0];
+  const call = resolvedCallFor(creator);
   const baseDuration = format === "weekly_investigation" ? 45 : format === "leaderboard_update" ? 14 : 10;
   return [
     { sceneId: "hook", order: 0, title: "Hook", narration: script.hook, durationSeconds: baseDuration, visualType: "hook", dataRefs: [`creator:${creator.creatorId}`] },
@@ -93,9 +106,10 @@ export function planVideo(input: VideoPlanInput): VideoPlannerOutput {
   const claimValidation = validateScriptClaims(scriptPackage, [selected]);
   if (!claimValidation.ok) throw new Error(`Claim validation failed: ${claimValidation.errors.join(",")}`);
   const scenes = scenesFor(format, selected, scriptPackage);
+  const attributedUrl = attributedCreatorUrl(selected, format);
   const metadata: YoutubeMetadata = {
     title: scriptPackage.title.slice(0, 100),
-    description: `${scriptPackage.voiceover}\n\nNot financial advice. See the full record on CallScore.`,
+    description: `${scriptPackage.voiceover}\n\nFull creator record: ${attributedUrl}\n\nNot financial advice. See the full record on CallScore.`,
     tags: ["CallScore", "crypto", "creator accountability", selected.name, "crypto calls"].slice(0, 30),
     categoryId: "28",
     madeForKids: false,
