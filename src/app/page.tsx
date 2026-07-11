@@ -6,6 +6,7 @@ import ConsensusSignals from "@/components/ConsensusSignals";
 import PeriodFilter from "@/components/PeriodFilter";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
 import { getCurrentTier } from "@/lib/auth";
+import { analyticsDataset } from "@/lib/conversion-analytics";
 import { query } from "@/lib/db";
 import { DEFAULT_PUBLIC_COUNTS, getPublicCounts, type PublicCounts } from "@/lib/public-counts";
 import { fetchHhHome, getHhReadApiBase } from "@/lib/hh-read-api";
@@ -370,7 +371,10 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
   const totalCalls = String(publicCounts.publicScoredCalls || publicCounts.scoredCalls || 0);
 
   return (
-    <div className="max-w-page mx-auto px-4 tab:px-8 desk:px-10">
+    <div
+      {...analyticsDataset("landing_view", {}, "view")}
+      className="max-w-page mx-auto px-4 tab:px-8 desk:px-10"
+    >
       <section className="relative min-h-[calc(100vh-80px)] pb-8 desk:pb-12 border-b border-ink-250 overflow-hidden">
         <div
           className="absolute inset-x-[-32px] bottom-[-220px] h-[420px] opacity-40 pointer-events-none"
@@ -483,7 +487,10 @@ export default async function HomePage({ searchParams: searchParamsPromise }: Pa
       </EditorialSection>
 
       <EditorialSection id="leaderboard" index="02" title={<>The ranking, <em className="italic text-accent">by alpha</em>.</>} meta={<>{officialRankedCreatorCount} ranked creators · {totalCalls} public-scored calls<br />{CREATOR_JUDGMENT_WINDOW_DETAIL_LABEL}</>}>
-        <div className="flex flex-col tab:flex-row tab:items-end tab:justify-between gap-3 mb-4">
+        <div
+          {...analyticsDataset("leaderboard_view", { period: requestedPeriod }, "view")}
+          className="flex flex-col tab:flex-row tab:items-end tab:justify-between gap-3 mb-4"
+        >
           <div className="space-y-1">
             <p className="font-mono text-[12px] text-ink-500 tracking-wide">{sampleThreshold.sample_floor_label}; floor {sampleThreshold.min_public_scored_calls}, Low N below {sampleThreshold.low_n_warning_calls}.</p>
             <p className="font-mono text-[11px] text-ink-500 tracking-wide max-w-[720px]">{RECENT_PUBLIC_SCORING_MATURITY_NOTE}</p>

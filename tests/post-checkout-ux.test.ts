@@ -7,11 +7,14 @@ function read(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
-test("checkout success page confirms active Pro access and routes buyer back into CallScore", () => {
+test("checkout return confirms active access only after entitlement verification", () => {
   const src = read("src/app/checkout/success/page.tsx");
 
-  assert.match(src, /Your CallScore Pro access is active\./);
-  assert.match(src, /You can manage or cancel billing from Whop at any time\./);
+  assert.match(src, /getCurrentTier/);
+  assert.match(src, /tier !== "free"/);
+  assert.match(src, /Your CallScore \$\{tierLabel\} access is active\./);
+  assert.match(src, /Verify your CallScore access to complete activation\./);
+  assert.match(src, /This return page cannot confirm a purchase on its own\./);
   assert.match(src, /href="\/"/);
   assert.match(src, /href="\/settings\/billing"/);
   assert.match(src, /href="\/alerts"/);
