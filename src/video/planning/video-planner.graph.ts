@@ -57,7 +57,7 @@ function scriptFor(format: VideoFormat, creator: CreatorScore): ScriptPackage {
   const voiceoverLines = [
     hook,
     `${creator.name} currently has ${creator.totalCalls} tracked calls in CallScore data.`,
-    `The available win rate is ${formatPercent(creator.winRate)}, and the current CallScore alpha score is ${formatAlpha(creator.alphaScore)}.`,
+    `The available win rate is ${formatPercent(creator.winRate)}, and the current CallScore creator score is ${formatAlpha(creator.alphaScore)}.`,
     callLine,
     "This is not financial advice. It is an accountability record built from tracked calls and resolved outcomes.",
     "Check the full record on CallScore before trusting any crypto caller.",
@@ -90,7 +90,7 @@ function scenesFor(format: VideoFormat, creator: CreatorScore, script: ScriptPac
   return [
     { sceneId: "hook", order: 0, title: "Hook", narration: script.hook, durationSeconds: baseDuration, visualType: "hook", dataRefs: [`creator:${creator.creatorId}`] },
     { sceneId: "creator", order: 1, title: creator.name, narration: `${creator.name} has ${creator.totalCalls} tracked calls.`, durationSeconds: baseDuration, visualType: "creator_card", dataRefs: [`creator:${creator.creatorId}`] },
-    { sceneId: "score", order: 2, title: "Score reveal", narration: `CallScore alpha score: ${formatAlpha(creator.alphaScore)}.`, durationSeconds: baseDuration, visualType: "score_reveal", dataRefs: [`creator:${creator.creatorId}`] },
+    { sceneId: "score", order: 2, title: "Score reveal", narration: `CallScore creator score: ${formatAlpha(creator.alphaScore)}.`, durationSeconds: baseDuration, visualType: "score_reveal", dataRefs: [`creator:${creator.creatorId}`] },
     { sceneId: "timeline", order: 3, title: "Recent call", narration: call ? `${call.symbol} ${call.direction} resolved as ${call.outcome}.` : "Insufficient recent call detail for a timeline.", durationSeconds: baseDuration, visualType: "call_timeline", dataRefs: call ? [`call:${call.id}`] : [] },
     { sceneId: "cta", order: 4, title: "CTA", narration: script.cta, durationSeconds: 6, visualType: "cta", dataRefs: [] },
   ];

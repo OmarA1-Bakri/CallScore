@@ -39,6 +39,8 @@ test("video planner never presents an open call as resolved evidence", () => {
   const plan = planVideo({ format: "daily_short", rankedCandidates: ranked, runDate: "2026-07-11T04:00:00.000Z" });
 
   assert.doesNotMatch(plan.scriptPackage.voiceover, /resolved as open/i);
+  assert.doesNotMatch(plan.scriptPackage.voiceover, /CallScore alpha score/i);
+  assert.match(plan.scriptPackage.voiceover, /current CallScore creator score is 29/i);
   assert.match(plan.scriptPackage.voiceover, /watch new resolved calls/i);
   assert.deepEqual(plan.scriptPackage.evidenceRefs, ["creator:4"]);
 
