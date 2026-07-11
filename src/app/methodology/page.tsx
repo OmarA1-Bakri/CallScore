@@ -8,6 +8,10 @@ import {
 } from "@/lib/public-methodology";
 import { TRACKED_CREATOR_COUNT } from "@/lib/tracked-creators";
 import {
+  METHODOLOGY_FAQS,
+  methodologyFaqJsonLd,
+} from "./methodology-faq";
+import {
   CALL_SCORE_LIFECYCLE_STATES,
   CREATOR_RANKING_STATES,
   CURRENT_CREATOR_RANKING_METHOD,
@@ -100,6 +104,10 @@ const TIERS: readonly TierRow[] = [
 export default function MethodologyPage(): ReactElement {
   return (
     <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(methodologyFaqJsonLd).replace(/</g, "\\u003c") }}
+      />
       {/* Back link */}
       <Link
         href="/"
@@ -391,9 +399,29 @@ export default function MethodologyPage(): ReactElement {
         </div>
       </EditorialSection>
 
-      {/* 09 — audit me */}
+      {/* 09 — FAQ */}
       <EditorialSection
         index="09"
+        title={<>Methodology <em className="italic text-accent">questions</em>.</>}
+        meta={<>eligibility · maturity · ranking · audit</>}
+      >
+        <dl className="grid grid-cols-1 tab:grid-cols-2 gap-x-8 gap-y-6">
+          {METHODOLOGY_FAQS.map((item) => (
+            <div key={item.question} className="border-t border-ink-250 pt-3">
+              <dt className="font-serif text-[19px] text-ink-900 font-medium leading-tight mb-2">
+                {item.question}
+              </dt>
+              <dd className="font-serif text-[15px] text-ink-700 leading-relaxed">
+                {item.answer}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </EditorialSection>
+
+      {/* 10 — audit me */}
+      <EditorialSection
+        index="10"
         title={<><em className="italic text-accent">Audit</em> me.</>}
         meta={<>Reproducible · source available for audit on request</>}
       >
