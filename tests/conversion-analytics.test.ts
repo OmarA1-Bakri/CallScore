@@ -75,8 +75,14 @@ test("PostHog ingestion emits a bounded event payload", async () => {
   });
 });
 
-test("client instrumentation tracks delegated funnel interactions and views", () => {
+test("client instrumentation is mounted and tracks delegated funnel interactions and views", () => {
   const source = read("src/instrumentation-client.ts");
+  const bootstrap = read("src/components/ConversionAnalyticsBootstrap.tsx");
+  const layout = read("src/app/layout.tsx");
+  assert.match(bootstrap, /"use client"/);
+  assert.match(bootstrap, /import "@\/instrumentation-client"/);
+  assert.match(layout, /ConversionAnalyticsBootstrap/);
+  assert.match(layout, /<ConversionAnalyticsBootstrap \/>/);
   assert.match(source, /capturePostHogEvent/);
   assert.match(source, /data-analytics-event/);
   assert.match(source, /IntersectionObserver/);

@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import FloatingFeedbackButton from "@/components/FloatingFeedbackButton";
 import StructuredData from "@/components/StructuredData";
+import ConversionAnalyticsBootstrap from "@/components/ConversionAnalyticsBootstrap";
 import { SITE_URL } from "@/lib/site";
 import { serif, sans, mono } from "./fonts";
 import "./globals.css";
@@ -84,6 +85,7 @@ export default function RootLayout({
     <html lang="en" className={`${serif.variable} ${sans.variable} ${mono.variable} dark`}>
       <body className="min-h-screen flex flex-col bg-ink-0 text-ink-700 font-sans">
         <StructuredData />
+        <ConversionAnalyticsBootstrap />
         <Header />
         <main className="flex-1">{children}</main>
         <Footer />
