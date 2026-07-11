@@ -1,4 +1,6 @@
 import * as assert from "node:assert/strict";
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { test } from "node:test";
 
 import { buildInitialOperatingState, createCallscoreOperatingGraph } from "../src/lib/workplane/callscore-operating-graph";
@@ -46,6 +48,7 @@ test("operating graph source wires public graph-owned mutation nodes to real wra
     "runYoutubePublicCommentNode",
     "runYoutubeThumbnailUpdateNode",
     "runYoutubeMetadataUpdateNode",
+    "runDiscordOwnedPublishNode",
   ];
   for (const wrapper of realWrappers) {
     assert.match(source, new RegExp(wrapper));
@@ -61,7 +64,77 @@ test("operating graph source wires public graph-owned mutation nodes to real wra
     "youtube_public_comment_node",
     "youtube_thumbnail_update_node",
     "youtube_metadata_update_node",
+    "discord_send_node",
   ]) {
     assert.doesNotMatch(source, new RegExp(`\\.addNode\\("${nodeId}", graphOwnedMutationPlaceholderNode`));
+  }
+});
+
+test("live owned-public Discord uses a real node and never calls provider before graph preflight", async () => {
+  const previousMode = process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+  const previousMock = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+  const previousAppDir = process.env.CALLSCORE_APP_DIR;
+  const appDir = mkdtempSync(`${tmpdir()}/callscore-discord-preflight-`);
+  process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = "1";
+  process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = JSON.stringify({
+    DISCORDBOT_CREATE_MESSAGE: { ok: true, channel_id: "channel-preflight", message_id: "must-not-exist" },
+  });
+  process.env.CALLSCORE_APP_DIR = appDir;
+
+  try {
+    const graph = createCallscoreOperatingGraph();
+    const payload = { channel_id: "channel-preflight", content: "must not send" };
+    const result = await graph.invoke(buildInitialOperatingState({
+      goal: "revenue_now",
+      mode: "live_owned_public",
+      dryRun: false,
+      approved: true,
+      approvalReceiptId: "approval-discord-preflight",
+      testFixtures: true,
+      artifacts: {
+        graph_mutation_inputs: {
+          discord_send_node: {
+            graph_context: {
+              operating_graph_run_id: "graph-run-discord-preflight",
+              graph_node_id: "discord_send_node",
+              goal: "revenue_now",
+              platform: "discord",
+              mutation_family: "public_publish",
+              acting_agent_id: "callscore-community-head",
+              authority: "owned_public_publish",
+              approval_receipt_id: "approval-discord-preflight",
+              evidence_receipt_id: "evidence-discord-preflight",
+              originality_receipt_id: "originality-discord-preflight",
+              approved_payload_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              dry_run: false,
+              parent_receipt_id: "approval-discord-preflight",
+            },
+            approved: true,
+            provider_tool: "DISCORDBOT_CREATE_MESSAGE",
+            provider_payload: payload,
+            payload,
+          },
+        },
+      },
+    }));
+
+    const nodeIds = result.node_results.map((item) => item.node_id);
+    const preflightIndex = nodeIds.indexOf("external_mutation_preflight");
+    const discordIndex = nodeIds.indexOf("discord_send_node");
+    const discordNode = result.node_results[discordIndex];
+    assert.notEqual(discordIndex, -1);
+    assert.equal(preflightIndex < discordIndex, true);
+    assert.equal(discordNode?.status, "blocked");
+    assert.equal(discordNode?.detail.blocker_code, "approved_payload_hash_mismatch");
+    assert.deepEqual(discordNode?.detail.provider_calls, []);
+    assert.equal(discordNode?.detail.provider_response, null);
+    assert.equal(existsSync(`${appDir}/.tmp/workflow-receipts/provider_execution`), false);
+  } finally {
+    if (previousMode === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+    else process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = previousMode;
+    if (previousMock === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+    else process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = previousMock;
+    if (previousAppDir === undefined) delete process.env.CALLSCORE_APP_DIR;
+    else process.env.CALLSCORE_APP_DIR = previousAppDir;
   }
 });

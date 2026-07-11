@@ -52,7 +52,7 @@ function providerExternalObject(response: unknown): { external_url: string | nul
     return { external_url: null, external_object_id: null };
   }
   const providerResponse = response as ProviderResponse;
-  const id = providerResponse.id ?? providerResponse.object_id ?? providerResponse.external_object_id ?? providerResponse.x_restli_id ?? providerResponse.urn ?? providerResponse.videoId ?? providerResponse.youtubeVideoId;
+  const id = providerResponse.id ?? providerResponse.message_id ?? providerResponse.object_id ?? providerResponse.external_object_id ?? providerResponse.x_restli_id ?? providerResponse.urn ?? providerResponse.videoId ?? providerResponse.youtubeVideoId;
   const url = providerResponse.url ?? providerResponse.external_url ?? providerResponse.publishUrl;
   return {
     external_url: typeof url === "string" && url.trim() ? url : null,
@@ -89,6 +89,7 @@ function platformFromProviderTool(tool: string | null | undefined): string | nul
   if (!tool) return null;
   const prefix = tool.split("_")[0]?.toLowerCase();
   if (prefix === "twitter" || prefix === "x") return "x";
+  if (prefix === "discordbot") return "discord";
   if (prefix === "zoho") return "gmail";
   if (["linkedin", "reddit", "youtube", "gmail", "resend", "whop", "attio", "posthog"].includes(prefix)) return prefix;
   return null;

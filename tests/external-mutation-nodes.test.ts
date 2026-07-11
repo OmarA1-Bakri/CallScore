@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 const emailNodesModulePath = "../src/lib/workplane/node-wrappers/" + "email-alert-nodes";
 const commerceNodesModulePath = "../src/lib/workplane/node-wrappers/" + "commerce-mutation-nodes";
 const crmNodesModulePath = "../src/lib/workplane/node-wrappers/" + "crm-analytics-nodes";
+const discordNodesModulePath = "../src/lib/workplane/node-wrappers/" + "discord-publish-nodes";
 
 type MutationNodeDecision = {
   readonly status: "ok" | "blocked" | "failed";
@@ -11,6 +12,8 @@ type MutationNodeDecision = {
   readonly node_id?: string;
   readonly provider_call_permitted?: boolean;
   readonly provider_response?: unknown;
+  readonly provider_calls?: readonly Record<string, unknown>[];
+  readonly receipt?: unknown;
   readonly mutation_flags?: {
     readonly external_mutation_performed?: boolean;
     readonly provider_mutation_performed?: boolean;
@@ -34,6 +37,10 @@ type CrmAnalyticsNodesModule = {
   runPostHogWriteNode: (input: Record<string, unknown>) => MutationNodeDecision | Promise<MutationNodeDecision>;
 };
 
+type DiscordPublishNodesModule = {
+  runDiscordOwnedPublishNode: (input: Record<string, unknown>) => MutationNodeDecision | Promise<MutationNodeDecision>;
+};
+
 async function loadEmailNodes(): Promise<EmailAlertNodesModule> {
   return await import(emailNodesModulePath) as EmailAlertNodesModule;
 }
@@ -44,6 +51,10 @@ async function loadCommerceNodes(): Promise<CommerceMutationNodesModule> {
 
 async function loadCrmNodes(): Promise<CrmAnalyticsNodesModule> {
   return await import(crmNodesModulePath) as CrmAnalyticsNodesModule;
+}
+
+async function loadDiscordNodes(): Promise<DiscordPublishNodesModule> {
+  return await import(discordNodesModulePath) as DiscordPublishNodesModule;
 }
 
 function graphContext(overrides: Record<string, unknown>) {
@@ -242,5 +253,82 @@ describe("third-review graph-owned node payload regressions", () => {
     assert.equal(decision.status, "blocked");
     assert.equal(decision.blocker_code, "approved_payload_hash_mismatch");
     assert.equal(decision.provider_call_permitted, false);
+  });
+});
+
+describe("Discord graph-owned owned-public node", () => {
+  const payload = { channel_id: "channel-123", content: "hello discord" };
+  const context = graphContext({
+    graph_node_id: "discord_send_node",
+    goal: "revenue_now",
+    platform: "discord",
+    mutation_family: "public_publish",
+    acting_agent_id: "callscore-community-head",
+    authority: "owned_public_publish",
+    evidence_receipt_id: "evidence-discord-001",
+    originality_receipt_id: "originality-discord-001",
+    approved_payload_hash: "sha256:a999808a99fddf9c29b45837c2c5b54fcd4322dda279f25751c82a4cd876df98",
+    parent_receipt_id: "approval-mutation-001",
+  });
+
+  test("blocks when the Discord provider adapter is missing", async () => {
+    const nodes = await loadDiscordNodes();
+    const decision = await nodes.runDiscordOwnedPublishNode({ graph_context: context, payload });
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.blocker_code, "discord_provider_tool_missing");
+    assert.equal(decision.provider_call_permitted, false);
+  });
+
+  test("mocked success retains channel, provider message ID, payload hash, lineage, and delete rollback metadata", async () => {
+    const nodes = await loadDiscordNodes();
+    const providerResponse = { ok: true, channel_id: "channel-123", message_id: "message-456" };
+    const decision = await nodes.runDiscordOwnedPublishNode({
+      graph_context: context,
+      approved: true,
+      provider_tool: "DISCORDBOT_CREATE_MESSAGE",
+      provider_execution_receipt_id: "provider-exec-receipt-001",
+      provider_response: providerResponse,
+      provider_payload: payload,
+      payload,
+    });
+
+    const receipt = decision.receipt as Record<string, unknown>;
+    assert.equal(decision.status, "ok");
+    assert.deepEqual(decision.provider_response, providerResponse);
+    assert.equal(receipt.channel_id, "channel-123");
+    assert.equal(receipt.message_id, "message-456");
+    assert.equal(receipt.external_object_id, "message-456");
+    assert.equal(receipt.approved_payload_hash, context.approved_payload_hash);
+    assert.equal(receipt.parent_receipt_id, "approval-mutation-001");
+    assert.deepEqual(receipt.child_receipt_ids, ["provider-exec-receipt-001"]);
+    assert.deepEqual(receipt.delete_rollback, {
+      provider_tool: "DISCORDBOT_DELETE_MESSAGE",
+      provider_payload: { channel_id: "channel-123", message_id: "message-456" },
+    });
+    assert.equal(decision.mutation_flags?.public_publish_performed, true);
+  });
+
+  test("mocked provider failure retains response but never sets mutation flags", async () => {
+    const nodes = await loadDiscordNodes();
+    const failedPayload = { channel_id: "channel-123", content: "provider failure" };
+    const decision = await nodes.runDiscordOwnedPublishNode({
+      graph_context: {
+        ...context,
+        approved_payload_hash: "sha256:7e338010b45f3b9e0b2d451038165cdb4edf4f81ad9648215f96738b3d8aea75",
+      },
+      approved: true,
+      provider_tool: "DISCORDBOT_CREATE_MESSAGE",
+      provider_execution_receipt_id: "provider-exec-receipt-001",
+      provider_response: { ok: false, error: "Discord rejected message" },
+      provider_payload: failedPayload,
+      payload: failedPayload,
+    });
+
+    assert.equal(decision.status, "failed");
+    assert.equal(decision.blocker_code, "provider_success_required_before_mutation_flags");
+    assert.deepEqual(decision.provider_response, { ok: false, error: "Discord rejected message" });
+    assert.equal(decision.mutation_flags?.external_mutation_performed, false);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, false);
+    assert.equal(decision.mutation_flags?.public_publish_performed, false);
   });
 });

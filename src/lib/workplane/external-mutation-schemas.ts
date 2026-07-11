@@ -11,6 +11,7 @@ const Sha256HashSchema = z.string().trim().regex(/^sha256:[a-f0-9]{64}$/);
 
 export const ExternalMutationPlatformSchema = z.enum([
   "x",
+  "discord",
   "linkedin",
   "reddit",
   "youtube",

@@ -358,3 +358,46 @@ describe("third-review receipt lineage regressions", () => {
     assert.equal(decision.blocker_code, "provider_execution_receipt_required");
   });
 });
+
+describe("Discord graph-owned mutation guard contract", () => {
+  test("Discord is a recognized external mutation platform", async () => {
+    const schemas = await import("../src/lib/workplane/external-mutation-schemas");
+    assert.equal(schemas.ExternalMutationPlatformSchema.safeParse("discord").success, true);
+  });
+
+  test("DISCORDBOT tools must match the Discord graph route", async () => {
+    const discordContext = {
+      ...graphContext,
+      graph_node_id: "discord_send_node",
+      platform: "discord",
+      acting_agent_id: "callscore-community-head",
+    };
+    const guard = await loadGuard();
+    const matching = await guard.evaluateExternalMutationRequest({
+      mode: "live_owned_public",
+      graph_context: discordContext,
+      requested_action: "publish_owned_public",
+      platform: "discord",
+      provider_tool: "DISCORDBOT_CREATE_MESSAGE",
+    });
+    assert.equal(matching.allowed, true);
+
+    await expectBlocked({
+      mode: "live_owned_public",
+      graph_context: { ...discordContext, platform: "x" },
+      requested_action: "publish_owned_public",
+      platform: "x",
+      provider_tool: "DISCORDBOT_CREATE_MESSAGE",
+    }, "provider_tool_platform_mismatch");
+  });
+
+  test("Discord sends fail closed without operating graph context", async () => {
+    await expectBlocked({
+      mode: "live_owned_public",
+      graph_context: null,
+      requested_action: "publish_owned_public",
+      platform: "discord",
+      provider_tool: "DISCORDBOT_CREATE_MESSAGE",
+    }, "missing_operating_graph_context");
+  });
+});

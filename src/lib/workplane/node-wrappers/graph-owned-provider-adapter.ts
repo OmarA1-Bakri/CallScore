@@ -75,6 +75,23 @@ function validateKnownProviderPayload(toolSlug: string, payload: Record<string, 
     if (!/^urn:li:(share|ugcPost):[0-9A-Za-z_-]+$/.test(postUrn)) return "payload_missing";
   }
 
+  if (toolSlug === "DISCORDBOT_CREATE_MESSAGE") {
+    const channelId = typeof payload.channel_id === "string" ? payload.channel_id.trim() : "";
+    const content = typeof payload.content === "string" ? payload.content.trim() : "";
+    const hasEmbeds = Array.isArray(payload.embeds) && payload.embeds.length > 0;
+    const hasComponents = Array.isArray(payload.components) && payload.components.length > 0;
+    const hasStickers = Array.isArray(payload.sticker_ids) && payload.sticker_ids.length > 0;
+    if (!/^[0-9]{17,20}$/.test(channelId)) return "target_missing";
+    if (!content && !hasEmbeds && !hasComponents && !hasStickers) return "payload_missing";
+    if (content.length > 2000) return "payload_too_long";
+    if (isRecord(payload.allowed_mentions)) {
+      const parse = Array.isArray(payload.allowed_mentions.parse) ? payload.allowed_mentions.parse : [];
+      const roles = Array.isArray(payload.allowed_mentions.roles) ? payload.allowed_mentions.roles : [];
+      const users = Array.isArray(payload.allowed_mentions.users) ? payload.allowed_mentions.users : [];
+      if (parse.length > 0 || roles.length > 0 || users.length > 0) return "blocked_platform_permission";
+    }
+  }
+
   if (toolSlug === "LINKEDIN_CREATE_LINKED_IN_POST") {
     const author = typeof payload.author === "string" ? payload.author.trim() : "";
     const commentary = typeof payload.commentary === "string" ? payload.commentary.trim() : "";
