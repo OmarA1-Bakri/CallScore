@@ -30,14 +30,37 @@ function isFunnelEvent(value: string | undefined): value is CallScoreFunnelEvent
 
 function attribution(): Record<string, string> {
   const query = new URLSearchParams(window.location.search);
-  return {
-    path: window.location.pathname,
-    url: window.location.href,
-    referrer: document.referrer,
+  const storageKey = "callscore_analytics_attribution";
+  const current = {
     utm_source: query.get("utm_source") ?? "",
     utm_medium: query.get("utm_medium") ?? "",
     utm_campaign: query.get("utm_campaign") ?? "",
     utm_content: query.get("utm_content") ?? "",
+  };
+  let campaign = current;
+  try {
+    if (Object.values(current).some(Boolean)) {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(current));
+    } else {
+      const stored = window.sessionStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Record<string, unknown>;
+        campaign = {
+          utm_source: typeof parsed.utm_source === "string" ? parsed.utm_source : "",
+          utm_medium: typeof parsed.utm_medium === "string" ? parsed.utm_medium : "",
+          utm_campaign: typeof parsed.utm_campaign === "string" ? parsed.utm_campaign : "",
+          utm_content: typeof parsed.utm_content === "string" ? parsed.utm_content : "",
+        };
+      }
+    }
+  } catch {
+    campaign = current;
+  }
+  return {
+    path: window.location.pathname,
+    url: window.location.href,
+    referrer: document.referrer,
+    ...campaign,
   };
 }
 

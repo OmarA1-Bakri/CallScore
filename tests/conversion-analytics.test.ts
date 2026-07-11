@@ -81,6 +81,7 @@ test("client instrumentation tracks delegated funnel interactions and views", ()
   assert.match(source, /data-analytics-event/);
   assert.match(source, /IntersectionObserver/);
   assert.match(source, /MutationObserver/);
+  assert.match(source, /sessionStorage/);
   assert.match(source, /addEventListener\("click"/);
 });
 
