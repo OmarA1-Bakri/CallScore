@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { validCanonicalMediaArtifact } from "./helpers/canonical-media-fixture";
+import { validCanonicalOperationalPackage } from "./helpers/canonical-operational-package-fixture";
 
 const socialNodesModulePath = "../src/lib/workplane/node-wrappers/" + "social-publish-nodes";
 const legacyBlockerModulePath = "../src/lib/workplane/" + "legacy-external-mutation-blockers";
@@ -92,7 +93,7 @@ const canonicalReceipts = [
 ].map((schema) => ({
   schema,
   receipt_id: `${schema}:test`,
-  created_at: "2026-07-01T00:00:00.000Z",
+  created_at: new Date().toISOString(),
   agent_id: "callscore-cmo-head",
   decision: "approved",
   evidence_hash: "sha256:" + "a".repeat(64),
@@ -114,6 +115,23 @@ describe("graph-only social external mutation RED contract", () => {
     assert.equal((decision.provider_calls ?? []).length, 0);
   });
 
+  test("owned-public publish blocks before provider handoff when canonical package is missing", async () => {
+    const nodes = await loadSocialNodes();
+    const decision = await nodes.runXOwnedPublishNode({
+      graph_context: { ...approvalContext, graph_node_id: "x_owned_publish_node", platform: "x" },
+      payload: { text: "CallScore evidence update" },
+      provider_tool: "TWITTER_CREATION_OF_A_POST",
+      provider_response: { ok: true, id: "post-without-package" },
+    });
+
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.blocker_code, "canonical_operational_package_missing");
+    assert.equal(decision.provider_call_permitted, false);
+    assert.equal((decision.provider_calls ?? []).length, 0);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, false);
+    assert.equal(decision.mutation_flags?.public_publish_performed, false);
+  });
+
   test("X owned publish node records provider mutation only from x_owned_publish_node", async () => {
     const nodes = await loadSocialNodes();
     const decision = await nodes.runXOwnedPublishNode({
@@ -121,6 +139,7 @@ describe("graph-only social external mutation RED contract", () => {
       payload: { text: "CallScore evidence update" },
       provider_tool: "TWITTER_CREATION_OF_A_POST",
       provider_response: { ok: true, id: "post-001", url: "https://x.com/callscore/status/post-001" },
+      canonical_operational_package: validCanonicalOperationalPackage("x"),
     });
 
     assert.equal(decision.status, "ok");
@@ -136,6 +155,7 @@ describe("graph-only social external mutation RED contract", () => {
       payload: { text: "CallScore evidence update" },
       provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
       provider_response: { ok: true, id: "li-post-001", url: "https://linkedin.com/feed/update/li-post-001" },
+      canonical_operational_package: validCanonicalOperationalPackage("linkedin"),
     });
 
     assert.equal(decision.status, "ok");

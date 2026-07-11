@@ -20,6 +20,7 @@ import {
   runYoutubeThumbnailUpdateNode,
   runYoutubeVideoPublishNode,
 } from "../src/lib/workplane/node-wrappers/video-publish-nodes";
+import { validCanonicalOperationalPackage } from "./helpers/canonical-operational-package-fixture";
 
 function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, val) => {
@@ -73,6 +74,7 @@ describe("graph-owned public publishing and engagement open by default", () => {
       provider_tool: "TWITTER_CREATION_OF_A_POST",
       provider_response: providerResponse,
       payload: { text: "CallScore public update" },
+      canonical_operational_package: validCanonicalOperationalPackage("x"),
     });
     assert.equal(owned.status, "ok");
     assert.equal(owned.mutation_flags.public_publish_performed, true);
@@ -94,6 +96,7 @@ describe("graph-owned public publishing and engagement open by default", () => {
       provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
       provider_response: providerResponse,
       payload: { text: "CallScore LinkedIn update" },
+      canonical_operational_package: validCanonicalOperationalPackage("linkedin"),
     });
     assert.equal(owned.status, "ok");
 
@@ -114,6 +117,7 @@ describe("graph-owned public publishing and engagement open by default", () => {
       provider_tool: "REDDIT_CREATE_REDDIT_POST",
       provider_response: providerResponse,
       payload: { title: "CallScore update", text: "Public profile post" },
+      canonical_operational_package: validCanonicalOperationalPackage("reddit"),
     });
     assert.equal(profile.status, "ok");
 
@@ -127,6 +131,28 @@ describe("graph-owned public publishing and engagement open by default", () => {
     assert.equal(subreddit.status, "ok");
   });
 
+  test("YouTube publish blocks when the canonical package omits YouTube production receipts", () => {
+    const payload = { title: "CallScore video", description: "Daily video", video_path: "/tmp/rendered.mp4" };
+    const canonicalPackage = validCanonicalOperationalPackage("youtube");
+    const decision = runYoutubeVideoPublishNode({
+      graph_context: context({ graph_node_id: "youtube_publish_node", goal: "produce_video", platform: "youtube", mutation_family: "video_publish", payload_for_hash: payload }),
+      provider_tool: "YOUTUBE_UPLOAD_VIDEO",
+      provider_response: { ...providerResponse, videoId: "yt-missing-receipts" },
+      rendered_video_path: "/tmp/rendered.mp4",
+      payload,
+      canonical_operational_package: {
+        ...canonicalPackage,
+        receipts: canonicalPackage.receipts.filter((receipt) => !receipt.schema.startsWith("youtube_")),
+      },
+    });
+
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.blocker_code, "missing_youtube_script_receipt.v1");
+    assert.equal(decision.provider_call_permitted, false);
+    assert.equal(decision.mutation_flags.provider_mutation_performed, false);
+    assert.equal(decision.mutation_flags.public_publish_performed, false);
+  });
+
   test("YouTube publish/comment/update open when graph-owned and execution inputs exist", () => {
     const publish = runYoutubeVideoPublishNode({
       graph_context: context({ graph_node_id: "youtube_publish_node", goal: "produce_video", platform: "youtube", mutation_family: "video_publish", payload_for_hash: { title: "CallScore video", description: "Daily video", video_path: "/tmp/rendered.mp4" } }),
@@ -134,6 +160,7 @@ describe("graph-owned public publishing and engagement open by default", () => {
       provider_response: { ...providerResponse, videoId: "yt-001" },
       rendered_video_path: "/tmp/rendered.mp4",
       payload: { title: "CallScore video", description: "Daily video", video_path: "/tmp/rendered.mp4" },
+      canonical_operational_package: validCanonicalOperationalPackage("youtube"),
     });
     assert.equal(publish.status, "ok");
     assert.equal(publish.mutation_flags.public_publish_performed, true);

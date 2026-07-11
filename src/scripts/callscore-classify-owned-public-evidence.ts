@@ -43,6 +43,7 @@ const classification = classifyOwnedPublicEvidence({
   graph_owned_path: graphPath,
   provider_auth_ok: publish?.status === "blocked_auth" ? false : undefined,
   duplicate_or_cadence_hit: Boolean(publish?.duplicate_or_cadence_hit || publish?.status === "blocked_duplicate_or_cadence"),
+  ceremonial_receipts: draft?.ceremonial_receipts ?? draft?.canonical_receipt_aliases ?? [],
 });
 
 const normalized = normalizeWorkflowStatus({

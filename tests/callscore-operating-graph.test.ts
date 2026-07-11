@@ -16,6 +16,7 @@ import {
   type OperatingNodeResult,
 } from "../src/lib/workplane/operating-graph-schemas";
 import { validCanonicalMediaArtifact } from "./helpers/canonical-media-fixture";
+import { validCanonicalOperationalPackage } from "./helpers/canonical-operational-package-fixture";
 
 const nodeStartedAt = "2026-06-25T12:00:00.000Z";
 const nodeFinishedAt = "2026-06-25T12:00:01.000Z";
@@ -71,7 +72,7 @@ function approvedCanonicalReceipts(agentId = "callscore-test-agent") {
   return schemas.map((schema) => ({
     schema,
     receipt_id: `${schema.replace(/[^a-z0-9]+/gi, "-")}-approved`,
-    created_at: "2026-06-25T12:00:00.000Z",
+    created_at: new Date().toISOString(),
     agent_id: agentId,
     decision: "approved" as const,
     evidence_hash: `sha256:${createHash("sha256").update(schema).digest("hex")}`,
@@ -250,7 +251,7 @@ describe("callscore operating graph", () => {
             canonical_operational_package: {
               package_id: "canonical-x-media-bridge",
               channel: "x",
-              created_at: "2026-06-25T12:00:00.000Z",
+              created_at: new Date().toISOString(),
               receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
               media_artifact: validCanonicalMediaArtifact("x"),
             },
@@ -276,7 +277,7 @@ describe("callscore operating graph", () => {
                 canonical_operational_package: {
                   package_id: "canonical-x-media-bridge",
                   channel: "x",
-                  created_at: "2026-06-25T12:00:00.000Z",
+                  created_at: new Date().toISOString(),
                   receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
                   media_artifact: validCanonicalMediaArtifact("x"),
                 },
@@ -337,7 +338,7 @@ describe("callscore operating graph", () => {
             canonical_operational_package: {
               package_id: "canonical-x-credits-depleted",
               channel: "x",
-              created_at: "2026-06-25T12:00:00.000Z",
+              created_at: new Date().toISOString(),
               receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
               media_artifact: validCanonicalMediaArtifact("x"),
             },
@@ -363,7 +364,7 @@ describe("callscore operating graph", () => {
                 canonical_operational_package: {
                   package_id: "canonical-x-credits-depleted",
                   channel: "x",
-                  created_at: "2026-06-25T12:00:00.000Z",
+                  created_at: new Date().toISOString(),
                   receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
                   media_artifact: validCanonicalMediaArtifact("x"),
                 },
@@ -426,6 +427,7 @@ describe("callscore operating graph", () => {
                 parent_receipt_id: "approval-youtube-publish-route",
               },
               approved: true,
+              canonical_operational_package: validCanonicalOperationalPackage("youtube"),
               provider_tool: "YOUTUBE_UPLOAD_VIDEO",
               payload,
               provider_execution_receipt_id: "provider-youtube-publish-route",
