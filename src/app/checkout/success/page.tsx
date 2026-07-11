@@ -2,34 +2,46 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
+import { analyticsDataset } from "@/lib/conversion-analytics";
+import { getCurrentTier } from "@/lib/auth";
 
 export const metadata: Metadata = {
-  title: "Checkout complete — CallScore",
+  title: "Checkout return — CallScore",
   description:
-    "Post-checkout confirmation for CallScore buyers, with direct routes back to the app, alerts, and Whop-managed billing.",
+    "Post-checkout entitlement verification for CallScore, with direct routes to refresh access, the app, and Whop-managed billing.",
   alternates: { canonical: "/checkout/success" },
 };
 
-export default function CheckoutSuccessPage(): ReactElement {
+export default async function CheckoutSuccessPage(): Promise<ReactElement> {
+  const tier = await getCurrentTier();
+  const accessActive = tier !== "free";
+  const tierLabel = tier === "alpha" ? "Alpha" : "Pro";
+
   return (
-    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
+    <div
+      {...(accessActive ? analyticsDataset("checkout_completed", { tier }, "view") : {})}
+      className="max-w-page mx-auto px-4 tab:px-6 desk:px-8"
+    >
       <section className="pb-12 border-b border-ink-250">
         <p className="font-mono text-mono-sm uppercase tracking-caps text-accent mb-4">
-          Checkout complete
+          {accessActive ? "Checkout verified" : "Checkout returned"}
         </p>
         <h1 className="font-serif text-[35px] tab:text-[45px] desk:text-[53px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[900px] mb-5">
-          Your CallScore Pro access is active.
+          {accessActive
+            ? `Your CallScore ${tierLabel} access is active.`
+            : "Verify your CallScore access to complete activation."}
         </h1>
         <p className="font-serif text-[20px] text-ink-700 leading-relaxed max-w-[760px]">
-          You can manage or cancel billing from Whop at any time. Return to CallScore to confirm
-          your session, configure alerts, and use the paid 90-day context filter.
+          {accessActive
+            ? "You can manage or cancel billing from Whop at any time. Continue in CallScore to use your paid features."
+            : "This return page cannot confirm a purchase on its own. Refresh access through Whop; paid features remain locked until entitlement verification succeeds."}
         </p>
         <MetaStrip
           cells={[
-            { k: "access", v: "Pro active" },
+            { k: "access", v: accessActive ? `${tierLabel} active` : "verification required" },
             { k: "billing", v: "Whop-managed" },
             { k: "cancel", v: "Whop anytime" },
-            { k: "next", v: "open app" },
+            { k: "next", v: accessActive ? "open app" : "refresh access" },
           ]}
         />
       </section>

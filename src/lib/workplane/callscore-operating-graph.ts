@@ -20,6 +20,7 @@ import { mergeMutationFlags, nodeResultToStatePatch, wrapDirectFunctionNode } fr
 import { generateOperatingReceiptId, writeOperatingReceipt, buildOperatingReceiptPath, redactOperatingValue, buildOperatingSummaryPath, writeOperatingSummary } from "./operating-receipts";
 import { bootContextNode, hardGatePreflightNode } from "./node-wrappers/gating-nodes";
 import { runAttioWriteNode } from "./node-wrappers/crm-write-nodes";
+import { runPostHogWriteNode } from "./node-wrappers/crm-analytics-nodes";
 import { runZohoMailReplyNode, runZohoMailSendNode } from "./node-wrappers/email-reply-nodes";
 import {
   alertGoalLoopNode,
@@ -142,6 +143,7 @@ function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
       "email_send_node",
       "email_reply_node",
       "attio_write_node",
+      "posthog_write_node",
     ] as const) {
       if (hasGraphMutationInput(parsed, nodeId) && !nodeAlreadyRan(parsed, nodeId)) return nodeId;
     }
@@ -662,7 +664,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("resend_alert_send_node", graphOwnedMutationPlaceholderNode("resend_alert_send_node"))
     .addNode("whop_mutation_node", graphOwnedMutationPlaceholderNode("whop_mutation_node"))
     .addNode("attio_write_node", graphOwnedMutationWrapperNode("attio_write_node", runAttioWriteNode))
-    .addNode("posthog_write_node", graphOwnedMutationPlaceholderNode("posthog_write_node"))
+    .addNode("posthog_write_node", graphOwnedMutationWrapperNode("posthog_write_node", runPostHogWriteNode))
     .addNode("revenue_goal_loop", revenueGoalLoopNode)
     .addNode("data_goal_loop", dataGoalLoopNode)
     .addNode("worker_dispatch_goal_loop", workerDispatchNode)

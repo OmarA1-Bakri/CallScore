@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
+import { analyticsDataset } from "@/lib/conversion-analytics";
 
 export const metadata: Metadata = {
   title: "Checkout cancelled — CallScore",
@@ -12,7 +13,10 @@ export const metadata: Metadata = {
 
 export default function CheckoutCancelledPage(): ReactElement {
   return (
-    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
+    <div
+      {...analyticsDataset("checkout_cancelled", {}, "view")}
+      className="max-w-page mx-auto px-4 tab:px-6 desk:px-8"
+    >
       <section className="pb-12 border-b border-ink-250">
         <p className="font-mono text-mono-sm uppercase tracking-caps text-accent mb-4">
           Checkout cancelled

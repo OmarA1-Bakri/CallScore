@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactElement } from "react";
 import { EditorialSection, MetaStrip } from "@/components/primitives";
+import { analyticsDataset } from "@/lib/conversion-analytics";
 
 const TITLE = "Pricing — CallScore";
 const DESCRIPTION =
@@ -66,6 +67,7 @@ interface PlanCardProps {
   readonly tagline: string;
   readonly cta: string;
   readonly ctaHref: string;
+  readonly analytics?: ReturnType<typeof analyticsDataset>;
   readonly manageLinks?: readonly { readonly label: string; readonly href: string; readonly prefetch?: boolean }[];
   readonly emphasis?: boolean; // editorial anchor — slightly wider, accent-low background
   readonly ctaVariant?: "button" | "soft" | "none"; // round2-005: free tier has no purchase, use soft link
@@ -78,6 +80,7 @@ function PlanCard({
   tagline,
   cta,
   ctaHref,
+  analytics,
   manageLinks = [],
   emphasis = false,
   ctaVariant = "button",
@@ -123,6 +126,7 @@ function PlanCard({
       )}
       {ctaVariant === "button" && (
         <Link
+          {...(analytics ?? {})}
           href={ctaHref}
           className={`mt-auto inline-block text-center font-mono text-[12px] tracking-caps uppercase px-4 py-2.5 transition-colors focus-visible:outline focus-visible:outline-1 focus-visible:outline-accent ${
             emphasis
@@ -148,7 +152,10 @@ function PlanCard({
 
 export default function PricingPage(): ReactElement {
   return (
-    <div className="max-w-page mx-auto px-4 tab:px-6 desk:px-8">
+    <div
+      {...analyticsDataset("pricing_view", {}, "view")}
+      className="max-w-page mx-auto px-4 tab:px-6 desk:px-8"
+    >
       {/* HERO */}
       <section className="pb-12 border-b border-ink-250">
         <h1 className="font-serif text-[35px] tab:text-[45px] desk:text-[53px] text-ink-900 font-medium tracking-tight leading-[1.05] text-balance max-w-[880px] mb-5">
@@ -240,6 +247,7 @@ export default function PricingPage(): ReactElement {
             tagline="Target prices, alerts, watchlists, exports."
             cta="Upgrade to Pro"
             ctaHref="/api/checkout/pro"
+            analytics={analyticsDataset("checkout_started", { tier: "pro", price: 19 })}
             manageLinks={[
               { label: "Email alerts", href: "/alerts" },
               { label: "CSV exports", href: "/pricing#plans" },
@@ -253,6 +261,7 @@ export default function PricingPage(): ReactElement {
             tagline="Backtests, API, webhooks, signals."
             cta="Upgrade to Alpha"
             ctaHref="/api/checkout/alpha"
+            analytics={analyticsDataset("checkout_started", { tier: "alpha", price: 49 })}
             manageLinks={[
               { label: "Backtest Lab", href: "/backtest" },
               { label: "API keys", href: "/settings/api" },
