@@ -145,3 +145,32 @@ test("YouTube upload normalization extracts nested response_data video IDs", asy
     if (previousMock === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON; else process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = previousMock;
   }
 });
+
+test("YouTube thumbnail bridge stages a local PNG to a public URL", async () => {
+  const previousProviderMode = process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+  const previousMock = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+  const previousFileMode = process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE;
+  delete process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE;
+  process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = "1";
+  process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = JSON.stringify({
+    COMPOSIO_REMOTE_WORKBENCH: { ok: true, s3key: "thumb/key", s3_url: "https://backend.composio.dev/api/v3/sl/thumb" },
+  });
+  try {
+    const dir = mkdtempSync(join(tmpdir(), "callscore-youtube-thumbnail-"));
+    const path = join(dir, "thumbnail.png");
+    writeFileSync(path, Buffer.from("png-fixture"));
+    const input: Record<string, unknown> = {
+      provider_tool: "YOUTUBE_UPDATE_THUMBNAIL",
+      provider_payload: { videoId: "qf5gVo05Uh8" },
+      graph_context: { approved_payload_hash: "sha256:placeholder" },
+      media_gate: { visual_required: true, media_plan: "media", local_path: path, mimetype: "image/png" },
+    };
+    const result = await bridgeGraphOwnedProviderMedia(input);
+    assert.equal(result.ok, true);
+    assert.equal((input.provider_payload as Record<string, unknown>).thumbnailUrl, "https://backend.composio.dev/api/v3/sl/thumb");
+  } finally {
+    if (previousProviderMode === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE; else process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = previousProviderMode;
+    if (previousMock === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON; else process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = previousMock;
+    if (previousFileMode === undefined) delete process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE; else process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE = previousFileMode;
+  }
+});

@@ -192,6 +192,9 @@ function providerPayloadHasRequiredMedia(toolSlug: string, payload: unknown): bo
         && typeof image.s3key === "string"
         && image.s3key.trim().length > 0);
   }
+  if (toolSlug === "YOUTUBE_UPDATE_THUMBNAIL") {
+    return typeof payload.thumbnailUrl === "string" && /^https:\/\//.test(payload.thumbnailUrl);
+  }
   if (toolSlug === "YOUTUBE_UPLOAD_VIDEO") {
     return isRecord(payload.videoFilePath)
       && typeof payload.videoFilePath.name === "string"
@@ -465,6 +468,10 @@ export function extractComposioS3Key(value: unknown): string | null {
   return stringFieldDeep(value, ["s3key", "s3_key"]);
 }
 
+export function extractComposioS3Url(value: unknown): string | null {
+  return stringFieldDeep(value, ["s3_url", "url"]);
+}
+
 async function stageLocalFileViaGraphOwnedWorkbench(input: {
   readonly localPath: string;
   readonly mimetype: string;
@@ -514,8 +521,9 @@ async function stageLocalFileViaGraphOwnedWorkbench(input: {
   if (result.executionReceiptPath) receiptPaths.push(result.executionReceiptPath);
   if (!result.ok) return { ok: false, blockerCode: result.blockerCode ?? "provider_media_bridge_failed", error: result.error, providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
   const key = extractComposioS3Key(result.response);
+  const url = extractComposioS3Url(result.response);
   if (!key) return { ok: false, blockerCode: "provider_media_bridge_failed", error: "Composio workbench upload succeeded without s3key", providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
-  return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: key }, providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
+  return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: key, ...(url ? { url } : {}) }, providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
 }
 
 async function stageLocalFileForComposio(input: {
@@ -528,6 +536,9 @@ async function stageLocalFileForComposio(input: {
   const name = basename(input.localPath);
   if (process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE === "1") {
     return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: `test/${input.toolSlug}/${name}` } };
+  }
+  if (input.toolSlug === "YOUTUBE_UPDATE_THUMBNAIL") {
+    return stageLocalFileViaGraphOwnedWorkbench(input);
   }
   const apiKey = process.env.COMPOSIO_API_KEY ?? process.env.COMPOSIO_FILE_UPLOAD_API_KEY;
   if (!apiKey) return { ok: false, blockerCode: "blocked_auth", error: "Composio file-upload API key missing for graph-owned media bridge" };
@@ -642,6 +653,18 @@ export async function bridgeGraphOwnedProviderMedia(input: Record<string, unknow
     if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error };
     mutateProviderPayload(input, { ...providerPayload, images: [staged.uploadable] });
     return { ok: true };
+  }
+
+  if (providerTool === "YOUTUBE_UPDATE_THUMBNAIL") {
+    const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "YOUTUBE_UPDATE_THUMBNAIL", toolkitSlug: "youtube" });
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error, providerExecutionReceiptIds: staged.providerExecutionReceiptIds, providerExecutionReceiptPaths: staged.providerExecutionReceiptPaths };
+    const thumbnailUrl = typeof staged.uploadable.url === "string" ? staged.uploadable.url : null;
+    if (!thumbnailUrl) return { ok: false, blockerCode: "provider_media_bridge_failed", error: "Thumbnail staging completed without public URL", providerExecutionReceiptIds: staged.providerExecutionReceiptIds, providerExecutionReceiptPaths: staged.providerExecutionReceiptPaths };
+    const receiptIds = staged.providerExecutionReceiptIds ?? [];
+    const receiptPaths = staged.providerExecutionReceiptPaths ?? [];
+    for (let index = 0; index < receiptIds.length; index += 1) appendChildProviderReceipt(input, receiptIds[index]!, receiptPaths[index] ?? null);
+    mutateProviderPayload(input, { ...providerPayload, thumbnailUrl });
+    return { ok: true, providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
   }
 
   if (providerTool === "YOUTUBE_UPLOAD_VIDEO") {
