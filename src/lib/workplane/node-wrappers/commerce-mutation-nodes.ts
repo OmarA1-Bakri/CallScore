@@ -31,6 +31,29 @@ function blocked(nodeId: string, blockerCode: string): WhopListingUpdateDecision
   };
 }
 
+const WHOP_LISTING_CORE_RECEIPTS = [
+  "editorial_angle_receipt.v1",
+  "platform_fit_receipt.v1",
+  "visual_brief_receipt.v1",
+  "visual_qa_receipt.v1",
+  "copy_visual_coherence_receipt.v1",
+  "same_shit_memory_receipt.v1",
+  "callscore.task_router_receipt.v1",
+  "callscore.tool_inheritance_receipt.v1",
+] as const;
+
+function whopListingReceiptBlocker(receipts: unknown[]): string | null {
+  for (const schema of WHOP_LISTING_CORE_RECEIPTS) {
+    const receipt = receipts.find((candidate) => isRecord(candidate) && candidate.schema === schema);
+    if (!isRecord(receipt)) return `missing_${schema}`;
+    const decision = typeof receipt.decision === "string" ? receipt.decision : typeof receipt.status === "string" ? receipt.status : "";
+    if (!["approved", "passed", "ready"].includes(decision)) return `rejected_${schema}`;
+    const evidenceHash = typeof receipt.evidence_hash === "string" ? receipt.evidence_hash : "";
+    if (!/^sha256:[a-f0-9]{64}$/.test(evidenceHash)) return `invalid_evidence_${schema}`;
+  }
+  return null;
+}
+
 export function runWhopMutationNode(input: Record<string, unknown>): CommerceMutationNodeDecision {
   return runGraphOwnedMutationNode({
     input,
@@ -49,6 +72,11 @@ export function runWhopListingUpdateNode(input: Record<string, unknown>): WhopLi
   const nodeId = "whop_listing_update_node";
   if (!Array.isArray(input.canonical_receipts)) {
     return blocked(nodeId, "canonical_operational_package_missing");
+  }
+  const receiptBlocker = whopListingReceiptBlocker(input.canonical_receipts);
+  if (receiptBlocker) return blocked(nodeId, receiptBlocker);
+  if (input.media_gate !== undefined || input.canonical_media_artifact !== undefined) {
+    return blocked(nodeId, "whop_listing_visual_mutation_requires_canonical_media_package");
   }
   if (typeof input.provider_tool === "string" && input.provider_tool !== "WHOP_UPDATE_APP") {
     return blocked(nodeId, "whop_listing_tool_not_allowed");
@@ -69,8 +97,22 @@ export function runWhopListingUpdateNode(input: Record<string, unknown>): WhopLi
     }
   }
 
+  const canonicalReceiptIds = input.canonical_receipts
+    .filter(isRecord)
+    .map((receipt) => receipt.receipt_id)
+    .filter((receiptId): receiptId is string => typeof receiptId === "string" && receiptId.trim().length > 0);
+  const copyOnlyInput = { ...input };
+  delete copyOnlyInput.canonical_receipts;
+  delete copyOnlyInput.canonical_operational_package;
+  delete copyOnlyInput.canonical_media_artifact;
+  delete copyOnlyInput.media_artifact;
+  copyOnlyInput.child_receipt_ids = [
+    ...(Array.isArray(input.child_receipt_ids) ? input.child_receipt_ids : []),
+    ...canonicalReceiptIds,
+  ];
+
   const decision = runGraphOwnedMutationNode({
-    input,
+    input: copyOnlyInput,
     nodeId,
     platform: "whop",
     mutationFamily: "whop_mutation",

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { validCanonicalMediaArtifact } from "./helpers/canonical-media-fixture";
 
 function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, val) => {
@@ -21,11 +20,6 @@ const canonicalReceipts = [
   "same_shit_memory_receipt.v1",
   "callscore.task_router_receipt.v1",
   "callscore.tool_inheritance_receipt.v1",
-  "callscore.design_bundle_reference_receipt.v1",
-  "callscore.website_design_alignment_receipt.v2",
-  "callscore.branding_receipt.v2",
-  "callscore.brand_lockup_occlusion_check.v1",
-  "callscore.media_artifact_receipt.v2",
 ].map((schema) => ({
   schema,
   receipt_id: `${schema}:whop-test`,
@@ -69,7 +63,6 @@ test("Whop listing node is a dedicated graph-owned wrapper with rollback metadat
     },
     approved: true,
     canonical_receipts: canonicalReceipts,
-    canonical_media_artifact: validCanonicalMediaArtifact(),
     approval_receipt_id: "approval-whop-listing-001",
     provider_tool: "WHOP_UPDATE_APP",
     provider_payload: payload,
