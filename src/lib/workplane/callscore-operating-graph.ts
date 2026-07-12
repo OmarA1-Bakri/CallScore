@@ -23,6 +23,7 @@ import { runAttioWriteNode } from "./node-wrappers/crm-write-nodes";
 import { runPostHogWriteNode } from "./node-wrappers/crm-analytics-nodes";
 import { runZohoMailReplyNode, runZohoMailSendNode } from "./node-wrappers/email-reply-nodes";
 import { runDiscordOwnedPublishNode } from "./node-wrappers/discord-publish-nodes";
+import { runWhopListingUpdateNode } from "./node-wrappers/commerce-mutation-nodes";
 import {
   alertGoalLoopNode,
   dataGoalLoopNode,
@@ -125,6 +126,7 @@ function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
   const mutationNodeIds: readonly string[] = parsed.config.mode === "live_owned_public"
     ? [
         "discord_send_node",
+        "whop_listing_update_node",
         "x_owned_publish_node",
         "linkedin_owned_publish_node",
         "x_post_delete_node",
@@ -212,6 +214,7 @@ export const externalMutationPreflightNode = wrapDirectFunctionNode({
           "email_reply_node",
           "gmail_send_node",
           "resend_alert_send_node",
+          "whop_listing_update_node",
           "whop_mutation_node",
           "attio_write_node",
           "posthog_write_node",
@@ -647,6 +650,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("hard_gate_preflight", hardGatePreflightNode)
     .addNode("external_mutation_preflight", externalMutationPreflightNode)
     .addNode("discord_send_node", graphOwnedMutationWrapperNode("discord_send_node", runDiscordOwnedPublishNode))
+    .addNode("whop_listing_update_node", graphOwnedMutationWrapperNode("whop_listing_update_node", runWhopListingUpdateNode))
     .addNode("x_owned_publish_node", graphOwnedMutationWrapperNode("x_owned_publish_node", runXOwnedPublishNode))
     .addNode("x_post_delete_node", graphOwnedMutationWrapperNode("x_post_delete_node", runXPostDeleteNode))
     .addNode("x_public_reply_node", graphOwnedMutationWrapperNode("x_public_reply_node", runXPublicReplyNode))
@@ -705,6 +709,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       alert_goal_loop: "alert_goal_loop",
       evidence_goal_loop: "evidence_goal_loop",
       discord_send_node: "discord_send_node",
+      whop_listing_update_node: "whop_listing_update_node",
       x_owned_publish_node: "x_owned_publish_node",
       x_post_delete_node: "x_post_delete_node",
       x_public_reply_node: "x_public_reply_node",
@@ -752,6 +757,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "alert_goal_loop",
     "evidence_goal_loop",
     "discord_send_node",
+    "whop_listing_update_node",
     "x_post_delete_node",
     "x_public_reply_node",
     "x_follow_user_node",

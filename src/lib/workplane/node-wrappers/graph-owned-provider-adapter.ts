@@ -134,6 +134,18 @@ function validateKnownProviderPayload(toolSlug: string, payload: Record<string, 
     if (!content || content.length > 10000) return "payload_missing";
   }
 
+  if (toolSlug === "WHOP_UPDATE_APP") {
+    const allowedFields = new Set(["id", "description", "app_store_description"]);
+    if (Object.keys(payload).some((key) => !allowedFields.has(key))) return "forbidden_whop_listing_field";
+    const appId = typeof payload.id === "string" ? payload.id.trim() : "";
+    const description = typeof payload.description === "string" ? payload.description.trim() : "";
+    const storeDescription = typeof payload.app_store_description === "string" ? payload.app_store_description.trim() : "";
+    if (appId !== "app_cDfDRY1cj8yQJZ") return "whop_listing_target_not_allowed";
+    if (!description && !storeDescription) return "payload_missing";
+    if (description && (description.length < 20 || description.length > 255)) return "payload_too_long";
+    if (storeDescription && (storeDescription.length < 80 || storeDescription.length > 5000)) return "payload_too_long";
+  }
+
   if (toolSlug === "ATTIO_CREATE_NOTE") {
     const parentObject = typeof payload.parent_object === "string" ? payload.parent_object.trim() : "";
     const parentRecordId = typeof payload.parent_record_id === "string" ? payload.parent_record_id.trim() : "";
@@ -658,6 +670,103 @@ function blockerForProviderMessage(message: string): string {
   return "provider_call_failed";
 }
 
+async function executeWhopListingAppUpdate(
+  toolSlug: string,
+  payload: Record<string, unknown>,
+  executionReceiptId: string,
+): Promise<ProviderExecutionResult> {
+  const validationBlocker = validateKnownProviderPayload(toolSlug, payload);
+  if (validationBlocker) {
+    const response = { ok: false, error: validationBlocker };
+    const executionReceiptPath = writeProviderExecutionReceipt({
+      executionReceiptId,
+      toolSlug,
+      payload,
+      ok: false,
+      response,
+      blockerCode: validationBlocker,
+      error: validationBlocker,
+    });
+    return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: validationBlocker, error: validationBlocker };
+  }
+
+  const apiKey = process.env.WHOP_API_KEY;
+  if (!apiKey) {
+    const response = { ok: false, error: "Whop API key not set in graph-owned node context" };
+    const executionReceiptPath = writeProviderExecutionReceipt({
+      executionReceiptId,
+      toolSlug,
+      payload,
+      ok: false,
+      response,
+      blockerCode: "blocked_auth",
+      error: "Whop API key not set",
+    });
+    return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "blocked_auth", error: "Whop API key not set" };
+  }
+
+  const appId = String(payload.id);
+  const body = {
+    ...(typeof payload.description === "string" ? { description: payload.description.trim() } : {}),
+    ...(typeof payload.app_store_description === "string" ? { app_store_description: payload.app_store_description.trim() } : {}),
+  };
+
+  try {
+    const response = await fetch(`https://api.whop.com/api/v1/apps/${encodeURIComponent(appId)}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Api-Version-Date": "2026-07-01",
+      },
+      body: JSON.stringify(body),
+    });
+    const text = await response.text();
+    let parsed: Record<string, unknown>;
+    try {
+      const candidate = JSON.parse(text) as unknown;
+      parsed = isRecord(candidate) ? candidate : { raw: text };
+    } catch {
+      parsed = { raw: text };
+    }
+    const ok = response.ok && !isRecord(parsed.error);
+    const blockerCode = ok ? undefined : blockerForHttpStatus(response.status, text, toolSlug);
+    const normalized = normalizeProviderResponse(toolSlug, parsed, ok, response.headers);
+    const executionReceiptPath = writeProviderExecutionReceipt({
+      executionReceiptId,
+      toolSlug,
+      payload,
+      ok,
+      response: normalized,
+      blockerCode,
+      error: ok ? undefined : text.slice(0, 500),
+      statusCode: response.status,
+    });
+    return {
+      ok,
+      response: normalized,
+      executionReceiptId,
+      executionReceiptPath,
+      blockerCode,
+      error: ok ? undefined : text.slice(0, 500),
+      statusCode: response.status,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const response = { ok: false, error: message };
+    const executionReceiptPath = writeProviderExecutionReceipt({
+      executionReceiptId,
+      toolSlug,
+      payload,
+      ok: false,
+      response,
+      blockerCode: "provider_call_failed",
+      error: message,
+    });
+    return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "provider_call_failed", error: message };
+  }
+}
+
 export async function executeGraphOwnedProviderCall(toolSlug: string, payload: Record<string, unknown>): Promise<ProviderExecutionResult> {
   const executionReceiptId = providerExecutionReceiptId(toolSlug, payload);
   if (process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE === "1") {
@@ -668,6 +777,10 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
     const blockerCode = ok ? undefined : blockerForProviderMessage(firstString(response.error, response.message) ?? `missing mock for ${toolSlug}`);
     const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizeProviderResponse(toolSlug, response, ok), blockerCode, error: ok ? undefined : JSON.stringify(response).slice(0, 500) });
     return { ok, response: normalizeProviderResponse(toolSlug, response, ok), executionReceiptId, executionReceiptPath, blockerCode, error: ok ? undefined : JSON.stringify(response).slice(0, 500) };
+  }
+
+  if (toolSlug === "WHOP_UPDATE_APP") {
+    return executeWhopListingAppUpdate(toolSlug, payload, executionReceiptId);
   }
 
   const consumerKey = process.env.COMPOSIO_MCP_CONSUMER_API_KEY ?? process.env.COMPOSIO_API_KEY;
