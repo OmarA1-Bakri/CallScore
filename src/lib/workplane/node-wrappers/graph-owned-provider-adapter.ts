@@ -192,6 +192,14 @@ function providerPayloadHasRequiredMedia(toolSlug: string, payload: unknown): bo
         && typeof image.s3key === "string"
         && image.s3key.trim().length > 0);
   }
+  if (toolSlug === "YOUTUBE_UPLOAD_VIDEO") {
+    return isRecord(payload.videoFilePath)
+      && typeof payload.videoFilePath.name === "string"
+      && payload.videoFilePath.name.trim().length > 0
+      && payload.videoFilePath.mimetype === "video/mp4"
+      && typeof payload.videoFilePath.s3key === "string"
+      && payload.videoFilePath.s3key.trim().length > 0;
+  }
   return true;
 }
 
@@ -404,7 +412,7 @@ function localMediaPathFromGate(gate: Record<string, unknown>): string | null {
 
 function mimetypeFromGateOrPath(gate: Record<string, unknown>, localPath: string): string {
   const explicit = firstString(gate.mimetype, gate.mime_type, gate.media_type);
-  if (explicit?.startsWith("image/")) return explicit;
+  if (explicit && /^(image|video|audio)\//.test(explicit)) return explicit;
   const lower = localPath.toLowerCase();
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
   if (lower.endsWith(".webp")) return "image/webp";
@@ -606,9 +614,15 @@ export async function bridgeGraphOwnedProviderMedia(input: Record<string, unknow
     return { ok: true };
   }
 
+  if (providerTool === "YOUTUBE_UPLOAD_VIDEO") {
+    const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "YOUTUBE_UPLOAD_VIDEO", toolkitSlug: "youtube" });
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error };
+    mutateProviderPayload(input, { ...providerPayload, videoFilePath: staged.uploadable });
+    return { ok: true };
+  }
+
   return { ok: true };
 }
-
 
 function parseMcpJson(text: string): Record<string, unknown> {
   const candidates = text
