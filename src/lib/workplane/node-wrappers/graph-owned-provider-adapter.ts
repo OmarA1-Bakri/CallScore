@@ -259,7 +259,8 @@ function normalizeProviderResponse(
   headers?: Headers,
 ): Record<string, unknown> {
   const data = nestedRecord(body, "data") ?? body;
-  const innerData = nestedRecord(data, "data") ?? data;
+  const dataData = nestedRecord(data, "data") ?? data;
+  const innerData = nestedRecord(dataData, "response_data") ?? nestedRecord(data, "response_data") ?? dataData;
   const restliId = headers?.get("x-restli-id") ?? headers?.get("x-linkedin-id") ?? null;
   const id = firstString(
     innerData.id,
@@ -281,6 +282,10 @@ function normalizeProviderResponse(
   if (id && !normalized.id) normalized.id = id;
   if (urn && !normalized.x_restli_id) normalized.x_restli_id = urn;
   if (url && !normalized.url) normalized.url = url;
+
+  if (statusOk && toolSlug === "YOUTUBE_UPLOAD_VIDEO" && id && !normalized.url) {
+    normalized.url = `https://www.youtube.com/watch?v=${id}`;
+  }
 
   if (statusOk && toolSlug === "TWITTER_CREATION_OF_A_POST" && id && !normalized.url) {
     const handle = (process.env.CALLSCORE_X_HANDLE ?? process.env.X_USERNAME ?? "0marbakri").replace(/^@/, "");
@@ -464,28 +469,53 @@ async function stageLocalFileViaGraphOwnedWorkbench(input: {
   readonly localPath: string;
   readonly mimetype: string;
   readonly toolSlug: string;
-}): Promise<{ ok: true; uploadable: Record<string, unknown> } | { ok: false; blockerCode: string; error?: string }> {
+}): Promise<{ ok: true; uploadable: Record<string, unknown>; providerExecutionReceiptIds: string[]; providerExecutionReceiptPaths: string[] } | { ok: false; blockerCode: string; error?: string; providerExecutionReceiptIds?: string[]; providerExecutionReceiptPaths?: string[] }> {
   const name = basename(input.localPath);
-  const encoded = readFileSync(input.localPath).toString("base64");
-  const remotePath = `/mnt/files/graph-owned-media/${name}`;
-  const code = [
-    "import base64, json, os",
+  const content = readFileSync(input.localPath);
+  const contentSha = createHash("sha256").update(content).digest("hex");
+  const remotePath = `/mnt/files/graph-owned-media/${contentSha}-${name}`;
+  const receiptIds: string[] = [];
+  const receiptPaths: string[] = [];
+  const chunkSize = 384 * 1024;
+  for (let offset = 0, index = 0; offset < content.length; offset += chunkSize, index += 1) {
+    const encoded = content.subarray(offset, Math.min(offset + chunkSize, content.length)).toString("base64");
+    const mode = index === 0 ? "wb" : "ab";
+    const code = [
+      "import base64, json, os",
+      `remote_path = ${JSON.stringify(remotePath)}`,
+      "os.makedirs(os.path.dirname(remote_path), exist_ok=True)",
+      `open(remote_path, ${JSON.stringify(mode)}).write(base64.b64decode(${JSON.stringify(encoded)}))`,
+      `print(json.dumps({'ok': True, 'chunk_index': ${index}, 'bytes_written': os.path.getsize(remote_path)}))`,
+    ].join("\n");
+    const result = await executeGraphOwnedProviderCall("COMPOSIO_REMOTE_WORKBENCH", {
+      code_to_execute: code,
+      thought: "Stage one bounded chunk of a graph-owned CallScore media artifact.",
+      current_step: "GRAPH_OWNED_MEDIA_STAGING_CHUNK",
+      current_step_metric: `${index + 1}/${Math.ceil(content.length / chunkSize)} chunks`,
+    });
+    receiptIds.push(result.executionReceiptId);
+    if (result.executionReceiptPath) receiptPaths.push(result.executionReceiptPath);
+    if (!result.ok) return { ok: false, blockerCode: result.blockerCode ?? "provider_media_bridge_failed", error: result.error, providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
+  }
+  const uploadCode = [
+    "import json, os",
     `remote_path = ${JSON.stringify(remotePath)}`,
-    "os.makedirs(os.path.dirname(remote_path), exist_ok=True)",
-    `open(remote_path, 'wb').write(base64.b64decode(${JSON.stringify(encoded)}))`,
     "result, error = upload_local_file(remote_path)",
+    "if os.path.exists(remote_path): os.remove(remote_path)",
     "print(json.dumps({'ok': not bool(error), 'error': error or None, 'upload': result or {}}))",
   ].join("\n");
   const result = await executeGraphOwnedProviderCall("COMPOSIO_REMOTE_WORKBENCH", {
-    code_to_execute: code,
-    thought: "Stage one graph-owned CallScore media artifact for a gated owned-public provider action.",
-    current_step: "GRAPH_OWNED_MEDIA_STAGING",
+    code_to_execute: uploadCode,
+    thought: "Finalize one graph-owned CallScore media artifact into provider-addressable staging.",
+    current_step: "GRAPH_OWNED_MEDIA_STAGING_FINALIZE",
     current_step_metric: "1/1 media artifact",
   });
-  if (!result.ok) return { ok: false, blockerCode: result.blockerCode ?? "provider_media_bridge_failed", error: result.error };
+  receiptIds.push(result.executionReceiptId);
+  if (result.executionReceiptPath) receiptPaths.push(result.executionReceiptPath);
+  if (!result.ok) return { ok: false, blockerCode: result.blockerCode ?? "provider_media_bridge_failed", error: result.error, providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
   const key = extractComposioS3Key(result.response);
-  if (!key) return { ok: false, blockerCode: "provider_media_bridge_failed", error: "Composio workbench upload succeeded without s3key" };
-  return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: key } };
+  if (!key) return { ok: false, blockerCode: "provider_media_bridge_failed", error: "Composio workbench upload succeeded without s3key", providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
+  return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: key }, providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
 }
 
 async function stageLocalFileForComposio(input: {
@@ -493,13 +523,13 @@ async function stageLocalFileForComposio(input: {
   readonly mimetype: string;
   readonly toolSlug: string;
   readonly toolkitSlug: string;
-}): Promise<{ ok: true; uploadable: Record<string, unknown> } | { ok: false; blockerCode: string; error?: string }> {
+}): Promise<{ ok: true; uploadable: Record<string, unknown>; providerExecutionReceiptIds?: string[]; providerExecutionReceiptPaths?: string[] } | { ok: false; blockerCode: string; error?: string; providerExecutionReceiptIds?: string[]; providerExecutionReceiptPaths?: string[] }> {
   if (!existsSync(input.localPath)) return { ok: false, blockerCode: "provider_media_bridge_missing", error: `local media not found: ${input.localPath}` };
   const name = basename(input.localPath);
   if (process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE === "1") {
     return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: `test/${input.toolSlug}/${name}` } };
   }
-  const apiKey = process.env.COMPOSIO_FILE_UPLOAD_API_KEY ?? process.env.COMPOSIO_API_KEY;
+  const apiKey = process.env.COMPOSIO_API_KEY ?? process.env.COMPOSIO_FILE_UPLOAD_API_KEY;
   if (!apiKey) return { ok: false, blockerCode: "blocked_auth", error: "Composio file-upload API key missing for graph-owned media bridge" };
   const content = readFileSync(input.localPath);
   const md5 = createHash("md5").update(content).digest("hex");
@@ -537,7 +567,7 @@ async function stageLocalFileForComposio(input: {
   return { ok: true, uploadable: { name, mimetype: input.mimetype, s3key: key } };
 }
 
-async function uploadableOrStageFromGate(gate: Record<string, unknown>, input: { readonly uploadToolSlug: string; readonly toolkitSlug: string }): Promise<{ ok: true; uploadable: Record<string, unknown> } | { ok: false; blockerCode: string; error?: string }> {
+async function uploadableOrStageFromGate(gate: Record<string, unknown>, input: { readonly uploadToolSlug: string; readonly toolkitSlug: string }): Promise<{ ok: true; uploadable: Record<string, unknown>; providerExecutionReceiptIds?: string[]; providerExecutionReceiptPaths?: string[] } | { ok: false; blockerCode: string; error?: string; providerExecutionReceiptIds?: string[]; providerExecutionReceiptPaths?: string[] }> {
   const uploadable = uploadableFromGate(gate);
   if (uploadable) return { ok: true, uploadable };
   const localPath = localMediaPathFromGate(gate);
@@ -616,9 +646,12 @@ export async function bridgeGraphOwnedProviderMedia(input: Record<string, unknow
 
   if (providerTool === "YOUTUBE_UPLOAD_VIDEO") {
     const staged = await uploadableOrStageFromGate(gate, { uploadToolSlug: "YOUTUBE_UPLOAD_VIDEO", toolkitSlug: "youtube" });
-    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error };
+    if (staged.ok !== true) return { ok: false, blockerCode: staged.blockerCode, error: staged.error, providerExecutionReceiptIds: staged.providerExecutionReceiptIds, providerExecutionReceiptPaths: staged.providerExecutionReceiptPaths };
+    const receiptIds = staged.providerExecutionReceiptIds ?? [];
+    const receiptPaths = staged.providerExecutionReceiptPaths ?? [];
+    for (let index = 0; index < receiptIds.length; index += 1) appendChildProviderReceipt(input, receiptIds[index]!, receiptPaths[index] ?? null);
     mutateProviderPayload(input, { ...providerPayload, videoFilePath: staged.uploadable });
-    return { ok: true };
+    return { ok: true, providerExecutionReceiptIds: receiptIds, providerExecutionReceiptPaths: receiptPaths };
   }
 
   return { ok: true };
