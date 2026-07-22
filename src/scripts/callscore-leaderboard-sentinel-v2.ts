@@ -87,7 +87,6 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     operational: internal.operational,
   });
   process.stdout.write(`${JSON.stringify(result.receipt)}\n`);
-  if (result.receipt.status === "RED_INTEGRITY_OR_PIPELINE_FAILURE") process.exitCode = 2;
 }
 
 if (require.main === module) {

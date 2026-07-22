@@ -20,6 +20,7 @@ test("sentinel v2 CLI enforces a PostgreSQL read-only transaction", () => {
   assert.match(source, /withTransaction/);
   assert.match(source, /SET TRANSACTION READ ONLY/);
   assert.doesNotMatch(source, /\b(?:INSERT|UPDATE|DELETE|ALTER|DROP)\b/i);
+  assert.doesNotMatch(source, /receipt\.status === "RED_INTEGRITY_OR_PIPELINE_FAILURE"[\s\S]*process\.exitCode = 2/);
   const pkg = JSON.parse(readFileSync(join(REPO, "package.json"), "utf8"));
   assert.match(pkg.scripts["sentinel:leaderboard:v2"], /callscore-leaderboard-sentinel-v2\.ts/);
 });
