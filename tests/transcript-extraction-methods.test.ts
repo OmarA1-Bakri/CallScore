@@ -8,6 +8,8 @@ import {
 } from "../src/lib/transcript-extraction-methods";
 import {
   buildMissingTranscriptVideosQuery,
+  JOURNALED_TRANSCRIPT_FAILURE_SQL,
+  JOURNALED_TRANSCRIPT_SUCCESS_SQL,
   buildYtDlpTranscriptArgs,
   assertBackfillWriteAuthority,
   fetchTranscript,
@@ -79,6 +81,8 @@ test("exact-ID transcript writes are owned by the Workplane recovery job", () =>
   const forcedArgs = parseBackfillTranscriptsArgs([
     "--youtube-video-ids", "VCbmPx1l7AU",
     "--force-targeted-retry",
+    "--workplane-job-id", "6632",
+    "--methods", "hh_ytdlp_ejs_wpc",
     "--write",
     "--limit", "1",
   ]);
@@ -87,12 +91,37 @@ test("exact-ID transcript writes are owned by the Workplane recovery job", () =>
 
   const exactWriteWithoutForce = parseBackfillTranscriptsArgs([
     "--youtube-video-ids", "VCbmPx1l7AU",
+    "--workplane-job-id", "6632",
+    "--methods", "hh_ytdlp_ejs_wpc",
     "--write",
     "--limit", "1",
   ]);
   assert.throws(() => assertBackfillWriteAuthority(exactWriteWithoutForce, "cli"), /transcript_recover_hh Workplane ownership/);
-  assert.doesNotThrow(() => assertBackfillWriteAuthority(exactWriteWithoutForce, "workplane"));
+  assert.throws(() => assertBackfillWriteAuthority(exactWriteWithoutForce, "workplane"), /force-targeted-retry/);
+
+  const tenIds = Array.from({ length: 10 }, (_, index) => `B${String(index).padStart(10, "0")}`).join(",");
+  const oversizedWorkplane = parseBackfillTranscriptsArgs([
+    "--youtube-video-ids", tenIds,
+    "--force-targeted-retry",
+    "--workplane-job-id", "6632",
+    "--methods", "hh_ytdlp_ejs_wpc",
+    "--write",
+    "--limit", "10",
+  ]);
+  assert.throws(() => assertBackfillWriteAuthority(oversizedWorkplane, "workplane"), /at most 9/);
   assert.doesNotThrow(() => assertBackfillWriteAuthority(parseBackfillTranscriptsArgs(["--write", "--limit", "1"]), "cli"));
+});
+
+test("Workplane transcript mutations journal in the same SQL statement as the row update", () => {
+  for (const sql of [JOURNALED_TRANSCRIPT_FAILURE_SQL, JOURNALED_TRANSCRIPT_SUCCESS_SQL]) {
+    assert.match(sql, /WITH owner AS/i);
+    assert.match(sql, /type = 'transcript_recover_hh' AND status = 'running'/);
+    assert.match(sql, /UPDATE videos/i);
+    assert.match(sql, /UPDATE pipeline_jobs/i);
+    assert.match(sql, /transcript_recovery_mutations/);
+    assert.match(sql, /jsonb_build_object/);
+    assert.match(sql, /FROM updated/i);
+  }
 });
 
 test("forced transcript recovery query selects exact IDs and bypasses cooldown only for those IDs", () => {

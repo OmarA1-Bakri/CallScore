@@ -153,4 +153,28 @@ Batch `deleg_5d169902` reviewed `d44bd8e336e80541f08a892299821a38300b6e4a` and r
 - `transcript_recover_hh` ignores caller-controlled audit paths, reserves an immutable per-run canonical JSONL file, includes the run ID on every audit row, rejects stale/foreign/duplicate rows, preserves valid rows alongside malformed lines, and counts partial DB mutations before reporting execution failures.
 - No evaluator or recovery failure grants public/provider/call/ranking mutation authority.
 
-Final pre-commit parent verification after this hardening: TypeScript passed; focused suite `85/85`; full suite `1437/1437`; Dockerfile build check passed with no warnings; Workplane `OK`; freshness `PASS`; canonical agent audit `51/51`; repository secret hygiene passed. Final acceptance still requires three fresh independent verdicts against the exact final commit. Verdicts against `44d1132`, `d44bd8e`, `809d4a9` or an uncommitted tree are not final acceptance evidence.
+Parent verification for that superseded tuple: TypeScript passed; focused suite `85/85`; full suite `1437/1437`; Dockerfile build check passed with no warnings; Workplane `OK`; freshness `PASS`; canonical agent audit `51/51`; repository secret hygiene passed. Batch `deleg_2dd37bd8` nevertheless returned three valid `FAIL` verdicts against `e69bfc27ae81842c53d529a57331fd43b0357ba4`, so that tuple is not acceptance evidence.
+
+## Fourth review cycle and transactional evidence hardening
+
+Batch `deleg_2dd37bd8` found five blockers that applied to the exact reviewed tuple:
+
+1. Compose overrode the new pinned runtime with bare `yt-dlp`, bare `node`, and enabled remote components.
+2. The exported Workplane recovery writer still allowed up to 25 IDs and did not itself require forced exact-nine selection.
+3. Direct CLI dry-runs bearing `hh_ytdlp_ejs_wpc` could bypass strict runtime preflight.
+4. Evaluator enum fields were accepted after `String(...)` coercion.
+5. A video-row update could commit before JSONL append, allowing a later audit-write failure to under-report mutation truth; duplicate audit rows also over-counted, and duplicate run IDs could overwrite the original workflow receipt.
+
+The superseding remediation:
+
+- aligns every Compose worker service with the exact pinned yt-dlp path, absolute Node path, disabled remote components and canonical Chromium; long-lived workers explicitly blank inherited cookie paths and do not mount the cookie secret by default;
+- enforces at the actual exported writer boundary: positive Workplane job ID, forced retry, only `hh_ytdlp_ejs_wpc`, exact limit/ID equality and at most nine IDs;
+- applies strict EJS/WPC preflight to every invocation path, including direct CLI dry-runs;
+- requires native string enum fields and native finite numeric confidence before allowlist checks;
+- atomically couples each Workplane video mutation with a `pipeline_jobs.metrics.transcript_recovery_mutations` journal append in one PostgreSQL CTE statement, then merges DB-journal and JSONL evidence while deduplicating mutation counts by video ID;
+- preserves original workflow receipts and writes replay-block evidence under a distinct replay receipt path;
+- adds regression tests for each defect and validates both journalled SQL statements against the live PostgreSQL schema with `EXPLAIN` only (`executed:false`).
+
+Current parent candidate evidence after this remediation: TypeScript passed; focused suite `89/89`; full suite `1441/1441`; both transactional mutation statements planned successfully against the live PostgreSQL schema with `EXPLAIN` and `executed:false`; effective Compose configuration shows the exact pinned runtime and zero cookie mounts; Dockerfile build check passed without warnings; Workplane `OK`; freshness `PASS`; canonical agent audit `51/51`; secret hygiene passed.
+
+Acceptance requires a new commit and a new three-review batch against that exact commit/tree. All earlier verdicts remain superseded.

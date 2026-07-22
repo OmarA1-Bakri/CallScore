@@ -33,12 +33,14 @@ const DEFAULT_YTDLP_EXTRACTOR_RETRIES = 2;
 const DEFAULT_YTDLP_RETRY_SLEEP = "extractor:exp=20:120:2";
 const DEFAULT_YTDLP_PO_TOKEN_PROVIDER_BASE_URL = "http://127.0.0.1:4416";
 const MAX_TARGETED_RECOVERY_IDS = 25;
+const MAX_WORKPLANE_TARGETED_RECOVERY_IDS = 9;
 
 export interface BackfillTranscriptsArgs {
   readonly runId: string;
   readonly creator: string | null;
   readonly youtubeVideoIds: readonly string[];
   readonly forceTargetedRetry: boolean;
+  readonly workplaneJobId: number;
   readonly limit: number;
   readonly offset: number;
   readonly concurrency: number;
@@ -161,6 +163,7 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
     creator: argValue(argv, "--creator"),
     youtubeVideoIds: targetedVideoIds,
     forceTargetedRetry,
+    workplaneJobId: positiveInt(argValue(argv, "--workplane-job-id"), 0),
     limit: positiveInt(argValue(argv, "--limit") ?? process.env.TRANSCRIPT_BATCH_LIMIT ?? null, DEFAULT_TRANSCRIPT_BATCH_LIMIT),
     offset: nonNegativeInt(argValue(argv, "--offset"), 0),
     concurrency: Math.min(MAX_TRANSCRIPT_CONCURRENCY, requestedConcurrency),
@@ -193,9 +196,26 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
 export type BackfillInvocationOwner = "cli" | "workplane";
 
 export function assertBackfillWriteAuthority(args: BackfillTranscriptsArgs, owner: BackfillInvocationOwner): void {
+  if (owner === "workplane") {
+    if (args.workplaneJobId <= 0) throw new Error("transcript_recover_hh Workplane invocation requires --workplane-job-id");
+    if (!args.forceTargetedRetry) throw new Error("transcript_recover_hh Workplane invocation requires --force-targeted-retry");
+    if (args.youtubeVideoIds.length === 0 || args.youtubeVideoIds.length > MAX_WORKPLANE_TARGETED_RECOVERY_IDS) {
+      throw new Error(`transcript_recover_hh Workplane invocation requires 1 to at most ${MAX_WORKPLANE_TARGETED_RECOVERY_IDS} exact IDs`);
+    }
+    if (args.limit !== args.youtubeVideoIds.length || args.limit > MAX_WORKPLANE_TARGETED_RECOVERY_IDS) {
+      throw new Error("transcript_recover_hh Workplane limit must equal the exact-ID count and be at most 9");
+    }
+    if (args.methods.length !== 1 || args.methods[0] !== "hh_ytdlp_ejs_wpc") {
+      throw new Error("transcript_recover_hh Workplane invocation requires only hh_ytdlp_ejs_wpc");
+    }
+  }
   if (args.write && args.youtubeVideoIds.length > 0 && owner !== "workplane") {
     throw new Error("exact-ID transcript writes require transcript_recover_hh Workplane ownership");
   }
+}
+
+export function requiresHhRecoveryRuntimePreflight(args: BackfillTranscriptsArgs): boolean {
+  return args.methods.includes("hh_ytdlp_ejs_wpc");
 }
 
 function serpApiKey(): string | null {
@@ -695,24 +715,127 @@ export async function fetchTranscript(videoId: string, args: BackfillTranscripts
   };
 }
 
-async function markTranscriptFailure(video: MissingTranscriptVideo, failure: TranscriptFailure, write: boolean): Promise<boolean> {
-  if (!write) return true;
-  const rows = await query<{ id: number }>(
-    `UPDATE videos
-     SET transcript_status = $2,
-         transcript_provider = $3,
-         transcript_error = $4,
-         transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
-         transcript_last_attempt_at = NOW()
-     WHERE id = $1
-       AND transcript_status IS NOT DISTINCT FROM $5
-       AND transcript_error IS NOT DISTINCT FROM $6
-       AND transcript_attempts IS NOT DISTINCT FROM $7
-       AND transcript_last_attempt_at IS NOT DISTINCT FROM $8::timestamptz
-       AND (transcript IS NULL OR length(transcript) = 0)
-     RETURNING id`,
-    [video.id, failure.status, failure.provider, failure.reason, video.transcript_status, video.transcript_error, video.transcript_attempts, video.transcript_last_attempt_at],
-  );
+export const JOURNALED_TRANSCRIPT_FAILURE_SQL = `WITH owner AS (
+  SELECT id FROM pipeline_jobs
+  WHERE id = $9 AND type = 'transcript_recover_hh' AND status = 'running'
+  FOR UPDATE
+), updated AS (
+  UPDATE videos
+  SET transcript_status = $2,
+      transcript_provider = $3,
+      transcript_error = $4,
+      transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
+      transcript_last_attempt_at = NOW()
+  WHERE id = $1
+    AND EXISTS (SELECT 1 FROM owner)
+    AND transcript_status IS NOT DISTINCT FROM $5
+    AND transcript_error IS NOT DISTINCT FROM $6
+    AND transcript_attempts IS NOT DISTINCT FROM $7
+    AND transcript_last_attempt_at IS NOT DISTINCT FROM $8::timestamptz
+    AND (transcript IS NULL OR length(transcript) = 0)
+  RETURNING id
+), journaled AS (
+  UPDATE pipeline_jobs AS p
+  SET metrics = jsonb_set(
+    COALESCE(p.metrics, '{}'::jsonb),
+    '{transcript_recovery_mutations}',
+    COALESCE(p.metrics->'transcript_recovery_mutations', '[]'::jsonb)
+      || jsonb_build_array(jsonb_build_object(
+        'run_id', $10::text,
+        'youtube_video_id', $11::text,
+        'video_id', $1::int,
+        'status', $2::text,
+        'reason', $4::text,
+        'db_write_performed', true,
+        'evidence_source', 'pipeline_job_transaction_journal'
+      )),
+    true
+  )
+  FROM updated
+  WHERE p.id = (SELECT id FROM owner)
+  RETURNING p.id
+)
+SELECT updated.id FROM updated JOIN journaled ON true`;
+
+export const JOURNALED_TRANSCRIPT_SUCCESS_SQL = `WITH owner AS (
+  SELECT id FROM pipeline_jobs
+  WHERE id = $9 AND type = 'transcript_recover_hh' AND status = 'running'
+  FOR UPDATE
+), updated AS (
+  UPDATE videos
+  SET transcript = $1, transcript_quality = $2, calls_extracted = false,
+      transcript_status = 'available', transcript_provider = $4, transcript_error = NULL,
+      transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
+      transcript_last_attempt_at = NOW()
+  WHERE id = $3
+    AND EXISTS (SELECT 1 FROM owner)
+    AND transcript_status IS NOT DISTINCT FROM $5
+    AND transcript_error IS NOT DISTINCT FROM $6
+    AND transcript_attempts IS NOT DISTINCT FROM $7
+    AND transcript_last_attempt_at IS NOT DISTINCT FROM $8::timestamptz
+    AND (transcript IS NULL OR length(transcript) = 0)
+  RETURNING id
+), journaled AS (
+  UPDATE pipeline_jobs AS p
+  SET metrics = jsonb_set(
+    COALESCE(p.metrics, '{}'::jsonb),
+    '{transcript_recovery_mutations}',
+    COALESCE(p.metrics->'transcript_recovery_mutations', '[]'::jsonb)
+      || jsonb_build_array(jsonb_build_object(
+        'run_id', $10::text,
+        'youtube_video_id', $11::text,
+        'video_id', $3::int,
+        'status', 'updated',
+        'db_write_performed', true,
+        'evidence_source', 'pipeline_job_transaction_journal'
+      )),
+    true
+  )
+  FROM updated
+  WHERE p.id = (SELECT id FROM owner)
+  RETURNING p.id
+)
+SELECT updated.id FROM updated JOIN journaled ON true`;
+
+async function markTranscriptFailure(
+  video: MissingTranscriptVideo,
+  failure: TranscriptFailure,
+  args: BackfillTranscriptsArgs,
+  owner: BackfillInvocationOwner,
+): Promise<boolean> {
+  if (!args.write) return true;
+  if (owner !== "workplane") {
+    const rows = await query<{ id: number }>(
+      `UPDATE videos
+       SET transcript_status = $2,
+           transcript_provider = $3,
+           transcript_error = $4,
+           transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
+           transcript_last_attempt_at = NOW()
+       WHERE id = $1
+         AND transcript_status IS NOT DISTINCT FROM $5
+         AND transcript_error IS NOT DISTINCT FROM $6
+         AND transcript_attempts IS NOT DISTINCT FROM $7
+         AND transcript_last_attempt_at IS NOT DISTINCT FROM $8::timestamptz
+         AND (transcript IS NULL OR length(transcript) = 0)
+       RETURNING id`,
+      [video.id, failure.status, failure.provider, failure.reason, video.transcript_status, video.transcript_error, video.transcript_attempts, video.transcript_last_attempt_at],
+    );
+    return rows.length === 1;
+  }
+  const rows = await query<{ id: number }>(JOURNALED_TRANSCRIPT_FAILURE_SQL, [
+    video.id,
+    failure.status,
+    failure.provider,
+    failure.reason,
+    video.transcript_status,
+    video.transcript_error,
+    video.transcript_attempts,
+    video.transcript_last_attempt_at,
+    args.workplaneJobId,
+    args.runId,
+    video.youtube_video_id,
+  ]);
   return rows.length === 1;
 }
 
@@ -805,8 +928,7 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
   loadEnv();
   const args = parseBackfillTranscriptsArgs([...argv]);
   assertBackfillWriteAuthority(args, owner);
-  const usesOwnedHhRecoveryRuntime = args.methods.includes("hh_ytdlp_ejs_wpc") && (owner === "workplane" || args.forceTargetedRetry);
-  if (usesOwnedHhRecoveryRuntime) assertHhTargetedRecoveryYtDlpEnv();
+  if (requiresHhRecoveryRuntimePreflight(args)) assertHhTargetedRecoveryYtDlpEnv();
   let releaseLock: (() => void) | null = null;
   try {
     releaseLock = acquireLock(args.lockFile);
@@ -857,7 +979,7 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
           }
 
           failed++;
-          const failureApplied = await markTranscriptFailure(video, transcript.failure, args.write);
+          const failureApplied = await markTranscriptFailure(video, transcript.failure, args, owner);
           if (args.write && !failureApplied) {
             audit(args, {
               record_type: "transcript_backfill",
@@ -901,21 +1023,35 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
         }
 
         if (args.write) {
-          const updatedRows = await query<{ id: number }>(
-            `UPDATE videos
-             SET transcript = $1, transcript_quality = $2, calls_extracted = false,
-                 transcript_status = 'available', transcript_provider = $4, transcript_error = NULL,
-                 transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
-                 transcript_last_attempt_at = NOW()
-             WHERE id = $3
-               AND transcript_status IS NOT DISTINCT FROM $5
-               AND transcript_error IS NOT DISTINCT FROM $6
-               AND transcript_attempts IS NOT DISTINCT FROM $7
-               AND transcript_last_attempt_at IS NOT DISTINCT FROM $8::timestamptz
-               AND (transcript IS NULL OR length(transcript) = 0)
-             RETURNING id`,
-            [transcript.transcript.text, transcript.transcript.quality, video.id, transcript.transcript.source, video.transcript_status, video.transcript_error, video.transcript_attempts, video.transcript_last_attempt_at],
-          );
+          const updatedRows = owner === "workplane"
+            ? await query<{ id: number }>(JOURNALED_TRANSCRIPT_SUCCESS_SQL, [
+              transcript.transcript.text,
+              transcript.transcript.quality,
+              video.id,
+              transcript.transcript.source,
+              video.transcript_status,
+              video.transcript_error,
+              video.transcript_attempts,
+              video.transcript_last_attempt_at,
+              args.workplaneJobId,
+              args.runId,
+              video.youtube_video_id,
+            ])
+            : await query<{ id: number }>(
+              `UPDATE videos
+               SET transcript = $1, transcript_quality = $2, calls_extracted = false,
+                   transcript_status = 'available', transcript_provider = $4, transcript_error = NULL,
+                   transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
+                   transcript_last_attempt_at = NOW()
+               WHERE id = $3
+                 AND transcript_status IS NOT DISTINCT FROM $5
+                 AND transcript_error IS NOT DISTINCT FROM $6
+                 AND transcript_attempts IS NOT DISTINCT FROM $7
+                 AND transcript_last_attempt_at IS NOT DISTINCT FROM $8::timestamptz
+                 AND (transcript IS NULL OR length(transcript) = 0)
+               RETURNING id`,
+              [transcript.transcript.text, transcript.transcript.quality, video.id, transcript.transcript.source, video.transcript_status, video.transcript_error, video.transcript_attempts, video.transcript_last_attempt_at],
+            );
           if (updatedRows.length !== 1) {
             failed++;
             audit(args, {

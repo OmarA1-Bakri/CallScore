@@ -11,6 +11,7 @@ import {
   canonicalTranscriptRecoveryRunConfig,
   evaluateArtOfWarCampaignWithLocalModel,
   getWorkplaneJobSpec,
+  mergeTranscriptRecoveryEvidence,
   readTranscriptRecoveryAudit,
   runWorkplaneJob,
   summarizeTranscriptRecoveryRecords,
@@ -182,6 +183,12 @@ test("Art of War evaluator rejects null and coercive confidence output", async (
   );
   await assert.rejects(
     evaluateArtOfWarCampaignWithLocalModel({}, responseFor({
+      claim_risk: ["low"], cta_risk: "low", trust_risk: "low", audience_fit: "strong", recommendation: "keep", confidence: 0.5,
+    })),
+    /schema validation/,
+  );
+  await assert.rejects(
+    evaluateArtOfWarCampaignWithLocalModel({}, responseFor({
       claim_risk: "low", cta_risk: "low", trust_risk: "low", audience_fit: "strong", recommendation: "keep", confidence: "0.5",
     })),
     /schema validation/,
@@ -294,6 +301,52 @@ test("transcript recovery reports only current-run requested-row DB mutations", 
   assert.equal(preserved.production_db_writes_performed, true);
   assert.deepEqual(preserved.blockers, ["audit_record_mismatch"]);
   rmSync(dirname(malformedPath), { recursive: true, force: true });
+});
+
+test("transcript recovery merges transactional DB journal evidence without double-counting", () => {
+  const journal = [{
+    run_id: "run-current",
+    youtube_video_id: "VCbmPx1l7AU",
+    status: "failed",
+    reason: "no_captions",
+    db_write_performed: true,
+    evidence_source: "pipeline_job_transaction_journal",
+  }];
+  const journalOnly = mergeTranscriptRecoveryEvidence([], journal);
+  const recovered = summarizeTranscriptRecoveryRecords(journalOnly, true, ["VCbmPx1l7AU"], "run-current");
+  assert.equal(recovered.production_db_writes_performed, true);
+  assert.equal(recovered.db_rows_mutated, 1);
+
+  const duplicateAudit = [
+    { run_id: "run-current", youtube_video_id: "VCbmPx1l7AU", status: "failed", reason: "no_captions", db_write_performed: true },
+    { run_id: "run-current", youtube_video_id: "VCbmPx1l7AU", status: "failed", reason: "no_captions", db_write_performed: true },
+  ];
+  const merged = mergeTranscriptRecoveryEvidence(duplicateAudit, journal);
+  assert.equal(merged.length, 2);
+  const duplicateSummary = summarizeTranscriptRecoveryRecords(merged, true, ["VCbmPx1l7AU"], "run-current");
+  assert.equal(duplicateSummary.db_rows_mutated, 1);
+  assert.deepEqual(duplicateSummary.blockers, ["audit_record_mismatch", "no_captions"]);
+});
+
+test("transcript recovery replay preserves the original workflow receipt", async () => {
+  const runId = `transcript-replay-${Date.now()}`;
+  const auditPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.jsonl`;
+  const receiptPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.json`;
+  mkdirSync(dirname(auditPath), { recursive: true });
+  writeFileSync(auditPath, "", { mode: 0o600 });
+  writeFileSync(receiptPath, JSON.stringify({ original: true }));
+  const result = await runWorkplaneJob({
+    id: 77123,
+    run_id: 77123,
+    type: "transcript_recover_hh",
+    payload: { run_id: runId, youtube_video_ids: ["VCbmPx1l7AU"], write: false },
+  } as never);
+  assert.equal(readFileSync(receiptPath, "utf8"), JSON.stringify({ original: true }));
+  assert.equal(result.original_receipt_preserved, true);
+  assert.notEqual(result.receipt_path, receiptPath);
+  rmSync(auditPath, { force: true });
+  rmSync(receiptPath, { force: true });
+  rmSync(String(result.receipt_path), { force: true });
 });
 
 test("workplane status exposes all job specs as JSON-friendly records", () => {

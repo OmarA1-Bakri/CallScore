@@ -25,16 +25,15 @@ services:
       ML_VERIFIER_PROVIDER: ollama
       OLLAMA_HOST: http://127.0.0.1:11434
       ML_VERIFIER_MODEL: qwen3:4b-instruct-2507-q4_K_M
-      YTDLP_BIN: yt-dlp
-      YTDLP_COOKIES_PATH: /run/secrets/youtube-cookies.txt
+      YTDLP_BIN: /opt/callscore/yt-dlp-2026.6.9/bin/yt-dlp
+      YTDLP_COOKIES_PATH: ""
       YTDLP_PO_TOKEN_PROVIDER: wpc
       YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
       YTDLP_PLAYER_CLIENT: web
-      YTDLP_JS_RUNTIMES: node
-      YTDLP_REMOTE_COMPONENTS: "1"
+      YTDLP_JS_RUNTIMES: node:/usr/local/bin/node
+      YTDLP_REMOTE_COMPONENTS: none
     volumes:
       - ./.tmp:/app/.tmp
-      - /opt/callscore/secrets/youtube-cookies.txt:/run/secrets/youtube-cookies.txt:ro
     command: ["npm", "run", "pipeline:worker", "--", "--worker-id", "data-pipeline-worker", "--poll-ms", "15000", "--no-channel-tasks"]
 
   channel-agent-worker:
@@ -52,12 +51,13 @@ services:
       ML_VERIFIER_PROVIDER: ollama
       OLLAMA_HOST: http://127.0.0.1:11434
       ML_VERIFIER_MODEL: qwen3:4b-instruct-2507-q4_K_M
-      YTDLP_BIN: yt-dlp
+      YTDLP_BIN: /opt/callscore/yt-dlp-2026.6.9/bin/yt-dlp
+      YTDLP_COOKIES_PATH: ""
       YTDLP_PO_TOKEN_PROVIDER: wpc
       YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
       YTDLP_PLAYER_CLIENT: web
-      YTDLP_JS_RUNTIMES: node
-      YTDLP_REMOTE_COMPONENTS: "1"
+      YTDLP_JS_RUNTIMES: node:/usr/local/bin/node
+      YTDLP_REMOTE_COMPONENTS: none
     volumes:
       - ./.tmp:/app/.tmp
     command: ["npm", "run", "pipeline:worker", "--", "--worker-id", "channel-agent-worker", "--poll-ms", "15000", "--no-pipeline-jobs"]
@@ -76,12 +76,13 @@ services:
       ML_VERIFIER_PROVIDER: ollama
       OLLAMA_HOST: http://127.0.0.1:11434
       ML_VERIFIER_MODEL: qwen3:4b-instruct-2507-q4_K_M
-      YTDLP_BIN: yt-dlp
+      YTDLP_BIN: /opt/callscore/yt-dlp-2026.6.9/bin/yt-dlp
+      YTDLP_COOKIES_PATH: ""
       YTDLP_PO_TOKEN_PROVIDER: wpc
       YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
       YTDLP_PLAYER_CLIENT: web
-      YTDLP_JS_RUNTIMES: node
-      YTDLP_REMOTE_COMPONENTS: "1"
+      YTDLP_JS_RUNTIMES: node:/usr/local/bin/node
+      YTDLP_REMOTE_COMPONENTS: none
     entrypoint: ["npm", "run", "pipeline:worker:once", "--"]
     command: ["--dry-run"]
 
@@ -97,12 +98,13 @@ services:
     env_file:
       - .env.hermes
     environment:
-      YTDLP_BIN: yt-dlp
+      YTDLP_BIN: /opt/callscore/yt-dlp-2026.6.9/bin/yt-dlp
+      YTDLP_COOKIES_PATH: ""
       YTDLP_PO_TOKEN_PROVIDER: wpc
       YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
       YTDLP_PLAYER_CLIENT: web
-      YTDLP_JS_RUNTIMES: node
-      YTDLP_REMOTE_COMPONENTS: "1"
+      YTDLP_JS_RUNTIMES: node:/usr/local/bin/node
+      YTDLP_REMOTE_COMPONENTS: none
     command:
       - npm
       - run
@@ -134,12 +136,13 @@ services:
     env_file:
       - .env.hermes
     environment:
-      YTDLP_BIN: yt-dlp
+      YTDLP_BIN: /opt/callscore/yt-dlp-2026.6.9/bin/yt-dlp
+      YTDLP_COOKIES_PATH: ""
       YTDLP_PO_TOKEN_PROVIDER: wpc
       YTDLP_PO_TOKEN_BROWSER_PATH: /usr/bin/chromium
       YTDLP_PLAYER_CLIENT: web
-      YTDLP_JS_RUNTIMES: node
-      YTDLP_REMOTE_COMPONENTS: "1"
+      YTDLP_JS_RUNTIMES: node:/usr/local/bin/node
+      YTDLP_REMOTE_COMPONENTS: none
     entrypoint:
       - npm
       - run

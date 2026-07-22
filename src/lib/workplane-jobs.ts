@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { buildRunId } from "./shadow-extraction";
 import { writeWorkflowReceipt } from "./workflow-receipts";
 import { buildExtractionLoopReceipt } from "./loop-engineering";
+import { query } from "./db";
 
 export const WORKPLANE_JOB_TYPES = [
   "transcript_collect_laptop",
@@ -188,11 +189,20 @@ export async function evaluateArtOfWarCampaignWithLocalModel(
   const riskValues = new Set(["low", "medium", "high", "unknown"]);
   const fitValues = new Set(["strong", "partial", "weak", "unknown"]);
   const recommendationValues = new Set(["keep", "revise", "block"]);
-  const claimRisk = String(evaluation.claim_risk ?? "");
-  const ctaRisk = String(evaluation.cta_risk ?? "");
-  const trustRisk = String(evaluation.trust_risk ?? "");
-  const audienceFit = String(evaluation.audience_fit ?? "");
-  const recommendation = String(evaluation.recommendation ?? "");
+  if (
+    typeof evaluation.claim_risk !== "string"
+    || typeof evaluation.cta_risk !== "string"
+    || typeof evaluation.trust_risk !== "string"
+    || typeof evaluation.audience_fit !== "string"
+    || typeof evaluation.recommendation !== "string"
+  ) {
+    throw new Error("local model schema validation failed");
+  }
+  const claimRisk = evaluation.claim_risk;
+  const ctaRisk = evaluation.cta_risk;
+  const trustRisk = evaluation.trust_risk;
+  const audienceFit = evaluation.audience_fit;
+  const recommendation = evaluation.recommendation;
   const confidence = evaluation.confidence;
   if (!riskValues.has(claimRisk) || !riskValues.has(ctaRisk) || !riskValues.has(trustRisk)
     || !fitValues.has(audienceFit) || !recommendationValues.has(recommendation)
@@ -255,6 +265,36 @@ export function readTranscriptRecoveryAudit(path: string): Record<string, unknow
   }
 }
 
+export function mergeTranscriptRecoveryEvidence(
+  auditRecords: readonly Record<string, unknown>[],
+  journalRecords: readonly Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const merged = [...auditRecords];
+  for (const journal of journalRecords) {
+    if (journal.db_write_performed !== true) continue;
+    const alreadyAudited = auditRecords.some((record) =>
+      record.db_write_performed === true
+      && record.run_id === journal.run_id
+      && record.youtube_video_id === journal.youtube_video_id
+      && record.status === journal.status
+      && String(record.reason ?? "") === String(journal.reason ?? ""));
+    if (!alreadyAudited) merged.push(journal);
+  }
+  return merged;
+}
+
+async function readTranscriptRecoveryMutationJournal(jobId: number): Promise<Record<string, unknown>[]> {
+  const [row] = await query<{ mutations: unknown }>(
+    `SELECT COALESCE(metrics->'transcript_recovery_mutations', '[]'::jsonb) AS mutations
+     FROM pipeline_jobs
+     WHERE id = $1 AND type = 'transcript_recover_hh'`,
+    [jobId],
+  );
+  const mutations = row?.mutations;
+  if (!Array.isArray(mutations)) throw new Error("transcript recovery mutation journal is unavailable or malformed");
+  return mutations.filter((value): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value)));
+}
+
 export function summarizeTranscriptRecoveryRecords(
   records: readonly Record<string, unknown>[],
   write: boolean,
@@ -272,19 +312,23 @@ export function summarizeTranscriptRecoveryRecords(
   const successStatus = write ? "updated" : "would_update";
   const succeeded = currentRecords.filter((record) => record.status === successStatus);
   const failed = currentRecords.filter((record) => record.status === "failed" || record.status === "pending_handoff" || record.status === "mutation_conflict");
-  const blockers = auditMismatch
-    ? ["audit_record_mismatch"]
-    : failed.length > 0
-      ? [...new Set(failed.map((record) => String(record.reason ?? "transcript_failed")))]
-      : (succeeded.length === ids.length ? [] : ["no_target_rows_selected"]);
-  const dbRowsMutated = write ? currentRecords.filter((record) => record.db_write_performed === true).length : 0;
+  const blockers: string[] = [];
+  if (auditMismatch) blockers.push("audit_record_mismatch");
+  if (failed.length > 0) {
+    blockers.push(...new Set(failed.map((record) => String(record.reason ?? "transcript_failed"))));
+  } else if (!auditMismatch && new Set(succeeded.map((record) => String(record.youtube_video_id))).size !== ids.length) {
+    blockers.push("no_target_rows_selected");
+  }
+  const mutatedIds = write
+    ? new Set(currentRecords.filter((record) => record.db_write_performed === true).map((record) => String(record.youtube_video_id)))
+    : new Set<string>();
   return {
     succeeded,
     failed,
     blockers,
     result: blockers.length === 0 ? "passed" : "blocked",
-    production_db_writes_performed: dbRowsMutated > 0,
-    db_rows_mutated: dbRowsMutated,
+    production_db_writes_performed: mutatedIds.size > 0,
+    db_rows_mutated: mutatedIds.size,
   };
 }
 
@@ -1064,10 +1108,10 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
     const runId = runConfig.run_id;
     const auditOut = runConfig.audit_out;
     const write = payload.write === true;
-    const forceTargetedRetry = payload.force_targeted_retry !== false;
-    if (write && !forceTargetedRetry) {
-      throw new Error("transcript_recover_hh write mode requires force_targeted_retry=true");
+    if (payload.force_targeted_retry === false) {
+      throw new Error("transcript_recover_hh requires force_targeted_retry=true for every Workplane invocation");
     }
+    const forceTargetedRetry = true;
     mkdirSync(dirname(auditOut), { recursive: true });
     try {
       writeFileSync(auditOut, "", { flag: "wx", mode: 0o600 });
@@ -1084,13 +1128,15 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
         blockers: [blocker],
         production_db_writes_performed: false,
         db_rows_mutated: 0,
-        receipt_path: writeWorkplaneReceipt(job, spec, runId, "blocked", [blocker], "choose a fresh run_id; audit evidence is immutable per run"),
+        receipt_path: writeWorkplaneReceipt(job, spec, `${runId}-replay-${job.id}`, "blocked", [blocker], "choose a fresh run_id; original audit and workflow receipt evidence remain immutable"),
+        original_receipt_preserved: true,
       };
     }
     const { runTargetedTranscriptRecoveryFromWorkplane } = await import("../scripts/backfill-transcripts");
     try {
       await runTargetedTranscriptRecoveryFromWorkplane([
         "--run-id", runId,
+        "--workplane-job-id", String(job.id),
         "--methods", "hh_ytdlp_ejs_wpc",
         "--youtube-video-ids", ids.join(","),
         "--limit", String(ids.length),
@@ -1101,7 +1147,9 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
         ...(write ? ["--write"] : ["--dry-run"]),
       ]);
     } catch {
-      const partialRecords = readTranscriptRecoveryAudit(auditOut);
+      const partialAuditRecords = readTranscriptRecoveryAudit(auditOut);
+      const journalRecords = await readTranscriptRecoveryMutationJournal(job.id);
+      const partialRecords = mergeTranscriptRecoveryEvidence(partialAuditRecords, journalRecords);
       const partialSummary = summarizeTranscriptRecoveryRecords(partialRecords, write, ids, runId);
       const blocker = partialRecords.length === 0 ? "runtime_preflight_failed" : "runtime_execution_failed";
       return {
@@ -1123,7 +1171,9 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
       };
     }
 
-    const records = readTranscriptRecoveryAudit(auditOut);
+    const auditRecords = readTranscriptRecoveryAudit(auditOut);
+    const journalRecords = await readTranscriptRecoveryMutationJournal(job.id);
+    const records = mergeTranscriptRecoveryEvidence(auditRecords, journalRecords);
     const summary = summarizeTranscriptRecoveryRecords(records, write, ids, runId);
     const { succeeded, failed, blockers, result } = summary;
     const receiptPath = writeWorkplaneReceipt(

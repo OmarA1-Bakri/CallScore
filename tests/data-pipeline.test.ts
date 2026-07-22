@@ -57,6 +57,7 @@ import {
   prepareWritableYtDlpAuth,
   redactYtDlpDiagnostic,
   redactedYtDlpOptionSummary,
+  requiresHhRecoveryRuntimePreflight,
   stripCaptionText,
   ytDlpAuthArgs,
   ytDlpExtraArgs,
@@ -700,8 +701,19 @@ test("HH targeted recovery rejects browser profiles and unreviewed executable/ru
   assert.match(redacted, /\[REDACTED\]/);
 });
 
-test("Hermes worker image recipe installs the pinned isolated yt-dlp runtime", () => {
+test("HH recovery runtime preflight applies to every EJS/WPC invocation path", () => {
+  const directDryRun = parseBackfillTranscriptsArgs([
+    "--youtube-video-ids", "VCbmPx1l7AU",
+    "--methods", "hh_ytdlp_ejs_wpc",
+    "--limit", "1",
+  ]);
+  assert.equal(directDryRun.forceTargetedRetry, false);
+  assert.equal(requiresHhRecoveryRuntimePreflight(directDryRun), true);
+});
+
+test("Hermes worker image and Compose recipes use the same pinned local yt-dlp contract", () => {
   const dockerfile = readFileSync("Dockerfile.hermes", "utf8");
+  const compose = readFileSync("docker-compose.yml", "utf8");
   assert.match(dockerfile, /ARG YTDLP_VERSION=2026\.6\.9/);
   assert.match(dockerfile, /ARG YTDLP_EJS_VERSION=0\.8\.0/);
   assert.match(dockerfile, /python3 -m venv \"\/opt\/callscore\/yt-dlp-\$\{YTDLP_VERSION\}\"/);
@@ -709,6 +721,14 @@ test("Hermes worker image recipe installs the pinned isolated yt-dlp runtime", (
   assert.match(dockerfile, /yt-dlp-ejs==\$\{YTDLP_EJS_VERSION\}/);
   assert.match(dockerfile, /\.callscore-yt-dlp-ejs-\$\{YTDLP_EJS_VERSION\}/);
   assert.doesNotMatch(dockerfile, /python3 -m pip install --break-system-packages/);
+  assert.doesNotMatch(compose, /YTDLP_BIN:\s*yt-dlp(?:\s|$)/);
+  assert.doesNotMatch(compose, /YTDLP_JS_RUNTIMES:\s*node(?:\s|$)/);
+  assert.doesNotMatch(compose, /YTDLP_REMOTE_COMPONENTS:\s*["']?1["']?/);
+  assert.match(compose, /YTDLP_BIN:\s*\/opt\/callscore\/yt-dlp-2026\.6\.9\/bin\/yt-dlp/);
+  assert.match(compose, /YTDLP_JS_RUNTIMES:\s*node:\/usr\/local\/bin\/node/);
+  assert.match(compose, /YTDLP_REMOTE_COMPONENTS:\s*none/);
+  assert.match(compose, /YTDLP_COOKIES_PATH:\s*["']{2}/);
+  assert.doesNotMatch(compose, /\/opt\/callscore\/secrets\/youtube-cookies/);
 });
 
 test("yt-dlp transcript args remain transcript-only and include extractor backoff", () => {
