@@ -99,7 +99,7 @@ function boundedInteger(value: unknown, fallback: number, minimum: number, maxim
 function safeWorkplaneRunId(value: unknown, prefix: string): string {
   if (typeof value !== "string" || !value.trim()) return buildRunId(prefix);
   const candidate = value.trim();
-  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(candidate)) {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/.test(candidate)) {
     throw new Error("Workplane run_id is outside the safe identifier allowlist");
   }
   return candidate;
@@ -251,7 +251,7 @@ export function isTranscriptRecoveryMutationEvidence(value: unknown, expectedRun
   if (!Number.isInteger(evidence.db_rows_mutated) || Number(evidence.db_rows_mutated) < 0) return false;
   if (typeof evidence.recovered_from_transactional_journal !== "boolean") return false;
   if (evidence.source_run_id !== expectedRunId) return false;
-  if (!Array.isArray(evidence.journal_records)) return false;
+  if (!Array.isArray(evidence.journal_records) || evidence.journal_records.length > 9) return false;
   try {
     const records = validateTranscriptRecoveryMutationJournal(evidence.journal_records);
     if (records.some((record) => record.run_id !== expectedRunId)) return false;
@@ -356,6 +356,8 @@ export function buildTranscriptRecoveryReplayEvidence(
   originalReceiptValid: boolean,
 ): Record<string, unknown> {
   const requested = new Set(ids);
+  if (requested.size > 9) throw new Error("transcript recovery evidence exceeds the exact-nine bound");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/.test(runId)) throw new Error("transcript recovery evidence run_id is outside the safe identifier allowlist");
   const currentByVideoId = new Map<string, Record<string, unknown>>();
   for (const record of validateTranscriptRecoveryMutationJournal([...journalRecords])) {
     if (record.run_id !== runId || !requested.has(String(record.youtube_video_id))) continue;

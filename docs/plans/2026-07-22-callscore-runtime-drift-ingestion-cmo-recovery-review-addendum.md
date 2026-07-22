@@ -220,4 +220,23 @@ The superseding remediation:
 
 Current parent evidence: TypeScript passed; expanded focused suite `94/94`; full suite `1441/1441`; both worker/lease/attempt-fenced mutation statements planned against the live PostgreSQL schema with `EXPLAIN` and `executed:false`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
 
+Acceptance for that tuple failed: `deleg_78b88c11` returned specification `PASS`, security/governance `PASS`, and implementation `FAIL` against `7513f1eecd1fe3ac97ad14002d2b1ff3b6d18c05`.
+
+## Seventh review cycle and unified exact-nine bounds
+
+The remaining implementation blockers were:
+
+1. Workplane accepted run IDs through 128 characters while the journal validator accepted only 96, so a 97-character run could mutate atomically and then fail durable receipt assembly;
+2. authoritative mutation evidence validation allowed ten records because it inherited the journal-wide history bound rather than the per-run exact-nine bound.
+
+The superseding narrow remediation:
+
+- unifies the Workplane run-ID allowlist with journal and receipt layers at 1–96 safe characters;
+- rejects authoritative receipt evidence above nine records and rejects evidence-builder input above nine distinct requested IDs;
+- adds RED→GREEN regressions for a valid 96-character run, rejected 97-character run, and rejected ten-record receipt evidence.
+
+Concurrent untracked `leaderboard-sentinel-v2*` tests appeared during verification and referenced implementation files not present in the frozen tree. They were preserved without modification in dedicated stash `3b0cbdff6e395c579a3fd4c6b413e22ceebf2f04` and excluded from this change.
+
+Current parent evidence: TypeScript passed; focused suite `94/94`; full suite `1441/1441`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
+
 Acceptance requires a new immutable commit and three fresh exact-tuple verdicts. All earlier verdicts remain superseded.

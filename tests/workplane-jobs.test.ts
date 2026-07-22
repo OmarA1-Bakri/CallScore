@@ -9,6 +9,7 @@ import {
   canonicalLocalModelForWorkplanePayload,
   canonicalShadowExecutionConfig,
   canonicalTranscriptRecoveryRunConfig,
+  isTranscriptRecoveryMutationEvidence,
   evaluateArtOfWarCampaignWithLocalModel,
   getWorkplaneJobSpec,
   mergeTranscriptRecoveryEvidence,
@@ -296,6 +297,8 @@ test("transcript recovery reports only current-run requested-row DB mutations", 
 
   const config = canonicalTranscriptRecoveryRunConfig({ run_id: "run-current", audit_out: "/tmp/injected.jsonl" });
   assert.equal(config.audit_out, ".tmp/workflow-receipts/transcript_recover_hh/run-current.jsonl");
+  assert.equal(canonicalTranscriptRecoveryRunConfig({ run_id: "r".repeat(96) }).run_id.length, 96);
+  assert.throws(() => canonicalTranscriptRecoveryRunConfig({ run_id: "r".repeat(97) }), /safe identifier allowlist/);
   assert.throws(() => canonicalTranscriptRecoveryRunConfig({ run_id: "../escape" }), /safe identifier allowlist/);
 
   const malformedPath = join(mkdtempSync(join(tmpdir(), "callscore-audit-reader-")), "audit.jsonl");
@@ -341,6 +344,19 @@ test("transcript recovery merges transactional DB journal evidence without doubl
   assert.equal(replayEvidence.production_db_writes_performed, true);
   assert.equal(replayEvidence.db_rows_mutated, 1);
   assert.equal(replayEvidence.recovered_from_transactional_journal, true);
+  const oversizedRecords = Array.from({ length: 10 }, (_, index) => ({
+    run_id: "run-current",
+    youtube_video_id: `A${String(index).padStart(10, "0")}`,
+    status: "updated",
+    db_write_performed: true,
+  }));
+  assert.equal(isTranscriptRecoveryMutationEvidence({
+    production_db_writes_performed: true,
+    db_rows_mutated: 10,
+    recovered_from_transactional_journal: true,
+    source_run_id: "run-current",
+    journal_records: oversizedRecords,
+  }, "run-current"), false);
   assert.equal(transcriptRecoveryJournalMutationCount([
     ...journal,
     ...journal,
