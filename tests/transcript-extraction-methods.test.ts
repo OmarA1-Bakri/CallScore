@@ -89,6 +89,7 @@ test("exact-ID transcript writes are owned by the Workplane recovery job", () =>
     "--limit", "1",
   ]);
   assert.throws(() => assertBackfillWriteAuthority(forcedArgs, "cli"), /transcript_recover_hh Workplane ownership/);
+  assert.match(forcedArgs.runId, /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/);
   assert.doesNotThrow(() => assertBackfillWriteAuthority(forcedArgs, "workplane"));
   const missingWorkerFence = parseBackfillTranscriptsArgs([
     "--youtube-video-ids", "VCbmPx1l7AU",
@@ -110,6 +111,18 @@ test("exact-ID transcript writes are owned by the Workplane recovery job", () =>
     "--limit", "1",
   ]);
   assert.throws(() => assertBackfillWriteAuthority(missingClaimGeneration, "workplane"), /claim generation/);
+  const oversizedRunId = parseBackfillTranscriptsArgs([
+    "--run-id", "r".repeat(97),
+    "--youtube-video-ids", "VCbmPx1l7AU",
+    "--force-targeted-retry",
+    "--workplane-job-id", "6632",
+    "--workplane-worker-id", "worker-final-review",
+    "--workplane-job-attempt", "2",
+    "--methods", "hh_ytdlp_ejs_wpc",
+    "--write",
+    "--limit", "1",
+  ]);
+  assert.throws(() => assertBackfillWriteAuthority(oversizedRunId, "workplane"), /safe run id/);
 
   const exactWriteWithoutForce = parseBackfillTranscriptsArgs([
     "--youtube-video-ids", "VCbmPx1l7AU",

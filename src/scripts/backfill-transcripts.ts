@@ -161,7 +161,7 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
     throw new Error("--force-targeted-retry requires --youtube-video-ids");
   }
   return {
-    runId: argValue(argv, "--run-id") ?? timestamp(),
+    runId: argValue(argv, "--run-id") ?? `transcript-backfill-${Date.now()}-${process.pid}`,
     creator: argValue(argv, "--creator"),
     youtubeVideoIds: targetedVideoIds,
     forceTargetedRetry,
@@ -201,6 +201,7 @@ export type BackfillInvocationOwner = "cli" | "workplane";
 
 export function assertBackfillWriteAuthority(args: BackfillTranscriptsArgs, owner: BackfillInvocationOwner): void {
   if (owner === "workplane") {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/.test(args.runId)) throw new Error("transcript_recover_hh Workplane ownership requires a 1-96 character safe run id");
     if (args.workplaneJobId <= 0) throw new Error("transcript_recover_hh Workplane ownership requires a positive workplane job id");
     if (!args.workplaneWorkerId || args.workplaneWorkerId.length > 256) throw new Error("transcript_recover_hh Workplane ownership requires the executing worker identity");
     if (args.workplaneJobAttempt <= 0) throw new Error("transcript_recover_hh Workplane ownership requires the positive claim generation");

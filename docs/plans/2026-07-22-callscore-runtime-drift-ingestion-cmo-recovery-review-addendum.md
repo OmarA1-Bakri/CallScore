@@ -239,4 +239,18 @@ Concurrent untracked `leaderboard-sentinel-v2*` tests appeared during verificati
 
 Current parent evidence: TypeScript passed; focused suite `94/94`; full suite `1441/1441`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
 
+Acceptance for that tuple failed: `deleg_53c87a01` returned specification `PASS`, implementation `PASS`, and security/governance `FAIL` against `49f5705aa550e9b530078284c4a7c3d3ff2ee521`.
+
+## Eighth review cycle and exported-writer run-ID authority
+
+The final security blocker was that the outer Workplane dispatcher enforced the 96-character run-ID contract, but the exported `runTargetedTranscriptRecoveryFromWorkplane()` authority boundary did not independently reject an oversized caller-supplied `--run-id`.
+
+The superseding remediation:
+
+- validates the 1–96 safe run-ID contract inside `assertBackfillWriteAuthority()` before runtime preflight, lock acquisition, video selection or mutation;
+- changes the parser’s implicit ISO timestamp default (which contained `:`) to a safe unique `transcript-backfill-<epoch>-<pid>` identifier;
+- adds RED→GREEN regressions for direct exported-writer rejection of a 97-character run ID and the parser’s safe default.
+
+Current parent evidence: TypeScript passed; focused suite `94/94`; full suite `1441/1441`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
+
 Acceptance requires a new immutable commit and three fresh exact-tuple verdicts. All earlier verdicts remain superseded.
