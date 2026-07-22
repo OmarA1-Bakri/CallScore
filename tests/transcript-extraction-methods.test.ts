@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildTranscriptExtractionPlan,
   parseTranscriptExtractionMethodChain,
@@ -8,6 +9,7 @@ import {
 import {
   buildMissingTranscriptVideosQuery,
   buildYtDlpTranscriptArgs,
+  assertBackfillWriteAuthority,
   fetchTranscript,
   parseBackfillTranscriptsArgs,
 } from "../src/scripts/backfill-transcripts";
@@ -73,6 +75,26 @@ test("backfill transcript args accept only explicit bounded YouTube IDs for forc
   );
 });
 
+test("exact-ID transcript writes are owned by the Workplane recovery job", () => {
+  const forcedArgs = parseBackfillTranscriptsArgs([
+    "--youtube-video-ids", "VCbmPx1l7AU",
+    "--force-targeted-retry",
+    "--write",
+    "--limit", "1",
+  ]);
+  assert.throws(() => assertBackfillWriteAuthority(forcedArgs, "cli"), /transcript_recover_hh Workplane ownership/);
+  assert.doesNotThrow(() => assertBackfillWriteAuthority(forcedArgs, "workplane"));
+
+  const exactWriteWithoutForce = parseBackfillTranscriptsArgs([
+    "--youtube-video-ids", "VCbmPx1l7AU",
+    "--write",
+    "--limit", "1",
+  ]);
+  assert.throws(() => assertBackfillWriteAuthority(exactWriteWithoutForce, "cli"), /transcript_recover_hh Workplane ownership/);
+  assert.doesNotThrow(() => assertBackfillWriteAuthority(exactWriteWithoutForce, "workplane"));
+  assert.doesNotThrow(() => assertBackfillWriteAuthority(parseBackfillTranscriptsArgs(["--write", "--limit", "1"]), "cli"));
+});
+
 test("forced transcript recovery query selects exact IDs and bypasses cooldown only for those IDs", () => {
   const args = parseBackfillTranscriptsArgs([
     "--youtube-video-ids",
@@ -84,10 +106,31 @@ test("forced transcript recovery query selects exact IDs and bypasses cooldown o
   const selection = buildMissingTranscriptVideosQuery(args);
 
   assert.match(selection.sql, /v\.youtube_video_id = ANY\(\$1::text\[\]\)/);
-  assert.doesNotMatch(selection.sql, /transcript_last_attempt_at/);
+  assert.match(selection.sql, /bot_verification_required/);
+  assert.match(selection.sql, /js_challenge_runtime_missing/);
+  assert.doesNotMatch(selection.sql, /transcript_last_attempt_at\s*</);
   assert.deepEqual(selection.params[0], ["VCbmPx1l7AU", "lVLvnT4j9TU"]);
   assert.equal(selection.params.at(-2), 9);
   assert.equal(selection.params.at(-1), 0);
+});
+
+test("transcript recovery persists pre-mutation state and rejects concurrent row changes", () => {
+  const selection = buildMissingTranscriptVideosQuery(parseBackfillTranscriptsArgs([
+    "--youtube-video-ids", "VCbmPx1l7AU",
+    "--force-targeted-retry",
+    "--limit", "1",
+  ]));
+  assert.match(selection.sql, /v\.transcript_status/);
+  assert.match(selection.sql, /v\.transcript_error/);
+  assert.match(selection.sql, /v\.transcript_attempts/);
+  assert.match(selection.sql, /v\.transcript_last_attempt_at/);
+
+  const source = readFileSync("src/scripts/backfill-transcripts.ts", "utf8");
+  assert.ok((source.match(/RETURNING id/g) ?? []).length >= 2);
+  assert.match(source, /transcript_status IS NOT DISTINCT FROM \$5/);
+  assert.match(source, /transcript_last_attempt_at IS NOT DISTINCT FROM \$8::timestamptz/);
+  assert.match(source, /status: "mutation_conflict"/);
+  assert.match(source, /previous_transcript_status/);
 });
 
 test("HH EJS/WPC method prefers isolated yt-dlp runtime and transcript-only args", () => {

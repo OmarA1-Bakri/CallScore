@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec, runWorkplaneJob } from "../src/lib/workplane-jobs";
+import { PipelineDispatchJobTypeSchema } from "../src/lib/workplane/operating-graph-schemas";
 import {
   buildReadinessDomains,
   chooseStatusNextAction,
@@ -23,6 +24,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
     "transcript_collect_laptop",
     "transcript_ingest_result",
     "transcript_recover_hh",
+    "local_model_shadow_extract",
     "gemma_shadow_extract",
     "ml_extraction_eval",
     "ml_idle_improve",
@@ -47,6 +49,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
     "artofwar_campaign_verify",
     "artofwar_campaign_persona_test",
     "artofwar_campaign_dry_run",
+    "artofwar_campaign_local_model_eval",
     "artofwar_campaign_gemma_eval",
     "artofwar_campaign_receipt",
     "artofwar_campaign_dossier",
@@ -70,12 +73,17 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   assert.match(collector.default_safe_command, /-Workplane/);
   assert.ok(collector.failure_classification.includes("collector_tool_error"));
 
-  const gemma = getWorkplaneJobSpec("gemma_shadow_extract");
-  assert.equal(gemma.execution_location, "HH");
-  assert.equal(gemma.max_batch_size, 10);
-  assert.equal(gemma.production_db_writes_allowed, false);
-  assert.equal(gemma.production_call_writes_allowed, false);
-  assert.match(gemma.default_safe_command, /qwen3:4b-instruct-2507-q4_K_M/);
+  const localModel = getWorkplaneJobSpec("local_model_shadow_extract");
+  assert.equal(localModel.execution_location, "HH");
+  assert.equal(localModel.max_batch_size, 10);
+  assert.equal(localModel.production_db_writes_allowed, false);
+  assert.equal(localModel.production_call_writes_allowed, false);
+  assert.match(localModel.default_safe_command, /qwen3:4b-instruct-2507-q4_K_M/);
+  assert.equal(getWorkplaneJobSpec("gemma_shadow_extract").default_safe_command, localModel.default_safe_command);
+  assert.equal(PipelineDispatchJobTypeSchema.safeParse("local_model_shadow_extract").success, true);
+  assert.equal(PipelineDispatchJobTypeSchema.safeParse("artofwar_campaign_local_model_eval").success, true);
+  assert.match(getWorkplaneJobSpec("artofwar_campaign_local_model_eval").output_artifact, /local-model-evaluations/);
+  assert.match(getWorkplaneJobSpec("artofwar_campaign_gemma_eval").output_artifact, /gemma-evaluations/);
 
   const ingest = getWorkplaneJobSpec("transcript_ingest_result");
   assert.equal(ingest.production_db_writes_allowed, true);
@@ -83,7 +91,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
 
   const recovery = getWorkplaneJobSpec("transcript_recover_hh");
   assert.equal(recovery.execution_location, "HH");
-  assert.equal(recovery.max_batch_size, 10);
+  assert.equal(recovery.max_batch_size, 9);
   assert.equal(recovery.concurrency, 1);
   assert.equal(recovery.production_db_writes_allowed, true);
   assert.equal(recovery.production_call_writes_allowed, false);
@@ -352,7 +360,7 @@ test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe w
     "wait_for_laptop_collector_rate_limit_cooldown",
   );
   assert.equal(decideNextAutonomousAction({ ...base, latestMlEval: { path: "r", exists: true, modified_at: "now", malformed: false, summary: { promotion_gate: { eligible_for_write_canary: false } } } }).action, "start_artofwar_internal_growth_intelligence");
-  assert.equal(decideNextAutonomousAction(base).job_type, "gemma_shadow_extract");
+  assert.equal(decideNextAutonomousAction(base).job_type, "local_model_shadow_extract");
 });
 
 
@@ -572,6 +580,7 @@ test("Art of War campaign loop supports owned public execution while restricted 
     "artofwar_campaign_verify",
     "artofwar_campaign_persona_test",
     "artofwar_campaign_dry_run",
+    "artofwar_campaign_local_model_eval",
     "artofwar_campaign_gemma_eval",
     "artofwar_campaign_receipt",
     "artofwar_campaign_dossier",
@@ -605,6 +614,18 @@ test("Art of War campaign loop supports owned public execution while restricted 
   assert.equal(owned.input_payload.receipt_required_after_execution, true);
   assert.match(owned.success_criteria.join(" "), /post-execution receipt required/);
   assert.ok(owned.failure_classification.includes("not_owned_channel"));
+});
+
+test("transcript recovery write mode requires forced replay-safe Workplane selection", async () => {
+  await assert.rejects(
+    runWorkplaneJob({
+      id: 6632,
+      run_id: 6632,
+      type: "transcript_recover_hh",
+      payload: { youtube_video_ids: ["VCbmPx1l7AU"], write: true, force_targeted_retry: false },
+    } as never),
+    /requires force_targeted_retry=true/,
+  );
 });
 
 test("owned public execution job emits a public artifact packet and receipt without restricted mutations", async () => {

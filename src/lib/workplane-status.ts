@@ -399,7 +399,7 @@ export function decideNextAutonomousAction(input: WorkplaneDecisionInput): Workp
     };
   }
   if (!input.latestGemmaShadow.exists) {
-    return { action: "run_local_model_shadow_extract_limit_10", reason: `no current ${CANONICAL_LOCAL_MODEL} shadow artifact found`, job_type: "gemma_shadow_extract", allowed: true };
+    return { action: "run_local_model_shadow_extract_limit_10", reason: `no current ${CANONICAL_LOCAL_MODEL} shadow artifact found`, job_type: "local_model_shadow_extract", allowed: true };
   }
   if (input.transcriptBacklogRecent30d > 0) {
     return { action: "run_laptop_collector_limit_5_if_laptop_cooldown_clear", reason: "recent transcript backlog remains and no active HH-visible cooldown", job_type: "transcript_collect_laptop", allowed: true };
@@ -410,9 +410,15 @@ export function decideNextAutonomousAction(input: WorkplaneDecisionInput): Workp
 export function workplaneJobModelForStatus(): readonly Record<string, unknown>[] {
   return workplaneSpecsForStatus().map((spec) => ({
     type: spec.type,
-    canonical_display_type: spec.type === "gemma_shadow_extract" ? "local_model_shadow_extract" : spec.type,
-    canonical_model: spec.type === "gemma_shadow_extract" ? CANONICAL_LOCAL_MODEL : null,
-    legacy_compatibility_identifier: spec.type === "gemma_shadow_extract" ? spec.type : null,
+    canonical_display_type: spec.type === "gemma_shadow_extract"
+      ? "local_model_shadow_extract"
+      : spec.type === "artofwar_campaign_gemma_eval"
+        ? "artofwar_campaign_local_model_eval"
+        : spec.type,
+    canonical_model: ["local_model_shadow_extract", "gemma_shadow_extract", "artofwar_campaign_local_model_eval", "artofwar_campaign_gemma_eval"].includes(spec.type)
+      ? CANONICAL_LOCAL_MODEL
+      : null,
+    legacy_compatibility_identifier: ["gemma_shadow_extract", "artofwar_campaign_gemma_eval"].includes(spec.type) ? spec.type : null,
     execution_location: spec.execution_location,
     max_batch_size: spec.max_batch_size,
     concurrency: spec.concurrency,
@@ -580,7 +586,7 @@ export function externalReadinessSnapshot(repoRoot = process.cwd(), now = new Da
         "artofwar_campaign_verify",
         "artofwar_campaign_persona_test",
         "artofwar_campaign_dry_run",
-        "artofwar_campaign_gemma_eval",
+        "artofwar_campaign_local_model_eval",
         "artofwar_campaign_receipt",
         "artofwar_campaign_dossier",
         "artofwar_campaign_approval_review",
@@ -731,7 +737,7 @@ export function buildReadinessDomains(input: {
       risky_actions_blocked: ["unbounded transcript collection", `${CANONICAL_LOCAL_MODEL} production writes`, "creator_stats mutation from shadow output"],
       required_approvals: ["production extractor default change"],
       relevant_commands: ["npm run freshness:check", "npm run workplane:status"],
-      relevant_jobs: ["transcript_collect_laptop", "gemma_shadow_extract", "ml_idle_improve"],
+      relevant_jobs: ["transcript_collect_laptop", "local_model_shadow_extract", "ml_idle_improve"],
       dry_run_available: true,
       canary_available: true,
     }, now),
@@ -793,7 +799,7 @@ export function buildReadinessDomains(input: {
       risky_actions_blocked: [`always-on ${CANONICAL_LOCAL_MODEL} jobs without capacity proof`, "production extractor default switch", "public ranking impact"],
       required_approvals: ["production extractor default change", "host memory/swap/service configuration change"],
       relevant_commands: ["npm run model:capacity-preflight"],
-      relevant_jobs: ["gemma_shadow_extract", "artofwar_campaign_gemma_eval", "ml_extraction_eval"],
+      relevant_jobs: ["local_model_shadow_extract", "artofwar_campaign_local_model_eval", "ml_extraction_eval"],
       dry_run_available: true,
       canary_available: gemmaCapacityCanLoad,
     }, now),
@@ -811,7 +817,7 @@ export function buildReadinessDomains(input: {
       risky_actions_blocked: [`${CANONICAL_LOCAL_MODEL} production call writes`, "public ranking impact"],
       required_approvals: ["write-canary promotion"],
       relevant_commands: ["npm run shadow:extract", "npm run shadow:diff"],
-      relevant_jobs: ["gemma_shadow_extract", "extraction_promotion_review"],
+      relevant_jobs: ["local_model_shadow_extract", "extraction_promotion_review"],
       dry_run_available: true,
       canary_available: gemmaShadowCanaryPassed,
     }, now),

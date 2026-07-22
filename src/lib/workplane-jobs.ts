@@ -9,6 +9,7 @@ export const WORKPLANE_JOB_TYPES = [
   "transcript_collect_laptop",
   "transcript_ingest_result",
   "transcript_recover_hh",
+  "local_model_shadow_extract",
   "gemma_shadow_extract",
   "ml_extraction_eval",
   "ml_idle_improve",
@@ -33,6 +34,7 @@ export const WORKPLANE_JOB_TYPES = [
   "artofwar_campaign_verify",
   "artofwar_campaign_persona_test",
   "artofwar_campaign_dry_run",
+  "artofwar_campaign_local_model_eval",
   "artofwar_campaign_gemma_eval",
   "artofwar_campaign_receipt",
   "artofwar_campaign_dossier",
@@ -110,6 +112,54 @@ const loopEngineeringFailures = [
   "no_progress",
 ] as const;
 
+function localModelShadowSpec(type: "local_model_shadow_extract" | "gemma_shadow_extract"): WorkplaneJobSpec {
+  return safeReportSpec(type, {
+    input_payload: {
+      model: "qwen3:4b-instruct-2507-q4_K_M",
+      provider: "ollama",
+      ollama_host: "http://127.0.0.1:11434",
+      limit: 10,
+      chunk_chars: 512,
+      chunk_overlap: 50,
+      max_chunks: 1,
+      num_predict: 512,
+      request_timeout_ms: 60000,
+      prompt_profile: "shadow-compact",
+      write: false,
+      shadow_out: "/tmp/callscore-shadow-extractions/<run-id>.jsonl",
+    },
+    execution_location: "HH",
+    max_batch_size: 10,
+    concurrency: 1,
+    timeout_seconds: 900,
+    retry_policy: "no automatic model retry beyond configured bounded model_attempts; failures become shadow artifact rows",
+    cooldown_policy: "none; use latency/timeout gate to hold promotion",
+    output_artifact: "/tmp/callscore-shadow-extractions/<run-id>.jsonl",
+    success_criteria: ["reads existing transcripts only", "writes shadow artifact rows only", "does not write calls or creator_stats", "records parser/schema/latency evidence"],
+    failure_classification: ["invalid_json", "schema_invalid", "timeout", "ollama_unavailable", "manual_review"],
+    default_safe_command: "npm run shadow:extract -- --execute --provider ollama --ollama-host http://127.0.0.1:11434 --model qwen3:4b-instruct-2507-q4_K_M --limit 10 --video-agents 1 --chunk-agents 1 --model-attempts 1 --prompt-profile shadow-compact --chunk-chars 512 --chunk-overlap 50 --max-chunks 1 --num-predict 512 --request-timeout-ms 60000",
+  });
+}
+
+function campaignLocalModelEvalSpec(type: "artofwar_campaign_local_model_eval" | "artofwar_campaign_gemma_eval"): WorkplaneJobSpec {
+  const legacyCompatibility = type === "artofwar_campaign_gemma_eval";
+  return safeReportSpec(type, {
+    input_payload: { dry_run: true, model: "qwen3:4b-instruct-2507-q4_K_M", role: "evaluate_optimize_classify_recommend", public_action: false },
+    execution_location: "HH",
+    max_batch_size: 3,
+    concurrency: 1,
+    timeout_seconds: 300,
+    retry_policy: "bounded local evaluation; parser/model failures become receipts",
+    cooldown_policy: "none",
+    output_artifact: legacyCompatibility
+      ? "docs/plans/artifacts/art-of-war/gemma-evaluations/<campaign-id>-<run-id>.json"
+      : "docs/plans/artifacts/art-of-war/local-model-evaluations/<campaign-id>-<run-id>.json",
+    success_criteria: [legacyCompatibility ? "GemmaEvaluationReceipt produced as a compatibility artifact" : "LocalModelEvaluationReceipt produced", "weak claims/CTA/trust/audience fit classified", "safe owned public action remains available when policy passes"],
+    failure_classification: campaignFailures,
+    default_safe_command: "cd /srv/agents/repos/Claude_Code_Automations && python3 scripts/art_of_war.py campaign-loop --dry-run --campaign-id callscore-receipts-proof --output /tmp/callscore-art-of-war-campaign-loop-latest.json",
+  });
+}
+
 export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
   transcript_collect_laptop: safeReportSpec("transcript_collect_laptop", {
     input_payload: {
@@ -172,14 +222,14 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
   transcript_recover_hh: safeReportSpec("transcript_recover_hh", {
     input_payload: {
       youtube_video_ids: ["<exact-11-character-youtube-id>"],
-      limit: 10,
+      limit: 9,
       method: "hh_ytdlp_ejs_wpc",
-      force_targeted_retry: false,
+      force_targeted_retry: true,
       continue_after_provider_block: false,
       write: false,
     },
     execution_location: "HH",
-    max_batch_size: 10,
+    max_batch_size: 9,
     concurrency: 1,
     timeout_seconds: 1800,
     retry_policy: "no automatic broad retry; exact IDs only; retry requires a new bounded Workplane job",
@@ -188,34 +238,10 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
     success_criteria: ["exact YouTube IDs selected", "current isolated yt-dlp EJS/WPC runtime used", "all selected rows emit updated/would_update audit records", "production call writes remain disabled"],
     failure_classification: ["invalid_payload", "no_target_rows_selected", "bot_verification_required", "js_challenge_runtime_missing", "po_token_required", "cookie_invalid_or_rotated", "rate_limited", "no_captions", "transcript_failed"],
     production_db_writes_allowed: true,
-    default_safe_command: "npm run backfill:transcripts -- --methods hh_ytdlp_ejs_wpc --youtube-video-ids <comma-separated-exact-ids> --force-targeted-retry --limit 10 --audit-out .tmp/workflow-receipts/transcript_recover_hh/<run-id>.jsonl --dry-run",
+    default_safe_command: "npm run backfill:transcripts -- --methods hh_ytdlp_ejs_wpc --youtube-video-ids <comma-separated-exact-ids> --force-targeted-retry --limit 9 --audit-out .tmp/workflow-receipts/transcript_recover_hh/<run-id>.jsonl --dry-run",
   }),
-  gemma_shadow_extract: safeReportSpec("gemma_shadow_extract", {
-    input_payload: {
-      model: "qwen3:4b-instruct-2507-q4_K_M",
-      provider: "ollama",
-      ollama_host: "http://127.0.0.1:11434",
-      limit: 10,
-      chunk_chars: 350,
-      chunk_overlap: 50,
-      max_chunks: 1,
-      num_predict: 350,
-      request_timeout_ms: 45000,
-      prompt_profile: "shadow-compact",
-      write: false,
-      shadow_out: "/tmp/callscore-shadow-extractions/<run-id>.jsonl",
-    },
-    execution_location: "HH",
-    max_batch_size: 10,
-    concurrency: 1,
-    timeout_seconds: 900,
-    retry_policy: "no automatic model retry beyond configured bounded model_attempts; failures become shadow artifact rows",
-    cooldown_policy: "none; use latency/timeout gate to hold promotion",
-    output_artifact: "/tmp/callscore-shadow-extractions/<run-id>.jsonl",
-    success_criteria: ["reads existing transcripts only", "writes shadow artifact rows only", "does not write calls or creator_stats", "records parser/schema/latency evidence"],
-    failure_classification: ["invalid_json", "schema_invalid", "timeout", "ollama_unavailable", "manual_review"],
-    default_safe_command: "npm run shadow:extract -- --execute --provider ollama --ollama-host http://127.0.0.1:11434 --model qwen3:4b-instruct-2507-q4_K_M --limit 10 --video-agents 1 --chunk-agents 1 --model-attempts 1 --prompt-profile shadow-compact --chunk-chars 512 --chunk-overlap 50 --max-chunks 1 --num-predict 512 --request-timeout-ms 60000",
-  }),
+  local_model_shadow_extract: localModelShadowSpec("local_model_shadow_extract"),
+  gemma_shadow_extract: localModelShadowSpec("gemma_shadow_extract"),
   ml_extraction_eval: safeReportSpec("ml_extraction_eval", {
     input_payload: { fixtures: "data/eval/call-extraction-fixtures.jsonl", shadow_in: "/tmp/callscore-shadow-extractions/<run-id>.jsonl", diff_in: "/tmp/callscore-shadow-extractions/<run-id>.diff.jsonl" },
     execution_location: "HH",
@@ -538,19 +564,8 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
     failure_classification: campaignFailures,
     default_safe_command: "cd /srv/agents/repos/Claude_Code_Automations && python3 scripts/art_of_war.py campaign-loop --dry-run --campaign-id callscore-receipts-proof --output /tmp/callscore-art-of-war-campaign-loop-latest.json",
   }),
-  artofwar_campaign_gemma_eval: safeReportSpec("artofwar_campaign_gemma_eval", {
-    input_payload: { dry_run: true, model: "qwen3:4b-instruct-2507-q4_K_M", role: "evaluate_optimize_classify_recommend", public_action: false },
-    execution_location: "HH",
-    max_batch_size: 3,
-    concurrency: 1,
-    timeout_seconds: 300,
-    retry_policy: "bounded local evaluation; parser/model failures become receipts",
-    cooldown_policy: "none",
-    output_artifact: "docs/plans/artifacts/art-of-war/gemma-evaluations/<campaign-id>-<run-id>.json",
-    success_criteria: ["GemmaEvaluationReceipt produced", "weak claims/CTA/trust/audience fit classified", "safe owned public action remains available when policy passes"],
-    failure_classification: campaignFailures,
-    default_safe_command: "cd /srv/agents/repos/Claude_Code_Automations && python3 scripts/art_of_war.py campaign-loop --dry-run --campaign-id callscore-receipts-proof --output /tmp/callscore-art-of-war-campaign-loop-latest.json",
-  }),
+  artofwar_campaign_local_model_eval: campaignLocalModelEvalSpec("artofwar_campaign_local_model_eval"),
+  artofwar_campaign_gemma_eval: campaignLocalModelEvalSpec("artofwar_campaign_gemma_eval"),
   artofwar_campaign_receipt: safeReportSpec("artofwar_campaign_receipt", {
     input_payload: { dry_run: true, public_action_performed: false, receipt_required: true },
     execution_location: "HH",
@@ -782,14 +797,18 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
       ? payload.audit_out
       : `.tmp/workflow-receipts/transcript_recover_hh/${runId}.jsonl`;
     const write = payload.write === true;
-    const { main } = await import("../scripts/backfill-transcripts");
-    await main([
+    const forceTargetedRetry = payload.force_targeted_retry !== false;
+    if (write && !forceTargetedRetry) {
+      throw new Error("transcript_recover_hh write mode requires force_targeted_retry=true");
+    }
+    const { runTargetedTranscriptRecoveryFromWorkplane } = await import("../scripts/backfill-transcripts");
+    await runTargetedTranscriptRecoveryFromWorkplane([
       "--methods", "hh_ytdlp_ejs_wpc",
       "--youtube-video-ids", ids.join(","),
       "--limit", String(ids.length),
       "--concurrency", "1",
       "--audit-out", auditOut,
-      ...(payload.force_targeted_retry === true ? ["--force-targeted-retry"] : []),
+      ...(forceTargetedRetry ? ["--force-targeted-retry"] : []),
       ...(payload.continue_after_provider_block === true ? ["--continue-after-provider-block"] : []),
       ...(write ? ["--write"] : ["--dry-run"]),
     ]);
@@ -841,7 +860,7 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
     return writeOwnedPublicArtifact(job, spec);
   }
 
-  if (job.type === "gemma_shadow_extract") {
+  if (job.type === "local_model_shadow_extract" || job.type === "gemma_shadow_extract") {
     const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("gemma-shadow");
     const shadowOut = typeof payload.shadow_out === "string" ? payload.shadow_out : `/tmp/callscore-shadow-extractions/${runId}.jsonl`;
     const { main } = await import("../scripts/shadow-extract-transcripts");

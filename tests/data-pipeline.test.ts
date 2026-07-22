@@ -51,9 +51,11 @@ import { parseBackfillPublicationDatesArgs } from "../src/scripts/backfill-publi
 import {
   buildYtDlpTranscriptArgs,
   classifyYtDlpFailure,
+  assertHhTargetedRecoveryYtDlpEnv,
   extractRequestedSubtitleUrl,
   parseBackfillTranscriptsArgs,
   prepareWritableYtDlpAuth,
+  redactYtDlpDiagnostic,
   redactedYtDlpOptionSummary,
   stripCaptionText,
   ytDlpAuthArgs,
@@ -586,6 +588,14 @@ test("yt-dlp PO-token provider config emits provider args without raw token expo
     () => ytDlpPoTokenProviderArgs({ YTDLP_PO_TOKEN_PROVIDER: "bgutil-script" }),
     /YTDLP_PO_TOKEN_PROVIDER_HOME/,
   );
+  assert.throws(
+    () => assertHhTargetedRecoveryYtDlpEnv({ YTDLP_PO_TOKEN_PROVIDER: "bgutil-http", YTDLP_PO_TOKEN_PROVIDER_BASE_URL: "https://provider.example.test" }),
+    /loopback-only/,
+  );
+  assert.throws(
+    () => assertHhTargetedRecoveryYtDlpEnv({ YTDLP_PO_TOKEN_PROVIDER: "bgutil-http", YTDLP_PO_TOKEN_PROVIDER_BASE_URL: "http://127.0.0.1:4416/?token=secret" }),
+    /query credentials/,
+  );
   assert.deepEqual(
     ytDlpPoTokenProviderArgs({
       YTDLP_PO_TOKEN_PROVIDER: "wpc",
@@ -594,6 +604,33 @@ test("yt-dlp PO-token provider config emits provider args without raw token expo
     ["--extractor-args", "youtubepot-wpc:browser_path=/usr/bin/chromium"],
   );
   assert.deepEqual(ytDlpPoTokenProviderArgs({ YTDLP_PO_TOKEN_PROVIDER: "wpc" }), []);
+});
+
+test("HH targeted recovery rejects browser profiles, non-loopback providers, and noncanonical WPC browsers", () => {
+  assert.doesNotThrow(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_COOKIES_PATH: "/run/secrets/youtube-cookies.txt",
+    YTDLP_PO_TOKEN_PROVIDER: "bgutil-http",
+    YTDLP_PO_TOKEN_PROVIDER_BASE_URL: "http://127.0.0.1:4416",
+  }));
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({ YTDLP_COOKIES_FROM_BROWSER: "chromium:Default" }), /cookies-from-browser/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({ YTDLP_COOKIES: "/tmp/cookies.txt" }), /YTDLP_COOKIES_PATH/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({ YTDLP_COOKIES_PATH: "/tmp/cookies.txt" }), /\/run\/secrets/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_PO_TOKEN_PROVIDER: "bgutil-http",
+    YTDLP_PO_TOKEN_PROVIDER_BASE_URL: "https://example.com/token",
+  }), /loopback-only/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_PO_TOKEN_PROVIDER: "wpc",
+    YTDLP_PO_TOKEN_BROWSER_PATH: "/opt/google/chrome",
+  }), /\/usr\/bin\/chromium/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_EXTRACTOR_ARGS: "youtube:player_client=unreviewed_client",
+  }), /outside the allowlist/);
+
+  const raw = "ERROR --cookies /run/secrets/youtube-cookies.txt /tmp/callscore-ytdlp-cookies-abc/cookies.txt token=secret-value youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416";
+  const redacted = redactYtDlpDiagnostic(raw);
+  assert.doesNotMatch(redacted, /youtube-cookies|callscore-ytdlp-cookies-abc|secret-value|127\.0\.0\.1/);
+  assert.match(redacted, /\[REDACTED\]/);
 });
 
 test("yt-dlp transcript args remain transcript-only and include extractor backoff", () => {

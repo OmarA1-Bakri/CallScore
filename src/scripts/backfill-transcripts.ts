@@ -62,6 +62,10 @@ interface MissingTranscriptVideo {
   readonly creator_name: string;
   readonly youtube_handle: string;
   readonly published_at: string | null;
+  readonly transcript_status: string | null;
+  readonly transcript_error: string | null;
+  readonly transcript_attempts: number | null;
+  readonly transcript_last_attempt_at: string | null;
 }
 
 interface TranscriptResult {
@@ -183,6 +187,14 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
   };
 }
 
+export type BackfillInvocationOwner = "cli" | "workplane";
+
+export function assertBackfillWriteAuthority(args: BackfillTranscriptsArgs, owner: BackfillInvocationOwner): void {
+  if (args.write && args.youtubeVideoIds.length > 0 && owner !== "workplane") {
+    throw new Error("exact-ID transcript writes require transcript_recover_hh Workplane ownership");
+  }
+}
+
 function serpApiKey(): string | null {
   return process.env.SERPAPI_API_KEY
     ?? process.env.SERPAPI_TOKEN
@@ -286,6 +298,63 @@ function splitMultilineEnv(value: string | undefined): string[] {
 
 function truthyEnv(value: string | undefined): boolean {
   return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
+}
+
+export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | undefined> = process.env): void {
+  if (env.YTDLP_COOKIES_FROM_BROWSER?.trim()) {
+    throw new Error("HH targeted recovery forbids --cookies-from-browser; browser profiles remain laptop-local");
+  }
+  if (env.YTDLP_COOKIES?.trim()) {
+    throw new Error("HH targeted recovery requires YTDLP_COOKIES_PATH; YTDLP_COOKIES is not accepted");
+  }
+  const cookiePath = env.YTDLP_COOKIES_PATH?.trim();
+  if ((cookiePath && !cookiePath.startsWith("/run/secrets/")) || cookiePath?.includes("..")) {
+    throw new Error("HH targeted recovery cookie path must be a non-traversing file under /run/secrets/");
+  }
+
+  const provider = normalizeProviderName(env.YTDLP_PO_TOKEN_PROVIDER);
+  const allowedProviders = new Set(["", "none", "off", "false", "bgutil", "bgutil-http", "bgutilhttp", "wpc", "webpo", "browser-attested"]);
+  if (!allowedProviders.has(provider)) {
+    throw new Error(`HH targeted recovery does not allow PO-token provider ${provider || "unknown"}`);
+  }
+  if (provider === "bgutil" || provider === "bgutil-http" || provider === "bgutilhttp") {
+    const rawUrl = env.YTDLP_PO_TOKEN_PROVIDER_BASE_URL?.trim()
+      || env.YTDLP_PO_TOKEN_BASE_URL?.trim()
+      || DEFAULT_YTDLP_PO_TOKEN_PROVIDER_BASE_URL;
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      throw new Error("HH targeted recovery PO-token provider URL is invalid");
+    }
+    if (parsed.protocol !== "http:" || !["127.0.0.1", "localhost", "::1"].includes(parsed.hostname) || parsed.username || parsed.password || parsed.search || parsed.hash) {
+      throw new Error("HH targeted recovery PO-token provider must be an unauthenticated loopback-only HTTP endpoint without query credentials");
+    }
+  }
+  if (provider === "wpc" || provider === "webpo" || provider === "browser-attested") {
+    const browserPath = env.YTDLP_PO_TOKEN_BROWSER_PATH?.trim() || env.YTDLP_WPC_BROWSER_PATH?.trim();
+    if (browserPath !== "/usr/bin/chromium") {
+      throw new Error("HH targeted recovery WPC browser must be /usr/bin/chromium");
+    }
+  }
+
+  const allowedPlayerClients = new Set(["mweb", "web", "web_safari", "tv", "tv_embedded"]);
+  for (const extractorArg of splitMultilineEnv(env.YTDLP_EXTRACTOR_ARGS)) {
+    if (extractorArg === "youtube:player_skip=configs") continue;
+    const clients = extractorArg.match(/^youtube:player_client=([A-Za-z0-9_,.-]+)$/)?.[1]?.split(",") ?? [];
+    if (clients.length === 0 || clients.some((client) => !allowedPlayerClients.has(client))) {
+      throw new Error("HH targeted recovery extractor arguments are outside the allowlist");
+    }
+  }
+}
+
+export function redactYtDlpDiagnostic(value: string): string {
+  return value
+    .replace(/(--cookies(?:-from-browser)?\s+)[^\s]+/gi, "$1[REDACTED]")
+    .replace(/\/run\/secrets\/[^\s'\"]+/g, "/run/secrets/[REDACTED]")
+    .replace(/\/tmp\/callscore-ytdlp-cookies-[^\s'\"]+/g, "/tmp/callscore-ytdlp-cookies-[REDACTED]")
+    .replace(/((?:po[_-]?token|token|visitor[_-]?data)\s*[=:]\s*)[^\s,;]+/gi, "$1[REDACTED]")
+    .replace(/(base_url=)[^\s,;]+/gi, "$1[REDACTED]");
 }
 
 export function ytDlpExtraArgs(env: Record<string, string | undefined> = process.env): string[] {
@@ -479,8 +548,8 @@ async function fetchViaYtDlp(
     return { ok: true, transcript: { text, quality: transcriptQuality(text), source: transcriptMethodProvider(method), detail: method } };
   } catch (error) {
     const maybeError = error as { stderr?: string; stdout?: string; message?: string };
-    const detail = `${maybeError.stderr ?? ""}\n${maybeError.stdout ?? ""}\n${maybeError.message ?? ""}`.slice(0, 500);
-    return { ok: false, failure: { reason: classifyYtDlpFailure(detail), status: "failed", provider: transcriptMethodProvider(method), detail } };
+    const rawDetail = `${maybeError.stderr ?? ""}\n${maybeError.stdout ?? ""}\n${maybeError.message ?? ""}`.slice(0, 2_000);
+    return { ok: false, failure: { reason: classifyYtDlpFailure(rawDetail), status: "failed", provider: transcriptMethodProvider(method), detail: redactYtDlpDiagnostic(rawDetail).slice(0, 500) } };
   } finally {
     writableAuth.cleanup();
   }
@@ -532,18 +601,25 @@ export async function fetchTranscript(videoId: string, args: BackfillTranscripts
   };
 }
 
-async function markTranscriptFailure(videoId: number, failure: TranscriptFailure, write: boolean): Promise<void> {
-  if (!write) return;
-  await query(
+async function markTranscriptFailure(video: MissingTranscriptVideo, failure: TranscriptFailure, write: boolean): Promise<boolean> {
+  if (!write) return true;
+  const rows = await query<{ id: number }>(
     `UPDATE videos
      SET transcript_status = $2,
          transcript_provider = $3,
          transcript_error = $4,
          transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
          transcript_last_attempt_at = NOW()
-     WHERE id = $1 AND (transcript IS NULL OR length(transcript) = 0)`,
-    [videoId, failure.status, failure.provider, failure.reason],
+     WHERE id = $1
+       AND transcript_status IS NOT DISTINCT FROM $5
+       AND transcript_error IS NOT DISTINCT FROM $6
+       AND transcript_attempts IS NOT DISTINCT FROM $7
+       AND transcript_last_attempt_at IS NOT DISTINCT FROM $8::timestamptz
+       AND (transcript IS NULL OR length(transcript) = 0)
+     RETURNING id`,
+    [video.id, failure.status, failure.provider, failure.reason, video.transcript_status, video.transcript_error, video.transcript_attempts, video.transcript_last_attempt_at],
   );
+  return rows.length === 1;
 }
 
 export interface MissingTranscriptVideosQuery {
@@ -561,6 +637,11 @@ export function buildMissingTranscriptVideosQuery(args: BackfillTranscriptsArgs)
   if (args.youtubeVideoIds.length > 0) {
     params.push(args.youtubeVideoIds);
     filters.push(`v.youtube_video_id = ANY($${params.length}::text[])`);
+  }
+
+  if (args.forceTargetedRetry) {
+    filters.push("v.transcript_status = 'failed'");
+    filters.push("v.transcript_error IN ('bot_verification_required','js_challenge_runtime_missing')");
   }
 
   if (!args.forceTargetedRetry) {
@@ -582,7 +663,9 @@ export function buildMissingTranscriptVideosQuery(args: BackfillTranscriptsArgs)
   }
   params.push(args.limit, args.offset);
   return {
-    sql: `SELECT v.id, v.creator_id, v.youtube_video_id, v.title, v.published_at, c.name AS creator_name, c.youtube_handle
+    sql: `SELECT v.id, v.creator_id, v.youtube_video_id, v.title, v.published_at,
+            v.transcript_status, v.transcript_error, v.transcript_attempts, v.transcript_last_attempt_at,
+            c.name AS creator_name, c.youtube_handle
      FROM videos v
      JOIN creators c ON c.id = v.creator_id
      WHERE ${filters.join(" AND ")}
@@ -624,9 +707,11 @@ function isProviderBlock(reason: TranscriptFailureReason): boolean {
     || reason === "rate_limited";
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+async function runBackfillTranscripts(argv: readonly string[], owner: BackfillInvocationOwner): Promise<void> {
   loadEnv();
-  const args = parseBackfillTranscriptsArgs(argv);
+  const args = parseBackfillTranscriptsArgs([...argv]);
+  assertBackfillWriteAuthority(args, owner);
+  if (owner === "workplane" && args.forceTargetedRetry) assertHhTargetedRecoveryYtDlpEnv();
   let releaseLock: (() => void) | null = null;
   try {
     releaseLock = acquireLock(args.lockFile);
@@ -677,7 +762,25 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           }
 
           failed++;
-          await markTranscriptFailure(video.id, transcript.failure, args.write);
+          const failureApplied = await markTranscriptFailure(video, transcript.failure, args.write);
+          if (args.write && !failureApplied) {
+            audit(args, {
+              record_type: "transcript_backfill",
+              ts: timestamp(),
+              mode: "WRITE",
+              status: "mutation_conflict",
+              reason: "concurrent_row_change",
+              video_id: video.id,
+              creator_id: video.creator_id,
+              youtube_video_id: video.youtube_video_id,
+              previous_transcript_status: video.transcript_status,
+              previous_transcript_error: video.transcript_error,
+              previous_transcript_attempts: video.transcript_attempts,
+              previous_transcript_last_attempt_at: video.transcript_last_attempt_at,
+            });
+            console.error(`[${timestamp()}] mutation-conflict ${video.youtube_video_id}: row changed after selection`);
+            continue;
+          }
           audit(args, {
             record_type: "transcript_backfill",
             ts: timestamp(),
@@ -689,6 +792,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
             creator_id: video.creator_id,
             youtube_video_id: video.youtube_video_id,
             creator: video.youtube_handle,
+            previous_transcript_status: video.transcript_status,
+            previous_transcript_error: video.transcript_error,
+            previous_transcript_attempts: video.transcript_attempts,
+            previous_transcript_last_attempt_at: video.transcript_last_attempt_at,
           });
           console.log(`[${timestamp()}] ${transcript.failure.status} ${video.youtube_video_id} ${video.creator_name} reason=${transcript.failure.reason}`);
           if (args.stopOnProviderBlock && isProviderBlock(transcript.failure.reason)) providerBlocked = true;
@@ -696,15 +803,40 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         }
 
         if (args.write) {
-          await query(
+          const updatedRows = await query<{ id: number }>(
             `UPDATE videos
              SET transcript = $1, transcript_quality = $2, calls_extracted = false,
                  transcript_status = 'available', transcript_provider = $4, transcript_error = NULL,
                  transcript_attempts = COALESCE(transcript_attempts, 0) + 1,
                  transcript_last_attempt_at = NOW()
-             WHERE id = $3 AND (transcript IS NULL OR length(transcript) = 0)`,
-            [transcript.transcript.text, transcript.transcript.quality, video.id, transcript.transcript.source],
+             WHERE id = $3
+               AND transcript_status IS NOT DISTINCT FROM $5
+               AND transcript_error IS NOT DISTINCT FROM $6
+               AND transcript_attempts IS NOT DISTINCT FROM $7
+               AND transcript_last_attempt_at IS NOT DISTINCT FROM $8::timestamptz
+               AND (transcript IS NULL OR length(transcript) = 0)
+             RETURNING id`,
+            [transcript.transcript.text, transcript.transcript.quality, video.id, transcript.transcript.source, video.transcript_status, video.transcript_error, video.transcript_attempts, video.transcript_last_attempt_at],
           );
+          if (updatedRows.length !== 1) {
+            failed++;
+            audit(args, {
+              record_type: "transcript_backfill",
+              ts: timestamp(),
+              mode: "WRITE",
+              status: "mutation_conflict",
+              reason: "concurrent_row_change",
+              video_id: video.id,
+              creator_id: video.creator_id,
+              youtube_video_id: video.youtube_video_id,
+              previous_transcript_status: video.transcript_status,
+              previous_transcript_error: video.transcript_error,
+              previous_transcript_attempts: video.transcript_attempts,
+              previous_transcript_last_attempt_at: video.transcript_last_attempt_at,
+            });
+            console.error(`[${timestamp()}] mutation-conflict ${video.youtube_video_id}: row changed after selection`);
+            continue;
+          }
         }
         written++;
         audit(args, {
@@ -720,6 +852,10 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           transcript_quality: transcript.transcript.quality,
           source: transcript.transcript.source,
           detail: transcript.transcript.detail,
+          previous_transcript_status: video.transcript_status,
+          previous_transcript_error: video.transcript_error,
+          previous_transcript_attempts: video.transcript_attempts,
+          previous_transcript_last_attempt_at: video.transcript_last_attempt_at,
         });
         console.log(`[${timestamp()}] ${args.write ? "updated" : "would-update"} ${video.youtube_video_id} source=${transcript.transcript.source} chars=${transcript.transcript.text.length}`);
       }
@@ -735,6 +871,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   } finally {
     releaseLock?.();
   }
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  return runBackfillTranscripts(argv, "cli");
+}
+
+export async function runTargetedTranscriptRecoveryFromWorkplane(argv: readonly string[]): Promise<void> {
+  return runBackfillTranscripts(argv, "workplane");
 }
 
 if (require.main === module) {
