@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, lstatSync, mkdirSync, mkdtempSync, openSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -161,7 +162,7 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
     throw new Error("--force-targeted-retry requires --youtube-video-ids");
   }
   return {
-    runId: argValue(argv, "--run-id") ?? `transcript-backfill-${Date.now()}-${process.pid}`,
+    runId: argValue(argv, "--run-id") ?? `transcript-backfill-${Date.now()}-${process.pid}-${randomUUID()}`,
     creator: argValue(argv, "--creator"),
     youtubeVideoIds: targetedVideoIds,
     forceTargetedRetry,

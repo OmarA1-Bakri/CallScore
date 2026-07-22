@@ -253,4 +253,16 @@ The superseding remediation:
 
 Current parent evidence: TypeScript passed; focused suite `94/94`; full suite `1441/1441`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
 
+Acceptance for that tuple failed: `deleg_7ffa5622` returned specification `PASS`, security/governance `PASS`, and implementation `FAIL` against `951651c511e45c67b8c216c8ebaf0aac1b5f0230`.
+
+## Ninth review cycle and collision-resistant implicit IDs
+
+The final implementation blocker was that the safe implicit `transcript-backfill-<epoch>-<pid>` ID could collide when generated more than once within the same millisecond in one process.
+
+The superseding remediation appends a `randomUUID()` nonce while remaining under the 96-character safe-ID ceiling, and a RED→GREEN regression generates 1,000 IDs in-process and requires all to be safe and unique.
+
+A second, changed snapshot of the unrelated concurrent `leaderboard-sentinel-v2*` tests appeared during verification. It was preserved unchanged in stash `b70db2dc5ed4e9cbd6551f77ef8fbe7f4df53b93`; neither concurrent snapshot is included in this change.
+
+Current parent evidence: TypeScript passed; focused suite `94/94`; full suite `1441/1441`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
+
 Acceptance requires a new immutable commit and three fresh exact-tuple verdicts. All earlier verdicts remain superseded.
