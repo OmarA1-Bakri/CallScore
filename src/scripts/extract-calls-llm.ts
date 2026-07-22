@@ -733,6 +733,14 @@ function appendAuditRecord(args: OpenRouterArgs, video: PendingVideo, result: Ex
   appendFileSync(args.auditOut, `${JSON.stringify(record)}\n`);
 }
 
+export function extractionRunExitCode(input: {
+  readonly videos: number;
+  readonly processed: number;
+  readonly failed: number;
+}): 0 | 1 {
+  return input.failed > 0 || input.processed !== input.videos ? 1 : 0;
+}
+
 export async function main(argv = process.argv.slice(2)): Promise<void> {
   loadEnv();
   const args = parseOpenRouterExtractionArgs(argv);
@@ -794,6 +802,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     calls: totalCalls,
     failed,
   });
+  process.exitCode = extractionRunExitCode({ videos: videos.length, processed, failed });
 }
 
 if (require.main === module) {
