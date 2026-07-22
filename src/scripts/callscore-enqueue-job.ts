@@ -4,7 +4,7 @@ import { getWorkplaneJobSpec, isWorkplaneJobType, type WorkplaneJobType } from "
 type JobName = "candles" | "match" | "scores" | "ml" | "workplane";
 type Mode = "schedule" | "probe";
 
-type Args = {
+export type Args = {
   job?: JobName;
   mode: Mode;
   symbols?: string[];
@@ -13,6 +13,7 @@ type Args = {
   matchBatchSize?: number;
   mlBatchSize?: number;
   workplaneType?: WorkplaneJobType;
+  youtubeVideoIds?: string[];
   limit?: number;
   browser?: string;
   sinceDays?: number;
@@ -30,6 +31,7 @@ Options:
   --match-batch-size N           match only; default 200 schedule, 10 probe
   --ml-batch-size N              ml only; default 250 schedule, 1 probe
   --workplane-type TYPE          workplane only; required, e.g. transcript_collect_laptop
+  --youtube-video-ids IDS        transcript_recover_hh only; comma-separated 1-9 exact 11-character IDs
   --limit N                      workplane transcript only; max 5 without --allow-large-batch
   --allow-large-batch            workplane transcript only; allows limit >5 (up to spec.max_batch_size)
   --browser VALUE                workplane transcript only; default firefox
@@ -53,7 +55,15 @@ function positiveInt(raw: string | undefined, name: string): number | undefined 
   return value;
 }
 
-function parseArgs(argv: string[]): Args {
+function parseYoutubeVideoIds(raw: string): string[] {
+  const ids = raw.split(",").map((value) => value.trim()).filter(Boolean);
+  if (ids.length === 0 || ids.length > 9) throw new Error("--youtube-video-ids requires 1 to at most 9 exact IDs");
+  if (ids.some((id) => !/^[A-Za-z0-9_-]{11}$/.test(id))) throw new Error("--youtube-video-ids values must be exact 11-character YouTube IDs");
+  if (new Set(ids).size !== ids.length) throw new Error("--youtube-video-ids values must be unique");
+  return ids;
+}
+
+export function parseEnqueueJobArgs(argv: string[]): Args {
   const args: Args = { mode: "schedule", queuedBy: "local-hh-scheduler" };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -96,6 +106,9 @@ function parseArgs(argv: string[]): Args {
         args.workplaneType = type;
         break;
       }
+      case "--youtube-video-ids":
+        args.youtubeVideoIds = parseYoutubeVideoIds(next());
+        break;
       case "--limit":
         args.limit = positiveInt(next(), "--limit");
         break;
@@ -122,10 +135,35 @@ function parseArgs(argv: string[]): Args {
   if (!args.job) usage();
   if (args.job === "workplane" && !args.workplaneType) usage();
   if (args.job !== "workplane" && args.workplaneType) usage();
-  if (args.limit && args.limit > 5 && !args.allowLargeBatch) {
+  if (args.youtubeVideoIds && args.workplaneType !== "transcript_recover_hh") {
+    throw new Error("--youtube-video-ids is only valid with --workplane-type transcript_recover_hh");
+  }
+  if (args.workplaneType === "transcript_recover_hh" && !args.youtubeVideoIds) {
+    throw new Error("transcript_recover_hh requires --youtube-video-ids");
+  }
+  if (args.limit && args.youtubeVideoIds && args.limit !== args.youtubeVideoIds.length) {
+    throw new Error("--limit must equal the exact --youtube-video-ids count");
+  }
+  if (args.limit && args.limit > 5 && !args.allowLargeBatch && args.workplaneType !== "transcript_recover_hh") {
     throw new Error("--limit >5 requires --allow-large-batch");
   }
   return args;
+}
+
+export function buildTranscriptRecoveryEnqueuePayload(args: Args, runId: string): Record<string, unknown> {
+  if (args.workplaneType !== "transcript_recover_hh") throw new Error("transcript recovery payload requires workplane type transcript_recover_hh");
+  const ids = args.youtubeVideoIds;
+  if (!ids || ids.length === 0 || ids.length > 9) throw new Error("transcript recovery payload requires 1 to at most 9 exact IDs");
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/.test(runId)) throw new Error("transcript recovery run id is outside the safe identifier allowlist");
+  return {
+    youtube_video_ids: ids,
+    limit: ids.length,
+    method: "hh_ytdlp_ejs_wpc",
+    force_targeted_retry: true,
+    continue_after_provider_block: false,
+    write: true,
+    run_id: runId,
+  };
 }
 
 function dayKey(now = new Date()): string {
@@ -148,7 +186,7 @@ function scheduledKey(prefix: string, cadence: "daily" | "quarter-hour"): string
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseEnqueueJobArgs(process.argv.slice(2));
   if (process.env.DATABASE_PROVIDER !== "postgres") {
     throw new Error("DATABASE_PROVIDER must be set to postgres for local HH scheduler enqueue");
   }
@@ -236,7 +274,12 @@ async function main() {
               write_result_to_hh: true,
               workplane_claim: true,
             }
-          : {};
+          : workplaneType === "transcript_recover_hh"
+            ? buildTranscriptRecoveryEnqueuePayload(
+                args,
+                `transcript-recover-hh-${new Date().toISOString().replace(/[:.]/g, "-")}`,
+              )
+            : {};
         return {
           runType: `workplane-${workplaneType}`,
           jobType: workplaneType,
@@ -275,7 +318,9 @@ async function main() {
   }));
 }
 
-main().catch((error) => {
-  console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    process.exit(1);
+  });
+}
