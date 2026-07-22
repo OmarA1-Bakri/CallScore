@@ -176,12 +176,16 @@ test("active O13 shell wrappers enter operating goals before legacy implementati
 test("installed O13 systemd entrypoints use graph wrappers or canonical compose workers", { skip: !existsSync("/etc/systemd/system/callscore-control-plane-canary.service") }, () => {
   const canary = readAbsolute("/etc/systemd/system/callscore-control-plane-canary.service");
   const dailyDropIn = readAbsolute("/etc/systemd/system/callscore-daily-pipeline.service.d/o13-operating-graph.conf");
-  const worker = readAbsolute("/etc/systemd/system/hermes-worker.service");
+  const installedWorker = readAbsolute("/etc/systemd/system/hermes-worker.service");
+  const sourceWorker = read("ops/systemd/hermes-worker.service");
 
   assert.match(canary, /ExecStart=\/usr\/bin\/npm run operating:goal -- --goal monitor --read-live --max-items 1/);
   assert.match(dailyDropIn, /ExecStart=\s*\nExecStart=\/srv\/agents\/hermes\/scripts\/callscore-daily-pipeline-operating\.sh/);
-  assert.match(worker, /ExecStart=\/usr\/bin\/docker compose up -d hermes-worker/);
-  assert.doesNotMatch(worker, /data-pipeline-continuous/);
+  for (const worker of [sourceWorker, installedWorker]) {
+    assert.match(worker, /ExecStart=\/usr\/bin\/docker compose -p crypto-tuber-ranked up -d --no-deps hermes-worker/);
+    assert.match(worker, /ExecStop=\/usr\/bin\/docker compose -p crypto-tuber-ranked stop hermes-worker/);
+    assert.doesNotMatch(worker, /docker compose down/);
+  }
 });
 
 test("agent heartbeat does not enqueue duplicate open channel tasks", () => {

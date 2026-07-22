@@ -8,8 +8,8 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=/opt/crypto-tuber-ranked
 RemainAfterExit=yes
-ExecStart=/usr/bin/docker compose up -d hermes-worker
-ExecStop=/usr/bin/docker compose down
+ExecStart=/usr/bin/docker compose -p crypto-tuber-ranked up -d --no-deps hermes-worker
+ExecStop=/usr/bin/docker compose -p crypto-tuber-ranked stop hermes-worker
 TimeoutStartSec=0
 
 [Install]
