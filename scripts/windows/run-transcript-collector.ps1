@@ -48,7 +48,8 @@ function Invoke-TransportCommand([string]$Program, [string[]]$ProgramArgs) {
 
 function Convert-LocalPathForSshTransport([string]$Path) {
   if ($SshTransport -ne "wsl" -or -not $Path) { return $Path }
-  $converted = (& wsl.exe -d $WslDistro -u $WslUser -- wslpath -a $Path 2>&1 | Out-String).Trim()
+  $normalizedPath = $Path.Replace("\", "/")
+  $converted = (& wsl.exe -d $WslDistro -u $WslUser -- wslpath -a $normalizedPath 2>&1 | Out-String).Trim()
   if ($LASTEXITCODE -ne 0 -or -not $converted) {
     throw "wslpath_failed transport=$SshTransport"
   }

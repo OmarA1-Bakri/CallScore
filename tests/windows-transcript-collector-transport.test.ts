@@ -8,4 +8,6 @@ test("Windows transcript collector never shadows PowerShell automatic $args and 
   assert.doesNotMatch(source, /\[string\[\]\]\$Args\b/i);
   assert.match(source, /function Invoke-TransportCommand\(\[string\]\$Program, \[string\[\]\]\$ProgramArgs\)/);
   assert.match(source, /-- \$Program @ProgramArgs/);
+  assert.equal(source.includes('$normalizedPath = $Path.Replace("\\", "/")'), true);
+  assert.match(source, /wslpath -a \$normalizedPath/);
 });
