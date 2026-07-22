@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
-const SCRIPT = "/opt/crypto-tuber-ranked/scripts/callscore-daily-orchestrator.sh";
+const SCRIPT = resolve(process.cwd(), "scripts", "callscore-daily-orchestrator.sh");
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "callscore-fair-scheduler-"));
@@ -23,7 +23,12 @@ function fixture() {
       channel,
       profile: "callscore",
       priority: 100,
-      tasks: [{ id: `${channel}-task`, prompt: `${channel} read only`, max_duration_seconds: 30 }],
+      tasks: [{
+        id: `${channel}-task`,
+        prompt: `${channel} read only`,
+        max_duration_seconds: 30,
+        ...(channel === "sentinel" ? { runner: "sentinel_v2" } : {}),
+      }],
     })),
   };
   writeFileSync(join(runtime, "tasklists", "current.tasklist"), `${JSON.stringify(tasklist)}\n`);
@@ -73,7 +78,7 @@ test("summary reports unique current-tasklist completion instead of cumulative c
   assert.equal(Object.hasOwn(summary, "tasks_completed"), false);
 });
 
-test("provider cooldown blocks a scheduler pulse instead of hammering a rate-limited model", () => {
+test("provider cooldown dispatches deterministic Sentinel locally without hammering model runners", () => {
   const { root, runtime, fakeBin } = fixture();
   mkdirSync(join(runtime, "state"), { recursive: true });
   writeFileSync(join(runtime, "state", "provider-cooldown.json"), JSON.stringify({
@@ -84,7 +89,10 @@ test("provider cooldown blocks a scheduler pulse instead of hammering a rate-lim
   run(runtime, fakeBin, root);
   const receiptName = readdirSync(join(runtime, "scheduler-receipts"))[0];
   const receipt = JSON.parse(readFileSync(join(runtime, "scheduler-receipts", receiptName), "utf8"));
-  assert.equal(receipt.status, "blocked_provider_cooldown");
-  assert.deepEqual(receipt.channels_dispatched, []);
+  assert.equal(receipt.status, "degraded_provider_cooldown_local_only");
+  assert.deepEqual(receipt.channels_dispatched, ["sentinel"]);
   assert.equal(receipt.next_cursor, 0);
+  const activeName = readdirSync(join(runtime, "active"))[0];
+  const activeTask = JSON.parse(readFileSync(join(runtime, "active", activeName), "utf8"));
+  assert.equal(activeTask.runner, "sentinel_v2");
 });

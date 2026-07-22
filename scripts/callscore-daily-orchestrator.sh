@@ -87,41 +87,6 @@ try:
 except Exception:
     cooldown = {}
     cooldown_active = False
-if cooldown_active:
-    new_state = {
-        "schema": "callscore.channel_head_scheduler_state.v1",
-        "tasklist_id": tasklist_id,
-        "next_cursor": cursor,
-        "pulse_sequence": sequence,
-        "last_pulse_at_utc": now,
-        "last_channels_dispatched": [],
-        "provider_cooldown_until_utc": cooldown.get("until_utc"),
-    }
-    tmp_state = state_path.with_suffix(".tmp")
-    tmp_state.write_text(json.dumps(new_state, indent=2, sort_keys=True) + "\n")
-    tmp_state.replace(state_path)
-    pulse = {
-        "schema": "callscore.channel_head_scheduler_pulse_receipt.v1",
-        "pulse_id": f"scheduler-{stamp}-p{sequence:06d}",
-        "created_at_utc": now,
-        "tasklist_id": tasklist_id,
-        "requested_max_active_channels": requested,
-        "effective_max_active_channels": max_active,
-        "active_before": [],
-        "channels_dispatched": [],
-        "run_ids": [],
-        "spawn_failures": [],
-        "next_cursor": cursor,
-        "status": "blocked_provider_cooldown",
-        "blockers": [str(cooldown.get("reason") or "provider_cooldown_active")],
-        "cooldown_until_utc": cooldown.get("until_utc"),
-    }
-    receipt_path = runtime / "scheduler-receipts" / f"{stamp}-p{sequence:06d}.json"
-    receipt_path.write_text(json.dumps(pulse, indent=2, sort_keys=True) + "\n")
-    with (runtime / "logs" / "orchestrator.log").open("a") as log:
-        log.write(json.dumps(pulse, sort_keys=True) + "\n")
-    print(json.dumps(pulse, sort_keys=True))
-    raise SystemExit(0)
 
 tmux = shutil.which("tmux")
 if not tmux:
@@ -150,6 +115,9 @@ for step in range(count):
     if not tasks:
         continue
     task = tasks[0]
+    runner = str(task.get("runner") or channel_cfg.get("runner") or "hermes")
+    if cooldown_active and runner != "sentinel_v2":
+        continue
     task_id = str(task.get("id") or f"{channel}-task")
     run_id = f"{channel}-{stamp}-p{sequence:06d}-{task_id}"
     pulse_id = f"scheduler-{stamp}-p{sequence:06d}"
@@ -162,6 +130,7 @@ for step in range(count):
         "task_id": task_id,
         "run_id": run_id,
         "profile": task.get("profile") or channel_cfg.get("profile") or "callscore",
+        "runner": runner,
         "model": task.get("model") or channel_cfg.get("model"),
         "prompt": task.get("prompt") or "",
         "max_duration_seconds": int(task.get("max_duration_seconds") or channel_cfg.get("max_duration_seconds") or 600),
@@ -191,9 +160,19 @@ new_state = {
     "last_pulse_at_utc": now,
     "last_channels_dispatched": dispatched,
 }
+if cooldown_active:
+    new_state["provider_cooldown_until_utc"] = cooldown.get("until_utc")
 tmp_state = state_path.with_suffix(".tmp")
 tmp_state.write_text(json.dumps(new_state, indent=2, sort_keys=True) + "\n")
 tmp_state.replace(state_path)
+if spawn_failures:
+    pulse_status = "degraded"
+elif cooldown_active and dispatched:
+    pulse_status = "degraded_provider_cooldown_local_only"
+elif cooldown_active:
+    pulse_status = "blocked_provider_cooldown"
+else:
+    pulse_status = "ok"
 pulse = {
     "schema": "callscore.channel_head_scheduler_pulse_receipt.v1",
     "pulse_id": f"scheduler-{stamp}-p{sequence:06d}",
@@ -206,8 +185,11 @@ pulse = {
     "run_ids": run_ids,
     "spawn_failures": spawn_failures,
     "next_cursor": next_cursor,
-    "status": "ok" if not spawn_failures else "degraded",
+    "status": pulse_status,
 }
+if cooldown_active:
+    pulse["blockers"] = [str(cooldown.get("reason") or "provider_cooldown_active")]
+    pulse["cooldown_until_utc"] = cooldown.get("until_utc")
 receipt_path = runtime / "scheduler-receipts" / f"{stamp}-p{sequence:06d}.json"
 receipt_path.write_text(json.dumps(pulse, indent=2, sort_keys=True) + "\n")
 with (runtime / "logs" / "orchestrator.log").open("a") as log:
