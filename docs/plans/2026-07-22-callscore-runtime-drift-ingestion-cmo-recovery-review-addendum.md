@@ -177,4 +177,25 @@ The superseding remediation:
 
 Current parent candidate evidence after this remediation: TypeScript passed; focused suite `89/89`; full suite `1441/1441`; both transactional mutation statements planned successfully against the live PostgreSQL schema with `EXPLAIN` and `executed:false`; effective Compose configuration shows the exact pinned runtime and zero cookie mounts; Dockerfile build check passed without warnings; Workplane `OK`; freshness `PASS`; canonical agent audit `51/51`; secret hygiene passed.
 
-Acceptance requires a new commit and a new three-review batch against that exact commit/tree. All earlier verdicts remain superseded.
+Acceptance for that tuple failed: `deleg_42804eb3` returned implementation `PASS`, specification `FAIL`, and security/governance `FAIL` against `977975655aadbee39c8495f1253c8461be293599`.
+
+## Fifth review cycle and durable lease-bound replay evidence
+
+The valid blockers from `deleg_42804eb3` were:
+
+1. recovered mutation truth existed only in the replay return object, not the persisted replay receipt;
+2. mutation SQL checked running job ID/type but not the executing worker identity or a live lease;
+3. malformed non-object entries in a mixed DB journal were silently filtered;
+4. partial original-receipt validation accepted only matching `run_id` plus any string result rather than the complete receipt shape/result enum.
+
+The superseding remediation:
+
+- extends the workflow receipt schema with bounded optional `evidence` and persists production DB-write truth, distinct mutated-row count and sanitized transactional-journal records in replay, blocked-partial and normal recovery receipts;
+- passes the claimed job’s `locked_by` identity into the writer and requires the same worker plus `lease_expires_at > NOW()` in both atomic mutation CTE owner predicates;
+- rejects the entire DB mutation journal when any entry is non-object or lacks valid run ID, 11-character video ID, status or `db_write_performed=true`;
+- validates complete workflow receipt structure, timestamps, workflow identity, blockers, approval evidence, next action, finite result enum and the current mutation-evidence block before suppressing journal recovery; a legacy receipt without durable mutation evidence is partial under the current contract;
+- keeps non-`EEXIST` audit failures and journal-read/schema failures fail-closed, and never overwrites the original receipt.
+
+Current parent evidence: TypeScript passed; focused suite `89/89`; full suite `1441/1441`; both worker/lease-fenced mutation statements planned against the live PostgreSQL schema with `EXPLAIN` and `executed:false`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
+
+Acceptance requires a new immutable commit and three fresh exact-tuple verdicts. All earlier verdicts remain superseded.

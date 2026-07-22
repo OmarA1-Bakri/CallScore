@@ -15,6 +15,7 @@ export interface WorkflowReceipt {
   readonly blockers: readonly string[];
   readonly approval_evidence: string | null;
   readonly next_action: string;
+  readonly evidence?: Record<string, unknown>;
 }
 
 export interface WorkflowReceiptWriteResult {
@@ -48,6 +49,24 @@ export function buildWorkflowReceiptPath(receipt: Pick<WorkflowReceipt, "workflo
   const out = resolve(join(base, workflow, `${runId}.json`));
   if (!out.startsWith(`${base}/`) && out !== base) throw new Error("receipt path escapes root");
   return out;
+}
+
+const WORKFLOW_RESULTS = new Set<WorkflowReceiptResult>(["passed", "failed", "blocked", "skipped"]);
+
+export function isWorkflowReceipt(value: unknown): value is WorkflowReceipt {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const receipt = value as Record<string, unknown>;
+  if (typeof receipt.run_id !== "string" || !receipt.run_id.trim()) return false;
+  if (typeof receipt.workflow_name !== "string" || !receipt.workflow_name.trim()) return false;
+  if (typeof receipt.started_at !== "string" || !Number.isFinite(Date.parse(receipt.started_at))) return false;
+  if (typeof receipt.finished_at !== "string" || !Number.isFinite(Date.parse(receipt.finished_at))) return false;
+  if (typeof receipt.command !== "string") return false;
+  if (typeof receipt.result !== "string" || !WORKFLOW_RESULTS.has(receipt.result as WorkflowReceiptResult)) return false;
+  if (!Array.isArray(receipt.blockers) || !receipt.blockers.every((item) => typeof item === "string")) return false;
+  if (receipt.approval_evidence !== null && typeof receipt.approval_evidence !== "string") return false;
+  if (typeof receipt.next_action !== "string") return false;
+  if (receipt.evidence !== undefined && (!receipt.evidence || typeof receipt.evidence !== "object" || Array.isArray(receipt.evidence))) return false;
+  return true;
 }
 
 export function enforceWorkflowApprovalGate(receipt: WorkflowReceipt): WorkflowReceipt {

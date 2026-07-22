@@ -12,10 +12,12 @@ import {
   evaluateArtOfWarCampaignWithLocalModel,
   getWorkplaneJobSpec,
   mergeTranscriptRecoveryEvidence,
+  buildTranscriptRecoveryReplayEvidence,
   readTranscriptRecoveryAudit,
   runWorkplaneJob,
   summarizeTranscriptRecoveryRecords,
   transcriptRecoveryJournalMutationCount,
+  validateTranscriptRecoveryMutationJournal,
   workflowReceiptIsValidForRun,
 } from "../src/lib/workplane-jobs";
 import { PipelineDispatchJobTypeSchema } from "../src/lib/workplane/operating-graph-schemas";
@@ -315,6 +317,15 @@ test("transcript recovery merges transactional DB journal evidence without doubl
     evidence_source: "pipeline_job_transaction_journal",
   }];
   const journalOnly = mergeTranscriptRecoveryEvidence([], journal);
+  assert.throws(
+    () => validateTranscriptRecoveryMutationJournal([journal[0], "malformed"]),
+    /mutation journal record is malformed/,
+  );
+  assert.deepEqual(validateTranscriptRecoveryMutationJournal(journal), journal);
+  const replayEvidence = buildTranscriptRecoveryReplayEvidence(journal, ["VCbmPx1l7AU"], "run-current", false);
+  assert.equal(replayEvidence.production_db_writes_performed, true);
+  assert.equal(replayEvidence.db_rows_mutated, 1);
+  assert.equal(replayEvidence.recovered_from_transactional_journal, true);
   assert.equal(transcriptRecoveryJournalMutationCount([
     ...journal,
     ...journal,
@@ -342,9 +353,30 @@ test("transcript recovery replay preserves the original workflow receipt", async
   const receiptPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.json`;
   mkdirSync(dirname(auditPath), { recursive: true });
   writeFileSync(auditPath, "", { mode: 0o600 });
-  const originalReceipt = JSON.stringify({ run_id: runId, result: "passed", original: true });
+  const originalReceiptObject = {
+    run_id: runId,
+    workflow_name: "transcript_recover_hh",
+    started_at: "2026-07-22T00:00:00.000Z",
+    finished_at: "2026-07-22T00:00:01.000Z",
+    command: "bounded recovery",
+    result: "passed",
+    blockers: [],
+    approval_evidence: null,
+    next_action: "none",
+  };
+  writeFileSync(receiptPath, JSON.stringify(originalReceiptObject));
+  assert.equal(workflowReceiptIsValidForRun(receiptPath, runId), false);
+  const originalReceipt = JSON.stringify({
+    ...originalReceiptObject,
+    evidence: {
+      production_db_writes_performed: false,
+      db_rows_mutated: 0,
+      recovered_from_transactional_journal: false,
+      journal_records: [],
+    },
+  });
   const partialReceiptPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.partial.json`;
-  writeFileSync(partialReceiptPath, "{");
+  writeFileSync(partialReceiptPath, JSON.stringify({ run_id: runId, result: "not-a-result" }));
   assert.equal(workflowReceiptIsValidForRun(partialReceiptPath, runId), false);
   writeFileSync(receiptPath, originalReceipt);
   assert.equal(workflowReceiptIsValidForRun(receiptPath, runId), true);
@@ -359,6 +391,13 @@ test("transcript recovery replay preserves the original workflow receipt", async
   assert.equal(result.original_receipt_valid, true);
   assert.equal(result.original_receipt_overwritten, false);
   assert.notEqual(result.receipt_path, receiptPath);
+  const replayReceipt = JSON.parse(readFileSync(String(result.receipt_path), "utf8"));
+  assert.deepEqual(replayReceipt.evidence, {
+    production_db_writes_performed: false,
+    db_rows_mutated: 0,
+    recovered_from_transactional_journal: false,
+    journal_records: [],
+  });
   rmSync(auditPath, { force: true });
   rmSync(receiptPath, { force: true });
   rmSync(partialReceiptPath, { force: true });

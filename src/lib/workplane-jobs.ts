@@ -2,7 +2,7 @@ import type { PipelineJob } from "./pipeline";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { buildRunId } from "./shadow-extraction";
-import { writeWorkflowReceipt } from "./workflow-receipts";
+import { isWorkflowReceipt, writeWorkflowReceipt } from "./workflow-receipts";
 import { buildExtractionLoopReceipt } from "./loop-engineering";
 import { query } from "./db";
 
@@ -244,12 +244,30 @@ export function canonicalTranscriptRecoveryRunConfig(payload: Readonly<Record<st
   };
 }
 
+export function isTranscriptRecoveryMutationEvidence(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const evidence = value as Record<string, unknown>;
+  if (typeof evidence.production_db_writes_performed !== "boolean") return false;
+  if (!Number.isInteger(evidence.db_rows_mutated) || Number(evidence.db_rows_mutated) < 0) return false;
+  if (typeof evidence.recovered_from_transactional_journal !== "boolean") return false;
+  if (!Array.isArray(evidence.journal_records)) return false;
+  try {
+    const records = validateTranscriptRecoveryMutationJournal(evidence.journal_records);
+    const distinct = new Set(records.map((record) => String(record.youtube_video_id))).size;
+    return distinct === Number(evidence.db_rows_mutated)
+      && evidence.production_db_writes_performed === (distinct > 0);
+  } catch {
+    return false;
+  }
+}
+
 export function workflowReceiptIsValidForRun(path: string, runId: string): boolean {
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
-    return Boolean(parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      && (parsed as Record<string, unknown>).run_id === runId
-      && typeof (parsed as Record<string, unknown>).result === "string");
+    return isWorkflowReceipt(parsed)
+      && parsed.run_id === runId
+      && parsed.workflow_name === "transcript_recover_hh"
+      && isTranscriptRecoveryMutationEvidence(parsed.evidence);
   } catch {
     return false;
   }
@@ -294,6 +312,26 @@ export function mergeTranscriptRecoveryEvidence(
   return merged;
 }
 
+export function validateTranscriptRecoveryMutationJournal(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) throw new Error("transcript recovery mutation journal is unavailable or malformed");
+  return value.map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error("transcript recovery mutation journal record is malformed");
+    }
+    const record = entry as Record<string, unknown>;
+    if (
+      typeof record.run_id !== "string"
+      || typeof record.youtube_video_id !== "string"
+      || !/^[A-Za-z0-9_-]{11}$/.test(record.youtube_video_id)
+      || typeof record.status !== "string"
+      || record.db_write_performed !== true
+    ) {
+      throw new Error("transcript recovery mutation journal record is malformed");
+    }
+    return record;
+  });
+}
+
 async function readTranscriptRecoveryMutationJournal(jobId: number): Promise<Record<string, unknown>[]> {
   const [row] = await query<{ mutations: unknown }>(
     `SELECT COALESCE(metrics->'transcript_recovery_mutations', '[]'::jsonb) AS mutations
@@ -301,9 +339,34 @@ async function readTranscriptRecoveryMutationJournal(jobId: number): Promise<Rec
      WHERE id = $1 AND type = 'transcript_recover_hh'`,
     [jobId],
   );
-  const mutations = row?.mutations;
-  if (!Array.isArray(mutations)) throw new Error("transcript recovery mutation journal is unavailable or malformed");
-  return mutations.filter((value): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value)));
+  return validateTranscriptRecoveryMutationJournal(row?.mutations);
+}
+
+export function buildTranscriptRecoveryReplayEvidence(
+  journalRecords: readonly Record<string, unknown>[],
+  ids: readonly string[],
+  runId: string,
+  originalReceiptValid: boolean,
+): Record<string, unknown> {
+  const requested = new Set(ids);
+  const currentRecords = journalRecords
+    .filter((record) => record.run_id === runId && record.db_write_performed === true && typeof record.youtube_video_id === "string" && requested.has(record.youtube_video_id))
+    .map((record) => ({
+      run_id: runId,
+      youtube_video_id: String(record.youtube_video_id),
+      video_id: typeof record.video_id === "number" ? record.video_id : null,
+      status: typeof record.status === "string" ? record.status : "unknown",
+      reason: typeof record.reason === "string" ? record.reason : null,
+      db_write_performed: true,
+      evidence_source: "pipeline_job_transaction_journal",
+    }));
+  const dbRowsMutated = new Set(currentRecords.map((record) => record.youtube_video_id)).size;
+  return {
+    production_db_writes_performed: dbRowsMutated > 0,
+    db_rows_mutated: dbRowsMutated,
+    recovered_from_transactional_journal: !originalReceiptValid,
+    journal_records: currentRecords,
+  };
 }
 
 export function transcriptRecoveryJournalMutationCount(
@@ -943,7 +1006,15 @@ export function workplaneSpecsForStatus(): readonly WorkplaneJobSpec[] {
   return WORKPLANE_JOB_TYPES.map((type) => WORKPLANE_JOB_SPECS[type]);
 }
 
-function writeWorkplaneReceipt(job: PipelineJob, spec: WorkplaneJobSpec, runId: string, result: "passed" | "failed" | "blocked" | "skipped", blockers: readonly string[], nextAction: string): string {
+function writeWorkplaneReceipt(
+  job: PipelineJob,
+  spec: WorkplaneJobSpec,
+  runId: string,
+  result: "passed" | "failed" | "blocked" | "skipped",
+  blockers: readonly string[],
+  nextAction: string,
+  evidence?: Record<string, unknown>,
+): string {
   return writeWorkflowReceipt({
     run_id: runId,
     workflow_name: job.type,
@@ -954,6 +1025,7 @@ function writeWorkplaneReceipt(job: PipelineJob, spec: WorkplaneJobSpec, runId: 
     blockers,
     approval_evidence: typeof job.payload?.approval_evidence === "string" ? job.payload.approval_evidence : null,
     next_action: nextAction,
+    ...(evidence ? { evidence } : {}),
   }).path;
 }
 
@@ -1147,7 +1219,9 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
       const replayJournalRecords = originalReceiptValid ? [] : await readTranscriptRecoveryMutationJournal(job.id);
       const replayRecords = mergeTranscriptRecoveryEvidence(replayAuditRecords, replayJournalRecords);
       const replaySummary = summarizeTranscriptRecoveryRecords(replayRecords, write, ids, runId);
-      const currentJobMutationCount = transcriptRecoveryJournalMutationCount(replayJournalRecords, ids, runId);
+      const replayEvidence = buildTranscriptRecoveryReplayEvidence(replayJournalRecords, ids, runId, originalReceiptValid);
+      const replayBlockers = [...new Set([blocker, ...replaySummary.blockers])];
+      const currentJobMutationCount = Number(replayEvidence.db_rows_mutated);
       return {
         mode: write ? "targeted_write" : "targeted_dry_run",
         execution_location: spec.execution_location,
@@ -1156,10 +1230,10 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
         selected_records: replayRecords.length,
         succeeded: replaySummary.succeeded.length,
         failed: replaySummary.failed.length,
-        blockers: [...new Set([blocker, ...replaySummary.blockers])],
+        blockers: replayBlockers,
         production_db_writes_performed: currentJobMutationCount > 0,
         db_rows_mutated: currentJobMutationCount,
-        receipt_path: writeWorkplaneReceipt(job, spec, `${runId}-replay-${job.id}`, "blocked", [blocker], "choose a fresh run_id; original audit and workflow receipt evidence are never overwritten"),
+        receipt_path: writeWorkplaneReceipt(job, spec, `${runId}-replay-${job.id}`, "blocked", replayBlockers, "choose a fresh run_id; original audit and workflow receipt evidence are never overwritten", replayEvidence),
         original_receipt_present: originalReceiptPresent,
         original_receipt_valid: originalReceiptValid,
         original_receipt_overwritten: false,
@@ -1170,6 +1244,7 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
       await runTargetedTranscriptRecoveryFromWorkplane([
         "--run-id", runId,
         "--workplane-job-id", String(job.id),
+        "--workplane-worker-id", job.locked_by ?? "",
         "--methods", "hh_ytdlp_ejs_wpc",
         "--youtube-video-ids", ids.join(","),
         "--limit", String(ids.length),
@@ -1184,6 +1259,7 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
       const journalRecords = await readTranscriptRecoveryMutationJournal(job.id);
       const partialRecords = mergeTranscriptRecoveryEvidence(partialAuditRecords, journalRecords);
       const partialSummary = summarizeTranscriptRecoveryRecords(partialRecords, write, ids, runId);
+      const partialEvidence = buildTranscriptRecoveryReplayEvidence(journalRecords, ids, runId, false);
       const blocker = partialRecords.length === 0 ? "runtime_preflight_failed" : "runtime_execution_failed";
       return {
         mode: write ? "targeted_write" : "targeted_dry_run",
@@ -1200,7 +1276,7 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
         db_rows_mutated: partialSummary.db_rows_mutated,
         production_call_writes_allowed: false,
         public_ranking_impact_allowed: false,
-        receipt_path: writeWorkplaneReceipt(job, spec, runId, "blocked", [...new Set([blocker, ...partialSummary.blockers])], "repair canonical worker runtime/configuration; do not bypass Workplane"),
+        receipt_path: writeWorkplaneReceipt(job, spec, runId, "blocked", [...new Set([blocker, ...partialSummary.blockers])], "repair canonical worker runtime/configuration; do not bypass Workplane", partialEvidence),
       };
     }
 
@@ -1208,6 +1284,7 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
     const journalRecords = await readTranscriptRecoveryMutationJournal(job.id);
     const records = mergeTranscriptRecoveryEvidence(auditRecords, journalRecords);
     const summary = summarizeTranscriptRecoveryRecords(records, write, ids, runId);
+    const normalEvidence = buildTranscriptRecoveryReplayEvidence(journalRecords, ids, runId, false);
     const { succeeded, failed, blockers, result } = summary;
     const receiptPath = writeWorkplaneReceipt(
       job,
@@ -1216,6 +1293,7 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
       result,
       blockers,
       result === "passed" ? "verify transcript rows and continue downstream extraction" : "hold broad retries; inspect exact failure classes and provider health",
+      normalEvidence,
     );
     return {
       mode: write ? "targeted_write" : "targeted_dry_run",

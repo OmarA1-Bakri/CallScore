@@ -82,16 +82,27 @@ test("exact-ID transcript writes are owned by the Workplane recovery job", () =>
     "--youtube-video-ids", "VCbmPx1l7AU",
     "--force-targeted-retry",
     "--workplane-job-id", "6632",
+    "--workplane-worker-id", "worker-final-review",
     "--methods", "hh_ytdlp_ejs_wpc",
     "--write",
     "--limit", "1",
   ]);
   assert.throws(() => assertBackfillWriteAuthority(forcedArgs, "cli"), /transcript_recover_hh Workplane ownership/);
   assert.doesNotThrow(() => assertBackfillWriteAuthority(forcedArgs, "workplane"));
+  const missingWorkerFence = parseBackfillTranscriptsArgs([
+    "--youtube-video-ids", "VCbmPx1l7AU",
+    "--force-targeted-retry",
+    "--workplane-job-id", "6632",
+    "--methods", "hh_ytdlp_ejs_wpc",
+    "--write",
+    "--limit", "1",
+  ]);
+  assert.throws(() => assertBackfillWriteAuthority(missingWorkerFence, "workplane"), /worker identity/);
 
   const exactWriteWithoutForce = parseBackfillTranscriptsArgs([
     "--youtube-video-ids", "VCbmPx1l7AU",
     "--workplane-job-id", "6632",
+    "--workplane-worker-id", "worker-final-review",
     "--methods", "hh_ytdlp_ejs_wpc",
     "--write",
     "--limit", "1",
@@ -104,6 +115,7 @@ test("exact-ID transcript writes are owned by the Workplane recovery job", () =>
     "--youtube-video-ids", tenIds,
     "--force-targeted-retry",
     "--workplane-job-id", "6632",
+    "--workplane-worker-id", "worker-final-review",
     "--methods", "hh_ytdlp_ejs_wpc",
     "--write",
     "--limit", "10",
@@ -115,7 +127,9 @@ test("exact-ID transcript writes are owned by the Workplane recovery job", () =>
 test("Workplane transcript mutations journal in the same SQL statement as the row update", () => {
   for (const sql of [JOURNALED_TRANSCRIPT_FAILURE_SQL, JOURNALED_TRANSCRIPT_SUCCESS_SQL]) {
     assert.match(sql, /WITH owner AS/i);
-    assert.match(sql, /type = 'transcript_recover_hh' AND status = 'running'/);
+    assert.match(sql, /type = 'transcript_recover_hh'[\s\S]*status = 'running'/);
+    assert.match(sql, /locked_by = \$12/);
+    assert.match(sql, /lease_expires_at > NOW\(\)/);
     assert.match(sql, /UPDATE videos/i);
     assert.match(sql, /UPDATE pipeline_jobs/i);
     assert.match(sql, /transcript_recovery_mutations/);
