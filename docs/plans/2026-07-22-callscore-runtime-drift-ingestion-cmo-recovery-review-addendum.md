@@ -134,7 +134,7 @@ The superseding remediation in the final review tuple:
 - forces exact `qwen3:4b-instruct-2507-q4_K_M`, loopback Ollama, canonical prompt profile, bounded resource controls, a safe run identifier and canonical artifact location for both shadow aliases;
 - adds a real loopback Ollama campaign evaluation branch for both Art-of-War evaluator aliases, validates the exact returned model and strict JSON output, persists only bounded campaign fields, and grants no mutation/public authority;
 - writes `db_write_performed` on every transcript audit outcome and derives `production_db_writes_performed` plus `db_rows_mutated` from those per-record facts, including failed-row updates;
-- pins HH targeted recovery to the isolated yt-dlp binary and allowlists player clients, JS runtimes, remote components and canonical Chromium paths while rejecting browser-profile extraction, arbitrary extra args and proxies;
+- pins HH targeted recovery to the isolated yt-dlp binary and allowlists player clients, JS runtimes, remote components and the canonical container Chromium path while rejecting browser-profile extraction, arbitrary extra args and proxies;
 - adds RED→GREEN regressions for every finding and a live loopback Qwen3 evaluator canary.
 
 Post-remediation parent evidence: focused tests `80/80`, full suite `1432/1432`, TypeScript and `git diff --check` pass. Final reviewers must bind to the exact superseding HEAD named in their dispatch; no verdict against `44d1132` or an uncommitted tree is final acceptance evidence.

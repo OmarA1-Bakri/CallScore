@@ -614,7 +614,7 @@ test("HH targeted recovery rejects browser profiles and unreviewed executable/ru
     YTDLP_JS_RUNTIMES: "node",
     YTDLP_REMOTE_COMPONENTS: "1",
     YTDLP_PO_TOKEN_PROVIDER: "wpc",
-    YTDLP_PO_TOKEN_BROWSER_PATH: "/snap/bin/chromium",
+    YTDLP_PO_TOKEN_BROWSER_PATH: "/usr/bin/chromium",
   }));
   assert.doesNotThrow(() => assertHhTargetedRecoveryYtDlpEnv({
     YTDLP_COOKIES_PATH: "/run/secrets/youtube-cookies.txt",
@@ -631,7 +631,11 @@ test("HH targeted recovery rejects browser profiles and unreviewed executable/ru
   assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
     YTDLP_PO_TOKEN_PROVIDER: "wpc",
     YTDLP_PO_TOKEN_BROWSER_PATH: "/opt/google/chrome",
-  }), /canonical Chromium allowlist/);
+  }), /canonical \/usr\/bin\/chromium/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_PO_TOKEN_PROVIDER: "wpc",
+    YTDLP_PO_TOKEN_BROWSER_PATH: "/snap/bin/chromium",
+  }), /canonical \/usr\/bin\/chromium/);
   assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
     YTDLP_BIN: "/tmp/unreviewed-ytdlp",
   }), /YTDLP_BIN/);

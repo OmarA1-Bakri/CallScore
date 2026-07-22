@@ -357,11 +357,11 @@ export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | un
       throw new Error("HH targeted recovery PO-token provider must be an unauthenticated loopback-only HTTP endpoint without query credentials");
     }
   }
-  const allowedChromiumPaths = new Set(["/usr/bin/chromium", "/snap/bin/chromium"]);
+  const canonicalChromiumPath = "/usr/bin/chromium";
   if (provider === "wpc" || provider === "webpo" || provider === "browser-attested") {
     const browserPath = env.YTDLP_PO_TOKEN_BROWSER_PATH?.trim() || env.YTDLP_WPC_BROWSER_PATH?.trim();
-    if (!browserPath || !allowedChromiumPaths.has(browserPath)) {
-      throw new Error("HH targeted recovery WPC browser is outside the canonical Chromium allowlist");
+    if (browserPath !== canonicalChromiumPath) {
+      throw new Error(`HH targeted recovery WPC browser must be canonical ${canonicalChromiumPath}`);
     }
   }
 
