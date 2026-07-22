@@ -238,6 +238,42 @@ describe("worker dispatch operating node", () => {
     assert.equal(result?.blockers.includes("pipeline fixture failed"), true);
   });
 
+  test("unsuccessful pipeline result routes to retryOrFail and is never completed", async () => {
+    const calls: string[] = [];
+    const job = pipelineJob({ type: "transcript_recover_hh" });
+    const node = createWorkerDispatchOnceNode(deps({
+      supportedPipelineJobTypes: ["transcript_recover_hh"],
+      claimNextPipelineJob: async () => job,
+      executePipelineJobWithKeepalive: async () => {
+        calls.push("execute");
+        return { success: false, blockers: ["no_target_rows_selected"] };
+      },
+      completePipelineJob: async () => {
+        calls.push("complete");
+      },
+      retryOrFailPipelineJob: async (_failed, error) => {
+        calls.push(`retry-or-fail:${error.message}`);
+        return { retrying: false };
+      },
+    }));
+
+    const patch = await node(
+      buildInitialOperatingState({
+        goal: "dispatch_worker_once",
+        mode: "bounded_write",
+        dryRun: false,
+        approved: true,
+        approvalReceiptId: "worker-dispatch-unsuccessful-result-test",
+        testFixtures: true,
+      }),
+      { configurable: { thread_id: "worker-dispatch-unsuccessful-result", workerId: "worker-test" } },
+    );
+
+    assert.deepEqual(calls, ["execute", "retry-or-fail:pipeline job reported unsuccessful result: no_target_rows_selected"]);
+    assert.equal(patch.node_results?.[0]?.status, "failed");
+    assert.equal(patch.node_results?.[0]?.blockers.includes("pipeline job reported unsuccessful result: no_target_rows_selected"), true);
+  });
+
   test("top-level dispatch_worker_once graph uses injected worker dispatch deps for a live bounded dispatch", async () => {
     const calls: string[] = [];
     const job = pipelineJob({ type: "candle_refresh" });

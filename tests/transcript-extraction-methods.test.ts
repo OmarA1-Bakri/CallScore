@@ -180,6 +180,7 @@ test("forced transcript recovery query selects exact IDs and bypasses cooldown o
   const selection = buildMissingTranscriptVideosQuery(args);
 
   assert.match(selection.sql, /v\.youtube_video_id = ANY\(\$1::text\[\]\)/);
+  assert.match(selection.sql, /v\.transcript_status = 'pending'/);
   assert.match(selection.sql, /bot_verification_required/);
   assert.match(selection.sql, /js_challenge_runtime_missing/);
   assert.doesNotMatch(selection.sql, /transcript_last_attempt_at\s*</);

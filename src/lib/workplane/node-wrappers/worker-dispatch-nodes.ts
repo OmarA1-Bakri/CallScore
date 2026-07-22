@@ -122,6 +122,12 @@ export function createWorkerDispatchOnceNode(deps: WorkerDispatchNodeDeps) {
           const executeResult = fixture?.executeResult
             ? (fixture.executeResult as Record<string, unknown>)
             : await deps.executePipelineJobWithKeepalive(job);
+          const resultBlockers = Array.isArray(executeResult.blockers)
+            ? executeResult.blockers.filter((value): value is string => typeof value === "string" && value.length > 0)
+            : [];
+          if (executeResult.success === false || resultBlockers.length > 0) {
+            throw new Error(`pipeline job reported unsuccessful result${resultBlockers.length > 0 ? `: ${resultBlockers.join(", ")}` : ""}`);
+          }
           await deps.completePipelineJob(job, executeResult);
 
           return {

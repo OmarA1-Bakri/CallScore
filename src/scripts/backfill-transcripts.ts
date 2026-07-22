@@ -877,8 +877,7 @@ export function buildMissingTranscriptVideosQuery(args: BackfillTranscriptsArgs)
   }
 
   if (args.forceTargetedRetry) {
-    filters.push("v.transcript_status = 'failed'");
-    filters.push("v.transcript_error IN ('bot_verification_required','js_challenge_runtime_missing')");
+    filters.push("(v.transcript_status = 'pending' OR (v.transcript_status = 'failed' AND v.transcript_error IN ('bot_verification_required','js_challenge_runtime_missing')))");
   }
 
   if (!args.forceTargetedRetry) {
