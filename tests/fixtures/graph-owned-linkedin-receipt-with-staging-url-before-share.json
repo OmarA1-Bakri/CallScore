@@ -1,0 +1,52 @@
+{
+  "schema": "callscore.operating_graph_receipt.v1",
+  "node_results": [
+    {
+      "node_id": "linkedin_owned_publish_node",
+      "status": "ok",
+      "detail": {
+        "provider_calls": [
+          {
+            "tool": "LINKEDIN_CREATE_LINKED_IN_POST",
+            "payload": {
+              "images": [
+                {
+                  "name": "two-clocks-decision-rights-v3.png",
+                  "mimetype": "image/png",
+                  "s3key": "project/test/tool_router_session/test/image",
+                  "url": "https://backend.composio.dev/api/v3/sl/hoHDwA_bew"
+                }
+              ]
+            }
+          }
+        ],
+        "provider_response": {
+          "successful": true,
+          "data": {
+            "x_restli_id": "urn:li:share:7484283939977728000"
+          },
+          "ok": true,
+          "success": true,
+          "x_restli_id": "urn:li:share:7484283939977728000"
+        },
+        "receipt": {
+          "receipt_id": "external-mutation-e64992a15a2cec7d",
+          "status": "ok",
+          "platform": "linkedin",
+          "provider_tool": "LINKEDIN_CREATE_LINKED_IN_POST",
+          "provider_execution_receipt_id": "provider-exec-4867263124ac78b8",
+          "graph_node_id": "linkedin_owned_publish_node",
+          "provider_mutation_performed": true,
+          "public_publish_performed": true,
+          "external_url": null,
+          "external_object_id": "urn:li:share:7484283939977728000"
+        }
+      }
+    }
+  ],
+  "mutation_flags": {
+    "external_mutation_performed": true,
+    "provider_mutation_performed": true,
+    "public_publish_performed": true
+  }
+}

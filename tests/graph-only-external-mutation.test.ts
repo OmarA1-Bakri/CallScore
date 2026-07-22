@@ -1,6 +1,8 @@
 import * as assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, test } from "node:test";
 import { validCanonicalMediaArtifact } from "./helpers/canonical-media-fixture";
 
@@ -49,6 +51,30 @@ function payloadHash(payload: unknown): string {
   return `sha256:${createHash("sha256").update(stableJson(payload)).digest("hex")}`;
 }
 
+function destructiveAuthorization(platform: "x" | "linkedin", target: string, providerTool: string) {
+  const root = mkdtempSync(join(tmpdir(), "callscore-destructive-auth-"));
+  const path = join(root, `${platform}.json`);
+  const raw = `${JSON.stringify({
+    schema: "callscore.graph_owned_destructive_authorization_receipt.v1",
+    status: "approved",
+    destructive_action_authorized: true,
+    action: "delete_public_post",
+    platform,
+    provider_tool: providerTool,
+    target_external_object_id: target,
+    approval_receipt_id: approvalContext.approval_receipt_id,
+    approved_by_operator: "operator-test",
+    source_incident_receipt_sha256: "a".repeat(64),
+    created_at_utc: new Date(Date.now() - 60_000).toISOString(),
+    expires_at_utc: new Date(Date.now() + 60_000).toISOString(),
+  }, null, 2)}\n`;
+  writeFileSync(path, raw);
+  return {
+    destructive_authorization_receipt_path: path,
+    destructive_authorization_receipt_sha256: createHash("sha256").update(raw).digest("hex"),
+  };
+}
+
 async function loadSocialNodes(): Promise<SocialPublishNodesModule> {
   return await import(socialNodesModulePath) as SocialPublishNodesModule;
 }
@@ -75,7 +101,7 @@ const approvalContext = {
   dry_run: false,
 };
 
-const canonicalReceipts = [
+const canonicalReceiptSchemas = [
   "editorial_angle_receipt.v1",
   "platform_fit_receipt.v1",
   "visual_brief_receipt.v1",
@@ -89,15 +115,40 @@ const canonicalReceipts = [
   "callscore.branding_receipt.v2",
   "callscore.brand_lockup_occlusion_check.v1",
   "callscore.media_artifact_receipt.v2",
-].map((schema) => ({
-  schema,
-  receipt_id: `${schema}:test`,
-  created_at: "2026-07-01T00:00:00.000Z",
-  agent_id: "callscore-cmo-head",
-  decision: "approved",
-  evidence_hash: "sha256:" + "a".repeat(64),
-  blockers: [],
-}));
+];
+
+function canonicalReceiptsFor(channel: "x" | "linkedin") {
+  const now = new Date().toISOString();
+  const platform = channel === "x"
+    ? { head: "callscore-x-head", media: "callscore-x-image-agent" }
+    : { head: "callscore-linkedin-head", media: "callscore-linkedin-image-agent" };
+  return canonicalReceiptSchemas.map((schema) => ({
+    schema,
+    receipt_id: `${schema}:${channel}:test`,
+    created_at: now,
+    agent_id: schema === "callscore.task_router_receipt.v1" || schema === "callscore.tool_inheritance_receipt.v1"
+      ? "callscore-orchestrator-head"
+      : schema === "platform_fit_receipt.v1"
+        ? platform.head
+        : schema === "editorial_angle_receipt.v1" || schema === "same_shit_memory_receipt.v1"
+          ? "callscore-cmo-head"
+          : platform.media,
+    decision: "approved",
+    evidence_hash: "sha256:" + "a".repeat(64),
+    blockers: [],
+  }));
+}
+
+function canonicalPackage(channel: "x" | "linkedin", payload: unknown, receipts = canonicalReceiptsFor(channel)) {
+  return {
+    package_id: `pkg-${channel}-test`,
+    channel,
+    created_at: new Date().toISOString(),
+    approved_payload_hash: payloadHash(payload),
+    receipts,
+    media_artifact: validCanonicalMediaArtifact(channel),
+  };
+}
 
 describe("graph-only social external mutation RED contract", () => {
   test("X publish can call provider only inside x_owned_publish_node", async () => {
@@ -114,7 +165,7 @@ describe("graph-only social external mutation RED contract", () => {
     assert.equal((decision.provider_calls ?? []).length, 0);
   });
 
-  test("X owned publish node records provider mutation only from x_owned_publish_node", async () => {
+  test("X owned publish requires a canonical operational package even for text-only payloads", async () => {
     const nodes = await loadSocialNodes();
     const decision = await nodes.runXOwnedPublishNode({
       graph_context: { ...approvalContext, graph_node_id: "x_owned_publish_node", platform: "x" },
@@ -123,13 +174,14 @@ describe("graph-only social external mutation RED contract", () => {
       provider_response: { ok: true, id: "post-001", url: "https://x.com/callscore/status/post-001" },
     });
 
-    assert.equal(decision.status, "ok");
-    assert.equal(decision.node_id, "x_owned_publish_node");
-    assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
-    assert.equal(decision.mutation_flags?.public_publish_performed, true);
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.blocker_code, "canonical_operational_package_missing");
+    assert.equal(decision.provider_call_permitted, false);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, false);
+    assert.equal(decision.mutation_flags?.public_publish_performed, false);
   });
 
-  test("LinkedIn owned publish is open by default when graph-owned and provider exists", async () => {
+  test("LinkedIn owned publish requires a canonical operational package even for text-only payloads", async () => {
     const nodes = await loadSocialNodes();
     const decision = await nodes.runLinkedInOwnedPublishNode({
       graph_context: { ...approvalContext, graph_node_id: "linkedin_owned_publish_node", platform: "linkedin", approved_payload_hash: "sha256:8ed4aa9e02eba8940c87e5d5e5834f2d8b780aa7967b51db517b2417ff54648a" },
@@ -138,9 +190,10 @@ describe("graph-only social external mutation RED contract", () => {
       provider_response: { ok: true, id: "li-post-001", url: "https://linkedin.com/feed/update/li-post-001" },
     });
 
-    assert.equal(decision.status, "ok");
-    assert.equal(decision.provider_call_permitted, true);
-    assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
+    assert.equal(decision.status, "blocked");
+    assert.equal(decision.blocker_code, "canonical_operational_package_missing");
+    assert.equal(decision.provider_call_permitted, false);
+    assert.equal(decision.mutation_flags?.provider_mutation_performed, false);
   });
 
   test("X owned publish blocks text-only payload when media is required", async () => {
@@ -151,7 +204,7 @@ describe("graph-only social external mutation RED contract", () => {
       payload,
       provider_tool: "TWITTER_CREATION_OF_A_POST",
       provider_response: { ok: true, id: "post-visual-missing" },
-      canonical_receipts: canonicalReceipts,
+      canonical_operational_package: canonicalPackage("x", payload),
       media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 
@@ -171,6 +224,7 @@ describe("graph-only social external mutation RED contract", () => {
       payload,
       approved: true,
       approval_receipt_id: "approval-social-001",
+      canonical_operational_package: canonicalPackage("x", payload),
       media_gate: { visual_required: true, media_plan: "image", content_type: "proof_post" },
     });
 
@@ -191,7 +245,7 @@ describe("graph-only social external mutation RED contract", () => {
       payload,
       provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
       provider_response: { ok: true, id: "li-visual-missing" },
-      canonical_receipts: canonicalReceipts,
+      canonical_operational_package: canonicalPackage("linkedin", payload),
       media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 
@@ -203,15 +257,14 @@ describe("graph-only social external mutation RED contract", () => {
 
   test("owned publish blocks when canonical operational package is missing same-shit receipt", async () => {
     const nodes = await loadSocialNodes();
-    const missingSameShit = canonicalReceipts.filter((receipt) => receipt.schema !== "same_shit_memory_receipt.v1");
+    const missingSameShit = canonicalReceiptsFor("x").filter((receipt) => receipt.schema !== "same_shit_memory_receipt.v1");
     const payload = { text: "CallScore evidence update", media_media_ids: ["1455952740635586573"] };
     const decision = await nodes.runXOwnedPublishNode({
       graph_context: { ...approvalContext, graph_node_id: "x_owned_publish_node", platform: "x", approved_payload_hash: payloadHash(payload) },
       payload,
       provider_tool: "TWITTER_CREATION_OF_A_POST",
       provider_response: { ok: true, id: "post-missing-same-shit" },
-      canonical_receipts: missingSameShit,
-      canonical_media_artifact: validCanonicalMediaArtifact("x"),
+      canonical_operational_package: canonicalPackage("x", payload, missingSameShit),
       media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 
@@ -229,8 +282,7 @@ describe("graph-only social external mutation RED contract", () => {
       payload,
       provider_tool: "TWITTER_CREATION_OF_A_POST",
       provider_response: { ok: true, id: "post-media-ok", url: "https://x.com/callscore/status/post-media-ok" },
-      canonical_receipts: canonicalReceipts,
-      canonical_media_artifact: validCanonicalMediaArtifact("x"),
+      canonical_operational_package: canonicalPackage("x", payload),
       media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 
@@ -253,14 +305,81 @@ describe("graph-only social external mutation RED contract", () => {
       payload,
       provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
       provider_response: { ok: true, id: "li-media-ok", url: "https://linkedin.com/feed/update/li-media-ok" },
-      canonical_receipts: canonicalReceipts,
-      canonical_media_artifact: validCanonicalMediaArtifact("linkedin"),
+      canonical_operational_package: canonicalPackage("linkedin", payload),
       media_gate: { visual_required: true, media_plan: "image", content_type: "thought_leadership" },
     });
 
     assert.equal(decision.status, "ok");
     assert.equal(decision.provider_call_permitted, true);
     assert.equal(decision.mutation_flags?.provider_mutation_performed, true);
+  });
+
+  test("graph-owned rollback delete blocks without a durable destructive authorization receipt", async () => {
+    const nodes = await loadSocialNodes();
+    const xDelete = await nodes.runXPostDeleteNode({
+      graph_context: {
+        ...approvalContext,
+        graph_node_id: "x_post_delete_node",
+        platform: "x",
+        mutation_family: "provider_mutation",
+        approved_payload_hash: "sha256:d8f1f63c672cf4198ab7f5f7677a0de54d2920ff071a26bc3327f4f678e0920d",
+      },
+      provider_tool: "TWITTER_POST_DELETE_BY_POST_ID",
+      payload: { id: "2071866502773432642" },
+      provider_execution_receipt_id: "provider-delete-x-missing-auth",
+      provider_response: { ok: true, id: "2071866502773432642", deleted: true },
+    });
+
+    assert.equal(xDelete.status, "blocked");
+    assert.equal(xDelete.blocker_code, "destructive_authorization_receipt_missing");
+    assert.equal(xDelete.provider_call_permitted, false);
+    assert.equal(xDelete.mutation_flags?.provider_mutation_performed, false);
+  });
+
+  test("graph-owned rollback delete blocks a destructive receipt bound to another public object", async () => {
+    const nodes = await loadSocialNodes();
+    const xDelete = await nodes.runXPostDeleteNode({
+      graph_context: {
+        ...approvalContext,
+        graph_node_id: "x_post_delete_node",
+        platform: "x",
+        mutation_family: "provider_mutation",
+        approved_payload_hash: "sha256:d8f1f63c672cf4198ab7f5f7677a0de54d2920ff071a26bc3327f4f678e0920d",
+      },
+      provider_tool: "TWITTER_POST_DELETE_BY_POST_ID",
+      payload: { id: "2071866502773432642" },
+      ...destructiveAuthorization("x", "DIFFERENT_POST", "TWITTER_POST_DELETE_BY_POST_ID"),
+      provider_execution_receipt_id: "provider-delete-x-wrong-target",
+      provider_response: { ok: true, id: "2071866502773432642", deleted: true },
+    });
+
+    assert.equal(xDelete.status, "blocked");
+    assert.equal(xDelete.blocker_code, "destructive_authorization_target_mismatch");
+    assert.equal(xDelete.provider_call_permitted, false);
+  });
+
+  test("graph-owned rollback delete blocks a destructive receipt whose bytes do not match its declared hash", async () => {
+    const nodes = await loadSocialNodes();
+    const auth = destructiveAuthorization("x", "2071866502773432642", "TWITTER_POST_DELETE_BY_POST_ID");
+    const xDelete = await nodes.runXPostDeleteNode({
+      graph_context: {
+        ...approvalContext,
+        graph_node_id: "x_post_delete_node",
+        platform: "x",
+        mutation_family: "provider_mutation",
+        approved_payload_hash: "sha256:d8f1f63c672cf4198ab7f5f7677a0de54d2920ff071a26bc3327f4f678e0920d",
+      },
+      provider_tool: "TWITTER_POST_DELETE_BY_POST_ID",
+      payload: { id: "2071866502773432642" },
+      ...auth,
+      destructive_authorization_receipt_sha256: "0".repeat(64),
+      provider_execution_receipt_id: "provider-delete-x-wrong-hash",
+      provider_response: { ok: true, id: "2071866502773432642", deleted: true },
+    });
+
+    assert.equal(xDelete.status, "blocked");
+    assert.equal(xDelete.blocker_code, "destructive_authorization_receipt_hash_mismatch");
+    assert.equal(xDelete.provider_call_permitted, false);
   });
 
   test("X and LinkedIn rollback deletes are graph-owned provider mutations, not parent deletes", async () => {
@@ -276,6 +395,7 @@ describe("graph-only social external mutation RED contract", () => {
       },
       provider_tool: "TWITTER_POST_DELETE_BY_POST_ID",
       payload: { id: "2071866502773432642" },
+      ...destructiveAuthorization("x", "2071866502773432642", "TWITTER_POST_DELETE_BY_POST_ID"),
       provider_execution_receipt_id: "provider-delete-x-001",
       provider_response: { ok: true, id: "2071866502773432642", deleted: true },
     });
@@ -295,6 +415,7 @@ describe("graph-only social external mutation RED contract", () => {
       },
       provider_tool: "LINKEDIN_DELETE_POST",
       payload: { post_urn: "urn:li:share:7474081425663610880" },
+      ...destructiveAuthorization("linkedin", "urn:li:share:7474081425663610880", "LINKEDIN_DELETE_POST"),
       provider_execution_receipt_id: "provider-delete-linkedin-001",
       provider_response: { ok: true, id: "urn:li:share:7474081425663610880", deleted: true },
     });

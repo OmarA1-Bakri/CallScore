@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
   DEFAULT_OPERATING_MUTATION_FLAGS,
   type MutationFlags,
@@ -41,6 +43,7 @@ export interface GraphOwnedMutationNodeOptions {
   readonly publicEngagement?: boolean;
   readonly sendOrOutreach?: boolean;
   readonly whopMutation?: boolean;
+  readonly destructiveAction?: boolean;
   readonly extraMutationFlags?: Partial<MutationFlags>;
 }
 
@@ -83,20 +86,33 @@ function providerPayloadHasRequiredMedia(toolSlug: string, payload: unknown): bo
   return true;
 }
 
-function canonicalReceiptBlocker(input: Record<string, unknown>, platform: ExternalMutationPlatform): string | null {
-  if (!hasOwn(input, "canonical_receipts") && !hasOwn(input, "canonical_operational_package") && !mediaGateRequiresMedia(input)) return null;
+export function canonicalReceiptBlocker(input: Record<string, unknown>, platform: ExternalMutationPlatform): string | null {
   const rawPackage = input.canonical_operational_package;
   const packageRecord = isRecord(rawPackage) ? rawPackage : null;
-  const receipts = hasOwn(input, "canonical_receipts") ? input.canonical_receipts : packageRecord?.receipts;
-  const mediaArtifact = input.canonical_media_artifact ?? input.media_artifact ?? packageRecord?.media_artifact;
+  if (!packageRecord) return "canonical_operational_package_missing";
+  const receipts = packageRecord.receipts;
+  const mediaArtifact = packageRecord.media_artifact ?? input.canonical_media_artifact ?? input.media_artifact;
   if (!Array.isArray(receipts)) return "canonical_operational_package_missing";
+  const graphContext = graphContextFor({
+    input,
+    nodeId: "canonical-package-evaluation",
+    platform,
+    mutationFamily: "public_publish",
+    mode: "live_owned_public",
+    requestedAction: "publish_owned_public",
+    missingProviderBlocker: "blocked_provider_missing",
+    wrongNodeBlocker: "non_graph_publish_blocked",
+  });
   try {
     const decision = evaluateCanonicalOperationalPackage({
-      package_id: typeof packageRecord?.package_id === "string" ? packageRecord.package_id : `owned-public-${platform}`,
-      channel: typeof packageRecord?.channel === "string" ? packageRecord.channel : platform,
-      created_at: typeof packageRecord?.created_at === "string" ? packageRecord.created_at : new Date().toISOString(),
+      package_id: typeof packageRecord.package_id === "string" ? packageRecord.package_id : "",
+      channel: typeof packageRecord.channel === "string" ? packageRecord.channel : "",
+      created_at: typeof packageRecord.created_at === "string" ? packageRecord.created_at : "",
+      approved_payload_hash: typeof packageRecord.approved_payload_hash === "string" ? packageRecord.approved_payload_hash : "",
       receipts,
       media_artifact: isRecord(mediaArtifact) ? mediaArtifact : null,
+      expected_channel: platform,
+      expected_payload_hash: typeof input.canonical_payload_hash === "string" ? input.canonical_payload_hash : graphContext?.approved_payload_hash,
     });
     return decision.status === "approved" ? null : (decision.blockers[0] ?? "canonical_operational_package_blocked");
   } catch {
@@ -144,6 +160,63 @@ function approvalReceipt(input: Record<string, unknown>, graphContext: Operating
 function approved(input: Record<string, unknown>, receiptId: string | null): boolean {
   if (typeof input.approved === "boolean") return input.approved;
   return Boolean(receiptId);
+}
+
+function destructiveAuthorizationBlocker(
+  options: GraphOwnedMutationNodeOptions,
+  receiptId: string | null,
+  providerTool: string,
+  providerPayload: unknown,
+): string | null {
+  if (options.destructiveAction !== true) return null;
+  const path = options.input.destructive_authorization_receipt_path;
+  const expectedSha256 = options.input.destructive_authorization_receipt_sha256;
+  if (typeof path !== "string" || !path.trim() || typeof expectedSha256 !== "string" || !/^[a-f0-9]{64}$/.test(expectedSha256)) {
+    return "destructive_authorization_receipt_missing";
+  }
+
+  let raw: string;
+  let receipt: Record<string, unknown>;
+  try {
+    raw = readFileSync(path, "utf8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isRecord(parsed)) return "destructive_authorization_receipt_invalid";
+    receipt = parsed;
+  } catch {
+    return "destructive_authorization_receipt_unreadable";
+  }
+  if (createHash("sha256").update(raw).digest("hex") !== expectedSha256) {
+    return "destructive_authorization_receipt_hash_mismatch";
+  }
+
+  const payload = isRecord(providerPayload) ? providerPayload : {};
+  const target = typeof payload.id === "string" ? payload.id : typeof payload.post_urn === "string" ? payload.post_urn : null;
+  const expiresAt = typeof receipt.expires_at_utc === "string" ? Date.parse(receipt.expires_at_utc) : Number.NaN;
+  const createdAt = typeof receipt.created_at_utc === "string" ? Date.parse(receipt.created_at_utc) : Number.NaN;
+  if (
+    receipt.schema !== "callscore.graph_owned_destructive_authorization_receipt.v1"
+    || receipt.status !== "approved"
+    || receipt.destructive_action_authorized !== true
+    || receipt.action !== "delete_public_post"
+    || receipt.platform !== options.platform
+    || receipt.provider_tool !== providerTool
+    || receipt.approval_receipt_id !== receiptId
+    || typeof receipt.approved_by_operator !== "string"
+    || !receipt.approved_by_operator.trim()
+    || typeof receipt.source_incident_receipt_sha256 !== "string"
+    || !/^[a-f0-9]{64}$/.test(receipt.source_incident_receipt_sha256)
+    || typeof receipt.target_external_object_id !== "string"
+    || !receipt.target_external_object_id.trim()
+    || !target
+    || !Number.isFinite(createdAt)
+    || !Number.isFinite(expiresAt)
+    || createdAt > Date.now()
+  ) {
+    return "destructive_authorization_receipt_invalid";
+  }
+  if (receipt.target_external_object_id !== target) return "destructive_authorization_target_mismatch";
+  if (expiresAt <= Date.now()) return "destructive_authorization_receipt_expired";
+  return null;
 }
 
 function blocked(nodeId: string, blockerCode: string, flags: MutationFlags = blankFlags(), receipt?: unknown): GraphOwnedMutationDecision {
@@ -214,9 +287,14 @@ export function runGraphOwnedMutationNode(options: GraphOwnedMutationNodeOptions
     return blocked(options.nodeId, "required_media_missing");
   }
 
-  const canonicalBlocker = canonicalReceiptBlocker(options.input, options.platform);
-  if (canonicalBlocker) {
-    return blocked(options.nodeId, canonicalBlocker);
+  const destructiveBlocker = destructiveAuthorizationBlocker(options, receiptId, providerTool, providerPayload);
+  if (destructiveBlocker) return blocked(options.nodeId, destructiveBlocker);
+
+  if (options.publicPublish === true && ["x", "linkedin"].includes(options.platform)) {
+    const canonicalBlocker = canonicalReceiptBlocker(options.input, options.platform);
+    if (canonicalBlocker) {
+      return blocked(options.nodeId, canonicalBlocker);
+    }
   }
 
   const preflight = evaluateExternalMutationRequest({

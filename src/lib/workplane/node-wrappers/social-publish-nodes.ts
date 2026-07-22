@@ -38,6 +38,7 @@ export function runXPostDeleteNode(input: Record<string, unknown>): SocialPublis
     mutationFamily: "provider_mutation",
     mode: "live_owned_public",
     requestedAction: "provider_mutation",
+    destructiveAction: true,
     missingProviderBlocker: "x_delete_provider_tool_missing",
     wrongNodeBlocker: "non_graph_publish_blocked",
   });
@@ -51,6 +52,7 @@ export function runLinkedInPostDeleteNode(input: Record<string, unknown>): Socia
     mutationFamily: "provider_mutation",
     mode: "live_owned_public",
     requestedAction: "provider_mutation",
+    destructiveAction: true,
     missingProviderBlocker: "linkedin_delete_provider_tool_missing",
     wrongNodeBlocker: "non_graph_publish_blocked",
   });

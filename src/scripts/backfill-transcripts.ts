@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { closeSync, mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, copyFileSync, mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -31,9 +31,12 @@ const DEFAULT_LOCK_FILE = "/tmp/callscore-slow-ytdlp-transcripts.lock";
 const DEFAULT_YTDLP_EXTRACTOR_RETRIES = 2;
 const DEFAULT_YTDLP_RETRY_SLEEP = "extractor:exp=20:120:2";
 const DEFAULT_YTDLP_PO_TOKEN_PROVIDER_BASE_URL = "http://127.0.0.1:4416";
+const MAX_TARGETED_RECOVERY_IDS = 25;
 
 export interface BackfillTranscriptsArgs {
   readonly creator: string | null;
+  readonly youtubeVideoIds: readonly string[];
+  readonly forceTargetedRetry: boolean;
   readonly limit: number;
   readonly offset: number;
   readonly concurrency: number;
@@ -115,8 +118,17 @@ function positiveInt(value: string | null, fallback: number): number {
 }
 
 function nonNegativeInt(value: string | null, fallback: number): number {
+  if (value === null || value.trim() === "") return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : fallback;
+}
+
+function youtubeVideoIds(value: string | null): string[] {
+  if (!value) return [];
+  const ids = [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
+  const invalid = ids.find((id) => !/^[A-Za-z0-9_-]{11}$/.test(id));
+  if (invalid) throw new Error(`Invalid YouTube video ID: ${invalid}`);
+  return ids;
 }
 
 export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): BackfillTranscriptsArgs {
@@ -130,8 +142,18 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
   const explicitMethods = parseTranscriptExtractionMethodChain(
     argValue(argv, "--methods") ?? argValue(argv, "--method"),
   );
+  const targetedVideoIds = youtubeVideoIds(argValue(argv, "--youtube-video-ids"));
+  const forceTargetedRetry = argv.includes("--force-targeted-retry");
+  if (targetedVideoIds.length > MAX_TARGETED_RECOVERY_IDS) {
+    throw new Error(`--youtube-video-ids count ${targetedVideoIds.length} exceeds hard cap of ${MAX_TARGETED_RECOVERY_IDS}`);
+  }
+  if (forceTargetedRetry && targetedVideoIds.length === 0) {
+    throw new Error("--force-targeted-retry requires --youtube-video-ids");
+  }
   return {
     creator: argValue(argv, "--creator"),
+    youtubeVideoIds: targetedVideoIds,
+    forceTargetedRetry,
     limit: positiveInt(argValue(argv, "--limit") ?? process.env.TRANSCRIPT_BATCH_LIMIT ?? null, DEFAULT_TRANSCRIPT_BATCH_LIMIT),
     offset: nonNegativeInt(argValue(argv, "--offset"), 0),
     concurrency: Math.min(MAX_TRANSCRIPT_CONCURRENCY, requestedConcurrency),
@@ -383,20 +405,26 @@ export function buildYtDlpTranscriptArgs(
   ];
 }
 
-function createInlineCookiesFile(env: Record<string, string | undefined> = process.env): { readonly args: readonly string[]; readonly cleanup: () => void } {
+export function prepareWritableYtDlpAuth(env: Record<string, string | undefined> = process.env): { readonly args: readonly string[]; readonly cleanup: () => void } {
   const cookies = env.YTDLP_COOKIES;
-  if (!cookies || !cookies.includes("\n")) return { args: [], cleanup: () => undefined };
-  const dir = mkdtempSync(join(tmpdir(), "callscore-ytdlp-cookies-"));
-  const file = join(dir, "cookies.txt");
-  writeFileSync(file, cookies, { mode: 0o600 });
-  return {
-    args: ["--cookies", file],
-    cleanup: () => rmSync(dir, { recursive: true, force: true }),
-  };
+  const sourcePath = env.YTDLP_COOKIES_PATH ?? (cookies && !cookies.includes("\n") ? cookies : null);
+  if (sourcePath || (cookies && cookies.includes("\n"))) {
+    const dir = mkdtempSync(join(tmpdir(), "callscore-ytdlp-cookies-"));
+    const file = join(dir, "cookies.txt");
+    if (sourcePath) copyFileSync(sourcePath, file);
+    else writeFileSync(file, cookies ?? "", { mode: 0o600 });
+    chmodSync(file, 0o600);
+    return {
+      args: ["--cookies", file],
+      cleanup: () => rmSync(dir, { recursive: true, force: true }),
+    };
+  }
+  return { args: ytDlpAuthArgs(env), cleanup: () => undefined };
 }
 
 export function classifyYtDlpFailure(text: string): TranscriptFailureReason {
   const lower = text.toLowerCase();
+  if (lower.includes("private video") || lower.includes("video unavailable") || lower.includes("this video is unavailable") || lower.includes("available to this channel's members") || lower.includes("members-only")) return "failed_terminal";
   if (
     lower.includes("po token")
     || lower.includes("potoken")
@@ -424,7 +452,6 @@ export function classifyYtDlpFailure(text: string): TranscriptFailureReason {
   if (lower.includes("sign in to confirm") || lower.includes("not a bot") || lower.includes("bot")) return "bot_verification_required";
   if (lower.includes("too many requests") || lower.includes("rate limit") || lower.includes("http error 429")) return "rate_limited";
   if (lower.includes("subtitles") || lower.includes("no captions") || lower.includes("no automatic captions")) return "no_captions";
-  if (lower.includes("private video") || lower.includes("video unavailable") || lower.includes("this video is unavailable")) return "failed_terminal";
   return "failed_retryable";
 }
 
@@ -433,13 +460,12 @@ async function fetchViaYtDlp(
   args: BackfillTranscriptsArgs,
   method: TranscriptExtractionMethod = "hh_ytdlp",
 ): Promise<TranscriptFetch> {
-  const inlineCookies = createInlineCookiesFile();
+  const methodEnv = envForTranscriptMethod(method);
+  const writableAuth = prepareWritableYtDlpAuth(methodEnv);
   try {
-    const methodEnv = envForTranscriptMethod(method);
-    const authArgs = inlineCookies.args.length > 0 ? inlineCookies.args : ytDlpAuthArgs(methodEnv);
     const { stdout } = await execFileAsync(
       resolveYtDlpBinaryForMethod(method, methodEnv),
-      buildYtDlpTranscriptArgs(videoId, args, methodEnv, authArgs, method),
+      buildYtDlpTranscriptArgs(videoId, args, methodEnv, writableAuth.args, method),
       { timeout: 180_000, maxBuffer: 10 * 1024 * 1024 },
     );
     const subtitleUrl = extractRequestedSubtitleUrl(stdout);
@@ -456,7 +482,7 @@ async function fetchViaYtDlp(
     const detail = `${maybeError.stderr ?? ""}\n${maybeError.stdout ?? ""}\n${maybeError.message ?? ""}`.slice(0, 500);
     return { ok: false, failure: { reason: classifyYtDlpFailure(detail), status: "failed", provider: transcriptMethodProvider(method), detail } };
   } finally {
-    inlineCookies.cleanup();
+    writableAuth.cleanup();
   }
 }
 
@@ -520,26 +546,43 @@ async function markTranscriptFailure(videoId: number, failure: TranscriptFailure
   );
 }
 
-async function loadMissingTranscriptVideos(args: BackfillTranscriptsArgs): Promise<MissingTranscriptVideo[]> {
+export interface MissingTranscriptVideosQuery {
+  readonly sql: string;
+  readonly params: unknown[];
+}
+
+export function buildMissingTranscriptVideosQuery(args: BackfillTranscriptsArgs): MissingTranscriptVideosQuery {
   const params: unknown[] = [];
   const filters = [
     "v.published_at IS NOT NULL",
     "(v.transcript IS NULL OR length(v.transcript) = 0)",
-    `(v.transcript_last_attempt_at IS NULL
-      OR v.transcript_last_attempt_at < NOW() - ($1::int * INTERVAL '1 hour')
-      OR (v.transcript_error IN ('provider_credentials_missing','bot_verification_required','rate_limited')
-          AND v.transcript_last_attempt_at < NOW() - ($2::int * INTERVAL '1 day'))
-      OR (v.transcript_error IN ('cookie_invalid_or_rotated','po_token_required','js_challenge_runtime_missing')
-          AND v.transcript_last_attempt_at < NOW() - ($2::int * INTERVAL '1 day')))`,
   ];
-  params.push(args.retryCooldownHours, args.staleRetryDays);
+
+  if (args.youtubeVideoIds.length > 0) {
+    params.push(args.youtubeVideoIds);
+    filters.push(`v.youtube_video_id = ANY($${params.length}::text[])`);
+  }
+
+  if (!args.forceTargetedRetry) {
+    params.push(args.retryCooldownHours);
+    const retryCooldownParam = params.length;
+    params.push(args.staleRetryDays);
+    const staleRetryParam = params.length;
+    filters.push(`(v.transcript_last_attempt_at IS NULL
+      OR v.transcript_last_attempt_at < NOW() - ($${retryCooldownParam}::int * INTERVAL '1 hour')
+      OR (v.transcript_error IN ('provider_credentials_missing','bot_verification_required','rate_limited')
+          AND v.transcript_last_attempt_at < NOW() - ($${staleRetryParam}::int * INTERVAL '1 day'))
+      OR (v.transcript_error IN ('cookie_invalid_or_rotated','po_token_required','js_challenge_runtime_missing')
+          AND v.transcript_last_attempt_at < NOW() - ($${staleRetryParam}::int * INTERVAL '1 day')))`);
+  }
+
   if (args.creator) {
     params.push(args.creator);
     filters.push(`lower(c.youtube_handle) = lower($${params.length})`);
   }
   params.push(args.limit, args.offset);
-  return query<MissingTranscriptVideo>(
-    `SELECT v.id, v.creator_id, v.youtube_video_id, v.title, v.published_at, c.name AS creator_name, c.youtube_handle
+  return {
+    sql: `SELECT v.id, v.creator_id, v.youtube_video_id, v.title, v.published_at, c.name AS creator_name, c.youtube_handle
      FROM videos v
      JOIN creators c ON c.id = v.creator_id
      WHERE ${filters.join(" AND ")}
@@ -547,7 +590,12 @@ async function loadMissingTranscriptVideos(args: BackfillTranscriptsArgs): Promi
      LIMIT $${params.length - 1}
      OFFSET $${params.length}`,
     params,
-  );
+  };
+}
+
+async function loadMissingTranscriptVideos(args: BackfillTranscriptsArgs): Promise<MissingTranscriptVideo[]> {
+  const selection = buildMissingTranscriptVideosQuery(args);
+  return query<MissingTranscriptVideo>(selection.sql, selection.params);
 }
 
 function audit(args: BackfillTranscriptsArgs, row: Record<string, unknown>): void {

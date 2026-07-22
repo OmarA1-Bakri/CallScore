@@ -6,6 +6,7 @@ import {
   resolveYtDlpBinaryForMethod,
 } from "../src/lib/transcript-extraction-methods";
 import {
+  buildMissingTranscriptVideosQuery,
   buildYtDlpTranscriptArgs,
   fetchTranscript,
   parseBackfillTranscriptsArgs,
@@ -47,6 +48,46 @@ test("backfill transcript args preserve legacy defaults and accept explicit meth
     ]).methods,
     ["serpapi_transcript", "hh_ytdlp_ejs_wpc", "media_asr_fallback"],
   );
+});
+
+test("backfill transcript args accept only explicit bounded YouTube IDs for forced recovery", () => {
+  const args = parseBackfillTranscriptsArgs([
+    "--youtube-video-ids",
+    "VCbmPx1l7AU,lVLvnT4j9TU,VCbmPx1l7AU",
+    "--force-targeted-retry",
+    "--limit",
+    "9",
+  ]);
+
+  assert.deepEqual(args.youtubeVideoIds, ["VCbmPx1l7AU", "lVLvnT4j9TU"]);
+  assert.equal(args.forceTargetedRetry, true);
+  assert.throws(
+    () => parseBackfillTranscriptsArgs(["--force-targeted-retry"]),
+    /requires --youtube-video-ids/,
+  );
+
+  const tooManyIds = Array.from({ length: 26 }, (_, index) => `A${String(index).padStart(10, "0")}`).join(",");
+  assert.throws(
+    () => parseBackfillTranscriptsArgs(["--youtube-video-ids", tooManyIds, "--limit", "26", "--force-targeted-retry"]),
+    /hard cap of 25/,
+  );
+});
+
+test("forced transcript recovery query selects exact IDs and bypasses cooldown only for those IDs", () => {
+  const args = parseBackfillTranscriptsArgs([
+    "--youtube-video-ids",
+    "VCbmPx1l7AU,lVLvnT4j9TU",
+    "--force-targeted-retry",
+    "--limit",
+    "9",
+  ]);
+  const selection = buildMissingTranscriptVideosQuery(args);
+
+  assert.match(selection.sql, /v\.youtube_video_id = ANY\(\$1::text\[\]\)/);
+  assert.doesNotMatch(selection.sql, /transcript_last_attempt_at/);
+  assert.deepEqual(selection.params[0], ["VCbmPx1l7AU", "lVLvnT4j9TU"]);
+  assert.equal(selection.params.at(-2), 9);
+  assert.equal(selection.params.at(-1), 0);
 });
 
 test("HH EJS/WPC method prefers isolated yt-dlp runtime and transcript-only args", () => {

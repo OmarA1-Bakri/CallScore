@@ -35,10 +35,10 @@ function runController(fixture = "green", channels = "x,linkedin,youtube") {
 test("autopilot_policy_loaded.test", () => {
   const policy = readJson(join(POLICY_DIR, "callscore-public-gtm-autopilot-policy.json"));
   assert.equal(policy.policy_name, "callscore_public_gtm_autopilot_v1");
-  assert.equal(policy.standing_operator_approval.operator, "Omar");
+  assert.equal(policy.standing_operator_approval.operator, "Omar Al-Bakri");
   assert.equal(policy.standing_operator_approval.standing_approval, true);
-  assert.equal(policy.standing_operator_approval.approval_scope, "owned_public_marketing_outputs");
-  assert.equal(policy.standing_operator_approval.mode, "policy_bound_autopilot");
+  assert.equal(policy.standing_operator_approval.approval_scope, "full_policy_bound_callscore_automation");
+  assert.equal(policy.standing_operator_approval.mode, "FULL_AUTONOMOUS_POLICY_BOUND");
   assert.equal(policy.standing_operator_approval.human_approval_required_per_artifact, false);
 });
 

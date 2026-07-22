@@ -2,6 +2,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { workplaneSpecsForStatus } from "./workplane-jobs";
 
+export const CANONICAL_LOCAL_MODEL = "qwen3:4b-instruct-2507-q4_K_M";
+
 export interface CollectorCooldownState {
   readonly state_path: string | null;
   readonly status: "active" | "clear" | "unknown" | "malformed";
@@ -153,8 +155,8 @@ function latestFile(root: string | readonly string[], predicate: (name: string) 
   })[0] ?? null;
 }
 
-export function latestGemmaShadowArtifact(root: string | readonly string[] = ["/tmp/callscore-shadow-extractions", ".tmp/shadow-extraction"]): ArtifactSummary {
-  const path = latestFile(root, (name) => name.endsWith(".jsonl") && (name.includes("gemma") || name.includes("shadow")) && !name.includes(".diff"));
+export function latestLocalModelShadowArtifact(root: string | readonly string[] = ["/tmp/callscore-shadow-extractions", ".tmp/shadow-extraction"]): ArtifactSummary {
+  const path = latestFile(root, (name) => name.endsWith(".jsonl") && (name.includes("qwen") || name.includes("gemma") || name.includes("shadow")) && !name.includes(".diff"));
   if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
   try {
     const lines = readFileSync(path, "utf8").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -178,6 +180,9 @@ export function latestGemmaShadowArtifact(root: string | readonly string[] = ["/
     return { path, exists: true, modified_at: statSync(path).mtime.toISOString(), malformed: true, summary: { error: error instanceof Error ? error.message : String(error) } };
   }
 }
+
+/** Compatibility alias for historical callers and artifacts. */
+export const latestGemmaShadowArtifact = latestLocalModelShadowArtifact;
 
 export function latestMlEvalArtifact(root: string | readonly string[] = ["/tmp/callscore-shadow-extractions", ".tmp/ml-idle-improve"]): ArtifactSummary {
   const path = latestFile(root, (name) => name.endsWith(".ml-idle-report.json") || /^ml-idle.*\.json$/.test(name));
@@ -231,8 +236,11 @@ export function latestMlVerifierQualityGateArtifact(repoRoot = process.cwd()): A
   }
 }
 
-export function latestGemmaCapacityPreflightArtifact(repoRoot = process.cwd()): ArtifactSummary {
-  const path = latestFile(join(repoRoot, ".tmp", "workflow-receipts", "gemma_capacity_preflight"), (name) => name.endsWith(".json"));
+export function latestLocalModelCapacityPreflightArtifact(repoRoot = process.cwd()): ArtifactSummary {
+  const path = latestFile([
+    join(repoRoot, ".tmp", "workflow-receipts", "local_model_capacity_preflight"),
+    join(repoRoot, ".tmp", "workflow-receipts", "gemma_capacity_preflight"),
+  ], (name) => name.endsWith(".json"));
   if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
   try {
     const json = readJsonObject(path);
@@ -257,6 +265,9 @@ export function latestGemmaCapacityPreflightArtifact(repoRoot = process.cwd()): 
     return { path, exists: true, modified_at: statSync(path).mtime.toISOString(), malformed: true, summary: { error: error instanceof Error ? error.message : String(error) } };
   }
 }
+
+/** Compatibility alias for historical callers and artifacts. */
+export const latestGemmaCapacityPreflightArtifact = latestLocalModelCapacityPreflightArtifact;
 
 export function latestWorkflowReceipt(workflow: string, repoRoot = process.cwd()): ArtifactSummary {
   const dir = join(repoRoot, ".tmp", "workflow-receipts", workflow);
@@ -293,8 +304,8 @@ export function latestArtOfWarCampaignReceipt(root: string | readonly string[] =
     const persona = json.persona_scorecard && typeof json.persona_scorecard === "object"
       ? json.persona_scorecard as Record<string, unknown>
       : {};
-    const gemma = json.gemma_evaluation && typeof json.gemma_evaluation === "object"
-      ? json.gemma_evaluation as Record<string, unknown>
+    const localModelEvaluation = (json.local_model_evaluation ?? json.gemma_evaluation) && typeof (json.local_model_evaluation ?? json.gemma_evaluation) === "object"
+      ? (json.local_model_evaluation ?? json.gemma_evaluation) as Record<string, unknown>
       : {};
     return {
       path,
@@ -314,7 +325,7 @@ export function latestArtOfWarCampaignReceipt(root: string | readonly string[] =
         production_mutation_performed: json.production_mutation_performed ?? null,
         verifier_passed: verifier.passed ?? null,
         persona_passed: persona.passed ?? null,
-        gemma_passed: gemma.passed ?? null,
+        local_model_evaluation_passed: localModelEvaluation.passed ?? null,
       },
     };
   } catch (error) {
@@ -382,13 +393,13 @@ export function decideNextAutonomousAction(input: WorkplaneDecisionInput): Workp
   if (input.latestMlEval.exists && mlGate.eligible_for_write_canary !== true) {
     return {
       action: "start_artofwar_internal_growth_intelligence",
-      reason: "latest ML eval keeps Gemma in HOLD; data surface is safe, so internal-only growth intelligence can proceed",
+      reason: `latest ML eval keeps ${CANONICAL_LOCAL_MODEL} in HOLD; data surface is safe, so internal-only growth intelligence can proceed`,
       job_type: "artofwar_strategy_brief",
       allowed: true,
     };
   }
   if (!input.latestGemmaShadow.exists) {
-    return { action: "run_gemma_shadow_extract_limit_10", reason: "no Gemma shadow artifact found", job_type: "gemma_shadow_extract", allowed: true };
+    return { action: "run_local_model_shadow_extract_limit_10", reason: `no current ${CANONICAL_LOCAL_MODEL} shadow artifact found`, job_type: "gemma_shadow_extract", allowed: true };
   }
   if (input.transcriptBacklogRecent30d > 0) {
     return { action: "run_laptop_collector_limit_5_if_laptop_cooldown_clear", reason: "recent transcript backlog remains and no active HH-visible cooldown", job_type: "transcript_collect_laptop", allowed: true };
@@ -399,6 +410,9 @@ export function decideNextAutonomousAction(input: WorkplaneDecisionInput): Workp
 export function workplaneJobModelForStatus(): readonly Record<string, unknown>[] {
   return workplaneSpecsForStatus().map((spec) => ({
     type: spec.type,
+    canonical_display_type: spec.type === "gemma_shadow_extract" ? "local_model_shadow_extract" : spec.type,
+    canonical_model: spec.type === "gemma_shadow_extract" ? CANONICAL_LOCAL_MODEL : null,
+    legacy_compatibility_identifier: spec.type === "gemma_shadow_extract" ? spec.type : null,
     execution_location: spec.execution_location,
     max_batch_size: spec.max_batch_size,
     concurrency: spec.concurrency,
@@ -547,7 +561,7 @@ export function externalReadinessSnapshot(repoRoot = process.cwd(), now = new Da
     }, now),
     art_of_war: domain({
       status: artEvidence.length >= 2 ? "MONITORED" : "NOT_CONNECTED",
-      evidence: [...artEvidence, "campaign_loop_contract=planned_in_master_plan", "persona/dry-run/Gemma verifier jobs=report_only", "owned-channel public GTM is READY_PUBLIC_OWNED when safe; persona/dry-run/Gemma verifier jobs are quality controls"],
+      evidence: [...artEvidence, "campaign_loop_contract=planned_in_master_plan", `persona/dry-run/${CANONICAL_LOCAL_MODEL} verifier jobs=report_only`, `owned-channel public GTM is READY_PUBLIC_OWNED when safe; persona/dry-run/${CANONICAL_LOCAL_MODEL} verifier jobs are quality controls`],
       blockers: [],
       safe_next_action: "run daily owned-channel GTM loop: Art of War draft/select, persona quality check, publish safe owned canary, receipt, and monitor",
       risky_actions_blocked: ["email/DM/outreach send", "non-owned public posting", "ad spend", "aggressive scraping", "restricted claims"],
@@ -637,7 +651,7 @@ export function buildReadinessDomains(input: {
     && !pipelineScoreCanaryReceipt.malformed
     && pipelineScoreCanaryReceipt.summary.result === "passed";
   const gemmaShadowSampleReceipt = latestWorkflowReceipt("gemma_shadow_sample", repoRoot);
-  const gemmaCapacityPreflight = latestGemmaCapacityPreflightArtifact(repoRoot);
+  const gemmaCapacityPreflight = latestLocalModelCapacityPreflightArtifact(repoRoot);
   const gemmaCapacitySummary = gemmaCapacityPreflight.summary;
   const gemmaCapacityBlockers = Array.isArray(gemmaCapacitySummary.blockers)
     ? gemmaCapacitySummary.blockers.map(String)
@@ -699,14 +713,14 @@ export function buildReadinessDomains(input: {
         `apiUnsafeOfficial=${input.apiUnsafeOfficialCount}`,
         `dailyPipelineActive=${input.dailyPipelineActive}`,
         transcriptCadenceReceipt.path ? `latest_transcript_cadence_receipt=${transcriptCadenceReceipt.path}` : "latest_transcript_cadence_receipt=missing",
-        gemmaWriteCanaryReceipt.path ? `latest_gemma_write_canary_receipt=${gemmaWriteCanaryReceipt.path}` : "latest_gemma_write_canary_receipt=missing",
+        gemmaWriteCanaryReceipt.path ? `latest_local_model_write_canary_receipt=${gemmaWriteCanaryReceipt.path}` : "latest_local_model_write_canary_receipt=missing",
         pipelineScoreCanaryReceipt.path ? `latest_pipeline_score_canary_receipt=${pipelineScoreCanaryReceipt.path}` : "latest_pipeline_score_canary_receipt=missing",
       ],
       blockers: publicSafe
         ? (pipelineScoreCanaryPassed
           ? []
           : (gemmaWriteCanaryPassed
-            ? ["bounded transcript cadence and one-video Gemma write canary passed; dedicated bounded scoring canary remains missing"]
+            ? [`bounded transcript cadence and one-video ${CANONICAL_LOCAL_MODEL} write canary passed; dedicated bounded scoring canary remains missing`]
             : (transcriptCadencePassed ? ["bounded transcript cadence passed; downstream extraction produced no accepted fresh calls yet"] : ["transcript freshness remains rate-limit controlled"])))
         : ["public safety violation detected"],
       safe_next_action: pipelineScoreCanaryPassed
@@ -714,7 +728,7 @@ export function buildReadinessDomains(input: {
         : (gemmaWriteCanaryPassed
           ? "implement dedicated bounded scoring canary or run explicit full recompute only with approval"
           : (transcriptCadencePassed ? "continue bounded laptop cadence and review fresh transcript extraction settings" : input.nextAction.action)),
-      risky_actions_blocked: ["unbounded transcript collection", "Gemma production writes", "creator_stats mutation from shadow output"],
+      risky_actions_blocked: ["unbounded transcript collection", `${CANONICAL_LOCAL_MODEL} production writes`, "creator_stats mutation from shadow output"],
       required_approvals: ["production extractor default change"],
       relevant_commands: ["npm run freshness:check", "npm run workplane:status"],
       relevant_jobs: ["transcript_collect_laptop", "gemma_shadow_extract", "ml_idle_improve"],
@@ -761,40 +775,40 @@ export function buildReadinessDomains(input: {
       dry_run_available: true,
       canary_available: true,
     }, now),
-    gemma_runtime_capacity: domain({
+    local_model_runtime_capacity: domain({
       status: gemmaCapacityCanLoad ? "READY" : (gemmaCapacityPreflight.exists ? "BLOCKED" : "PARTIAL"),
       evidence: [
-        gemmaCapacityPreflight.path ? `latest_gemma_capacity_preflight=${gemmaCapacityPreflight.path}` : "latest_gemma_capacity_preflight=missing",
-        `model=${gemmaCapacitySummary.model ?? "callscore-gemma4-extractor:latest"}`,
+        gemmaCapacityPreflight.path ? `latest_local_model_capacity_preflight=${gemmaCapacityPreflight.path}` : "latest_local_model_capacity_preflight=missing",
+        `model=${gemmaCapacitySummary.model ?? CANONICAL_LOCAL_MODEL}`,
         `can_load=${gemmaCapacitySummary.can_load === true}`,
         `available_memory_gib=${gemmaCapacitySummary.available_memory_gib ?? "unknown"}`,
         `required_memory_gib=${gemmaCapacitySummary.required_memory_gib ?? "unknown"}`,
       ],
       blockers: gemmaCapacityCanLoad
         ? []
-        : (gemmaCapacityBlockers.length > 0 ? gemmaCapacityBlockers : [gemmaCapacityPreflight.exists ? "gemma_capacity_preflight_failed" : "gemma_capacity_preflight_missing"]),
+        : (gemmaCapacityBlockers.length > 0 ? gemmaCapacityBlockers : [gemmaCapacityPreflight.exists ? "local_model_capacity_preflight_failed" : "local_model_capacity_preflight_missing"]),
       safe_next_action: gemmaCapacityCanLoad
-        ? "schedule bounded Gemma4 shadow/eval jobs when higher-value than lightweight Qwen verifier"
-        : "free memory, configure a smaller Gemma4 quant/model, or route Gemma4 jobs to the laptop/GPU side before scheduling always-on Gemma4 work",
-      risky_actions_blocked: ["always-on Gemma4 jobs without capacity proof", "production extractor default switch", "public ranking impact"],
+        ? `schedule bounded ${CANONICAL_LOCAL_MODEL} shadow/eval jobs when higher-value than the current audit-only verifier cadence`
+        : `free memory, use a smaller ${CANONICAL_LOCAL_MODEL} quant, or route local-model jobs to the laptop/GPU side before scheduling always-on work`,
+      risky_actions_blocked: [`always-on ${CANONICAL_LOCAL_MODEL} jobs without capacity proof`, "production extractor default switch", "public ranking impact"],
       required_approvals: ["production extractor default change", "host memory/swap/service configuration change"],
-      relevant_commands: ["npm run gemma:capacity-preflight"],
+      relevant_commands: ["npm run model:capacity-preflight"],
       relevant_jobs: ["gemma_shadow_extract", "artofwar_campaign_gemma_eval", "ml_extraction_eval"],
       dry_run_available: true,
       canary_available: gemmaCapacityCanLoad,
     }, now),
-    gemma_shadow_extraction: domain({
+    local_model_shadow_extraction: domain({
       status: gemmaShadowCanaryPassed ? "READY" : "PARTIAL",
       evidence: [
         `latest_shadow_exists=${input.latestGemmaShadow.exists}`,
         `shadow_summary=${JSON.stringify(shadowMetrics)}`,
-        gemmaShadowSampleReceipt.path ? `latest_gemma_shadow_sample_receipt=${gemmaShadowSampleReceipt.path}` : "latest_gemma_shadow_sample_receipt=missing",
+        gemmaShadowSampleReceipt.path ? `latest_local_model_shadow_sample_receipt=${gemmaShadowSampleReceipt.path}` : "latest_local_model_shadow_sample_receipt=missing",
       ],
       blockers: gemmaShadowCanaryPassed ? [] : ["latest real-transcript run timed out/invalid; not canary eligible"],
       safe_next_action: gemmaShadowCanaryPassed
         ? "review bounded shadow diff; keep promotion/write approval-gated"
-        : "run bounded gemma_shadow_extract after prompt/chunk controls",
-      risky_actions_blocked: ["Gemma production call writes", "public ranking impact"],
+        : `run bounded ${CANONICAL_LOCAL_MODEL} local-model shadow extraction after prompt/chunk controls`,
+      risky_actions_blocked: [`${CANONICAL_LOCAL_MODEL} production call writes`, "public ranking impact"],
       required_approvals: ["write-canary promotion"],
       relevant_commands: ["npm run shadow:extract", "npm run shadow:diff"],
       relevant_jobs: ["gemma_shadow_extract", "extraction_promotion_review"],
@@ -803,7 +817,7 @@ export function buildReadinessDomains(input: {
     }, now),
     ml_improvement_loop: domain({
       status: gemmaDiffClassified ? "MONITORED" : "PARTIAL",
-      evidence: [`latest_ml_eval_exists=${input.latestMlEval.exists}`, `eligible_for_write_canary=${mlGate.eligible_for_write_canary === true}`, gemmaDiffClassificationReceipt.path ? `latest_gemma_diff_classification_receipt=${gemmaDiffClassificationReceipt.path}` : "latest_gemma_diff_classification_receipt=missing"],
+      evidence: [`latest_ml_eval_exists=${input.latestMlEval.exists}`, `eligible_for_write_canary=${mlGate.eligible_for_write_canary === true}`, gemmaDiffClassificationReceipt.path ? `latest_local_model_diff_classification_receipt=${gemmaDiffClassificationReceipt.path}` : "latest_local_model_diff_classification_receipt=missing"],
       blockers: gemmaDiffClassified || mlGate.eligible_for_write_canary === true ? [] : ["quality gates hold write canary"],
       safe_next_action: "run ml_idle_improve and add fixtures/chunking recommendations",
       risky_actions_blocked: ["auto-promotion", "methodology change without review"],

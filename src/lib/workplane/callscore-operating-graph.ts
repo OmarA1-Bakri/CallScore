@@ -343,7 +343,13 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
 
         const tool = input["provider_tool"] as string;
         const payload = input["provider_payload"] as Record<string, unknown>;
-        const result = await executeGraphOwnedProviderCall(tool, payload);
+        const graphContext = input["graph_context"] as Record<string, unknown>;
+        const workflowIdempotencyScope = `${String(graphContext["operating_graph_run_id"])}:${nodeId}`;
+        const mutationFamily = String(graphContext["mutation_family"] ?? "");
+        const result = await executeGraphOwnedProviderCall(tool, payload, {
+          workflowId: workflowIdempotencyScope,
+          dedupeAcrossWorkflows: mutationFamily === "public_publish" || mutationFamily === "video_publish",
+        });
         input["provider_response"] = result.response;
         input["provider_execution_receipt_id"] = result.executionReceiptId;
         input["provider_execution_receipt_path"] = result.executionReceiptPath;
@@ -353,6 +359,26 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
             : []),
           result.executionReceiptId,
         ];
+
+        if (result.reusedExistingExecution) {
+          return {
+            status: "blocked" as const,
+            summary: `${nodeId} suppressed an already completed provider mutation for the identical approved payload.`,
+            blockers: ["blocked_duplicate_or_cadence"],
+            detail: {
+              node_id: nodeId,
+              provider_call_permitted: false,
+              provider_calls: [],
+              provider_response: result.response,
+              provider_execution_receipt_id: result.executionReceiptId,
+              provider_execution_receipt_path: result.executionReceiptPath,
+              reused_existing_execution: true,
+              receipt: null,
+              blocker_code: "blocked_duplicate_or_cadence",
+            },
+            mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
+          };
+        }
 
         if (!result.ok) {
           return {

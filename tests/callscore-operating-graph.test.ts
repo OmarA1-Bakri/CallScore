@@ -16,6 +16,7 @@ import {
   type OperatingNodeResult,
 } from "../src/lib/workplane/operating-graph-schemas";
 import { validCanonicalMediaArtifact } from "./helpers/canonical-media-fixture";
+import { validCanonicalOperationalPackage } from "./helpers/canonical-operational-package-fixture";
 
 const nodeStartedAt = "2026-06-25T12:00:00.000Z";
 const nodeFinishedAt = "2026-06-25T12:00:01.000Z";
@@ -50,6 +51,30 @@ function stableJson(value: unknown): string {
 
 function payloadHash(payload: unknown): string {
   return `sha256:${createHash("sha256").update(stableJson(payload)).digest("hex")}`;
+}
+
+function destructiveAuthorization(platform: "x" | "linkedin", target: string, providerTool: string, approvalReceiptId: string) {
+  const root = mkdtempSync(join(tmpdir(), "callscore-operating-destructive-auth-"));
+  const path = join(root, `${platform}.json`);
+  const raw = `${JSON.stringify({
+    schema: "callscore.graph_owned_destructive_authorization_receipt.v1",
+    status: "approved",
+    destructive_action_authorized: true,
+    action: "delete_public_post",
+    platform,
+    provider_tool: providerTool,
+    target_external_object_id: target,
+    approval_receipt_id: approvalReceiptId,
+    approved_by_operator: "operator-test",
+    source_incident_receipt_sha256: "a".repeat(64),
+    created_at_utc: new Date(Date.now() - 60_000).toISOString(),
+    expires_at_utc: new Date(Date.now() + 60_000).toISOString(),
+  }, null, 2)}\n`;
+  writeFileSync(path, raw);
+  return {
+    destructive_authorization_receipt_path: path,
+    destructive_authorization_receipt_sha256: createHash("sha256").update(raw).digest("hex"),
+  };
 }
 
 function approvedCanonicalReceipts(agentId = "callscore-test-agent") {
@@ -208,6 +233,7 @@ describe("callscore operating graph", () => {
               },
               provider_tool: "TWITTER_POST_DELETE_BY_POST_ID",
               payload: { id: "2071866502773432642" },
+              ...destructiveAuthorization("x", "2071866502773432642", "TWITTER_POST_DELETE_BY_POST_ID", "approval-delete-x-graph"),
               provider_execution_receipt_id: "provider-delete-x-graph",
               provider_response: { ok: true, id: "2071866502773432642", deleted: true },
             },
@@ -227,6 +253,8 @@ describe("callscore operating graph", () => {
     const previousMode = process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
     const previousMock = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
     const previousFileUploadMode = process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE;
+    const previousAppDir = process.env.CALLSCORE_APP_DIR;
+    process.env.CALLSCORE_APP_DIR = mkdtempSync(join(tmpdir(), "callscore-x-media-bridge-state-"));
     process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = "1";
     process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE = "1";
     process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = JSON.stringify({
@@ -236,6 +264,7 @@ describe("callscore operating graph", () => {
     try {
       const graph = createCallscoreOperatingGraph();
       const textOnlyPayload = { text: "Graph-owned publish with required media." };
+      const canonicalPackage = validCanonicalOperationalPackage("x", textOnlyPayload);
       const localPath = join(mkdtempSync(join(tmpdir(), "callscore-x-media-")), "final-x-visual.png");
       writeFileSync(localPath, "fixture-image-bytes");
       const result = await graph.invoke(
@@ -247,13 +276,7 @@ describe("callscore operating graph", () => {
           approvalReceiptId: "approval-x-media-bridge",
           testFixtures: true,
           artifacts: {
-            canonical_operational_package: {
-              package_id: "canonical-x-media-bridge",
-              channel: "x",
-              created_at: "2026-06-25T12:00:00.000Z",
-              receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
-              media_artifact: validCanonicalMediaArtifact("x"),
-            },
+            canonical_operational_package: canonicalPackage,
             graph_mutation_inputs: {
               x_owned_publish_node: {
                 graph_context: {
@@ -273,13 +296,7 @@ describe("callscore operating graph", () => {
                   parent_receipt_id: "approval-x-media-bridge",
                 },
                 approved: true,
-                canonical_operational_package: {
-                  package_id: "canonical-x-media-bridge",
-                  channel: "x",
-                  created_at: "2026-06-25T12:00:00.000Z",
-                  receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
-                  media_artifact: validCanonicalMediaArtifact("x"),
-                },
+                canonical_operational_package: canonicalPackage,
                 provider_tool: "TWITTER_CREATION_OF_A_POST",
                 provider_payload: textOnlyPayload,
                 payload: textOnlyPayload,
@@ -297,7 +314,7 @@ describe("callscore operating graph", () => {
       );
 
       const xNode = result.node_results.find((item) => item.node_id === "x_owned_publish_node");
-      assert.equal(xNode?.status, "ok");
+      assert.equal(xNode?.status, "ok", JSON.stringify(xNode?.detail));
       const providerCall = (xNode?.detail.provider_calls as Array<{ payload?: Record<string, unknown> }> | undefined)?.[0];
       assert.deepEqual(providerCall?.payload?.media_media_ids, ["1455952740635586573"]);
       assert.equal(result.mutation_flags.provider_mutation_performed, true);
@@ -309,12 +326,93 @@ describe("callscore operating graph", () => {
       else process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = previousMock;
       if (previousFileUploadMode === undefined) delete process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE;
       else process.env.CALLSCORE_GRAPH_FILE_UPLOAD_TEST_MODE = previousFileUploadMode;
+      if (previousAppDir === undefined) delete process.env.CALLSCORE_APP_DIR;
+      else process.env.CALLSCORE_APP_DIR = previousAppDir;
+    }
+  });
+
+  test("a second graph workflow suppresses an identical public payload without claiming a new mutation", async () => {
+    const previousMode = process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+    const previousMock = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+    const previousAppDir = process.env.CALLSCORE_APP_DIR;
+    process.env.CALLSCORE_APP_DIR = mkdtempSync(join(tmpdir(), "callscore-public-graph-dedupe-test-"));
+    process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = "1";
+    process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = JSON.stringify({
+      TWITTER_CREATION_OF_A_POST: { ok: true, id: "public-post-once" },
+    });
+
+    const invoke = async (runId: string) => {
+      const payload = { text: "One approved public payload" };
+      const canonicalPackage = validCanonicalOperationalPackage("x", payload);
+      const graph = createCallscoreOperatingGraph();
+      return graph.invoke(
+        buildInitialOperatingState({
+          goal: "revenue_now",
+          mode: "live_owned_public",
+          dryRun: false,
+          approved: true,
+          approvalReceiptId: "approval-public-graph-dedupe",
+          testFixtures: true,
+          artifacts: {
+            canonical_operational_package: canonicalPackage,
+            graph_mutation_inputs: {
+              x_owned_publish_node: {
+                graph_context: {
+                  operating_graph_run_id: runId,
+                  graph_node_id: "x_owned_publish_node",
+                  goal: "revenue_now",
+                  platform: "x",
+                  mutation_family: "public_publish",
+                  acting_agent_id: "callscore-x-posting-agent",
+                  authority: "owned_public_publish",
+                  approval_receipt_id: "approval-public-graph-dedupe",
+                  evidence_receipt_id: "evidence-public-graph-dedupe",
+                  originality_receipt_id: "originality-public-graph-dedupe",
+                  approved_payload_hash: payloadHash(payload),
+                  provider_execution_receipt_id: "provider-public-graph-dedupe",
+                  dry_run: false,
+                  parent_receipt_id: "approval-public-graph-dedupe",
+                },
+                approved: true,
+                canonical_operational_package: canonicalPackage,
+                provider_tool: "TWITTER_CREATION_OF_A_POST",
+                provider_payload: payload,
+                payload,
+              },
+            },
+          },
+        }),
+        { configurable: { thread_id: `operating-public-graph-dedupe-${runId}` } },
+      );
+    };
+
+    try {
+      const first = await invoke("graph-run-public-dedupe-A");
+      const retry = await invoke("graph-run-public-dedupe-B");
+      const firstNode = first.node_results.find((item) => item.node_id === "x_owned_publish_node");
+      const retryNode = retry.node_results.find((item) => item.node_id === "x_owned_publish_node");
+      assert.equal(firstNode?.status, "ok");
+      assert.equal(first.mutation_flags.public_publish_performed, true);
+      assert.equal(retryNode?.status, "blocked");
+      assert.equal(retryNode?.detail.blocker_code, "blocked_duplicate_or_cadence");
+      assert.equal(retryNode?.detail.reused_existing_execution, true);
+      assert.equal(retry.mutation_flags.provider_mutation_performed, false);
+      assert.equal(retry.mutation_flags.public_publish_performed, false);
+    } finally {
+      if (previousMode === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
+      else process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = previousMode;
+      if (previousMock === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+      else process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = previousMock;
+      if (previousAppDir === undefined) delete process.env.CALLSCORE_APP_DIR;
+      else process.env.CALLSCORE_APP_DIR = previousAppDir;
     }
   });
 
   test("X provider credits depleted is classified as blocked_rate_limit", async () => {
     const previousMode = process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
     const previousMock = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
+    const previousAppDir = process.env.CALLSCORE_APP_DIR;
+    process.env.CALLSCORE_APP_DIR = mkdtempSync(join(tmpdir(), "callscore-x-credits-test-"));
     process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = "1";
     process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = JSON.stringify({
       TWITTER_CREATION_OF_A_POST: {
@@ -325,6 +423,7 @@ describe("callscore operating graph", () => {
     try {
       const graph = createCallscoreOperatingGraph();
       const payload = { text: "CallScore quota-classification test" };
+      const canonicalPackage = validCanonicalOperationalPackage("x", payload);
       const result = await graph.invoke(
         buildInitialOperatingState({
           goal: "revenue_now",
@@ -334,13 +433,7 @@ describe("callscore operating graph", () => {
           approvalReceiptId: "approval-x-credits-depleted",
           testFixtures: true,
           artifacts: {
-            canonical_operational_package: {
-              package_id: "canonical-x-credits-depleted",
-              channel: "x",
-              created_at: "2026-06-25T12:00:00.000Z",
-              receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
-              media_artifact: validCanonicalMediaArtifact("x"),
-            },
+            canonical_operational_package: canonicalPackage,
             graph_mutation_inputs: {
               x_owned_publish_node: {
                 graph_context: {
@@ -360,13 +453,7 @@ describe("callscore operating graph", () => {
                   parent_receipt_id: "approval-x-credits-depleted",
                 },
                 approved: true,
-                canonical_operational_package: {
-                  package_id: "canonical-x-credits-depleted",
-                  channel: "x",
-                  created_at: "2026-06-25T12:00:00.000Z",
-                  receipts: approvedCanonicalReceipts("callscore-x-posting-agent"),
-                  media_artifact: validCanonicalMediaArtifact("x"),
-                },
+                canonical_operational_package: canonicalPackage,
                 provider_tool: "TWITTER_CREATION_OF_A_POST",
                 provider_payload: payload,
                 payload,
@@ -387,6 +474,8 @@ describe("callscore operating graph", () => {
       else process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = previousMode;
       if (previousMock === undefined) delete process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
       else process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON = previousMock;
+      if (previousAppDir === undefined) delete process.env.CALLSCORE_APP_DIR;
+      else process.env.CALLSCORE_APP_DIR = previousAppDir;
     }
   });
 

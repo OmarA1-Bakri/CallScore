@@ -21,6 +21,8 @@ import {
   runYoutubeVideoPublishNode,
 } from "../src/lib/workplane/node-wrappers/video-publish-nodes";
 
+import { validCanonicalOperationalPackage } from "./helpers/canonical-operational-package-fixture";
+
 function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, val) => {
     if (val && typeof val === "object" && !Array.isArray(val)) {
@@ -68,11 +70,13 @@ describe("graph-owned public publishing and engagement open by default", () => {
   });
 
   test("X owned post and public reply open when provider/payload/target exist", () => {
+    const ownedPayload = { text: "CallScore public update" };
     const owned = runXOwnedPublishNode({
-      graph_context: context({ graph_node_id: "x_owned_publish_node", platform: "x", mutation_family: "public_publish", payload_for_hash: { text: "CallScore public update" } }),
+      graph_context: context({ graph_node_id: "x_owned_publish_node", platform: "x", mutation_family: "public_publish", payload_for_hash: ownedPayload }),
       provider_tool: "TWITTER_CREATION_OF_A_POST",
       provider_response: providerResponse,
-      payload: { text: "CallScore public update" },
+      payload: ownedPayload,
+      canonical_operational_package: validCanonicalOperationalPackage("x", ownedPayload),
     });
     assert.equal(owned.status, "ok");
     assert.equal(owned.mutation_flags.public_publish_performed, true);
@@ -89,11 +93,13 @@ describe("graph-owned public publishing and engagement open by default", () => {
   });
 
   test("LinkedIn owned post and public comment open without manual approval", () => {
+    const ownedPayload = { text: "CallScore LinkedIn update" };
     const owned = runLinkedInOwnedPublishNode({
-      graph_context: context({ graph_node_id: "linkedin_owned_publish_node", platform: "linkedin", mutation_family: "public_publish", payload_for_hash: { text: "CallScore LinkedIn update" } }),
+      graph_context: context({ graph_node_id: "linkedin_owned_publish_node", platform: "linkedin", mutation_family: "public_publish", payload_for_hash: ownedPayload }),
       provider_tool: "LINKEDIN_CREATE_LINKED_IN_POST",
       provider_response: providerResponse,
-      payload: { text: "CallScore LinkedIn update" },
+      payload: ownedPayload,
+      canonical_operational_package: validCanonicalOperationalPackage("linkedin", ownedPayload),
     });
     assert.equal(owned.status, "ok");
 

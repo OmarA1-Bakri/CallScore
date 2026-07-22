@@ -16,7 +16,9 @@ test("CMO cooldown catch-up watcher wakes only the canonical revenue_now job", {
   assert.equal(existsSync(WATCHER), true);
   const source = read(WATCHER);
   assert.match(source, /MAIN_JOB_ID="\$\{CALLSCORE_CMO_JOB_ID:-9c03a6eea969\}"/);
-  assert.match(source, /hermes cron run --accept-hooks "\$MAIN_JOB_ID"/);
+  assert.match(source, /systemd-run --user/);
+  assert.match(source, /callscore-cmo-wake-and-commit\.sh "\$MAIN_JOB_ID" "\$STATE_FILE" "\$PENDING_STATE_FILE"/);
+  assert.doesNotMatch(source, /hermes cron run --accept-hooks "\$MAIN_JOB_ID"/);
   assert.match(source, /python3 - "\$RECEIPT_DIR" "\$STATE_FILE" "\$GRACE_SECONDS" "\$STALE_AFTER_SECONDS" "\$STALE_RETRY_SECONDS" "\$EXTERNAL_BLOCKER_GRACE_SECONDS" "\$MAIN_JOB_ID"/);
   assert.match(source, /CALLSCORE_CMO_STALE_RETRY_SECONDS:-43200/);
   assert.doesNotMatch(source, /hour_bucket/);
@@ -52,27 +54,29 @@ test("current cooldown receipts with nested prior verified posts do not trigger 
   const root = mkdtempSync(join(tmpdir(), "cmo-catchup-current-cooldown-"));
   const receiptDir = join(root, "receipts");
   const stateDir = join(root, "state");
+  const createdAt = new Date().toISOString();
+  const dueAt = new Date(Date.now() + 12 * 60 * 60 * 1_000).toISOString();
   require("node:fs").mkdirSync(receiptDir, { recursive: true });
   require("node:fs").writeFileSync(join(receiptDir, "20260626T201028Z-x-cooldown_skipped_no_provider_mutation.json"), JSON.stringify({
     status: "cooldown_skipped_no_provider_mutation",
-    created_at_utc: "2099-01-01T00:00:00Z",
-    earliest_safe_reconsideration_utc: "2099-01-01T12:00:00Z",
+    created_at_utc: createdAt,
+    earliest_safe_reconsideration_utc: dueAt,
     prior_posts: {
       x: {
         status: "published_verified",
-        created_at_utc: "2099-01-01T00:00:00Z",
+        created_at_utc: createdAt,
         post_url: "https://x.com/example/status/1"
       }
     }
   }));
   require("node:fs").writeFileSync(join(receiptDir, "20260626T201028Z-linkedin-cooldown_skipped_no_provider_mutation.json"), JSON.stringify({
     status: "cooldown_skipped_no_provider_mutation",
-    created_at_utc: "2099-01-01T00:00:00Z",
-    earliest_safe_reconsideration_utc: "2099-01-01T12:00:00Z",
+    created_at_utc: createdAt,
+    earliest_safe_reconsideration_utc: dueAt,
     prior_posts: {
       linkedin: {
         status: "published_create_verified_readback_forbidden",
-        created_at_utc: "2099-01-01T00:00:00Z",
+        created_at_utc: createdAt,
         post_urn: "urn:li:share:1"
       }
     }
@@ -90,8 +94,8 @@ test("current cooldown receipts with nested prior verified posts do not trigger 
   const parsed = JSON.parse(output) as { action: string; reason: string; latest_verified?: Record<string, string> };
   assert.equal(parsed.action, "none");
   assert.equal(parsed.reason, "no_due_trigger");
-  assert.equal(parsed.latest_verified?.x, "2099-01-01T00:00:00Z");
-  assert.equal(parsed.latest_verified?.linkedin, "2099-01-01T00:00:00Z");
+  assert.equal(Date.parse(parsed.latest_verified?.x ?? ""), Date.parse(createdAt));
+  assert.equal(Date.parse(parsed.latest_verified?.linkedin ?? ""), Date.parse(createdAt));
 });
 
 test("combined graph-owned publication receipts reconcile verified X and LinkedIn cadence", { skip: !watcherExists }, () => {
@@ -99,6 +103,7 @@ test("combined graph-owned publication receipts reconcile verified X and LinkedI
   const receiptDir = join(root, "receipts");
   const stateDir = join(root, "state");
   const fs = require("node:fs");
+  const createdAt = new Date().toISOString();
   // nosemgrep
   fs.mkdirSync(receiptDir, { recursive: true });
   const mutationInputsPath = join(receiptDir, "graph-mutation-inputs.json");
@@ -113,10 +118,24 @@ test("combined graph-owned publication receipts reconcile verified X and LinkedI
       provider_execution_receipt_id: "provider-exec-linkedin",
     },
   }));
+  const xProviderReceiptPath = join(receiptDir, "provider-exec-x.json");
+  const linkedinProviderReceiptPath = join(receiptDir, "provider-exec-linkedin.json");
+  fs.writeFileSync(xProviderReceiptPath, JSON.stringify({
+    schema: "callscore.graph_owned_provider_execution_receipt.v1",
+    receipt_id: "provider-exec-x",
+    provider_action_name: "TWITTER_CREATION_OF_A_POST",
+    ok: true,
+  }));
+  fs.writeFileSync(linkedinProviderReceiptPath, JSON.stringify({
+    schema: "callscore.graph_owned_provider_execution_receipt.v1",
+    receipt_id: "provider-exec-linkedin",
+    provider_action_name: "LINKEDIN_CREATE_LINKED_IN_POST",
+    ok: true,
+  }));
   // nosemgrep
   fs.writeFileSync(join(receiptDir, "20990101T000000Z-combined-published_graph_owned.json"), JSON.stringify({
     schema: "callscore.cmo_combined_receipt.v1",
-    created_at_utc: "2099-01-01T00:00:00Z",
+    created_at_utc: createdAt,
     status: "published_graph_owned",
     graph_lane_invoked: true,
     public_publish_performed: true,
@@ -124,6 +143,7 @@ test("combined graph-owned publication receipts reconcile verified X and LinkedI
     invoker_result: {
       status: "published_graph_owned",
       mutation_inputs_path: mutationInputsPath,
+      provider_execution_receipt_paths: [xProviderReceiptPath, linkedinProviderReceiptPath],
       mutation_flags: {
         public_publish_performed: true,
         provider_mutation_performed: true,
@@ -143,8 +163,8 @@ test("combined graph-owned publication receipts reconcile verified X and LinkedI
   const parsed = JSON.parse(output) as { action: string; reason: string; latest_verified?: Record<string, string> };
   assert.equal(parsed.action, "none");
   assert.equal(parsed.reason, "no_due_trigger");
-  assert.equal(parsed.latest_verified?.x, "2099-01-01T00:00:00Z");
-  assert.equal(parsed.latest_verified?.linkedin, "2099-01-01T00:00:00Z");
+  assert.equal(Date.parse(parsed.latest_verified?.x ?? ""), Date.parse(createdAt));
+  assert.equal(Date.parse(parsed.latest_verified?.linkedin ?? ""), Date.parse(createdAt));
 });
 
 test("combined graph-owned status without provider mutation evidence fails closed", { skip: !watcherExists }, () => {

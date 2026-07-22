@@ -53,6 +53,7 @@ import {
   classifyYtDlpFailure,
   extractRequestedSubtitleUrl,
   parseBackfillTranscriptsArgs,
+  prepareWritableYtDlpAuth,
   redactedYtDlpOptionSummary,
   stripCaptionText,
   ytDlpAuthArgs,
@@ -76,8 +77,9 @@ import {
   parseYouTubeRss,
   upsertVideo,
 } from "../src/scripts/discover-videos-rss-api";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { splitSqlStatements } from "../src/scripts/migrate";
 
 function toPosixPath(value: string): string {
@@ -501,6 +503,7 @@ test("transcript backfill is dry-run and bounded by default", () => {
   assert.equal(args.fallbackYtDlp, true);
   assert.equal(args.ytDlpSleepSeconds, 20);
   assert.equal(args.ytDlpMaxSleepSeconds, 60);
+  assert.equal(args.gapMs, 20_000);
   assert.equal(args.stopOnProviderBlock, true);
   assert.equal(args.auditOut, ".tmp/transcripts.jsonl");
   assert.equal(args.write, false);
@@ -613,6 +616,23 @@ test("yt-dlp transcript args remain transcript-only and include extractor backof
   assert.equal(ytdlpArgs.includes("-f"), false);
 });
 
+test("yt-dlp uses a private writable cookie copy and leaves the canonical cookie file untouched", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-ytdlp-auth-"));
+  const source = join(root, "youtube.cookies");
+  writeFileSync(source, "# Netscape HTTP Cookie File\n", { mode: 0o400 });
+
+  const prepared = prepareWritableYtDlpAuth({ YTDLP_COOKIES_PATH: source });
+  const copy = prepared.args[1];
+  assert.equal(prepared.args[0], "--cookies");
+  assert.notEqual(copy, source);
+  assert.equal(readFileSync(copy, "utf8"), readFileSync(source, "utf8"));
+  assert.equal(statSync(copy).mode & 0o777, 0o600);
+  prepared.cleanup();
+  assert.equal(existsSync(copy), false);
+  assert.equal(existsSync(source), true);
+  rmSync(root, { recursive: true, force: true });
+});
+
 test("yt-dlp failure classifier distinguishes cookie, PO token, JS runtime, bot, and rate gates", () => {
   assert.equal(classifyYtDlpFailure("ERROR: This request requires a PO Token / Proof of Origin"), "po_token_required");
   assert.equal(classifyYtDlpFailure("ERROR: JavaScript runtime unavailable for EJS challenge"), "js_challenge_runtime_missing");
@@ -620,6 +640,11 @@ test("yt-dlp failure classifier distinguishes cookie, PO token, JS runtime, bot,
   assert.equal(classifyYtDlpFailure("ERROR: Sign in to confirm you’re not a bot"), "bot_verification_required");
   assert.equal(classifyYtDlpFailure("ERROR: HTTP Error 429: Too Many Requests"), "rate_limited");
   assert.equal(classifyYtDlpFailure("WARNING: no automatic captions"), "no_captions");
+  assert.equal(classifyYtDlpFailure("This video is available to this channel's members"), "failed_terminal");
+  assert.equal(
+    classifyYtDlpFailure("[debug] EJS runtime node available\nERROR: This video is available to this channel's members"),
+    "failed_terminal",
+  );
 });
 
 test("yt-dlp requested_subtitles output is dereferenced instead of stored as transcript text", () => {

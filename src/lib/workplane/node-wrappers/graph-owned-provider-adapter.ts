@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, unlinkSync, renameSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 
 import { evaluateExternalMutationRequest } from "../external-mutation-guard";
 import { DEFAULT_OPERATING_MUTATION_FLAGS } from "../operating-graph-schemas";
+import { canonicalReceiptBlocker } from "./external-mutation-node-utils";
 
 export interface ProviderExecutionResult {
   readonly ok: boolean;
@@ -13,6 +14,8 @@ export interface ProviderExecutionResult {
   readonly blockerCode?: string;
   readonly error?: string;
   readonly statusCode?: number;
+  readonly mutationOutcome?: "succeeded" | "confirmed_not_performed" | "unknown";
+  readonly reusedExistingExecution?: boolean;
 }
 
 export interface ProviderCallPreflightResult {
@@ -319,6 +322,31 @@ function receiptDir(): string {
   return dir;
 }
 
+export interface ProviderExecutionScope {
+  readonly workflowId?: string;
+  readonly dedupeAcrossWorkflows?: boolean;
+}
+
+interface ResolvedProviderExecutionScope {
+  readonly accountId: string;
+  readonly workflowId: string;
+}
+
+function connectedAccountIdForTool(toolSlug: string): string {
+  if (toolSlug.startsWith("TWITTER_")) return process.env.COMPOSIO_TWITTER_CONNECTED_ACCOUNT_ID?.trim() || "unscoped-account";
+  if (toolSlug.startsWith("LINKEDIN_")) return process.env.COMPOSIO_LINKEDIN_CONNECTED_ACCOUNT_ID?.trim() || "unscoped-account";
+  return "unscoped-account";
+}
+
+function resolveProviderExecutionScope(toolSlug: string, scope?: ProviderExecutionScope): ResolvedProviderExecutionScope {
+  return {
+    accountId: connectedAccountIdForTool(toolSlug),
+    workflowId: scope?.dedupeAcrossWorkflows === true
+      ? "cross-workflow-public-payload"
+      : scope?.workflowId?.trim() || "global-workflow",
+  };
+}
+
 function writeProviderExecutionReceipt(input: {
   readonly executionReceiptId: string;
   readonly toolSlug: string;
@@ -328,29 +356,42 @@ function writeProviderExecutionReceipt(input: {
   readonly blockerCode?: string;
   readonly statusCode?: number;
   readonly error?: string;
+  readonly mutationOutcome?: "succeeded" | "confirmed_not_performed" | "unknown";
+  readonly scope?: ResolvedProviderExecutionScope;
 }): string | null {
   try {
     const path = join(receiptDir(), `${input.executionReceiptId}.json`);
-    writeFileSync(path, `${stableJson({
+    const tempPath = `${path}.${process.pid}.${createHash("sha256").update(`${Date.now()}:${Math.random()}`).digest("hex").slice(0, 8)}.tmp`;
+    writeFileSync(tempPath, `${stableJson({
       schema: "callscore.graph_owned_provider_execution_receipt.v1",
       created_at_utc: new Date().toISOString(),
       receipt_id: input.executionReceiptId,
       provider_action_name: input.toolSlug,
       payload_hash: payloadHash(input.payload),
+      provider_account_scope_hash: createHash("sha256").update(input.scope?.accountId ?? "unscoped-account").digest("hex"),
+      workflow_idempotency_scope: input.scope?.workflowId ?? "global-workflow",
       ok: input.ok,
       blocker_code: input.blockerCode ?? null,
       status_code: input.statusCode ?? null,
       error: input.error ?? null,
+      mutation_outcome: input.ok ? "succeeded" : (input.mutationOutcome ?? "unknown"),
       provider_response_summary: redact(input.response),
     })}\n`, { mode: 0o600 });
+    renameSync(tempPath, path);
     return path;
   } catch {
     return null;
   }
 }
 
-export function providerExecutionReceiptId(toolSlug: string, payload: unknown): string {
-  const material = stableJson({ tool: toolSlug, payload });
+export function providerExecutionReceiptId(toolSlug: string, payload: unknown, scope?: ProviderExecutionScope): string {
+  const resolvedScope = resolveProviderExecutionScope(toolSlug, scope);
+  const material = stableJson({
+    tool: toolSlug,
+    payload,
+    provider_account_id: resolvedScope.accountId,
+    workflow_idempotency_scope: resolvedScope.workflowId,
+  });
   return `provider-exec-${createHash("sha256").update(material).digest("hex").slice(0, 16)}`;
 }
 
@@ -372,6 +413,12 @@ export function preflightGraphOwnedProviderCall(nodeId: string, input: Record<st
   if (!isRecord(providerPayload) || Object.keys(providerPayload).length === 0) return { ok: false, blockerCode: "payload_missing" };
   const providerPayloadBlocker = validateKnownProviderPayload(providerTool, providerPayload);
   if (providerPayloadBlocker) return { ok: false, blockerCode: providerPayloadBlocker };
+  if (safeString(graphContext.mutation_family) === "public_publish" && ["x", "linkedin"].includes(safeString(graphContext.platform) ?? "")) {
+    const platform = safeString(graphContext.platform);
+    if (!platform) return { ok: false, blockerCode: "canonical_operational_package_invalid" };
+    const canonicalBlocker = canonicalReceiptBlocker(input, platform as Parameters<typeof canonicalReceiptBlocker>[1]);
+    if (canonicalBlocker) return { ok: false, blockerCode: canonicalBlocker };
+  }
   if (mediaGateRequiresMedia(input) && !providerPayloadHasRequiredMedia(providerTool, providerPayload)) {
     return { ok: false, blockerCode: "required_media_missing" };
   }
@@ -603,9 +650,12 @@ function extractProviderMediaId(response: Record<string, unknown>): string | nul
 }
 
 function mutateProviderPayload(input: Record<string, unknown>, nextPayload: Record<string, unknown>): void {
+  const graphContext = graphContextRecord(input);
+  if (!hasOwn(input, "canonical_payload_hash") && typeof graphContext?.approved_payload_hash === "string") {
+    input.canonical_payload_hash = graphContext.approved_payload_hash;
+  }
   input.provider_payload = nextPayload;
   if (hasOwn(input, "payload")) input.payload = nextPayload;
-  const graphContext = graphContextRecord(input);
   if (graphContext) graphContext.approved_payload_hash = payloadHash(nextPayload);
 }
 
@@ -744,6 +794,8 @@ async function executeWhopListingAppUpdate(
   toolSlug: string,
   payload: Record<string, unknown>,
   executionReceiptId: string,
+  scope: ResolvedProviderExecutionScope,
+  markProviderInFlight: () => void,
 ): Promise<ProviderExecutionResult> {
   const validationBlocker = validateKnownProviderPayload(toolSlug, payload);
   if (validationBlocker) {
@@ -756,6 +808,8 @@ async function executeWhopListingAppUpdate(
       response,
       blockerCode: validationBlocker,
       error: validationBlocker,
+      mutationOutcome: "confirmed_not_performed",
+      scope,
     });
     return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: validationBlocker, error: validationBlocker };
   }
@@ -771,6 +825,8 @@ async function executeWhopListingAppUpdate(
       response,
       blockerCode: "blocked_auth",
       error: "Whop API key not set",
+      mutationOutcome: "confirmed_not_performed",
+      scope,
     });
     return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "blocked_auth", error: "Whop API key not set" };
   }
@@ -782,6 +838,7 @@ async function executeWhopListingAppUpdate(
   };
 
   try {
+    markProviderInFlight();
     const response = await fetch(`https://api.whop.com/api/v1/apps/${encodeURIComponent(appId)}`, {
       method: "PATCH",
       headers: {
@@ -811,6 +868,7 @@ async function executeWhopListingAppUpdate(
       blockerCode,
       error: ok ? undefined : text.slice(0, 500),
       statusCode: response.status,
+      scope,
     });
     return {
       ok,
@@ -832,34 +890,36 @@ async function executeWhopListingAppUpdate(
       response,
       blockerCode: "provider_call_failed",
       error: message,
+      scope,
     });
     return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "provider_call_failed", error: message };
   }
 }
 
-export async function executeGraphOwnedProviderCall(toolSlug: string, payload: Record<string, unknown>): Promise<ProviderExecutionResult> {
-  const executionReceiptId = providerExecutionReceiptId(toolSlug, payload);
+async function executeGraphOwnedProviderCallUnclaimed(
+  toolSlug: string,
+  payload: Record<string, unknown>,
+  executionReceiptId: string,
+  scope: ResolvedProviderExecutionScope,
+  markProviderInFlight: () => void,
+): Promise<ProviderExecutionResult> {
   if (process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE === "1") {
     const mocked = process.env.CALLSCORE_GRAPH_PROVIDER_MOCK_RESPONSE_JSON;
     const parsed = mocked ? JSON.parse(mocked) as Record<string, unknown> : {};
     const response = (isRecord(parsed[toolSlug]) ? parsed[toolSlug] : { ok: false, error: `missing mock for ${toolSlug}` }) as Record<string, unknown>;
     const ok = response.ok === true || response.success === true;
     const blockerCode = ok ? undefined : blockerForProviderMessage(firstString(response.error, response.message) ?? `missing mock for ${toolSlug}`);
-    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizeProviderResponse(toolSlug, response, ok), blockerCode, error: ok ? undefined : JSON.stringify(response).slice(0, 500) });
+    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizeProviderResponse(toolSlug, response, ok), blockerCode, error: ok ? undefined : JSON.stringify(response).slice(0, 500), mutationOutcome: ok ? "succeeded" : "confirmed_not_performed", scope });
     return { ok, response: normalizeProviderResponse(toolSlug, response, ok), executionReceiptId, executionReceiptPath, blockerCode, error: ok ? undefined : JSON.stringify(response).slice(0, 500) };
   }
 
   if (toolSlug === "WHOP_UPDATE_APP") {
-    return executeWhopListingAppUpdate(toolSlug, payload, executionReceiptId);
+    return executeWhopListingAppUpdate(toolSlug, payload, executionReceiptId, scope, markProviderInFlight);
   }
 
   const consumerKey = process.env.COMPOSIO_MCP_CONSUMER_API_KEY ?? process.env.COMPOSIO_API_KEY;
   const mcpUrl = process.env.COMPOSIO_MCP_URL ?? "https://connect.composio.dev/mcp";
-  const connectedAccountId = toolSlug.startsWith("TWITTER_")
-    ? process.env.COMPOSIO_TWITTER_CONNECTED_ACCOUNT_ID
-    : toolSlug.startsWith("LINKEDIN_")
-      ? process.env.COMPOSIO_LINKEDIN_CONNECTED_ACCOUNT_ID
-      : undefined;
+  const connectedAccountId = scope.accountId === "unscoped-account" ? undefined : scope.accountId;
 
   if (!consumerKey) {
     const response = { ok: false, error: "Composio MCP consumer key not set in graph-owned node context" };
@@ -871,6 +931,8 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
       response,
       blockerCode: "blocked_auth",
       error: "Composio MCP consumer key not set",
+      mutationOutcome: "confirmed_not_performed",
+      scope,
     });
     return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "blocked_auth", error: "Composio MCP consumer key not set" };
   }
@@ -908,7 +970,7 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
     if (!init.response.ok) {
       const blockerCode = blockerForHttpStatus(init.response.status, init.text, toolSlug);
       const providerResponse = { ok: false, error: init.body };
-      const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response: providerResponse, blockerCode, statusCode: init.response.status, error: `Composio MCP initialize failed ${init.response.status}` });
+      const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response: providerResponse, blockerCode, statusCode: init.response.status, error: `Composio MCP initialize failed ${init.response.status}`, mutationOutcome: "confirmed_not_performed", scope });
       return { ok: false, response: providerResponse, executionReceiptId, executionReceiptPath, blockerCode, statusCode: init.response.status, error: `Composio MCP initialize failed ${init.response.status}: ${init.text.slice(0, 500)}` };
     }
 
@@ -932,7 +994,7 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
 
     if (!selectedToolName) {
       const response = { ok: false, error: `MCP tool ${toolSlug} not found`, mcp_tool_count: availableToolNames.length, mcp_tool_names: availableToolNames.slice(0, 120) };
-      const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response, blockerCode: "blocked_provider_missing", statusCode: listed.response.status, error: `Composio MCP tool ${toolSlug} not found` });
+      const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response, blockerCode: "blocked_provider_missing", statusCode: listed.response.status, error: `Composio MCP tool ${toolSlug} not found`, mutationOutcome: "confirmed_not_performed", scope });
       return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "blocked_provider_missing", statusCode: listed.response.status, error: `Composio MCP tool ${toolSlug} not found` };
     }
 
@@ -948,6 +1010,7 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
         }
       : payload;
 
+    markProviderInFlight();
     const call = await postRpc({
       jsonrpc: "2.0",
       id: rpcId++,
@@ -983,13 +1046,259 @@ export async function executeGraphOwnedProviderCall(toolSlug: string, payload: R
       normalizedResponse.url = normalizedResponse.url ?? `https://www.linkedin.com/feed/update/${payload.post_urn}/`;
     }
     const blockerCode = ok ? undefined : call.response.ok ? blockerForProviderMessage(errorMessage) : blockerForHttpStatus(call.response.status, call.text, toolSlug);
-    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizedResponse, blockerCode, statusCode: call.response.status, error: ok ? undefined : `Composio MCP ${toolSlug} failed ${call.response.status}` });
+    const mutationOutcome = ok ? "succeeded" as const : innerFailed ? "confirmed_not_performed" as const : "unknown" as const;
+    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok, response: normalizedResponse, blockerCode, statusCode: call.response.status, error: ok ? undefined : `Composio MCP ${toolSlug} failed ${call.response.status}`, mutationOutcome, scope });
 
-    return { ok, response: normalizedResponse, executionReceiptId, executionReceiptPath, blockerCode, statusCode: call.response.status, error: ok ? undefined : `Composio MCP ${toolSlug} failed ${call.response.status}: ${errorMessage.slice(0, 500)}` };
+    return { ok, response: normalizedResponse, executionReceiptId, executionReceiptPath, blockerCode, statusCode: call.response.status, error: ok ? undefined : `Composio MCP ${toolSlug} failed ${call.response.status}: ${errorMessage.slice(0, 500)}`, mutationOutcome };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const response = { ok: false, error: message };
-    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response, blockerCode: "provider_call_failed", error: message });
+    const executionReceiptPath = writeProviderExecutionReceipt({ executionReceiptId, toolSlug, payload, ok: false, response, blockerCode: "provider_call_failed", error: message, scope });
     return { ok: false, response, executionReceiptId, executionReceiptPath, blockerCode: "provider_call_failed", error: message };
+  }
+}
+
+function readExistingProviderExecution(
+  executionReceiptId: string,
+  toolSlug: string,
+  payload: Record<string, unknown>,
+  reuseConfirmedNotPerformed = false,
+): ProviderExecutionResult | null {
+  const path = join(receiptDir(), `${executionReceiptId}.json`);
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    if (parsed.schema !== "callscore.graph_owned_provider_execution_receipt.v1"
+      || parsed.receipt_id !== executionReceiptId
+      || parsed.provider_action_name !== toolSlug
+      || parsed.payload_hash !== payloadHash(payload)) return null;
+    const response = isRecord(parsed.provider_response_summary) ? parsed.provider_response_summary : {};
+    const ok = parsed.ok === true;
+    const mutationOutcome = parsed.mutation_outcome === "succeeded" || parsed.mutation_outcome === "confirmed_not_performed"
+      ? parsed.mutation_outcome
+      : "unknown";
+    const createdAtMs = typeof parsed.created_at_utc === "string" ? Date.parse(parsed.created_at_utc) : Number.NaN;
+    const successDedupeMs = 24 * 60 * 60 * 1_000;
+    if (!ok && mutationOutcome === "confirmed_not_performed" && !reuseConfirmedNotPerformed) return null;
+    if (ok && (!Number.isFinite(createdAtMs) || Date.now() - createdAtMs > successDedupeMs || createdAtMs > Date.now() + 5 * 60 * 1_000)) return null;
+    return {
+      ok,
+      response,
+      executionReceiptId,
+      executionReceiptPath: path,
+      blockerCode: !ok && mutationOutcome === "unknown"
+        ? "provider_execution_outcome_unknown"
+        : typeof parsed.blocker_code === "string" ? parsed.blocker_code : undefined,
+      error: typeof parsed.error === "string" ? parsed.error : undefined,
+      statusCode: typeof parsed.status_code === "number" ? parsed.status_code : undefined,
+      mutationOutcome,
+      reusedExistingExecution: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function providerExecutionClaimPath(executionReceiptId: string): string {
+  return join(receiptDir(), `${executionReceiptId}.claim`);
+}
+
+function providerExecutionClaimIsStale(claimPath: string): boolean {
+  try {
+    return Date.now() - statSync(claimPath).mtimeMs > 10 * 60 * 1_000;
+  } catch {
+    return false;
+  }
+}
+
+interface ProviderExecutionClaimState {
+  readonly pid: number | null;
+  readonly phase: "pre_provider" | "provider_in_flight" | "provider_outcome_unrecorded" | "unknown";
+  readonly raw: Record<string, unknown>;
+}
+
+function readProviderExecutionClaimState(claimPath: string): ProviderExecutionClaimState | null {
+  try {
+    const raw = JSON.parse(readFileSync(claimPath, "utf8")) as Record<string, unknown>;
+    const pid = typeof raw.pid === "number" && Number.isInteger(raw.pid) && raw.pid > 0 ? raw.pid : null;
+    const phase = raw.phase === "pre_provider" || raw.phase === "provider_in_flight" || raw.phase === "provider_outcome_unrecorded"
+      ? raw.phase
+      : "unknown";
+    return { pid, phase, raw };
+  } catch {
+    return null;
+  }
+}
+
+function providerExecutionClaimOwnerAlive(claimPath: string): boolean {
+  const pid = readProviderExecutionClaimState(claimPath)?.pid ?? null;
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const code = isRecord(error) && typeof error.code === "string" ? error.code : "";
+    return code === "EPERM";
+  }
+}
+
+function markProviderExecutionClaimInFlight(claimPath: string): void {
+  const state = readProviderExecutionClaimState(claimPath);
+  if (!state || state.pid !== process.pid || state.phase !== "pre_provider") {
+    throw new Error("provider execution claim could not be marked in-flight");
+  }
+  const tempPath = `${claimPath}.${process.pid}.${createHash("sha256").update(`${Date.now()}:${Math.random()}`).digest("hex").slice(0, 8)}.tmp`;
+  writeFileSync(tempPath, `${stableJson({
+    ...state.raw,
+    phase: "provider_in_flight",
+    phase_updated_at_utc: new Date().toISOString(),
+  })}\n`, { mode: 0o600 });
+  renameSync(tempPath, claimPath);
+}
+
+function markProviderExecutionClaimOutcomeUnrecorded(claimPath: string): void {
+  const state = readProviderExecutionClaimState(claimPath);
+  if (!state || state.pid !== process.pid || state.phase !== "provider_in_flight") {
+    throw new Error("provider execution claim could not be marked outcome-unrecorded");
+  }
+  const tempPath = `${claimPath}.${process.pid}.${createHash("sha256").update(`${Date.now()}:${Math.random()}`).digest("hex").slice(0, 8)}.tmp`;
+  writeFileSync(tempPath, `${stableJson({
+    ...state.raw,
+    phase: "provider_outcome_unrecorded",
+    phase_updated_at_utc: new Date().toISOString(),
+  })}\n`, { mode: 0o600 });
+  renameSync(tempPath, claimPath);
+}
+
+function reclaimStaleProviderExecutionClaim(claimPath: string): boolean {
+  if (!existsSync(claimPath)) return false;
+  try {
+    if (!providerExecutionClaimIsStale(claimPath)) return false;
+    const state = readProviderExecutionClaimState(claimPath);
+    if (!state || state.phase !== "pre_provider") return false;
+    if (providerExecutionClaimOwnerAlive(claimPath)) return false;
+    const quarantinePath = `${claimPath}.stale.${process.pid}.${createHash("sha256").update(`${Date.now()}:${Math.random()}`).digest("hex").slice(0, 8)}`;
+    renameSync(claimPath, quarantinePath);
+    try { unlinkSync(quarantinePath); } catch { /* renamed stale claim is no longer authoritative */ }
+    return true;
+  } catch (error) {
+    const code = isRecord(error) && typeof error.code === "string" ? error.code : "";
+    if (code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function waitForProviderExecution(
+  executionReceiptId: string,
+  toolSlug: string,
+  payload: Record<string, unknown>,
+  claimPath: string,
+): Promise<ProviderExecutionResult | null> {
+  const configuredWaitMs = Number(process.env.CALLSCORE_PROVIDER_EXECUTION_WAIT_MS);
+  const waitMs = Number.isFinite(configuredWaitMs) && configuredWaitMs >= 10
+    ? Math.min(configuredWaitMs, 10_000)
+    : 10_000;
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline) {
+    const existing = readExistingProviderExecution(executionReceiptId, toolSlug, payload, true);
+    if (existing) return existing;
+    if (!existsSync(claimPath)) return null;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return null;
+}
+
+export async function executeGraphOwnedProviderCall(
+  toolSlug: string,
+  payload: Record<string, unknown>,
+  scopeOptions?: ProviderExecutionScope,
+): Promise<ProviderExecutionResult> {
+  const resolvedScope = resolveProviderExecutionScope(toolSlug, scopeOptions);
+  const executionReceiptId = providerExecutionReceiptId(toolSlug, payload, scopeOptions);
+  const existing = readExistingProviderExecution(executionReceiptId, toolSlug, payload);
+  if (existing) return existing;
+
+  const claimPath = providerExecutionClaimPath(executionReceiptId);
+  let claimFd: number | null = null;
+  try {
+    claimFd = openSync(claimPath, "wx", 0o600);
+    writeFileSync(claimFd, `${stableJson({
+      schema: "callscore.graph_owned_provider_execution_claim.v1",
+      created_at_utc: new Date().toISOString(),
+      receipt_id: executionReceiptId,
+      provider_action_name: toolSlug,
+      payload_hash: payloadHash(payload),
+      pid: process.pid,
+      phase: "pre_provider",
+    })}\n`);
+    closeSync(claimFd);
+    claimFd = null;
+  } catch (error) {
+    if (claimFd !== null) closeSync(claimFd);
+    const code = isRecord(error) && typeof error.code === "string" ? error.code : "";
+    if (code !== "EEXIST") throw error;
+    if (reclaimStaleProviderExecutionClaim(claimPath)) {
+      return executeGraphOwnedProviderCall(toolSlug, payload, scopeOptions);
+    }
+    const initialClaimState = readProviderExecutionClaimState(claimPath);
+    if (initialClaimState?.phase === "provider_outcome_unrecorded") {
+      const message = "provider execution outcome could not be durably recorded; provider readback or operator reconciliation is required";
+      return {
+        ok: false,
+        response: { ok: false, error: message },
+        executionReceiptId,
+        executionReceiptPath: null,
+        blockerCode: "provider_execution_outcome_unknown",
+        error: message,
+        mutationOutcome: "unknown",
+      };
+    }
+    const completed = await waitForProviderExecution(executionReceiptId, toolSlug, payload, claimPath);
+    if (completed) return completed;
+    const claimState = readProviderExecutionClaimState(claimPath);
+    const stale = providerExecutionClaimIsStale(claimPath);
+    const outcomeUnknown = stale && claimState?.phase !== "pre_provider";
+    const blockerCode = outcomeUnknown
+      ? "provider_execution_outcome_unknown"
+      : stale ? "provider_execution_claim_stale" : "provider_execution_in_progress";
+    const message = outcomeUnknown
+      ? "provider execution outcome is unknown; provider readback or operator reconciliation is required"
+      : stale ? "provider execution claim is stale" : "provider execution is still in progress";
+    return {
+      ok: false,
+      response: { ok: false, error: message },
+      executionReceiptId,
+      executionReceiptPath: null,
+      blockerCode,
+      error: message,
+      mutationOutcome: outcomeUnknown ? "unknown" : undefined,
+    };
+  }
+
+  let releaseClaim = true;
+  try {
+    const result = await executeGraphOwnedProviderCallUnclaimed(
+      toolSlug,
+      payload,
+      executionReceiptId,
+      resolvedScope,
+      () => markProviderExecutionClaimInFlight(claimPath),
+    );
+    if (!result.executionReceiptPath) {
+      releaseClaim = false;
+      try { markProviderExecutionClaimOutcomeUnrecorded(claimPath); } catch { /* preserve provider_in_flight claim if tombstone update fails */ }
+      return {
+        ...result,
+        ok: false,
+        blockerCode: "provider_execution_outcome_unknown",
+        error: "provider execution completed without a durable receipt; reconciliation is required",
+        mutationOutcome: "unknown",
+      };
+    }
+    return result;
+  } finally {
+    if (releaseClaim) {
+      try { unlinkSync(claimPath); } catch { /* claim may already be absent */ }
+    }
   }
 }

@@ -2,6 +2,11 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { NonEmptyStringSchema } from "../validation/shared";
 import { validateCanonicalMediaArtifact, type MediaArtifactReceipt } from "../agent-toolbox-contract";
+import { loadCanonicalAgentIds } from "../canonical-agent-registry";
+
+const Sha256Schema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+const MAX_PACKAGE_AGE_MS = 24 * 60 * 60 * 1_000;
+const MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 
 export const REQUIRED_CANONICAL_RECEIPT_TYPES = [
   "editorial_angle_receipt.v1",
@@ -32,17 +37,18 @@ export const CanonicalDecisionSchema = z.enum(["approved", "rejected", "revise",
 export const CanonicalReceiptSchema = z.object({
   schema: NonEmptyStringSchema,
   receipt_id: NonEmptyStringSchema,
-  created_at: NonEmptyStringSchema,
+  created_at: z.string().datetime({ offset: true }),
   agent_id: NonEmptyStringSchema,
   decision: CanonicalDecisionSchema,
-  evidence_hash: NonEmptyStringSchema,
+  evidence_hash: Sha256Schema,
   blockers: z.array(NonEmptyStringSchema).default([]),
 }).strict();
 
 export const CanonicalOperationalPackageSchema = z.object({
   package_id: NonEmptyStringSchema,
   channel: NonEmptyStringSchema,
-  created_at: NonEmptyStringSchema,
+  created_at: z.string().datetime({ offset: true }),
+  approved_payload_hash: Sha256Schema,
   receipts: z.array(CanonicalReceiptSchema),
   status: CanonicalDecisionSchema.optional(),
   blockers: z.array(NonEmptyStringSchema).optional(),
@@ -59,6 +65,9 @@ export interface CanonicalPackageEvaluation {
 
 export interface CanonicalOperationalPackageInput extends Omit<CanonicalOperationalPackage, "status" | "blockers"> {
   readonly media_artifact?: Partial<MediaArtifactReceipt> | null;
+  readonly evaluation_now?: string | Date;
+  readonly expected_channel?: string;
+  readonly expected_payload_hash?: string;
 }
 
 function hasApprovedReceipt(receipts: readonly CanonicalReceipt[], schema: string): boolean {
@@ -75,9 +84,58 @@ function missingReceiptBlockers(receipts: readonly CanonicalReceipt[], required:
   return required.filter((schema) => !hasApprovedReceipt(receipts, schema)).map((schema) => `missing_${schema}`);
 }
 
+let canonicalAgentIds: ReadonlySet<string> | null = null;
+
+function canonicalAgents(): ReadonlySet<string> {
+  canonicalAgentIds ??= new Set(loadCanonicalAgentIds());
+  return canonicalAgentIds;
+}
+
+function platformOwners(channel: string): { head: string; posting: string; media: string } | null {
+  if (channel === "x") return { head: "callscore-x-head", posting: "callscore-x-posting-agent", media: "callscore-x-image-agent" };
+  if (channel === "linkedin") return { head: "callscore-linkedin-head", posting: "callscore-linkedin-posting-agent", media: "callscore-linkedin-image-agent" };
+  if (channel === "reddit") return { head: "callscore-reddit-head", posting: "callscore-reddit-posting-agent", media: "callscore-reddit-image-agent" };
+  if (channel === "youtube") return { head: "callscore-youtube-head", posting: "callscore-youtube-publishing-agent", media: "callscore-youtube-thumbnail-agent" };
+  return null;
+}
+
+function receiptOwnerAllowed(receipt: CanonicalReceipt, channel: string): boolean {
+  if (!canonicalAgents().has(receipt.agent_id)) return false;
+  const platform = platformOwners(channel);
+  if (!platform) return false;
+  if (["callscore.task_router_receipt.v1", "callscore.tool_inheritance_receipt.v1"].includes(receipt.schema)) {
+    return receipt.agent_id === "callscore-orchestrator-head";
+  }
+  if (receipt.schema === "editorial_angle_receipt.v1") {
+    return ["callscore-cmo-head", "callscore-artofwar-strategist"].includes(receipt.agent_id);
+  }
+  if (receipt.schema === "platform_fit_receipt.v1") {
+    return [platform.head, platform.posting].includes(receipt.agent_id);
+  }
+  if (receipt.schema === "same_shit_memory_receipt.v1") {
+    return ["callscore-cmo-head", "callscore-reviewer-head"].includes(receipt.agent_id);
+  }
+  return [platform.media, platform.head, "callscore-reviewer-head", "callscore-safety-head", "callscore-trust-head"].includes(receipt.agent_id);
+}
+
+function timestampBlockers(label: string, timestamp: string, nowMs: number): string[] {
+  const value = Date.parse(timestamp);
+  if (!Number.isFinite(value)) return [`${label}_timestamp_invalid`];
+  if (value > nowMs + MAX_FUTURE_SKEW_MS) return [`${label}_future_dated`];
+  if (nowMs - value > MAX_PACKAGE_AGE_MS) return [`${label}_stale`];
+  return [];
+}
+
 export function evaluateCanonicalOperationalPackage(input: CanonicalOperationalPackageInput): CanonicalPackageEvaluation {
-  const { media_artifact: mediaArtifact, ...packageInput } = input;
+  const {
+    media_artifact: mediaArtifact,
+    evaluation_now: evaluationNow,
+    expected_channel: expectedChannel,
+    expected_payload_hash: expectedPayloadHash,
+    ...packageInput
+  } = input;
   const parsed = CanonicalOperationalPackageSchema.omit({ status: true, blockers: true }).parse(packageInput);
+  const nowMs = evaluationNow instanceof Date ? evaluationNow.getTime() : Date.parse(evaluationNow ?? new Date().toISOString());
   const mediaBlockers: string[] = [];
   if (!mediaArtifact) {
     mediaBlockers.push("missing_canonical_media_artifact");
@@ -92,6 +150,11 @@ export function evaluateCanonicalOperationalPackage(input: CanonicalOperationalP
   const blockers = [
     ...missingReceiptBlockers(parsed.receipts, REQUIRED_CANONICAL_RECEIPT_TYPES),
     ...receiptBlockers(parsed.receipts),
+    ...timestampBlockers("canonical_package", parsed.created_at, nowMs),
+    ...parsed.receipts.flatMap((receipt) => timestampBlockers(`receipt_${receipt.schema}`, receipt.created_at, nowMs)),
+    ...parsed.receipts.filter((receipt) => !receiptOwnerAllowed(receipt, parsed.channel)).map((receipt) => `receipt_wrong_owner_${receipt.schema}`),
+    ...(expectedChannel && parsed.channel !== expectedChannel ? ["canonical_package_channel_mismatch"] : []),
+    ...(expectedPayloadHash && parsed.approved_payload_hash !== expectedPayloadHash ? ["canonical_package_payload_hash_mismatch"] : []),
     ...mediaBlockers,
   ];
   const status = blockers.length === 0 ? "approved" : "blocked";
@@ -159,6 +222,7 @@ export function buildAgentPerformanceLedger(input: { agent_id: string; tasks_see
 export interface YoutubeProductionPackageInput {
   readonly package_id: string;
   readonly created_at: string;
+  readonly approved_payload_hash: string;
   readonly receipts: readonly CanonicalReceipt[];
   readonly media_artifact?: Partial<MediaArtifactReceipt> | null;
 }
@@ -168,6 +232,7 @@ export function buildYoutubeProductionPackage(input: YoutubeProductionPackageInp
     package_id: input.package_id,
     channel: "youtube",
     created_at: input.created_at,
+    approved_payload_hash: input.approved_payload_hash,
     receipts: [...input.receipts],
     media_artifact: input.media_artifact,
   });

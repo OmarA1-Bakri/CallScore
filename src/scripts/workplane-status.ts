@@ -1,15 +1,16 @@
 import { query } from "../lib/db";
 import {
   buildReadinessDomains,
+  CANONICAL_LOCAL_MODEL,
   chooseStatusNextAction,
   defaultCollectorStatePath,
   decideNextAutonomousAction,
   latestArtOfWarCampaignReceipt,
-  latestGemmaShadowArtifact,
+  latestLocalModelShadowArtifact,
   latestWorkflowReceipt,
   latestMlEvalArtifact,
   latestMlVerifierQualityGateArtifact,
-  latestGemmaCapacityPreflightArtifact,
+  latestLocalModelCapacityPreflightArtifact,
   latestLoopEngineeringReceipt,
   readCollectorCooldownState,
   rootHygieneAudit,
@@ -95,10 +96,10 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     };
   }
   const collectorCooldown = readCollectorCooldownState(args.collectorStatePath);
-  const latestGemmaShadow = latestGemmaShadowArtifact();
+  const latestLocalModelShadow = latestLocalModelShadowArtifact();
   const latestMlEval = latestMlEvalArtifact();
   const latestMlVerifierQualityGate = latestMlVerifierQualityGateArtifact();
-  const latestGemmaCapacityPreflight = latestGemmaCapacityPreflightArtifact();
+  const latestLocalModelCapacityPreflight = latestLocalModelCapacityPreflightArtifact();
   const latestArtOfWarCampaignLoop = latestArtOfWarCampaignReceipt();
   const latestLoopEngineeringEval = latestLoopEngineeringReceipt();
   const latestTranscriptCadenceReceipt = latestWorkflowReceipt("transcript_laptop_cadence");
@@ -116,7 +117,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     unsafeSourceRanks,
     apiUnsafeOfficialCount: unsafeOfficial.count,
     collectorCooldown,
-    latestGemmaShadow,
+    latestGemmaShadow: latestLocalModelShadow,
     latestMlEval,
     transcriptBacklogRecent30d,
     collectorLastAttemptedCount: collectorCooldown.last_attempted_count,
@@ -130,7 +131,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     unsafeSourceRanks,
     apiUnsafeOfficialCount: unsafeOfficial.count,
     collectorCooldown,
-    latestGemmaShadow,
+    latestGemmaShadow: latestLocalModelShadow,
     latestMlEval,
     transcriptBacklogRecent30d,
     dailyPipelineActive,
@@ -176,13 +177,19 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
       success_rate: collectorCooldown.last_success_rate,
       recent_failure_reasons: collectorCooldown.recent_failure_reasons,
     },
-    latest_gemma_shadow_extraction_run: latestGemmaShadow,
-    latest_gemma_capacity_preflight_run: latestGemmaCapacityPreflight,
+    local_model_contract: {
+      provider: "ollama",
+      model: CANONICAL_LOCAL_MODEL,
+      mode: "shadow_and_audit_only",
+      production_mutation_allowed: false,
+    },
+    latest_local_model_shadow_extraction_run: latestLocalModelShadow,
+    latest_local_model_capacity_preflight_run: latestLocalModelCapacityPreflight,
     latest_ml_eval_run: latestMlEval,
     latest_ml_verifier_quality_gate_run: latestMlVerifierQualityGate,
     model_currently_recommended: latestMlEval.exists && latestMlGate.eligible_for_write_canary !== true
       ? "rule_extractor_safe_fallback"
-      : "qwen3-4b-instruct-2507:shadow_only",
+      : `${CANONICAL_LOCAL_MODEL}:shadow_only`,
     production_default_changed: false,
     unsafe_source_ranks: unsafeSourceRanks,
     api_unsafe_official: unsafeOfficial,
@@ -193,14 +200,14 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
     latest_loop_engineering_eval_run: latestLoopEngineeringEval,
     automation_registry_status: readiness_domains.claude_code_automations,
     approval_required_for_next_risky_action: readiness_domains.activation_gates.required_approvals,
-    next_approval_gated_action: "operator approval required before public marketing/outreach/spend, Whop live mutation, Gemma write-canary, or production extractor default change",
+    next_approval_gated_action: `operator approval required before public marketing/outreach/spend, Whop live mutation, ${CANONICAL_LOCAL_MODEL} write-canary, or production extractor default change`,
     autonomous_revenue_status: "NO",
     blocked_public_actions: readiness_domains.activation_gates.risky_actions_blocked,
     runtime_loop_capabilities: [
       "inspect_workplane_status",
       "run_laptop_collector_limit_5_when_cooldown_clear",
       "ingest_transcript_results",
-      "run_gemma_shadow_extract_artifact_only",
+      "run_local_model_shadow_extract_artifact_only",
       "run_ml_idle_improve_artifact_only",
       "run_loop_engineering_eval_dry_run",
       "write_loop_receipt_public_action_false",
@@ -211,7 +218,7 @@ export async function buildWorkplaneStatus(args = parseWorkplaneStatusArgs()): P
       "run_artofwar_campaign_contract_preflight",
       "run_artofwar_persona_tests_report_only",
       "run_artofwar_dry_run_simulations_report_only",
-      "run_artofwar_gemma_evaluation_report_only",
+      "run_artofwar_local_model_evaluation_report_only",
       "write_artofwar_campaign_receipts_public_action_false",
       "produce_promotion_reviews_without_auto_promotion",
     ],

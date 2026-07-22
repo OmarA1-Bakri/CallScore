@@ -22,6 +22,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   for (const required of [
     "transcript_collect_laptop",
     "transcript_ingest_result",
+    "transcript_recover_hh",
     "gemma_shadow_extract",
     "ml_extraction_eval",
     "ml_idle_improve",
@@ -79,6 +80,18 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   const ingest = getWorkplaneJobSpec("transcript_ingest_result");
   assert.equal(ingest.production_db_writes_allowed, true);
   assert.equal(ingest.production_call_writes_allowed, false);
+
+  const recovery = getWorkplaneJobSpec("transcript_recover_hh");
+  assert.equal(recovery.execution_location, "HH");
+  assert.equal(recovery.max_batch_size, 10);
+  assert.equal(recovery.concurrency, 1);
+  assert.equal(recovery.production_db_writes_allowed, true);
+  assert.equal(recovery.production_call_writes_allowed, false);
+  assert.match(recovery.default_safe_command, /hh_ytdlp_ejs_wpc/);
+  assert.match(recovery.default_safe_command, /--youtube-video-ids/);
+  assert.match(recovery.default_safe_command, /--force-targeted-retry/);
+  assert.ok(recovery.failure_classification.includes("bot_verification_required"));
+  assert.ok(recovery.failure_classification.includes("js_challenge_runtime_missing"));
 
   const whop = getWorkplaneJobSpec("whop_plan_inventory_check");
   assert.equal(whop.production_db_writes_allowed, false);
@@ -164,11 +177,11 @@ test("Gemma readiness trusts bounded shadow sample receipts and clean artifacts"
     now: new Date("2026-06-14T04:10:00.000Z"),
   });
 
-  assert.equal(domains.gemma_shadow_extraction.status, "READY");
-  assert.deepEqual(domains.gemma_shadow_extraction.blockers, []);
-  assert.equal(domains.gemma_shadow_extraction.canary_available, true);
-  assert.match(String(domains.gemma_shadow_extraction.safe_next_action), /shadow diff/);
-  assert.ok(domains.gemma_shadow_extraction.evidence.some((item) => item.includes("latest_gemma_shadow_sample_receipt=")));
+  assert.equal(domains.local_model_shadow_extraction.status, "READY");
+  assert.deepEqual(domains.local_model_shadow_extraction.blockers, []);
+  assert.equal(domains.local_model_shadow_extraction.canary_available, true);
+  assert.match(String(domains.local_model_shadow_extraction.safe_next_action), /shadow diff/);
+  assert.ok(domains.local_model_shadow_extraction.evidence.some((item) => item.includes("latest_local_model_shadow_sample_receipt=")));
 });
 
 test("Gemma runtime capacity preflight blocks Gemma4 scheduling when host memory is insufficient", () => {
@@ -205,10 +218,10 @@ test("Gemma runtime capacity preflight blocks Gemma4 scheduling when host memory
     now: new Date("2026-06-20T12:00:00.000Z"),
   });
 
-  assert.equal(domains.gemma_runtime_capacity.status, "BLOCKED");
-  assert.ok(domains.gemma_runtime_capacity.blockers.includes("insufficient_system_memory"));
-  assert.match(String(domains.gemma_runtime_capacity.safe_next_action), /free memory|smaller model|laptop/i);
-  assert.equal(domains.gemma_runtime_capacity.canary_available, false);
+  assert.equal(domains.local_model_runtime_capacity.status, "BLOCKED");
+  assert.ok(domains.local_model_runtime_capacity.blockers.includes("insufficient_system_memory"));
+  assert.match(String(domains.local_model_runtime_capacity.safe_next_action), /free memory|smaller model|laptop/i);
+  assert.equal(domains.local_model_runtime_capacity.canary_available, false);
 });
 
 test("ML verifier quality gate receipt exposes audit-only activation status", () => {
@@ -332,7 +345,7 @@ test("next autonomous action blocks unsafe/cooldown and otherwise chooses safe w
   assert.equal(decideNextAutonomousAction({ ...base, collectorLastAttemptedCount: 5, collectorLastSuccessCount: 0 }).action, "repair_transcript_targeting_or_failure_classification");
   assert.equal(
     decideNextAutonomousAction({ ...base, collectorLastAttemptedCount: 5, collectorLastSuccessCount: 0, latestTranscriptCadencePassed: true }).action,
-    "run_gemma_shadow_extract_limit_10",
+    "run_local_model_shadow_extract_limit_10",
   );
   assert.equal(
     decideNextAutonomousAction({ ...base, collectorLastAttemptedCount: 5, collectorLastSuccessCount: 0, latestTranscriptCadenceResult: "partial_rate_limited_stop" }).action,
@@ -446,7 +459,7 @@ test("pipeline readiness recognizes latest Gemma write and score canary receipts
   assert.equal(domains.callscore_pipeline.status, "MONITORED");
   assert.deepEqual(domains.callscore_pipeline.blockers, []);
   assert.match(String(domains.callscore_pipeline.safe_next_action), /monitor bounded laptop cadence/);
-  assert.ok(domains.callscore_pipeline.evidence.some((item) => item.includes("latest_gemma_write_canary_receipt=")));
+  assert.ok(domains.callscore_pipeline.evidence.some((item) => item.includes("latest_local_model_write_canary_receipt=")));
   assert.ok(domains.callscore_pipeline.evidence.some((item) => item.includes("latest_pipeline_score_canary_receipt=")));
 });
 
@@ -463,7 +476,7 @@ test("readiness domains cover all activation surfaces with mutation gates", asyn
     nextAction: { action: "run_laptop_collector_limit_5_if_laptop_cooldown_clear", reason: "test", job_type: "transcript_collect_laptop", allowed: true },
     now: new Date("2026-06-12T12:00:00.000Z"),
   });
-  for (const key of ["callscore_pipeline", "transcript_collector", "gemma_shadow_extraction", "ml_improvement_loop", "whop_auto", "art_of_war", "claude_code_automations", "hermes_worker", "provider_integrations", "activation_gates", "root_hygiene"]) {
+  for (const key of ["callscore_pipeline", "transcript_collector", "local_model_shadow_extraction", "ml_improvement_loop", "whop_auto", "art_of_war", "claude_code_automations", "hermes_worker", "provider_integrations", "activation_gates", "root_hygiene"]) {
     assert.ok(domains[key], key);
     assert.equal(domains[key].production_mutation_allowed, false, key);
   }
@@ -496,7 +509,7 @@ test("public artifact readiness stays open when unrelated private infra lane is 
     now: new Date("2026-06-26T13:00:00.000Z"),
   });
 
-  assert.equal(domains.gemma_runtime_capacity.status, "BLOCKED");
+  assert.equal(domains.local_model_runtime_capacity.status, "BLOCKED");
   const readiness = summarizePublicArtifactReadiness(domains);
   assert.equal(readiness.status, "READY_PUBLIC_OWNED");
   assert.equal(readiness.allowed, true);

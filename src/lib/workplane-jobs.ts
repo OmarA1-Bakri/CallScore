@@ -1,5 +1,5 @@
 import type { PipelineJob } from "./pipeline";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { buildRunId } from "./shadow-extraction";
 import { writeWorkflowReceipt } from "./workflow-receipts";
@@ -8,6 +8,7 @@ import { buildExtractionLoopReceipt } from "./loop-engineering";
 export const WORKPLANE_JOB_TYPES = [
   "transcript_collect_laptop",
   "transcript_ingest_result",
+  "transcript_recover_hh",
   "gemma_shadow_extract",
   "ml_extraction_eval",
   "ml_idle_improve",
@@ -167,6 +168,27 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
     failure_classification: ["invalid_payload", "video_mismatch", "transcript_too_short", "db_write_failed"],
     production_db_writes_allowed: true,
     default_safe_command: "npm run transcript:ingest -- --input - --write",
+  }),
+  transcript_recover_hh: safeReportSpec("transcript_recover_hh", {
+    input_payload: {
+      youtube_video_ids: ["<exact-11-character-youtube-id>"],
+      limit: 10,
+      method: "hh_ytdlp_ejs_wpc",
+      force_targeted_retry: false,
+      continue_after_provider_block: false,
+      write: false,
+    },
+    execution_location: "HH",
+    max_batch_size: 10,
+    concurrency: 1,
+    timeout_seconds: 1800,
+    retry_policy: "no automatic broad retry; exact IDs only; retry requires a new bounded Workplane job",
+    cooldown_policy: "normal cooldown applies unless force_targeted_retry=true with exact IDs; stop on provider block by default",
+    output_artifact: ".tmp/workflow-receipts/transcript_recover_hh/<run-id>.jsonl plus receipt JSON",
+    success_criteria: ["exact YouTube IDs selected", "current isolated yt-dlp EJS/WPC runtime used", "all selected rows emit updated/would_update audit records", "production call writes remain disabled"],
+    failure_classification: ["invalid_payload", "no_target_rows_selected", "bot_verification_required", "js_challenge_runtime_missing", "po_token_required", "cookie_invalid_or_rotated", "rate_limited", "no_captions", "transcript_failed"],
+    production_db_writes_allowed: true,
+    default_safe_command: "npm run backfill:transcripts -- --methods hh_ytdlp_ejs_wpc --youtube-video-ids <comma-separated-exact-ids> --force-targeted-retry --limit 10 --audit-out .tmp/workflow-receipts/transcript_recover_hh/<run-id>.jsonl --dry-run",
   }),
   gemma_shadow_extract: safeReportSpec("gemma_shadow_extract", {
     input_payload: {
@@ -743,6 +765,76 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
     await main(["--input", inputPath, ...(payload.write === false ? ["--dry-run"] : ["--write"])]);
     const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("transcript_ingest_result");
     return { mode: payload.write === false ? "dry_run" : "write", execution_location: spec.execution_location, input_path: inputPath, production_call_writes_allowed: false, public_ranking_impact_allowed: false, receipt_path: writeWorkplaneReceipt(job, spec, runId, "passed", [], "review transcript ingest result; no production call writes allowed") };
+  }
+
+  if (job.type === "transcript_recover_hh") {
+    const ids = [...new Set((Array.isArray(payload.youtube_video_ids) ? payload.youtube_video_ids : [])
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean))];
+    if (ids.length === 0) throw new Error("transcript_recover_hh requires payload.youtube_video_ids");
+    if (ids.length > spec.max_batch_size) throw new Error(`transcript_recover_hh supports at most ${spec.max_batch_size} exact IDs`);
+    const invalid = ids.find((id) => !/^[A-Za-z0-9_-]{11}$/.test(id));
+    if (invalid) throw new Error(`Invalid YouTube video ID: ${invalid}`);
+
+    const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("transcript-recover-hh");
+    const auditOut = typeof payload.audit_out === "string"
+      ? payload.audit_out
+      : `.tmp/workflow-receipts/transcript_recover_hh/${runId}.jsonl`;
+    const write = payload.write === true;
+    const { main } = await import("../scripts/backfill-transcripts");
+    await main([
+      "--methods", "hh_ytdlp_ejs_wpc",
+      "--youtube-video-ids", ids.join(","),
+      "--limit", String(ids.length),
+      "--concurrency", "1",
+      "--audit-out", auditOut,
+      ...(payload.force_targeted_retry === true ? ["--force-targeted-retry"] : []),
+      ...(payload.continue_after_provider_block === true ? ["--continue-after-provider-block"] : []),
+      ...(write ? ["--write"] : ["--dry-run"]),
+    ]);
+
+    let records: Record<string, unknown>[] = [];
+    try {
+      records = readFileSync(auditOut, "utf8")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+    } catch {
+      records = [];
+    }
+    const successStatus = write ? "updated" : "would_update";
+    const succeeded = records.filter((record) => record.status === successStatus);
+    const failed = records.filter((record) => record.status === "failed" || record.status === "pending_handoff");
+    const blockers = failed.length > 0
+      ? [...new Set(failed.map((record) => String(record.reason ?? "transcript_failed")))]
+      : (succeeded.length === ids.length ? [] : ["no_target_rows_selected"]);
+    const result = blockers.length === 0 ? "passed" : "blocked";
+    const receiptPath = writeWorkplaneReceipt(
+      job,
+      spec,
+      runId,
+      result,
+      blockers,
+      result === "passed" ? "verify transcript rows and continue downstream extraction" : "hold broad retries; inspect exact failure classes and provider health",
+    );
+    return {
+      mode: write ? "targeted_write" : "targeted_dry_run",
+      execution_location: spec.execution_location,
+      run_id: runId,
+      requested_youtube_video_ids: ids,
+      selected_records: records.length,
+      succeeded: succeeded.length,
+      failed: failed.length,
+      blockers,
+      audit_out: auditOut,
+      receipt_path: receiptPath,
+      success: result === "passed",
+      production_db_writes_performed: write && succeeded.length > 0,
+      production_call_writes_allowed: false,
+      public_ranking_impact_allowed: false,
+    };
   }
 
   if (job.type === "artofwar_owned_public_execution") {

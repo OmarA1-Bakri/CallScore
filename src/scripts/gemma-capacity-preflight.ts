@@ -1,11 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { freemem, totalmem } from "node:os";
+import { CANONICAL_LOCAL_MODEL } from "../lib/workplane-status";
 import { loadEnv } from "./script-helpers";
 
-export interface GemmaCapacityReceipt {
-  readonly workflow_name: "gemma_capacity_preflight";
-  readonly schema_version: "gemma_capacity_preflight.v1";
+export interface LocalModelCapacityReceipt {
+  readonly workflow_name: "local_model_capacity_preflight";
+  readonly schema_version: "callscore.local_model_capacity_preflight.v1";
   readonly run_id: string;
   readonly created_at: string;
   readonly model: string;
@@ -27,6 +28,9 @@ export interface GemmaCapacityReceipt {
   readonly next_safe_action: string;
   readonly artifact_path: string;
 }
+
+/** Compatibility type alias for callers using the historical name. */
+export type GemmaCapacityReceipt = LocalModelCapacityReceipt;
 
 function argValue(argv: readonly string[], flag: string): string | null {
   const index = argv.indexOf(flag);
@@ -77,19 +81,19 @@ async function tryGenerate(input: { readonly host: string; readonly model: strin
   }
 }
 
-export async function runGemmaCapacityPreflight(input: {
+export async function runLocalModelCapacityPreflight(input: {
   readonly model?: string;
   readonly ollamaHost?: string;
   readonly repoRoot?: string;
   readonly createdAt?: string;
-} = {}): Promise<GemmaCapacityReceipt> {
-  const model = input.model ?? process.env.GEMMA_CAPACITY_MODEL ?? "callscore-gemma4-extractor:latest";
+} = {}): Promise<LocalModelCapacityReceipt> {
+  const model = input.model ?? process.env.CALLSCORE_LOCAL_MODEL ?? process.env.GEMMA_CAPACITY_MODEL ?? CANONICAL_LOCAL_MODEL;
   const primaryHost = (input.ollamaHost ?? process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434").replace(/\/$/, "");
   const fallbackHost = "http://127.0.0.1:11434";
   const repoRoot = input.repoRoot ?? process.cwd();
   const createdAt = input.createdAt ?? new Date().toISOString();
-  const runId = `gemma-capacity-preflight-${timestampForPath(new Date(createdAt))}`;
-  const artifactPath = join(repoRoot, ".tmp", "workflow-receipts", "gemma_capacity_preflight", `${runId}.json`);
+  const runId = `local-model-capacity-preflight-${timestampForPath(new Date(createdAt))}`;
+  const artifactPath = join(repoRoot, ".tmp", "workflow-receipts", "local_model_capacity_preflight", `${runId}.json`);
 
   const attempts = [primaryHost, ...(primaryHost === fallbackHost ? [] : [fallbackHost])];
   const results = [] as Awaited<ReturnType<typeof tryGenerate>>[];
@@ -106,11 +110,11 @@ export async function runGemmaCapacityPreflight(input: {
   const canLoad = errorText === null && responseText !== null && responseText.length > 0;
   const required = parseRequiredMemoryGiB(errorText);
   const blockers = canLoad ? [] : [
-    required !== null ? "insufficient_system_memory" : "gemma_generation_failed",
+    required !== null ? "insufficient_system_memory" : "local_model_generation_failed",
   ];
-  const receipt: GemmaCapacityReceipt = {
-    workflow_name: "gemma_capacity_preflight",
-    schema_version: "gemma_capacity_preflight.v1",
+  const receipt: LocalModelCapacityReceipt = {
+    workflow_name: "local_model_capacity_preflight",
+    schema_version: "callscore.local_model_capacity_preflight.v1",
     run_id: runId,
     created_at: createdAt,
     model,
@@ -130,8 +134,8 @@ export async function runGemmaCapacityPreflight(input: {
       production_default_changed: false,
     },
     next_safe_action: canLoad
-      ? "Gemma4 is capacity-ready for bounded shadow/eval jobs; keep production default changes gated."
-      : "Use lightweight Qwen for verifier work now; free memory, configure swap/smaller Gemma4 quant, or route Gemma4 jobs to laptop/GPU before always-on Gemma4 scheduling.",
+      ? `${CANONICAL_LOCAL_MODEL} is capacity-ready for bounded shadow/eval jobs; keep production default changes gated.`
+      : `Free memory, use a smaller ${CANONICAL_LOCAL_MODEL} quant, or route local-model jobs to laptop/GPU before always-on scheduling.`,
     artifact_path: artifactPath,
   };
   mkdirSync(dirname(artifactPath), { recursive: true });
@@ -139,9 +143,12 @@ export async function runGemmaCapacityPreflight(input: {
   return receipt;
 }
 
+/** Compatibility alias for the historical command surface. */
+export const runGemmaCapacityPreflight = runLocalModelCapacityPreflight;
+
 async function main(): Promise<void> {
   loadEnv();
-  const receipt = await runGemmaCapacityPreflight({
+  const receipt = await runLocalModelCapacityPreflight({
     model: argValue(process.argv.slice(2), "--model") ?? undefined,
     ollamaHost: argValue(process.argv.slice(2), "--ollama-host") ?? undefined,
   });

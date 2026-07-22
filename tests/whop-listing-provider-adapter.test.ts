@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -66,11 +69,12 @@ test("graph-owned WHOP_UPDATE_APP uses a narrow direct Whop endpoint fallback an
   const previousWhopKey = process.env.WHOP_API_KEY;
   const previousTestMode = process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
   const previousAppDir = process.env.CALLSCORE_APP_DIR;
+  const isolatedAppDir = mkdtempSync(join(tmpdir(), "callscore-whop-listing-test-"));
   const calls: Array<{ url: string; init?: RequestInit }> = [];
 
   process.env.WHOP_API_KEY = "test-whop-key";
   delete process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE;
-  process.env.CALLSCORE_APP_DIR = "/tmp/callscore-whop-listing-test";
+  process.env.CALLSCORE_APP_DIR = isolatedAppDir;
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(url), init });
     return new Response(JSON.stringify({
@@ -109,5 +113,6 @@ test("graph-owned WHOP_UPDATE_APP uses a narrow direct Whop endpoint fallback an
     else process.env.CALLSCORE_GRAPH_PROVIDER_TEST_MODE = previousTestMode;
     if (previousAppDir === undefined) delete process.env.CALLSCORE_APP_DIR;
     else process.env.CALLSCORE_APP_DIR = previousAppDir;
+    rmSync(isolatedAppDir, { recursive: true, force: true });
   }
 });
