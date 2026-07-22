@@ -321,6 +321,21 @@ test("transcript recovery merges transactional DB journal evidence without doubl
     () => validateTranscriptRecoveryMutationJournal([journal[0], "malformed"]),
     /mutation journal record is malformed/,
   );
+  assert.throws(
+    () => validateTranscriptRecoveryMutationJournal([{ ...journal[0], run_id: "", status: "" }]),
+    /mutation journal record is malformed/,
+  );
+  const duplicateEvidence = buildTranscriptRecoveryReplayEvidence(
+    [journal[0], { ...journal[0], reason: "no_captions" }],
+    ["VCbmPx1l7AU"],
+    "run-current",
+    false,
+  );
+  assert.equal((duplicateEvidence.journal_records as unknown[]).length, 1);
+  assert.throws(
+    () => buildTranscriptRecoveryReplayEvidence([{ ...journal[0], reason: "x".repeat(400) }], ["VCbmPx1l7AU"], "run-current", false),
+    /mutation journal record is malformed/,
+  );
   assert.deepEqual(validateTranscriptRecoveryMutationJournal(journal), journal);
   const replayEvidence = buildTranscriptRecoveryReplayEvidence(journal, ["VCbmPx1l7AU"], "run-current", false);
   assert.equal(replayEvidence.production_db_writes_performed, true);
@@ -366,12 +381,24 @@ test("transcript recovery replay preserves the original workflow receipt", async
   };
   writeFileSync(receiptPath, JSON.stringify(originalReceiptObject));
   assert.equal(workflowReceiptIsValidForRun(receiptPath, runId), false);
+  writeFileSync(receiptPath, JSON.stringify({
+    ...originalReceiptObject,
+    evidence: {
+      production_db_writes_performed: true,
+      db_rows_mutated: 1,
+      recovered_from_transactional_journal: true,
+      source_run_id: runId,
+      journal_records: [{ run_id: "foreign-run", youtube_video_id: "VCbmPx1l7AU", status: "updated", db_write_performed: true }],
+    },
+  }));
+  assert.equal(workflowReceiptIsValidForRun(receiptPath, runId), false);
   const originalReceipt = JSON.stringify({
     ...originalReceiptObject,
     evidence: {
       production_db_writes_performed: false,
       db_rows_mutated: 0,
       recovered_from_transactional_journal: false,
+      source_run_id: runId,
       journal_records: [],
     },
   });
@@ -396,12 +423,34 @@ test("transcript recovery replay preserves the original workflow receipt", async
     production_db_writes_performed: false,
     db_rows_mutated: 0,
     recovered_from_transactional_journal: false,
+    source_run_id: runId,
     journal_records: [],
   });
+
+  const receiptOnlyRunId = `transcript-replay-receipt-only-${Date.now()}`;
+  const receiptOnlyPath = `.tmp/workflow-receipts/transcript_recover_hh/${receiptOnlyRunId}.json`;
+  const receiptOnlyAuditPath = `.tmp/workplane-jobs/transcript_recover_hh/${receiptOnlyRunId}.jsonl`;
+  const receiptOnlyBody = JSON.stringify({
+    ...originalReceiptObject,
+    run_id: receiptOnlyRunId,
+    evidence: { ...JSON.parse(originalReceipt).evidence, source_run_id: receiptOnlyRunId },
+  });
+  writeFileSync(receiptOnlyPath, receiptOnlyBody);
+  const receiptOnlyReplay = await runWorkplaneJob({
+    id: 77124,
+    run_id: 77124,
+    type: "transcript_recover_hh",
+    payload: { run_id: receiptOnlyRunId, youtube_video_ids: ["VCbmPx1l7AU"], write: false },
+  } as never);
+  assert.equal(existsSync(receiptOnlyAuditPath), false);
+  assert.equal(readFileSync(receiptOnlyPath, "utf8"), receiptOnlyBody);
+  assert.notEqual(receiptOnlyReplay.receipt_path, receiptOnlyPath);
   rmSync(auditPath, { force: true });
   rmSync(receiptPath, { force: true });
   rmSync(partialReceiptPath, { force: true });
   rmSync(String(result.receipt_path), { force: true });
+  rmSync(receiptOnlyPath, { force: true });
+  rmSync(String(receiptOnlyReplay.receipt_path), { force: true });
 });
 
 test("workplane status exposes all job specs as JSON-friendly records", () => {
@@ -922,7 +971,7 @@ test("transcript recovery write mode requires forced replay-safe Workplane selec
 });
 
 test("owned public execution job emits a public artifact packet and receipt without restricted mutations", async () => {
-  const runId = "owned-public-artifact-test";
+  const runId = `owned-public-artifact-test-${Date.now()}`;
   const out = join(mkdtempSync(join(tmpdir(), "callscore-owned-public-artifact-")), "artifact.json");
   const result = await runWorkplaneJob({
     id: 1,
@@ -943,6 +992,7 @@ test("owned public execution job emits a public artifact packet and receipt with
   assert.equal(artifact.ready_public_owned, true);
   assert.equal(artifact.restricted_actions_blocked, true);
   assert.match(String(result.receipt_path), /artofwar_owned_public_execution/);
+  rmSync(String(result.receipt_path), { force: true });
 });
 
 test("Gemma Ollama Modelfile is aligned to production shadow extraction schema", () => {

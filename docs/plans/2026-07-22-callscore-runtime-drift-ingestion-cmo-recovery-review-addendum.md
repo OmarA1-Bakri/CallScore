@@ -198,4 +198,26 @@ The superseding remediation:
 
 Current parent evidence: TypeScript passed; focused suite `89/89`; full suite `1441/1441`; both worker/lease-fenced mutation statements planned against the live PostgreSQL schema with `EXPLAIN` and `executed:false`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
 
+Acceptance for that tuple failed: `deleg_21b1769e` returned three `FAIL` verdicts against `60ba10b6cc85831c6ec784ac81052f28a6436370`.
+
+## Sixth review cycle and immutable claim-generation fencing
+
+The valid blockers from `deleg_21b1769e` were:
+
+1. mutation evidence was not bound record-by-record to the receipt’s source run, and blank/unknown run/status values were accepted;
+2. persisted evidence retained duplicate records and did not enforce string/cardinality bounds;
+3. worker/lease fencing did not include the claim generation (`pipeline_jobs.attempts`), allowing a stale execution from the same stable worker identity to match a later reclaimed lease;
+4. receipt writes were not exclusive, and a receipt-only collision with no JSONL audit could enter normal execution and overwrite evidence.
+
+The superseding remediation:
+
+- requires bounded safe run IDs, exact statuses (`updated` or `failed`), bounded reasons and no malformed entries anywhere in the journal;
+- requires `source_run_id` plus every persisted record’s run ID to equal the expected original run, and rejects duplicate receipt evidence while deduplicating bounded persistence by video ID;
+- passes the positive claimed `attempts` generation end-to-end and requires `attempts = $13` in both atomic owner CTEs alongside job ID/type/status, `locked_by` and unexpired lease;
+- writes every workflow receipt with exclusive `wx` creation and mode `0600`;
+- treats either a pre-existing receipt or JSONL audit as an immutable replay collision before execution, never creates JSONL for a receipt-only collision, and gives every replay receipt a fresh immutable run ID;
+- adds regressions for foreign/blank/duplicate/oversized evidence, missing claim generation, SQL attempt fencing, receipt exclusivity, receipt-only replay and repeat-safe public test receipts.
+
+Current parent evidence: TypeScript passed; expanded focused suite `94/94`; full suite `1441/1441`; both worker/lease/attempt-fenced mutation statements planned against the live PostgreSQL schema with `EXPLAIN` and `executed:false`; Workplane `OK`; freshness `PASS`; canonical audit `51/51`; secret hygiene passed.
+
 Acceptance requires a new immutable commit and three fresh exact-tuple verdicts. All earlier verdicts remain superseded.

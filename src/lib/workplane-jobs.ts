@@ -244,17 +244,20 @@ export function canonicalTranscriptRecoveryRunConfig(payload: Readonly<Record<st
   };
 }
 
-export function isTranscriptRecoveryMutationEvidence(value: unknown): boolean {
+export function isTranscriptRecoveryMutationEvidence(value: unknown, expectedRunId: string): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const evidence = value as Record<string, unknown>;
   if (typeof evidence.production_db_writes_performed !== "boolean") return false;
   if (!Number.isInteger(evidence.db_rows_mutated) || Number(evidence.db_rows_mutated) < 0) return false;
   if (typeof evidence.recovered_from_transactional_journal !== "boolean") return false;
+  if (evidence.source_run_id !== expectedRunId) return false;
   if (!Array.isArray(evidence.journal_records)) return false;
   try {
     const records = validateTranscriptRecoveryMutationJournal(evidence.journal_records);
+    if (records.some((record) => record.run_id !== expectedRunId)) return false;
     const distinct = new Set(records.map((record) => String(record.youtube_video_id))).size;
-    return distinct === Number(evidence.db_rows_mutated)
+    return records.length === distinct
+      && distinct === Number(evidence.db_rows_mutated)
       && evidence.production_db_writes_performed === (distinct > 0);
   } catch {
     return false;
@@ -267,7 +270,7 @@ export function workflowReceiptIsValidForRun(path: string, runId: string): boole
     return isWorkflowReceipt(parsed)
       && parsed.run_id === runId
       && parsed.workflow_name === "transcript_recover_hh"
-      && isTranscriptRecoveryMutationEvidence(parsed.evidence);
+      && isTranscriptRecoveryMutationEvidence(parsed.evidence, runId);
   } catch {
     return false;
   }
@@ -313,7 +316,8 @@ export function mergeTranscriptRecoveryEvidence(
 }
 
 export function validateTranscriptRecoveryMutationJournal(value: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(value)) throw new Error("transcript recovery mutation journal is unavailable or malformed");
+  if (!Array.isArray(value) || value.length > 100) throw new Error("transcript recovery mutation journal is unavailable or malformed");
+  const validStatuses = new Set(["updated", "failed"]);
   return value.map((entry) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       throw new Error("transcript recovery mutation journal record is malformed");
@@ -321,9 +325,12 @@ export function validateTranscriptRecoveryMutationJournal(value: unknown): Recor
     const record = entry as Record<string, unknown>;
     if (
       typeof record.run_id !== "string"
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/.test(record.run_id)
       || typeof record.youtube_video_id !== "string"
       || !/^[A-Za-z0-9_-]{11}$/.test(record.youtube_video_id)
       || typeof record.status !== "string"
+      || !validStatuses.has(record.status)
+      || (record.reason !== undefined && record.reason !== null && (typeof record.reason !== "string" || record.reason.length > 256))
       || record.db_write_performed !== true
     ) {
       throw new Error("transcript recovery mutation journal record is malformed");
@@ -349,22 +356,26 @@ export function buildTranscriptRecoveryReplayEvidence(
   originalReceiptValid: boolean,
 ): Record<string, unknown> {
   const requested = new Set(ids);
-  const currentRecords = journalRecords
-    .filter((record) => record.run_id === runId && record.db_write_performed === true && typeof record.youtube_video_id === "string" && requested.has(record.youtube_video_id))
-    .map((record) => ({
-      run_id: runId,
-      youtube_video_id: String(record.youtube_video_id),
-      video_id: typeof record.video_id === "number" ? record.video_id : null,
-      status: typeof record.status === "string" ? record.status : "unknown",
-      reason: typeof record.reason === "string" ? record.reason : null,
-      db_write_performed: true,
-      evidence_source: "pipeline_job_transaction_journal",
-    }));
+  const currentByVideoId = new Map<string, Record<string, unknown>>();
+  for (const record of validateTranscriptRecoveryMutationJournal([...journalRecords])) {
+    if (record.run_id !== runId || !requested.has(String(record.youtube_video_id))) continue;
+    currentByVideoId.set(String(record.youtube_video_id), record);
+  }
+  const currentRecords = [...currentByVideoId.values()].map((record) => ({
+    run_id: runId,
+    youtube_video_id: String(record.youtube_video_id),
+    video_id: typeof record.video_id === "number" && Number.isInteger(record.video_id) && record.video_id > 0 ? record.video_id : null,
+    status: String(record.status),
+    reason: typeof record.reason === "string" ? record.reason.slice(0, 256) : null,
+    db_write_performed: true,
+    evidence_source: "pipeline_job_transaction_journal",
+  }));
   const dbRowsMutated = new Set(currentRecords.map((record) => record.youtube_video_id)).size;
   return {
     production_db_writes_performed: dbRowsMutated > 0,
     db_rows_mutated: dbRowsMutated,
     recovered_from_transactional_journal: !originalReceiptValid,
+    source_run_id: runId,
     journal_records: currentRecords,
   };
 }
@@ -1206,20 +1217,27 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
       throw new Error("transcript_recover_hh requires force_targeted_retry=true for every Workplane invocation");
     }
     const forceTargetedRetry = true;
+    const originalReceiptPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.json`;
+    const originalReceiptPresent = existsSync(originalReceiptPath);
+    const originalReceiptValid = originalReceiptPresent && workflowReceiptIsValidForRun(originalReceiptPath, runId);
+    let replayCollision = originalReceiptPresent;
     mkdirSync(dirname(auditOut), { recursive: true });
-    try {
-      writeFileSync(auditOut, "", { flag: "wx", mode: 0o600 });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const blocker = "audit_output_exists";
-      const originalReceiptPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.json`;
-      const originalReceiptPresent = existsSync(originalReceiptPath);
-      const originalReceiptValid = originalReceiptPresent && workflowReceiptIsValidForRun(originalReceiptPath, runId);
+    if (!replayCollision) {
+      try {
+        writeFileSync(auditOut, "", { flag: "wx", mode: 0o600 });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        replayCollision = true;
+      }
+    }
+    if (replayCollision) {
+      const blocker = "immutable_run_artifact_exists";
       const replayAuditRecords = readTranscriptRecoveryAudit(auditOut);
       const replayJournalRecords = originalReceiptValid ? [] : await readTranscriptRecoveryMutationJournal(job.id);
       const replayRecords = mergeTranscriptRecoveryEvidence(replayAuditRecords, replayJournalRecords);
       const replaySummary = summarizeTranscriptRecoveryRecords(replayRecords, write, ids, runId);
       const replayEvidence = buildTranscriptRecoveryReplayEvidence(replayJournalRecords, ids, runId, originalReceiptValid);
+      const replayReceiptRunId = buildRunId("transcript-recover-hh-replay");
       const replayBlockers = [...new Set([blocker, ...replaySummary.blockers])];
       const currentJobMutationCount = Number(replayEvidence.db_rows_mutated);
       return {
@@ -1233,7 +1251,8 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
         blockers: replayBlockers,
         production_db_writes_performed: currentJobMutationCount > 0,
         db_rows_mutated: currentJobMutationCount,
-        receipt_path: writeWorkplaneReceipt(job, spec, `${runId}-replay-${job.id}`, "blocked", replayBlockers, "choose a fresh run_id; original audit and workflow receipt evidence are never overwritten", replayEvidence),
+        receipt_path: writeWorkplaneReceipt(job, spec, replayReceiptRunId, "blocked", replayBlockers, "choose a fresh run_id; original audit and workflow receipt evidence are never overwritten", replayEvidence),
+        replay_receipt_run_id: replayReceiptRunId,
         original_receipt_present: originalReceiptPresent,
         original_receipt_valid: originalReceiptValid,
         original_receipt_overwritten: false,
@@ -1245,6 +1264,7 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
         "--run-id", runId,
         "--workplane-job-id", String(job.id),
         "--workplane-worker-id", job.locked_by ?? "",
+        "--workplane-job-attempt", String(job.attempts),
         "--methods", "hh_ytdlp_ejs_wpc",
         "--youtube-video-ids", ids.join(","),
         "--limit", String(ids.length),

@@ -42,6 +42,7 @@ export interface BackfillTranscriptsArgs {
   readonly forceTargetedRetry: boolean;
   readonly workplaneJobId: number;
   readonly workplaneWorkerId: string;
+  readonly workplaneJobAttempt: number;
   readonly limit: number;
   readonly offset: number;
   readonly concurrency: number;
@@ -166,6 +167,7 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
     forceTargetedRetry,
     workplaneJobId: positiveInt(argValue(argv, "--workplane-job-id"), 0),
     workplaneWorkerId: (argValue(argv, "--workplane-worker-id") ?? "").trim(),
+    workplaneJobAttempt: positiveInt(argValue(argv, "--workplane-job-attempt"), 0),
     limit: positiveInt(argValue(argv, "--limit") ?? process.env.TRANSCRIPT_BATCH_LIMIT ?? null, DEFAULT_TRANSCRIPT_BATCH_LIMIT),
     offset: nonNegativeInt(argValue(argv, "--offset"), 0),
     concurrency: Math.min(MAX_TRANSCRIPT_CONCURRENCY, requestedConcurrency),
@@ -201,6 +203,7 @@ export function assertBackfillWriteAuthority(args: BackfillTranscriptsArgs, owne
   if (owner === "workplane") {
     if (args.workplaneJobId <= 0) throw new Error("transcript_recover_hh Workplane ownership requires a positive workplane job id");
     if (!args.workplaneWorkerId || args.workplaneWorkerId.length > 256) throw new Error("transcript_recover_hh Workplane ownership requires the executing worker identity");
+    if (args.workplaneJobAttempt <= 0) throw new Error("transcript_recover_hh Workplane ownership requires the positive claim generation");
     if (!args.forceTargetedRetry) throw new Error("transcript_recover_hh Workplane invocation requires --force-targeted-retry");
     if (args.youtubeVideoIds.length === 0 || args.youtubeVideoIds.length > MAX_WORKPLANE_TARGETED_RECOVERY_IDS) {
       throw new Error(`transcript_recover_hh Workplane invocation requires 1 to at most ${MAX_WORKPLANE_TARGETED_RECOVERY_IDS} exact IDs`);
@@ -725,6 +728,7 @@ export const JOURNALED_TRANSCRIPT_FAILURE_SQL = `WITH owner AS (
     AND status = 'running'
     AND locked_by = $12
     AND lease_expires_at > NOW()
+    AND attempts = $13
   FOR UPDATE
 ), updated AS (
   UPDATE videos
@@ -771,6 +775,7 @@ export const JOURNALED_TRANSCRIPT_SUCCESS_SQL = `WITH owner AS (
     AND status = 'running'
     AND locked_by = $12
     AND lease_expires_at > NOW()
+    AND attempts = $13
   FOR UPDATE
 ), updated AS (
   UPDATE videos
@@ -847,6 +852,7 @@ async function markTranscriptFailure(
     args.runId,
     video.youtube_video_id,
     args.workplaneWorkerId,
+    args.workplaneJobAttempt,
   ]);
   return rows.length === 1;
 }
@@ -1049,6 +1055,7 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
               args.runId,
               video.youtube_video_id,
               args.workplaneWorkerId,
+              args.workplaneJobAttempt,
             ])
             : await query<{ id: number }>(
               `UPDATE videos

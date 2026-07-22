@@ -85,6 +85,6 @@ export function writeWorkflowReceipt(receipt: WorkflowReceipt, root = WORKFLOW_R
   const gated = enforceWorkflowApprovalGate(receipt);
   const out = buildWorkflowReceiptPath(gated, root);
   mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, `${JSON.stringify(gated, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(out, `${JSON.stringify(gated, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   return { path: out, receipt: gated };
 }

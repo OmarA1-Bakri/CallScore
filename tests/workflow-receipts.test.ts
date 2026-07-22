@@ -28,6 +28,10 @@ test("workflow receipts write deterministic JSON artifacts", () => {
   const stored = JSON.parse(readFileSync(result.path, "utf8")) as WorkflowReceipt;
   assert.equal(stored.workflow_name, "freshness_check");
   assert.equal(stored.result, "passed");
+  assert.throws(
+    () => writeWorkflowReceipt(receipt({ workflow_name: "freshness_check", run_id: "fresh-1", result: "failed" }), root),
+    (error: unknown) => (error as NodeJS.ErrnoException).code === "EEXIST",
+  );
 });
 
 test("workflow receipt paths reject traversal", () => {
