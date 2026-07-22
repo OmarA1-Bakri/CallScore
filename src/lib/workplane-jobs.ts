@@ -236,7 +236,7 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
     cooldown_policy: "normal cooldown applies unless force_targeted_retry=true with exact IDs; stop on provider block by default",
     output_artifact: ".tmp/workflow-receipts/transcript_recover_hh/<run-id>.jsonl plus receipt JSON",
     success_criteria: ["exact YouTube IDs selected", "current isolated yt-dlp EJS/WPC runtime used", "all selected rows emit updated/would_update audit records", "production call writes remain disabled"],
-    failure_classification: ["invalid_payload", "no_target_rows_selected", "bot_verification_required", "js_challenge_runtime_missing", "po_token_required", "cookie_invalid_or_rotated", "rate_limited", "no_captions", "transcript_failed"],
+    failure_classification: ["invalid_payload", "no_target_rows_selected", "mutation_conflict", "bot_verification_required", "js_challenge_runtime_missing", "po_token_required", "cookie_invalid_or_rotated", "rate_limited", "no_captions", "transcript_failed"],
     production_db_writes_allowed: true,
     default_safe_command: "npm run backfill:transcripts -- --methods hh_ytdlp_ejs_wpc --youtube-video-ids <comma-separated-exact-ids> --force-targeted-retry --limit 9 --audit-out .tmp/workflow-receipts/transcript_recover_hh/<run-id>.jsonl --dry-run",
   }),
@@ -825,7 +825,7 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
     }
     const successStatus = write ? "updated" : "would_update";
     const succeeded = records.filter((record) => record.status === successStatus);
-    const failed = records.filter((record) => record.status === "failed" || record.status === "pending_handoff");
+    const failed = records.filter((record) => record.status === "failed" || record.status === "pending_handoff" || record.status === "mutation_conflict");
     const blockers = failed.length > 0
       ? [...new Set(failed.map((record) => String(record.reason ?? "transcript_failed")))]
       : (succeeded.length === ids.length ? [] : ["no_target_rows_selected"]);

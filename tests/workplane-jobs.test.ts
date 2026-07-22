@@ -95,6 +95,7 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   assert.equal(recovery.concurrency, 1);
   assert.equal(recovery.production_db_writes_allowed, true);
   assert.equal(recovery.production_call_writes_allowed, false);
+  assert.ok(recovery.failure_classification.includes("mutation_conflict"));
   assert.match(recovery.default_safe_command, /hh_ytdlp_ejs_wpc/);
   assert.match(recovery.default_safe_command, /--youtube-video-ids/);
   assert.match(recovery.default_safe_command, /--force-targeted-retry/);
