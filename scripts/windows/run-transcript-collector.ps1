@@ -38,12 +38,12 @@ if ($MinGapSeconds -lt 1 -or $MaxGapSeconds -lt $MinGapSeconds) { throw "Gap bou
 if ($CooldownMinHours -lt 1 -or $CooldownMaxHours -lt $CooldownMinHours) { throw "Cooldown bounds must satisfy 1 <= CooldownMinHours <= CooldownMaxHours" }
 if ($HhPort -lt 1 -or $HhPort -gt 65535) { throw "HhPort must be 1..65535" }
 
-function Invoke-TransportCommand([string]$Program, [string[]]$Args) {
+function Invoke-TransportCommand([string]$Program, [string[]]$ProgramArgs) {
   if ($SshTransport -eq "wsl") {
-    & wsl.exe -d $WslDistro -u $WslUser -- $Program @Args
+    & wsl.exe -d $WslDistro -u $WslUser -- $Program @ProgramArgs
     return
   }
-  & $Program @Args
+  & $Program @ProgramArgs
 }
 
 function Convert-LocalPathForSshTransport([string]$Path) {
