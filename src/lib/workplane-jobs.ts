@@ -1,5 +1,5 @@
 import type { PipelineJob } from "./pipeline";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { buildRunId } from "./shadow-extraction";
 import { writeWorkflowReceipt } from "./workflow-receipts";
@@ -244,6 +244,17 @@ export function canonicalTranscriptRecoveryRunConfig(payload: Readonly<Record<st
   };
 }
 
+export function workflowReceiptIsValidForRun(path: string, runId: string): boolean {
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
+    return Boolean(parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      && (parsed as Record<string, unknown>).run_id === runId
+      && typeof (parsed as Record<string, unknown>).result === "string");
+  } catch {
+    return false;
+  }
+}
+
 export function readTranscriptRecoveryAudit(path: string): Record<string, unknown>[] {
   try {
     return readFileSync(path, "utf8")
@@ -293,6 +304,17 @@ async function readTranscriptRecoveryMutationJournal(jobId: number): Promise<Rec
   const mutations = row?.mutations;
   if (!Array.isArray(mutations)) throw new Error("transcript recovery mutation journal is unavailable or malformed");
   return mutations.filter((value): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value)));
+}
+
+export function transcriptRecoveryJournalMutationCount(
+  journalRecords: readonly Record<string, unknown>[],
+  ids: readonly string[],
+  runId: string,
+): number {
+  const requested = new Set(ids);
+  return new Set(journalRecords
+    .filter((record) => record.run_id === runId && record.db_write_performed === true && typeof record.youtube_video_id === "string" && requested.has(record.youtube_video_id))
+    .map((record) => String(record.youtube_video_id))).size;
 }
 
 export function summarizeTranscriptRecoveryRecords(
@@ -1115,21 +1137,32 @@ export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJ
     mkdirSync(dirname(auditOut), { recursive: true });
     try {
       writeFileSync(auditOut, "", { flag: "wx", mode: 0o600 });
-    } catch {
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
       const blocker = "audit_output_exists";
+      const originalReceiptPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.json`;
+      const originalReceiptPresent = existsSync(originalReceiptPath);
+      const originalReceiptValid = originalReceiptPresent && workflowReceiptIsValidForRun(originalReceiptPath, runId);
+      const replayAuditRecords = readTranscriptRecoveryAudit(auditOut);
+      const replayJournalRecords = originalReceiptValid ? [] : await readTranscriptRecoveryMutationJournal(job.id);
+      const replayRecords = mergeTranscriptRecoveryEvidence(replayAuditRecords, replayJournalRecords);
+      const replaySummary = summarizeTranscriptRecoveryRecords(replayRecords, write, ids, runId);
+      const currentJobMutationCount = transcriptRecoveryJournalMutationCount(replayJournalRecords, ids, runId);
       return {
         mode: write ? "targeted_write" : "targeted_dry_run",
         execution_location: spec.execution_location,
         run_id: runId,
         requested_youtube_video_ids: ids,
-        selected_records: 0,
-        succeeded: 0,
-        failed: 0,
-        blockers: [blocker],
-        production_db_writes_performed: false,
-        db_rows_mutated: 0,
-        receipt_path: writeWorkplaneReceipt(job, spec, `${runId}-replay-${job.id}`, "blocked", [blocker], "choose a fresh run_id; original audit and workflow receipt evidence remain immutable"),
-        original_receipt_preserved: true,
+        selected_records: replayRecords.length,
+        succeeded: replaySummary.succeeded.length,
+        failed: replaySummary.failed.length,
+        blockers: [...new Set([blocker, ...replaySummary.blockers])],
+        production_db_writes_performed: currentJobMutationCount > 0,
+        db_rows_mutated: currentJobMutationCount,
+        receipt_path: writeWorkplaneReceipt(job, spec, `${runId}-replay-${job.id}`, "blocked", [blocker], "choose a fresh run_id; original audit and workflow receipt evidence are never overwritten"),
+        original_receipt_present: originalReceiptPresent,
+        original_receipt_valid: originalReceiptValid,
+        original_receipt_overwritten: false,
       };
     }
     const { runTargetedTranscriptRecoveryFromWorkplane } = await import("../scripts/backfill-transcripts");

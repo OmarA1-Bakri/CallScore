@@ -15,6 +15,8 @@ import {
   readTranscriptRecoveryAudit,
   runWorkplaneJob,
   summarizeTranscriptRecoveryRecords,
+  transcriptRecoveryJournalMutationCount,
+  workflowReceiptIsValidForRun,
 } from "../src/lib/workplane-jobs";
 import { PipelineDispatchJobTypeSchema } from "../src/lib/workplane/operating-graph-schemas";
 import {
@@ -313,6 +315,12 @@ test("transcript recovery merges transactional DB journal evidence without doubl
     evidence_source: "pipeline_job_transaction_journal",
   }];
   const journalOnly = mergeTranscriptRecoveryEvidence([], journal);
+  assert.equal(transcriptRecoveryJournalMutationCount([
+    ...journal,
+    ...journal,
+    { ...journal[0], run_id: "foreign-run" },
+    { ...journal[0], youtube_video_id: "lVLvnT4j9TU" },
+  ], ["VCbmPx1l7AU"], "run-current"), 1);
   const recovered = summarizeTranscriptRecoveryRecords(journalOnly, true, ["VCbmPx1l7AU"], "run-current");
   assert.equal(recovered.production_db_writes_performed, true);
   assert.equal(recovered.db_rows_mutated, 1);
@@ -334,18 +342,26 @@ test("transcript recovery replay preserves the original workflow receipt", async
   const receiptPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.json`;
   mkdirSync(dirname(auditPath), { recursive: true });
   writeFileSync(auditPath, "", { mode: 0o600 });
-  writeFileSync(receiptPath, JSON.stringify({ original: true }));
+  const originalReceipt = JSON.stringify({ run_id: runId, result: "passed", original: true });
+  const partialReceiptPath = `.tmp/workflow-receipts/transcript_recover_hh/${runId}.partial.json`;
+  writeFileSync(partialReceiptPath, "{");
+  assert.equal(workflowReceiptIsValidForRun(partialReceiptPath, runId), false);
+  writeFileSync(receiptPath, originalReceipt);
+  assert.equal(workflowReceiptIsValidForRun(receiptPath, runId), true);
   const result = await runWorkplaneJob({
     id: 77123,
     run_id: 77123,
     type: "transcript_recover_hh",
     payload: { run_id: runId, youtube_video_ids: ["VCbmPx1l7AU"], write: false },
   } as never);
-  assert.equal(readFileSync(receiptPath, "utf8"), JSON.stringify({ original: true }));
-  assert.equal(result.original_receipt_preserved, true);
+  assert.equal(readFileSync(receiptPath, "utf8"), originalReceipt);
+  assert.equal(result.original_receipt_present, true);
+  assert.equal(result.original_receipt_valid, true);
+  assert.equal(result.original_receipt_overwritten, false);
   assert.notEqual(result.receipt_path, receiptPath);
   rmSync(auditPath, { force: true });
   rmSync(receiptPath, { force: true });
+  rmSync(partialReceiptPath, { force: true });
   rmSync(String(result.receipt_path), { force: true });
 });
 

@@ -172,7 +172,7 @@ The superseding remediation:
 - applies strict EJS/WPC preflight to every invocation path, including direct CLI dry-runs;
 - requires native string enum fields and native finite numeric confidence before allowlist checks;
 - atomically couples each Workplane video mutation with a `pipeline_jobs.metrics.transcript_recovery_mutations` journal append in one PostgreSQL CTE statement, then merges DB-journal and JSONL evidence while deduplicating mutation counts by video ID;
-- preserves original workflow receipts and writes replay-block evidence under a distinct replay receipt path;
+- treats only `EEXIST` as a replay collision; other audit-create failures propagate. Replay validates the original receipt’s JSON/run identity, never overwrites it, and recovers current-job mutation truth from the transactional journal into a distinct replay receipt when the original is missing or partial;
 - adds regression tests for each defect and validates both journalled SQL statements against the live PostgreSQL schema with `EXPLAIN` only (`executed:false`).
 
 Current parent candidate evidence after this remediation: TypeScript passed; focused suite `89/89`; full suite `1441/1441`; both transactional mutation statements planned successfully against the live PostgreSQL schema with `EXPLAIN` and `executed:false`; effective Compose configuration shows the exact pinned runtime and zero cookie mounts; Dockerfile build check passed without warnings; Workplane `OK`; freshness `PASS`; canonical agent audit `51/51`; secret hygiene passed.
