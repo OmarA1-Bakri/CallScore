@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { NextRequest } from "next/server";
 import {
   CLAIM_NEXT_PIPELINE_JOB_SQL,
+  RESET_STALE_PIPELINE_JOBS_SQL,
   candidateAdmissionRunKey,
   candleRefreshRunKey,
   computeScoresRunKey,
@@ -117,6 +118,21 @@ test("Phase 2 pipeline recovery adds heartbeats, keepalive, and stale reset sema
   assert.equal(typeof updatePipelineJobHeartbeat, "function");
   assert.equal(typeof resetStalePipelineJobs, "function");
   assert.equal(typeof executeJobWithKeepalive, "function");
+});
+
+test("pipeline stale recovery atomically reconciles attempt budgets, parent runs, and reason-specific events", () => {
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /FOR UPDATE SKIP LOCKED/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /status = 'pending'[\s\S]*attempts >= max_attempts/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /WHEN c\.previous_status = 'running' AND c\.attempts < c\.max_attempts THEN 'pending'/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /ELSE 'failed'/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /UPDATE pipeline_runs/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /EXISTS \(\s*SELECT 1 FROM updated failed_update[\s\S]*failed_update\.status = 'failed'/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /NOT EXISTS \([\s\S]*FROM pipeline_jobs open_job[\s\S]*NOT EXISTS \(\s*SELECT 1 FROM updated closed_update[\s\S]*closed_update\.id = open_job\.id/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /finished_at = NOW\(\)/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /INSERT INTO pipeline_job_events/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /attempts_exhausted_reconciled/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /stale_failed/i);
+  assert.match(RESET_STALE_PIPELINE_JOBS_SQL, /stale_reset/i);
 });
 
 test("Phase 3 set-based matcher uses lateral candle lookups and SQL batch update", () => {

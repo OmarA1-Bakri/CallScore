@@ -438,50 +438,116 @@ export async function updatePipelineJobHeartbeat(
   });
 }
 
+export const RESET_STALE_PIPELINE_JOBS_SQL = `WITH candidates AS (
+  SELECT
+    id,
+    run_id,
+    status AS previous_status,
+    attempts,
+    max_attempts
+  FROM pipeline_jobs
+  WHERE (
+    status = 'running'
+    AND (
+      (lease_expires_at IS NOT NULL AND lease_expires_at < NOW())
+      OR (lease_expires_at IS NULL AND heartbeat_at IS NOT NULL AND heartbeat_at < NOW() - ($1::int * INTERVAL '1 second'))
+      OR (lease_expires_at IS NULL AND heartbeat_at IS NULL AND locked_at IS NOT NULL AND locked_at < NOW() - ($1::int * INTERVAL '1 second'))
+    )
+  ) OR (
+    status = 'pending'
+    AND run_after <= NOW()
+    AND attempts >= max_attempts
+  )
+  FOR UPDATE SKIP LOCKED
+), updated AS (
+  UPDATE pipeline_jobs j
+  SET status = CASE
+        WHEN c.previous_status = 'running' AND c.attempts < c.max_attempts THEN 'pending'
+        ELSE 'failed'
+      END,
+      locked_by = NULL,
+      locked_at = NULL,
+      heartbeat_at = NULL,
+      lease_expires_at = NULL,
+      run_after = CASE
+        WHEN c.previous_status = 'running' AND c.attempts < c.max_attempts THEN NOW()
+        ELSE j.run_after
+      END,
+      error = CASE
+        WHEN c.previous_status = 'pending' THEN COALESCE(j.error, 'attempts_exhausted_reconciled')
+        WHEN c.attempts >= c.max_attempts THEN COALESCE(j.error, 'stale_lease_expired_attempts_exhausted')
+        ELSE j.error
+      END,
+      updated_at = NOW()
+  FROM candidates c
+  WHERE j.id = c.id
+  RETURNING j.*, c.previous_status, c.attempts AS candidate_attempts, c.max_attempts AS candidate_max_attempts
+), terminal_runs AS (
+  UPDATE pipeline_runs r
+  SET status = CASE
+        WHEN EXISTS (
+          SELECT 1 FROM pipeline_jobs failed_job
+          WHERE failed_job.run_id = r.id AND failed_job.status = 'failed'
+        ) OR EXISTS (
+          SELECT 1 FROM updated failed_update
+          WHERE failed_update.run_id = r.id AND failed_update.status = 'failed'
+        ) THEN 'failed'
+        ELSE 'succeeded'
+      END,
+      finished_at = NOW(),
+      updated_at = NOW()
+  WHERE r.status = 'running'
+    AND EXISTS (SELECT 1 FROM pipeline_jobs any_job WHERE any_job.run_id = r.id)
+    AND NOT EXISTS (
+      SELECT 1 FROM pipeline_jobs open_job
+      WHERE open_job.run_id = r.id
+        AND open_job.status IN ('pending', 'running')
+        AND NOT EXISTS (
+          SELECT 1 FROM updated closed_update
+          WHERE closed_update.id = open_job.id AND closed_update.status = 'failed'
+        )
+    )
+  RETURNING r.id
+), inserted_events AS (
+  INSERT INTO pipeline_job_events (
+    run_id, job_id, event_type, status, message, payload
+  )
+  SELECT
+    u.run_id,
+    u.id,
+    CASE
+      WHEN u.previous_status = 'pending' THEN 'attempts_exhausted_reconciled'
+      WHEN u.candidate_attempts >= u.candidate_max_attempts THEN 'stale_failed'
+      ELSE 'stale_reset'
+    END,
+    u.status,
+    CASE
+      WHEN u.previous_status = 'pending' THEN 'Reconciled attempts-exhausted pending job'
+      WHEN u.candidate_attempts >= u.candidate_max_attempts THEN 'Failed stale running job with exhausted attempts'
+      ELSE 'Recovered retryable stale running job'
+    END,
+    jsonb_build_object(
+      'previous_status', u.previous_status,
+      'attempts', u.candidate_attempts,
+      'max_attempts', u.candidate_max_attempts,
+      'stale_seconds', $1::int,
+      'reset_by', $2::text
+    )
+  FROM updated u
+  RETURNING job_id
+)
+SELECT u.* FROM updated u`;
+
 export async function resetStalePipelineJobs(input: {
   readonly staleSeconds?: number;
   readonly workerId?: string;
 } = {}): Promise<readonly PipelineJob[]> {
   const staleSeconds = Math.max(60, Math.floor(input.staleSeconds ?? DEFAULT_STUCK_JOB_SECONDS));
-  const resetJobs = await query<PipelineJob>(
-    `UPDATE pipeline_jobs
-     SET status = 'pending',
-         locked_by = NULL,
-         locked_at = NULL,
-         heartbeat_at = NULL,
-         lease_expires_at = NULL,
-         run_after = NOW(),
-         updated_at = NOW()
-     WHERE id IN (
-       SELECT id
-       FROM pipeline_jobs
-       WHERE status = 'running'
-         AND (
-           (lease_expires_at IS NOT NULL AND lease_expires_at < NOW())
-           OR (lease_expires_at IS NULL AND heartbeat_at IS NOT NULL AND heartbeat_at < NOW() - ($1::int * INTERVAL '1 second'))
-           OR (lease_expires_at IS NULL AND heartbeat_at IS NULL AND locked_at IS NOT NULL AND locked_at < NOW() - ($1::int * INTERVAL '1 second'))
-         )
-       FOR UPDATE SKIP LOCKED
-     )
-     RETURNING *`,
-    [staleSeconds],
-  );
-
-  await Promise.all(
-    resetJobs.map((staleJob) => appendPipelineJobEvent({
-      runId: staleJob.run_id,
-      jobId: staleJob.id,
-      eventType: "stale_reset",
-      status: "pending",
-      message: "Recovered stale running job",
-      payload: {
-        stale_seconds: staleSeconds,
-        reset_by: input.workerId ?? null,
-      },
-    })),
-  );
-
-  return resetJobs.map(normalizeJob);
+  const reconciledJobs = await query<PipelineJob>(RESET_STALE_PIPELINE_JOBS_SQL, [
+    staleSeconds,
+    input.workerId ?? null,
+  ]);
+  return reconciledJobs.map(normalizeJob);
 }
 
 export async function claimNextPipelineJob(input: ClaimNextJobInput): Promise<PipelineJob | null> {
