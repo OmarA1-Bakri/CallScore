@@ -3,7 +3,16 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { WORKPLANE_JOB_SPECS, WORKPLANE_JOB_TYPES, getWorkplaneJobSpec, runWorkplaneJob } from "../src/lib/workplane-jobs";
+import {
+  WORKPLANE_JOB_SPECS,
+  WORKPLANE_JOB_TYPES,
+  canonicalLocalModelForWorkplanePayload,
+  canonicalShadowExecutionConfig,
+  evaluateArtOfWarCampaignWithLocalModel,
+  getWorkplaneJobSpec,
+  runWorkplaneJob,
+  summarizeTranscriptRecoveryRecords,
+} from "../src/lib/workplane-jobs";
 import { PipelineDispatchJobTypeSchema } from "../src/lib/workplane/operating-graph-schemas";
 import {
   buildReadinessDomains,
@@ -110,6 +119,66 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   const art = getWorkplaneJobSpec("artofwar_publish_approval_review");
   assert.equal(art.public_ranking_impact_allowed, false);
   assert.match(art.cooldown_policy, /not applicable/);
+});
+
+test("canonical local-model execution ignores caller-controlled model, host, and output payloads", () => {
+  assert.equal(canonicalLocalModelForWorkplanePayload({ model: "gemma4:latest" }), "qwen3:4b-instruct-2507-q4_K_M");
+  const config = canonicalShadowExecutionConfig({
+    run_id: "safe-canary",
+    model: "gemma4:latest",
+    ollama_host: "https://unreviewed.example.test",
+    shadow_out: "/tmp/unreviewed.jsonl",
+    limit: 999,
+    num_predict: 99999,
+  });
+  assert.equal(config.model, "qwen3:4b-instruct-2507-q4_K_M");
+  assert.equal(config.ollama_host, "http://127.0.0.1:11434");
+  assert.equal(config.shadow_out, "/tmp/callscore-shadow-extractions/safe-canary.jsonl");
+  assert.equal(config.limit, "10");
+  assert.equal(config.num_predict, "1024");
+  assert.throws(() => canonicalShadowExecutionConfig({ run_id: "../escape" }), /safe identifier allowlist/);
+});
+
+test("Art of War local-model evaluator calls loopback Ollama with exact canonical Qwen3", async () => {
+  let requestUrl = "";
+  let requestBody: Record<string, unknown> = {};
+  const evaluation = await evaluateArtOfWarCampaignWithLocalModel(
+    { campaign_id: "campaign-1", claim: "Receipts beat vibes", audience: "crypto operators", cta: "Inspect the evidence" },
+    async (input, init) => {
+      requestUrl = String(input);
+      requestBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      return new Response(JSON.stringify({
+        model: "qwen3:4b-instruct-2507-q4_K_M",
+        response: JSON.stringify({
+          claim_risk: "low",
+          cta_risk: "low",
+          trust_risk: "low",
+          audience_fit: "strong",
+          recommendation: "keep",
+          confidence: 0.92,
+        }),
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    },
+  );
+  assert.equal(requestUrl, "http://127.0.0.1:11434/api/generate");
+  assert.equal(requestBody.model, "qwen3:4b-instruct-2507-q4_K_M");
+  assert.equal(evaluation.model, "qwen3:4b-instruct-2507-q4_K_M");
+  assert.equal(evaluation.evaluation.recommendation, "keep");
+});
+
+test("transcript recovery reports failure-row writes as production DB mutations", () => {
+  const summary = summarizeTranscriptRecoveryRecords([
+    { status: "failed", reason: "no_captions", db_write_performed: true },
+  ], true, ["VCbmPx1l7AU"]);
+  assert.equal(summary.production_db_writes_performed, true);
+  assert.equal(summary.db_rows_mutated, 1);
+  assert.deepEqual(summary.blockers, ["no_captions"]);
+
+  const conflict = summarizeTranscriptRecoveryRecords([
+    { status: "mutation_conflict", reason: "mutation_conflict", db_write_performed: false },
+  ], true, ["VCbmPx1l7AU"]);
+  assert.equal(conflict.production_db_writes_performed, false);
+  assert.deepEqual(conflict.blockers, ["mutation_conflict"]);
 });
 
 test("workplane status exposes all job specs as JSON-friendly records", () => {

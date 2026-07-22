@@ -7,6 +7,7 @@ import { query } from "../lib/db";
 import { writeJsonlRecord } from "../lib/shadow-extraction";
 import {
   buildTranscriptExtractionPlan,
+  DEFAULT_HH_YTDLP_EJS_WPC_BIN,
   defaultTranscriptExtractionMethods,
   envForTranscriptMethod,
   isLocalBackfillMethod,
@@ -312,6 +313,31 @@ export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | un
     throw new Error("HH targeted recovery cookie path must be a non-traversing file under /run/secrets/");
   }
 
+  const ytDlpBin = env.YTDLP_BIN?.trim();
+  if (ytDlpBin && ytDlpBin !== DEFAULT_HH_YTDLP_EJS_WPC_BIN) {
+    throw new Error(`HH targeted recovery YTDLP_BIN must be ${DEFAULT_HH_YTDLP_EJS_WPC_BIN}`);
+  }
+  if (env.YTDLP_EXTRA_ARGS?.trim()) {
+    throw new Error("HH targeted recovery forbids YTDLP_EXTRA_ARGS");
+  }
+  if (env.YTDLP_PROXY?.trim()) {
+    throw new Error("HH targeted recovery forbids YTDLP_PROXY");
+  }
+
+  const allowedPlayerClients = new Set(["mweb", "web", "web_safari", "tv", "tv_embedded"]);
+  const configuredPlayerClients = (env.YTDLP_PLAYER_CLIENT?.trim() || "mweb").split(",").filter(Boolean);
+  if (configuredPlayerClients.length === 0 || configuredPlayerClients.some((client) => !allowedPlayerClients.has(client))) {
+    throw new Error("HH targeted recovery YTDLP_PLAYER_CLIENT is outside the allowlist");
+  }
+  const configuredJsRuntimes = (env.YTDLP_JS_RUNTIMES?.trim() || "node").split(",").filter(Boolean);
+  if (configuredJsRuntimes.length === 0 || configuredJsRuntimes.some((runtime) => !["node", "deno"].includes(runtime))) {
+    throw new Error("HH targeted recovery YTDLP_JS_RUNTIMES is outside the allowlist");
+  }
+  const remoteComponents = (env.YTDLP_REMOTE_COMPONENTS?.trim() || "ejs:github").toLowerCase();
+  if (!["0", "false", "off", "no", "1", "true", "yes", "on", "ejs:github"].includes(remoteComponents)) {
+    throw new Error("HH targeted recovery YTDLP_REMOTE_COMPONENTS is outside the allowlist");
+  }
+
   const provider = normalizeProviderName(env.YTDLP_PO_TOKEN_PROVIDER);
   const allowedProviders = new Set(["", "none", "off", "false", "bgutil", "bgutil-http", "bgutilhttp", "wpc", "webpo", "browser-attested"]);
   if (!allowedProviders.has(provider)) {
@@ -331,14 +357,14 @@ export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | un
       throw new Error("HH targeted recovery PO-token provider must be an unauthenticated loopback-only HTTP endpoint without query credentials");
     }
   }
+  const allowedChromiumPaths = new Set(["/usr/bin/chromium", "/snap/bin/chromium"]);
   if (provider === "wpc" || provider === "webpo" || provider === "browser-attested") {
     const browserPath = env.YTDLP_PO_TOKEN_BROWSER_PATH?.trim() || env.YTDLP_WPC_BROWSER_PATH?.trim();
-    if (browserPath !== "/usr/bin/chromium") {
-      throw new Error("HH targeted recovery WPC browser must be /usr/bin/chromium");
+    if (!browserPath || !allowedChromiumPaths.has(browserPath)) {
+      throw new Error("HH targeted recovery WPC browser is outside the canonical Chromium allowlist");
     }
   }
 
-  const allowedPlayerClients = new Set(["mweb", "web", "web_safari", "tv", "tv_embedded"]);
   for (const extractorArg of splitMultilineEnv(env.YTDLP_EXTRACTOR_ARGS)) {
     if (extractorArg === "youtube:player_skip=configs") continue;
     const clients = extractorArg.match(/^youtube:player_client=([A-Za-z0-9_,.-]+)$/)?.[1]?.split(",") ?? [];
@@ -771,6 +797,7 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
               status: "mutation_conflict",
               reason: "mutation_conflict",
               detail: "concurrent_row_change",
+              db_write_performed: false,
               video_id: video.id,
               creator_id: video.creator_id,
               youtube_video_id: video.youtube_video_id,
@@ -789,6 +816,7 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
             status: transcript.failure.status,
             reason: transcript.failure.reason,
             provider: transcript.failure.provider,
+            db_write_performed: args.write && failureApplied,
             video_id: video.id,
             creator_id: video.creator_id,
             youtube_video_id: video.youtube_video_id,
@@ -828,6 +856,7 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
               status: "mutation_conflict",
               reason: "mutation_conflict",
               detail: "concurrent_row_change",
+              db_write_performed: false,
               video_id: video.id,
               creator_id: video.creator_id,
               youtube_video_id: video.youtube_video_id,
@@ -846,6 +875,7 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
           ts: timestamp(),
           mode: args.write ? "WRITE" : "DRY",
           status: args.write ? "updated" : "would_update",
+          db_write_performed: args.write,
           video_id: video.id,
           creator_id: video.creator_id,
           youtube_video_id: video.youtube_video_id,

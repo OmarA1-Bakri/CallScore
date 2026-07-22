@@ -119,3 +119,22 @@ Acceptance requires:
 - zero unresolved secret findings;
 - clean repository tree after the review-remediation commit;
 - three fresh independent verdicts against the same final commit.
+
+## Second review cycle and superseding remediation
+
+Batch `deleg_3ed92e5b` reviewed `44d1132acf1e5e449814fe88f692e24c3261524a`. Specification and security roles timed out and are not acceptance evidence. The implementation/integration role returned `FAIL` with four valid blockers:
+
+1. shadow execution forwarded caller-controlled model/host/resource payloads;
+2. Art-of-War local-model evaluator aliases fell through to report-only output without executing a model;
+3. failed transcript attempts could mutate row failure state while the Workplane summary still reported no production DB writes;
+4. HH targeted recovery still accepted unreviewed yt-dlp executable/runtime controls.
+
+The superseding remediation in the final review tuple:
+
+- forces exact `qwen3:4b-instruct-2507-q4_K_M`, loopback Ollama, canonical prompt profile, bounded resource controls, a safe run identifier and canonical artifact location for both shadow aliases;
+- adds a real loopback Ollama campaign evaluation branch for both Art-of-War evaluator aliases, validates the exact returned model and strict JSON output, persists only bounded campaign fields, and grants no mutation/public authority;
+- writes `db_write_performed` on every transcript audit outcome and derives `production_db_writes_performed` plus `db_rows_mutated` from those per-record facts, including failed-row updates;
+- pins HH targeted recovery to the isolated yt-dlp binary and allowlists player clients, JS runtimes, remote components and canonical Chromium paths while rejecting browser-profile extraction, arbitrary extra args and proxies;
+- adds RED→GREEN regressions for every finding and a live loopback Qwen3 evaluator canary.
+
+Post-remediation parent evidence: focused tests `80/80`, full suite `1432/1432`, TypeScript and `git diff --check` pass. Final reviewers must bind to the exact superseding HEAD named in their dispatch; no verdict against `44d1132` or an uncommitted tree is final acceptance evidence.

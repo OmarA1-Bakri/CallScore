@@ -606,7 +606,16 @@ test("yt-dlp PO-token provider config emits provider args without raw token expo
   assert.deepEqual(ytDlpPoTokenProviderArgs({ YTDLP_PO_TOKEN_PROVIDER: "wpc" }), []);
 });
 
-test("HH targeted recovery rejects browser profiles, non-loopback providers, and noncanonical WPC browsers", () => {
+test("HH targeted recovery rejects browser profiles and unreviewed executable/runtime controls", () => {
+  assert.doesNotThrow(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_BIN: "/opt/callscore/yt-dlp-2026.6.9/bin/yt-dlp",
+    YTDLP_COOKIES_PATH: "/run/secrets/youtube-cookies.txt",
+    YTDLP_PLAYER_CLIENT: "web",
+    YTDLP_JS_RUNTIMES: "node",
+    YTDLP_REMOTE_COMPONENTS: "1",
+    YTDLP_PO_TOKEN_PROVIDER: "wpc",
+    YTDLP_PO_TOKEN_BROWSER_PATH: "/snap/bin/chromium",
+  }));
   assert.doesNotThrow(() => assertHhTargetedRecoveryYtDlpEnv({
     YTDLP_COOKIES_PATH: "/run/secrets/youtube-cookies.txt",
     YTDLP_PO_TOKEN_PROVIDER: "bgutil-http",
@@ -622,7 +631,25 @@ test("HH targeted recovery rejects browser profiles, non-loopback providers, and
   assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
     YTDLP_PO_TOKEN_PROVIDER: "wpc",
     YTDLP_PO_TOKEN_BROWSER_PATH: "/opt/google/chrome",
-  }), /\/usr\/bin\/chromium/);
+  }), /canonical Chromium allowlist/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_BIN: "/tmp/unreviewed-ytdlp",
+  }), /YTDLP_BIN/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_PLAYER_CLIENT: "unreviewed_client",
+  }), /YTDLP_PLAYER_CLIENT/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_JS_RUNTIMES: "deno:\/tmp\/unreviewed-runtime",
+  }), /YTDLP_JS_RUNTIMES/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_REMOTE_COMPONENTS: "ejs:npm",
+  }), /YTDLP_REMOTE_COMPONENTS/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_EXTRA_ARGS: "--exec touch /tmp/unsafe",
+  }), /YTDLP_EXTRA_ARGS/);
+  assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
+    YTDLP_PROXY: "http://proxy.example.test:8080",
+  }), /YTDLP_PROXY/);
   assert.throws(() => assertHhTargetedRecoveryYtDlpEnv({
     YTDLP_EXTRACTOR_ARGS: "youtube:player_client=unreviewed_client",
   }), /outside the allowlist/);
