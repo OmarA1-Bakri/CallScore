@@ -92,8 +92,17 @@ export function resolveYtDlpBinaryForMethod(
   env: Record<string, string | undefined> = process.env,
   exists: (candidate: string) => boolean = existsSync,
 ): string {
+  if (method === "hh_ytdlp_ejs_wpc") {
+    const configured = env.YTDLP_BIN?.trim();
+    if (configured && configured !== DEFAULT_HH_YTDLP_EJS_WPC_BIN) {
+      throw new Error(`HH EJS/WPC recovery requires canonical yt-dlp binary ${DEFAULT_HH_YTDLP_EJS_WPC_BIN}`);
+    }
+    if (!exists(DEFAULT_HH_YTDLP_EJS_WPC_BIN)) {
+      throw new Error("HH EJS/WPC canonical isolated yt-dlp runtime is unavailable");
+    }
+    return DEFAULT_HH_YTDLP_EJS_WPC_BIN;
+  }
   if (env.YTDLP_BIN?.trim()) return env.YTDLP_BIN.trim();
-  if (method === "hh_ytdlp_ejs_wpc" && exists(DEFAULT_HH_YTDLP_EJS_WPC_BIN)) return DEFAULT_HH_YTDLP_EJS_WPC_BIN;
   return "yt-dlp";
 }
 
@@ -105,8 +114,8 @@ export function envForTranscriptMethod(
   return {
     ...env,
     YTDLP_PLAYER_CLIENT: env.YTDLP_PLAYER_CLIENT ?? "mweb",
-    YTDLP_JS_RUNTIMES: env.YTDLP_JS_RUNTIMES ?? "node",
-    YTDLP_REMOTE_COMPONENTS: env.YTDLP_REMOTE_COMPONENTS ?? "ejs:github",
+    YTDLP_JS_RUNTIMES: env.YTDLP_JS_RUNTIMES ?? "node:/usr/local/bin/node",
+    YTDLP_REMOTE_COMPONENTS: env.YTDLP_REMOTE_COMPONENTS ?? "none",
     YTDLP_PO_TOKEN_PROVIDER: env.YTDLP_PO_TOKEN_PROVIDER ?? "wpc",
   };
 }

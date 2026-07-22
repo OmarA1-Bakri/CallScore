@@ -139,15 +139,19 @@ test("HH EJS/WPC method prefers isolated yt-dlp runtime and transcript-only args
     resolveYtDlpBinaryForMethod("hh_ytdlp_ejs_wpc", {}, (candidate) => candidate === "/opt/callscore/yt-dlp-2026.6.9/bin/yt-dlp"),
     "/opt/callscore/yt-dlp-2026.6.9/bin/yt-dlp",
   );
+  assert.throws(
+    () => resolveYtDlpBinaryForMethod("hh_ytdlp_ejs_wpc", {}, () => false),
+    /canonical isolated yt-dlp runtime is unavailable/,
+  );
 
   const ytdlpArgs = buildYtDlpTranscriptArgs("video123", args, {}, [], "hh_ytdlp_ejs_wpc");
   assert.ok(ytdlpArgs.includes("--skip-download"));
   assert.ok(ytdlpArgs.includes("--write-auto-subs"));
   assert.ok(ytdlpArgs.includes("--write-subs"));
   assert.ok(ytdlpArgs.includes("--js-runtimes"));
-  assert.ok(ytdlpArgs.includes("node"));
-  assert.ok(ytdlpArgs.includes("--remote-components"));
-  assert.ok(ytdlpArgs.includes("ejs:github"));
+  assert.ok(ytdlpArgs.includes("node:/usr/local/bin/node"));
+  assert.equal(ytdlpArgs.includes("--remote-components"), false);
+  assert.equal(ytdlpArgs.includes("ejs:github"), false);
   assert.equal(ytdlpArgs.includes("--extract-audio"), false);
   assert.equal(ytdlpArgs.includes("-f"), false);
 });

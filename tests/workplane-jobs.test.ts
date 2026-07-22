@@ -1,15 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   WORKPLANE_JOB_SPECS,
   WORKPLANE_JOB_TYPES,
   canonicalLocalModelForWorkplanePayload,
   canonicalShadowExecutionConfig,
+  canonicalTranscriptRecoveryRunConfig,
   evaluateArtOfWarCampaignWithLocalModel,
   getWorkplaneJobSpec,
+  readTranscriptRecoveryAudit,
   runWorkplaneJob,
   summarizeTranscriptRecoveryRecords,
 } from "../src/lib/workplane-jobs";
@@ -91,8 +93,8 @@ test("workplane job specs cover required Hermes surfaces with safe defaults", ()
   assert.equal(getWorkplaneJobSpec("gemma_shadow_extract").default_safe_command, localModel.default_safe_command);
   assert.equal(PipelineDispatchJobTypeSchema.safeParse("local_model_shadow_extract").success, true);
   assert.equal(PipelineDispatchJobTypeSchema.safeParse("artofwar_campaign_local_model_eval").success, true);
-  assert.match(getWorkplaneJobSpec("artofwar_campaign_local_model_eval").output_artifact, /local-model-evaluations/);
-  assert.match(getWorkplaneJobSpec("artofwar_campaign_gemma_eval").output_artifact, /gemma-evaluations/);
+  assert.match(getWorkplaneJobSpec("artofwar_campaign_local_model_eval").output_artifact, /artofwar_campaign_local_model_eval/);
+  assert.match(getWorkplaneJobSpec("artofwar_campaign_gemma_eval").output_artifact, /artofwar_campaign_gemma_eval/);
 
   const ingest = getWorkplaneJobSpec("transcript_ingest_result");
   assert.equal(ingest.production_db_writes_allowed, true);
@@ -142,11 +144,13 @@ test("canonical local-model execution ignores caller-controlled model, host, and
 test("Art of War local-model evaluator calls loopback Ollama with exact canonical Qwen3", async () => {
   let requestUrl = "";
   let requestBody: Record<string, unknown> = {};
+  let requestRedirect: RequestRedirect | undefined;
   const evaluation = await evaluateArtOfWarCampaignWithLocalModel(
     { campaign_id: "campaign-1", claim: "Receipts beat vibes", audience: "crypto operators", cta: "Inspect the evidence" },
     async (input, init) => {
       requestUrl = String(input);
       requestBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      requestRedirect = init?.redirect;
       return new Response(JSON.stringify({
         model: "qwen3:4b-instruct-2507-q4_K_M",
         response: JSON.stringify({
@@ -162,23 +166,134 @@ test("Art of War local-model evaluator calls loopback Ollama with exact canonica
   );
   assert.equal(requestUrl, "http://127.0.0.1:11434/api/generate");
   assert.equal(requestBody.model, "qwen3:4b-instruct-2507-q4_K_M");
+  assert.equal(requestRedirect, "error");
   assert.equal(evaluation.model, "qwen3:4b-instruct-2507-q4_K_M");
   assert.equal(evaluation.evaluation.recommendation, "keep");
 });
 
-test("transcript recovery reports failure-row writes as production DB mutations", () => {
+test("Art of War evaluator rejects null and coercive confidence output", async () => {
+  const responseFor = (value: unknown) => async () => new Response(JSON.stringify({
+    model: "qwen3:4b-instruct-2507-q4_K_M",
+    response: JSON.stringify(value),
+  }), { status: 200 });
+  await assert.rejects(
+    evaluateArtOfWarCampaignWithLocalModel({}, responseFor(null)),
+    /invalid JSON object/,
+  );
+  await assert.rejects(
+    evaluateArtOfWarCampaignWithLocalModel({}, responseFor({
+      claim_risk: "low", cta_risk: "low", trust_risk: "low", audience_fit: "strong", recommendation: "keep", confidence: "0.5",
+    })),
+    /schema validation/,
+  );
+});
+
+test("Art of War evaluator emits a canonical success artifact without mutation authority", async () => {
+  const runId = `artofwar-eval-success-${Date.now()}`;
+  const artifact = `.tmp/workflow-receipts/artofwar_campaign_local_model_eval/${runId}.artifact.json`;
+  const result = await runWorkplaneJob({
+    id: 9000,
+    run_id: 9000,
+    type: "artofwar_campaign_local_model_eval",
+    payload: { run_id: runId, model: "attacker-model", claim: "test" },
+  } as never, {
+    fetchImpl: async () => new Response(JSON.stringify({
+      model: "qwen3:4b-instruct-2507-q4_K_M",
+      response: JSON.stringify({ claim_risk: "low", cta_risk: "low", trust_risk: "low", audience_fit: "strong", recommendation: "keep", confidence: 0.8 }),
+    }), { status: 200 }),
+  });
+  assert.equal(result.success, true);
+  assert.equal(result.record_type, "LocalModelEvaluationReceipt");
+  assert.equal(result.canonical_model, "qwen3:4b-instruct-2507-q4_K_M");
+  assert.equal(result.requested_model_remapped, true);
+  assert.equal(result.public_action_allowed, false);
+  assert.equal(result.out, artifact);
+  assert.notEqual(result.receipt_path, result.out);
+  const persisted = JSON.parse(readFileSync(artifact, "utf8")) as Record<string, unknown>;
+  assert.equal(persisted.record_type, "LocalModelEvaluationReceipt");
+  assert.equal(persisted.decision, "local_model_evaluation_artifact_only");
+  assert.equal(existsSync(String(result.receipt_path)), true);
+  rmSync(artifact, { force: true });
+  rmSync(String(result.receipt_path), { force: true });
+});
+
+test("Art of War evaluator does not relabel evidence-write failures as model failures", async () => {
+  const runId = `artofwar-eval-write-failure-${Date.now()}`;
+  const artifact = `.tmp/workflow-receipts/artofwar_campaign_local_model_eval/${runId}.artifact.json`;
+  mkdirSync(artifact, { recursive: true });
+  await assert.rejects(
+    runWorkplaneJob({ id: 9002, run_id: 9002, type: "artofwar_campaign_local_model_eval", payload: { run_id: runId } } as never, {
+      fetchImpl: async () => new Response(JSON.stringify({
+        model: "qwen3:4b-instruct-2507-q4_K_M",
+        response: JSON.stringify({ claim_risk: "low", cta_risk: "low", trust_risk: "low", audience_fit: "strong", recommendation: "keep", confidence: 0.8 }),
+      }), { status: 200 }),
+    }),
+    /EISDIR|illegal operation on a directory/i,
+  );
+  rmSync(artifact, { recursive: true, force: true });
+});
+
+test("Art of War evaluator emits a blocked compatibility artifact and receipt on schema failure", async () => {
+  const runId = `artofwar-eval-failure-${Date.now()}`;
+  const artifact = `.tmp/workflow-receipts/artofwar_campaign_gemma_eval/${runId}.artifact.json`;
+  const result = await runWorkplaneJob({
+    id: 9001,
+    run_id: 9001,
+    type: "artofwar_campaign_gemma_eval",
+    payload: { run_id: runId, model: "gemma4:latest", claim: "test" },
+  } as never, {
+    fetchImpl: async () => new Response(JSON.stringify({
+      model: "qwen3:4b-instruct-2507-q4_K_M",
+      response: "null",
+    }), { status: 200 }),
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failure_class, "invalid_model_output");
+  assert.equal(result.record_type, "GemmaEvaluationReceipt");
+  assert.equal(result.out, artifact);
+  assert.equal(existsSync(artifact), true);
+  assert.equal(typeof result.receipt_path, "string");
+  assert.notEqual(result.receipt_path, result.out);
+  const persisted = JSON.parse(readFileSync(artifact, "utf8")) as Record<string, unknown>;
+  assert.equal(persisted.record_type, "GemmaEvaluationReceipt");
+  assert.equal(persisted.result, "blocked");
+  assert.equal(persisted.failure_class, "invalid_model_output");
+  rmSync(artifact, { force: true });
+  rmSync(String(result.receipt_path), { force: true });
+});
+
+test("transcript recovery reports only current-run requested-row DB mutations", () => {
   const summary = summarizeTranscriptRecoveryRecords([
-    { status: "failed", reason: "no_captions", db_write_performed: true },
-  ], true, ["VCbmPx1l7AU"]);
+    { run_id: "run-current", youtube_video_id: "VCbmPx1l7AU", status: "failed", reason: "no_captions", db_write_performed: true },
+  ], true, ["VCbmPx1l7AU"], "run-current");
   assert.equal(summary.production_db_writes_performed, true);
   assert.equal(summary.db_rows_mutated, 1);
   assert.deepEqual(summary.blockers, ["no_captions"]);
 
   const conflict = summarizeTranscriptRecoveryRecords([
-    { status: "mutation_conflict", reason: "mutation_conflict", db_write_performed: false },
-  ], true, ["VCbmPx1l7AU"]);
+    { run_id: "run-current", youtube_video_id: "VCbmPx1l7AU", status: "mutation_conflict", reason: "mutation_conflict", db_write_performed: false },
+  ], true, ["VCbmPx1l7AU"], "run-current");
   assert.equal(conflict.production_db_writes_performed, false);
   assert.deepEqual(conflict.blockers, ["mutation_conflict"]);
+
+  const stale = summarizeTranscriptRecoveryRecords([
+    { run_id: "run-prior", youtube_video_id: "VCbmPx1l7AU", status: "updated", db_write_performed: true },
+  ], true, ["VCbmPx1l7AU"], "run-current");
+  assert.equal(stale.production_db_writes_performed, false);
+  assert.equal(stale.db_rows_mutated, 0);
+  assert.deepEqual(stale.blockers, ["audit_record_mismatch"]);
+
+  const config = canonicalTranscriptRecoveryRunConfig({ run_id: "run-current", audit_out: "/tmp/injected.jsonl" });
+  assert.equal(config.audit_out, ".tmp/workflow-receipts/transcript_recover_hh/run-current.jsonl");
+  assert.throws(() => canonicalTranscriptRecoveryRunConfig({ run_id: "../escape" }), /safe identifier allowlist/);
+
+  const malformedPath = join(mkdtempSync(join(tmpdir(), "callscore-audit-reader-")), "audit.jsonl");
+  writeFileSync(malformedPath, `${JSON.stringify({ run_id: "run-current", youtube_video_id: "VCbmPx1l7AU", status: "updated", db_write_performed: true })}\n{"broken":\n`);
+  const preserved = summarizeTranscriptRecoveryRecords(readTranscriptRecoveryAudit(malformedPath), true, ["VCbmPx1l7AU"], "run-current");
+  assert.equal(preserved.db_rows_mutated, 1);
+  assert.equal(preserved.production_db_writes_performed, true);
+  assert.deepEqual(preserved.blockers, ["audit_record_mismatch"]);
+  rmSync(dirname(malformedPath), { recursive: true, force: true });
 });
 
 test("workplane status exposes all job specs as JSON-friendly records", () => {

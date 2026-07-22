@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { chmodSync, closeSync, copyFileSync, mkdirSync, mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
+import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, lstatSync, mkdirSync, mkdtempSync, openSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -35,6 +35,7 @@ const DEFAULT_YTDLP_PO_TOKEN_PROVIDER_BASE_URL = "http://127.0.0.1:4416";
 const MAX_TARGETED_RECOVERY_IDS = 25;
 
 export interface BackfillTranscriptsArgs {
+  readonly runId: string;
   readonly creator: string | null;
   readonly youtubeVideoIds: readonly string[];
   readonly forceTargetedRetry: boolean;
@@ -156,6 +157,7 @@ export function parseBackfillTranscriptsArgs(argv = process.argv.slice(2)): Back
     throw new Error("--force-targeted-retry requires --youtube-video-ids");
   }
   return {
+    runId: argValue(argv, "--run-id") ?? timestamp(),
     creator: argValue(argv, "--creator"),
     youtubeVideoIds: targetedVideoIds,
     forceTargetedRetry,
@@ -301,7 +303,57 @@ function truthyEnv(value: string | undefined): boolean {
   return ["1", "true", "yes", "on"].includes((value ?? "").trim().toLowerCase());
 }
 
-export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | undefined> = process.env): void {
+const CANONICAL_HH_NODE_RUNTIME = "/usr/local/bin/node";
+const CANONICAL_HH_CHROMIUM = "/usr/bin/chromium";
+const CANONICAL_HH_YTDLP_EJS_SENTINEL = "/opt/callscore/yt-dlp-2026.6.9/.callscore-yt-dlp-ejs-0.8.0";
+
+export interface HhRecoveryFileInfo {
+  readonly realpath: string;
+  readonly is_file: boolean;
+  readonly uid: number;
+  readonly mode: number;
+  readonly size: number;
+  readonly executable: boolean;
+}
+
+export type HhRecoveryFileInspector = (path: string) => HhRecoveryFileInfo;
+
+const inspectHhRecoveryFile: HhRecoveryFileInspector = (path) => {
+  const stat = lstatSync(path);
+  let executable = false;
+  try {
+    accessSync(path, fsConstants.X_OK);
+    executable = true;
+  } catch {
+    executable = false;
+  }
+  return {
+    realpath: realpathSync(path),
+    is_file: stat.isFile(),
+    uid: stat.uid,
+    mode: stat.mode & 0o777,
+    size: stat.size,
+    executable,
+  };
+};
+
+function requireCanonicalRootFile(path: string, label: string, inspector: HhRecoveryFileInspector, executable: boolean): HhRecoveryFileInfo {
+  let info: HhRecoveryFileInfo;
+  try {
+    info = inspector(path);
+  } catch {
+    throw new Error(`HH targeted recovery ${label} canonical file is unavailable`);
+  }
+  if (info.realpath !== path || !info.is_file || info.uid !== 0 || (info.mode & 0o022) !== 0 || (executable && !info.executable)) {
+    throw new Error(`HH targeted recovery ${label} canonical file failed ownership/type/mode checks`);
+  }
+  return info;
+}
+
+export function assertHhTargetedRecoveryYtDlpEnv(
+  env: Record<string, string | undefined> = process.env,
+  inspector: HhRecoveryFileInspector = inspectHhRecoveryFile,
+): void {
   if (env.YTDLP_COOKIES_FROM_BROWSER?.trim()) {
     throw new Error("HH targeted recovery forbids --cookies-from-browser; browser profiles remain laptop-local");
   }
@@ -312,11 +364,24 @@ export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | un
   if ((cookiePath && !cookiePath.startsWith("/run/secrets/")) || cookiePath?.includes("..")) {
     throw new Error("HH targeted recovery cookie path must be a non-traversing file under /run/secrets/");
   }
+  if (cookiePath) {
+    let cookieInfo: HhRecoveryFileInfo;
+    try {
+      cookieInfo = inspector(cookiePath);
+    } catch {
+      throw new Error("HH targeted recovery cookie file is unavailable");
+    }
+    if (cookieInfo.realpath !== cookiePath || !cookieInfo.is_file || cookieInfo.uid !== 0 || (cookieInfo.mode & 0o077) !== 0 || cookieInfo.size <= 0 || cookieInfo.size > 10 * 1024 * 1024) {
+      throw new Error("HH targeted recovery cookie file failed canonical ownership/type/mode/size checks");
+    }
+  }
 
-  const ytDlpBin = env.YTDLP_BIN?.trim();
-  if (ytDlpBin && ytDlpBin !== DEFAULT_HH_YTDLP_EJS_WPC_BIN) {
+  const ytDlpBin = env.YTDLP_BIN?.trim() || DEFAULT_HH_YTDLP_EJS_WPC_BIN;
+  if (ytDlpBin !== DEFAULT_HH_YTDLP_EJS_WPC_BIN) {
     throw new Error(`HH targeted recovery YTDLP_BIN must be ${DEFAULT_HH_YTDLP_EJS_WPC_BIN}`);
   }
+  requireCanonicalRootFile(DEFAULT_HH_YTDLP_EJS_WPC_BIN, "yt-dlp", inspector, true);
+  requireCanonicalRootFile(CANONICAL_HH_YTDLP_EJS_SENTINEL, "local yt-dlp-ejs", inspector, false);
   if (env.YTDLP_EXTRA_ARGS?.trim()) {
     throw new Error("HH targeted recovery forbids YTDLP_EXTRA_ARGS");
   }
@@ -329,13 +394,14 @@ export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | un
   if (configuredPlayerClients.length === 0 || configuredPlayerClients.some((client) => !allowedPlayerClients.has(client))) {
     throw new Error("HH targeted recovery YTDLP_PLAYER_CLIENT is outside the allowlist");
   }
-  const configuredJsRuntimes = (env.YTDLP_JS_RUNTIMES?.trim() || "node").split(",").filter(Boolean);
-  if (configuredJsRuntimes.length === 0 || configuredJsRuntimes.some((runtime) => !["node", "deno"].includes(runtime))) {
-    throw new Error("HH targeted recovery YTDLP_JS_RUNTIMES is outside the allowlist");
+  const configuredJsRuntimes = env.YTDLP_JS_RUNTIMES?.trim() || `node:${CANONICAL_HH_NODE_RUNTIME}`;
+  if (configuredJsRuntimes !== `node:${CANONICAL_HH_NODE_RUNTIME}`) {
+    throw new Error(`HH targeted recovery YTDLP_JS_RUNTIMES must be node:${CANONICAL_HH_NODE_RUNTIME}`);
   }
-  const remoteComponents = (env.YTDLP_REMOTE_COMPONENTS?.trim() || "ejs:github").toLowerCase();
-  if (!["0", "false", "off", "no", "1", "true", "yes", "on", "ejs:github"].includes(remoteComponents)) {
-    throw new Error("HH targeted recovery YTDLP_REMOTE_COMPONENTS is outside the allowlist");
+  requireCanonicalRootFile(CANONICAL_HH_NODE_RUNTIME, "Node runtime", inspector, true);
+  const remoteComponents = (env.YTDLP_REMOTE_COMPONENTS?.trim() || "none").toLowerCase();
+  if (!["0", "false", "off", "no", "none"].includes(remoteComponents)) {
+    throw new Error("HH targeted recovery remote components are disabled; local pinned yt-dlp-ejs is required");
   }
 
   const provider = normalizeProviderName(env.YTDLP_PO_TOKEN_PROVIDER);
@@ -357,12 +423,12 @@ export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | un
       throw new Error("HH targeted recovery PO-token provider must be an unauthenticated loopback-only HTTP endpoint without query credentials");
     }
   }
-  const canonicalChromiumPath = "/usr/bin/chromium";
   if (provider === "wpc" || provider === "webpo" || provider === "browser-attested") {
     const browserPath = env.YTDLP_PO_TOKEN_BROWSER_PATH?.trim() || env.YTDLP_WPC_BROWSER_PATH?.trim();
-    if (browserPath !== canonicalChromiumPath) {
-      throw new Error(`HH targeted recovery WPC browser must be canonical ${canonicalChromiumPath}`);
+    if (browserPath !== CANONICAL_HH_CHROMIUM) {
+      throw new Error(`HH targeted recovery WPC browser must be canonical ${CANONICAL_HH_CHROMIUM}`);
     }
+    requireCanonicalRootFile(CANONICAL_HH_CHROMIUM, "Chromium", inspector, true);
   }
 
   for (const extractorArg of splitMultilineEnv(env.YTDLP_EXTRACTOR_ARGS)) {
@@ -376,6 +442,7 @@ export function assertHhTargetedRecoveryYtDlpEnv(env: Record<string, string | un
 
 export function redactYtDlpDiagnostic(value: string): string {
   return value
+    .replace(/((?:Cookie|Authorization)\s*:\s*)[^\r\n]+/gi, "$1[REDACTED]")
     .replace(/(--cookies(?:-from-browser)?\s+)[^\s]+/gi, "$1[REDACTED]")
     .replace(/\/run\/secrets\/[^\s'\"]+/g, "/run/secrets/[REDACTED]")
     .replace(/\/tmp\/callscore-ytdlp-cookies-[^\s'\"]+/g, "/tmp/callscore-ytdlp-cookies-[REDACTED]")
@@ -399,7 +466,8 @@ export function ytDlpExtraArgs(env: Record<string, string | undefined> = process
   if (jsRuntimes) args.push("--js-runtimes", jsRuntimes);
 
   const remoteComponents = env.YTDLP_REMOTE_COMPONENTS?.trim();
-  if (remoteComponents) {
+  const remoteComponentsDisabled = ["0", "false", "off", "no", "none"].includes((remoteComponents ?? "").toLowerCase());
+  if (remoteComponents && !remoteComponentsDisabled) {
     args.push("--remote-components", truthyEnv(remoteComponents) ? "ejs:github" : remoteComponents);
   }
 
@@ -709,7 +777,7 @@ async function loadMissingTranscriptVideos(args: BackfillTranscriptsArgs): Promi
 
 function audit(args: BackfillTranscriptsArgs, row: Record<string, unknown>): void {
   if (!args.auditOut) return;
-  writeJsonlRecord(args.auditOut, row);
+  writeJsonlRecord(args.auditOut, { run_id: args.runId, ...row });
 }
 
 function acquireLock(lockFile: string): () => void {
@@ -737,7 +805,8 @@ async function runBackfillTranscripts(argv: readonly string[], owner: BackfillIn
   loadEnv();
   const args = parseBackfillTranscriptsArgs([...argv]);
   assertBackfillWriteAuthority(args, owner);
-  if (owner === "workplane" && args.forceTargetedRetry) assertHhTargetedRecoveryYtDlpEnv();
+  const usesOwnedHhRecoveryRuntime = args.methods.includes("hh_ytdlp_ejs_wpc") && (owner === "workplane" || args.forceTargetedRetry);
+  if (usesOwnedHhRecoveryRuntime) assertHhTargetedRecoveryYtDlpEnv();
   let releaseLock: (() => void) | null = null;
   try {
     releaseLock = acquireLock(args.lockFile);

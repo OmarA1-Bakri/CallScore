@@ -168,30 +168,35 @@ export async function evaluateArtOfWarCampaignWithLocalModel(
       ].join("\n"),
     }),
     signal: AbortSignal.timeout(120_000),
+    redirect: "error",
   });
   if (!response.ok) throw new Error(`canonical local-model campaign evaluation failed with HTTP ${response.status}`);
   const envelope = await response.json() as { model?: unknown; response?: unknown };
   if (envelope.model !== CANONICAL_LOCAL_MODEL || typeof envelope.response !== "string") {
     throw new Error("canonical local-model campaign evaluation returned an invalid model envelope");
   }
-  let raw: Record<string, unknown>;
+  let raw: unknown;
   try {
-    raw = JSON.parse(envelope.response) as Record<string, unknown>;
+    raw = JSON.parse(envelope.response);
   } catch {
     throw new Error("canonical local-model campaign evaluation returned invalid JSON");
   }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("canonical local-model campaign evaluation returned invalid JSON object");
+  }
+  const evaluation = raw as Record<string, unknown>;
   const riskValues = new Set(["low", "medium", "high", "unknown"]);
   const fitValues = new Set(["strong", "partial", "weak", "unknown"]);
   const recommendationValues = new Set(["keep", "revise", "block"]);
-  const claimRisk = String(raw.claim_risk ?? "");
-  const ctaRisk = String(raw.cta_risk ?? "");
-  const trustRisk = String(raw.trust_risk ?? "");
-  const audienceFit = String(raw.audience_fit ?? "");
-  const recommendation = String(raw.recommendation ?? "");
-  const confidence = Number(raw.confidence);
+  const claimRisk = String(evaluation.claim_risk ?? "");
+  const ctaRisk = String(evaluation.cta_risk ?? "");
+  const trustRisk = String(evaluation.trust_risk ?? "");
+  const audienceFit = String(evaluation.audience_fit ?? "");
+  const recommendation = String(evaluation.recommendation ?? "");
+  const confidence = evaluation.confidence;
   if (!riskValues.has(claimRisk) || !riskValues.has(ctaRisk) || !riskValues.has(trustRisk)
     || !fitValues.has(audienceFit) || !recommendationValues.has(recommendation)
-    || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    || typeof confidence !== "number" || !Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
     throw new Error("canonical local-model campaign evaluation failed schema validation");
   }
   return {
@@ -216,18 +221,63 @@ export interface TranscriptRecoveryAuditSummary {
   readonly db_rows_mutated: number;
 }
 
+export interface TranscriptRecoveryRunConfig {
+  readonly run_id: string;
+  readonly audit_out: string;
+}
+
+export function canonicalTranscriptRecoveryRunConfig(payload: Readonly<Record<string, unknown>>): TranscriptRecoveryRunConfig {
+  const runId = safeWorkplaneRunId(payload.run_id, "transcript-recover-hh");
+  return {
+    run_id: runId,
+    audit_out: `.tmp/workflow-receipts/transcript_recover_hh/${runId}.jsonl`,
+  };
+}
+
+export function readTranscriptRecoveryAudit(path: string): Record<string, unknown>[] {
+  try {
+    return readFileSync(path, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          const parsed = JSON.parse(line);
+          return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? parsed as Record<string, unknown>
+            : { audit_record_invalid: true };
+        } catch {
+          return { audit_record_invalid: true };
+        }
+      });
+  } catch {
+    return [];
+  }
+}
+
 export function summarizeTranscriptRecoveryRecords(
   records: readonly Record<string, unknown>[],
   write: boolean,
   ids: readonly string[],
+  runId: string,
 ): TranscriptRecoveryAuditSummary {
+  const requested = new Set(ids);
+  const currentRecords = records.filter((record) => record.run_id === runId && typeof record.youtube_video_id === "string" && requested.has(record.youtube_video_id));
+  const perIdCounts = new Map<string, number>();
+  for (const record of currentRecords) {
+    const id = String(record.youtube_video_id);
+    perIdCounts.set(id, (perIdCounts.get(id) ?? 0) + 1);
+  }
+  const auditMismatch = currentRecords.length !== records.length || [...perIdCounts.values()].some((count) => count !== 1);
   const successStatus = write ? "updated" : "would_update";
-  const succeeded = records.filter((record) => record.status === successStatus);
-  const failed = records.filter((record) => record.status === "failed" || record.status === "pending_handoff" || record.status === "mutation_conflict");
-  const blockers = failed.length > 0
-    ? [...new Set(failed.map((record) => String(record.reason ?? "transcript_failed")))]
-    : (succeeded.length === ids.length ? [] : ["no_target_rows_selected"]);
-  const dbRowsMutated = write ? records.filter((record) => record.db_write_performed === true).length : 0;
+  const succeeded = currentRecords.filter((record) => record.status === successStatus);
+  const failed = currentRecords.filter((record) => record.status === "failed" || record.status === "pending_handoff" || record.status === "mutation_conflict");
+  const blockers = auditMismatch
+    ? ["audit_record_mismatch"]
+    : failed.length > 0
+      ? [...new Set(failed.map((record) => String(record.reason ?? "transcript_failed")))]
+      : (succeeded.length === ids.length ? [] : ["no_target_rows_selected"]);
+  const dbRowsMutated = write ? currentRecords.filter((record) => record.db_write_performed === true).length : 0;
   return {
     succeeded,
     failed,
@@ -309,11 +359,9 @@ function campaignLocalModelEvalSpec(type: "artofwar_campaign_local_model_eval" |
     timeout_seconds: 300,
     retry_policy: "bounded local evaluation; parser/model failures become receipts",
     cooldown_policy: "none",
-    output_artifact: legacyCompatibility
-      ? "docs/plans/artifacts/art-of-war/gemma-evaluations/<campaign-id>-<run-id>.json"
-      : "docs/plans/artifacts/art-of-war/local-model-evaluations/<campaign-id>-<run-id>.json",
-    success_criteria: [legacyCompatibility ? "GemmaEvaluationReceipt produced as a compatibility artifact" : "LocalModelEvaluationReceipt produced", "weak claims/CTA/trust/audience fit classified", "safe owned public action remains available when policy passes"],
-    failure_classification: campaignFailures,
+    output_artifact: `.tmp/workflow-receipts/${type}/<run-id>.artifact.json`,
+    success_criteria: [legacyCompatibility ? "GemmaEvaluationReceipt produced as a compatibility artifact backed by canonical Qwen3" : "LocalModelEvaluationReceipt produced", "weak claims/CTA/trust/audience fit classified", "safe owned public action remains available when policy passes"],
+    failure_classification: [...campaignFailures, "local_model_unavailable", "invalid_model_output"],
     default_safe_command: "cd /srv/agents/repos/Claude_Code_Automations && python3 scripts/art_of_war.py campaign-loop --dry-run --campaign-id callscore-receipts-proof --output /tmp/callscore-art-of-war-campaign-loop-latest.json",
   });
 }
@@ -393,8 +441,8 @@ export const WORKPLANE_JOB_SPECS: Record<WorkplaneJobType, WorkplaneJobSpec> = {
     retry_policy: "no automatic broad retry; exact IDs only; retry requires a new bounded Workplane job",
     cooldown_policy: "normal cooldown applies unless force_targeted_retry=true with exact IDs; stop on provider block by default",
     output_artifact: ".tmp/workflow-receipts/transcript_recover_hh/<run-id>.jsonl plus receipt JSON",
-    success_criteria: ["exact YouTube IDs selected", "current isolated yt-dlp EJS/WPC runtime used", "all selected rows emit updated/would_update audit records", "production call writes remain disabled"],
-    failure_classification: ["invalid_payload", "no_target_rows_selected", "mutation_conflict", "bot_verification_required", "js_challenge_runtime_missing", "po_token_required", "cookie_invalid_or_rotated", "rate_limited", "no_captions", "transcript_failed"],
+    success_criteria: ["exact YouTube IDs selected", "root-owned canonical yt-dlp/local EJS/Node/Chromium files verified before execution", "all selected rows emit one current-run updated/would_update audit record", "production call writes remain disabled"],
+    failure_classification: ["invalid_payload", "audit_output_exists", "audit_record_mismatch", "runtime_preflight_failed", "runtime_execution_failed", "no_target_rows_selected", "mutation_conflict", "bot_verification_required", "js_challenge_runtime_missing", "po_token_required", "cookie_invalid_or_rotated", "rate_limited", "no_captions", "transcript_failed"],
     production_db_writes_allowed: true,
     default_safe_command: "npm run backfill:transcripts -- --methods hh_ytdlp_ejs_wpc --youtube-video-ids <comma-separated-exact-ids> --force-targeted-retry --limit 9 --audit-out .tmp/workflow-receipts/transcript_recover_hh/<run-id>.jsonl --dry-run",
   }),
@@ -866,6 +914,64 @@ function writeReportOnlyArtifact(job: PipelineJob, spec: WorkplaneJobSpec): Reco
   return { mode: "report_only", out, receipt_path: receiptPath, ...report };
 }
 
+function classifyLocalModelEvaluationFailure(error: unknown): "local_model_unavailable" | "invalid_model_output" {
+  const message = error instanceof Error ? error.message : String(error);
+  return /HTTP|fetch|network|timeout|unavailable|ECONN/i.test(message) ? "local_model_unavailable" : "invalid_model_output";
+}
+
+function writeArtOfWarLocalModelEvaluationArtifact(
+  job: PipelineJob,
+  spec: WorkplaneJobSpec,
+  runId: string,
+  evaluation: ArtOfWarLocalModelEvaluation | null,
+  failureClass: "local_model_unavailable" | "invalid_model_output" | null,
+): Record<string, unknown> {
+  const payload = job.payload ?? {};
+  const recordType = job.type === "artofwar_campaign_gemma_eval" ? "GemmaEvaluationReceipt" : "LocalModelEvaluationReceipt";
+  const out = `.tmp/workflow-receipts/${job.type}/${runId}.artifact.json`;
+  const artifact = {
+    record_type: recordType,
+    job_type: job.type,
+    run_id: runId,
+    generated_at: new Date().toISOString(),
+    result: failureClass ? "blocked" : "passed",
+    failure_class: failureClass,
+    campaign: {
+      campaign_id: boundedCampaignString(payload, "campaign_id", "unspecified"),
+      claim: boundedCampaignString(payload, "claim", "No explicit claim supplied."),
+      audience: boundedCampaignString(payload, "audience", "CallScore owned audience"),
+      cta: boundedCampaignString(payload, "cta", "No explicit CTA supplied."),
+      evidence_summary: boundedCampaignString(payload, "evidence_summary", "No evidence summary supplied."),
+    },
+    canonical_model: CANONICAL_LOCAL_MODEL,
+    requested_model_remapped: typeof payload.model === "string" && payload.model !== CANONICAL_LOCAL_MODEL,
+    evaluation: evaluation?.evaluation ?? null,
+    execution_location: spec.execution_location,
+    production_db_writes_allowed: false,
+    production_call_writes_allowed: false,
+    public_ranking_impact_allowed: false,
+    public_action_allowed: false,
+    decision: failureClass ? "blocked_local_model_evaluation" : "local_model_evaluation_artifact_only",
+  };
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
+  const receiptPath = writeWorkplaneReceipt(
+    job,
+    spec,
+    runId,
+    failureClass ? "blocked" : "passed",
+    failureClass ? [failureClass] : [],
+    failureClass ? "inspect the bounded failure class; no public action is authorized" : "review evaluation artifact; public action remains separately gated",
+  );
+  return {
+    success: failureClass === null,
+    mode: "local_model_evaluation",
+    out,
+    receipt_path: receiptPath,
+    ...artifact,
+  };
+}
+
 function writeOwnedPublicArtifact(job: PipelineJob, spec: WorkplaneJobSpec): Record<string, unknown> {
   const payload = job.payload ?? {};
   const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("owned-public-artifact");
@@ -913,7 +1019,11 @@ function writeOwnedPublicArtifact(job: PipelineJob, spec: WorkplaneJobSpec): Rec
   return { mode: "owned_public_artifact", out, receipt_path: receiptPath, ...artifact };
 }
 
-export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, unknown>> {
+export interface WorkplaneJobRuntimeDependencies {
+  readonly fetchImpl?: FetchLike;
+}
+
+export async function runWorkplaneJob(job: PipelineJob, dependencies: WorkplaneJobRuntimeDependencies = {}): Promise<Record<string, unknown>> {
   if (!isWorkplaneJobType(job.type)) throw new Error(`Unsupported workplane job type: ${job.type}`);
   const spec = getWorkplaneJobSpec(job.type);
   const payload = job.payload ?? {};
@@ -950,38 +1060,71 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
     const invalid = ids.find((id) => !/^[A-Za-z0-9_-]{11}$/.test(id));
     if (invalid) throw new Error(`Invalid YouTube video ID: ${invalid}`);
 
-    const runId = typeof payload.run_id === "string" ? payload.run_id : buildRunId("transcript-recover-hh");
-    const auditOut = typeof payload.audit_out === "string"
-      ? payload.audit_out
-      : `.tmp/workflow-receipts/transcript_recover_hh/${runId}.jsonl`;
+    const runConfig = canonicalTranscriptRecoveryRunConfig(payload);
+    const runId = runConfig.run_id;
+    const auditOut = runConfig.audit_out;
     const write = payload.write === true;
     const forceTargetedRetry = payload.force_targeted_retry !== false;
     if (write && !forceTargetedRetry) {
       throw new Error("transcript_recover_hh write mode requires force_targeted_retry=true");
     }
-    const { runTargetedTranscriptRecoveryFromWorkplane } = await import("../scripts/backfill-transcripts");
-    await runTargetedTranscriptRecoveryFromWorkplane([
-      "--methods", "hh_ytdlp_ejs_wpc",
-      "--youtube-video-ids", ids.join(","),
-      "--limit", String(ids.length),
-      "--concurrency", "1",
-      "--audit-out", auditOut,
-      ...(forceTargetedRetry ? ["--force-targeted-retry"] : []),
-      ...(payload.continue_after_provider_block === true ? ["--continue-after-provider-block"] : []),
-      ...(write ? ["--write"] : ["--dry-run"]),
-    ]);
-
-    let records: Record<string, unknown>[] = [];
+    mkdirSync(dirname(auditOut), { recursive: true });
     try {
-      records = readFileSync(auditOut, "utf8")
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      writeFileSync(auditOut, "", { flag: "wx", mode: 0o600 });
     } catch {
-      records = [];
+      const blocker = "audit_output_exists";
+      return {
+        mode: write ? "targeted_write" : "targeted_dry_run",
+        execution_location: spec.execution_location,
+        run_id: runId,
+        requested_youtube_video_ids: ids,
+        selected_records: 0,
+        succeeded: 0,
+        failed: 0,
+        blockers: [blocker],
+        production_db_writes_performed: false,
+        db_rows_mutated: 0,
+        receipt_path: writeWorkplaneReceipt(job, spec, runId, "blocked", [blocker], "choose a fresh run_id; audit evidence is immutable per run"),
+      };
     }
-    const summary = summarizeTranscriptRecoveryRecords(records, write, ids);
+    const { runTargetedTranscriptRecoveryFromWorkplane } = await import("../scripts/backfill-transcripts");
+    try {
+      await runTargetedTranscriptRecoveryFromWorkplane([
+        "--run-id", runId,
+        "--methods", "hh_ytdlp_ejs_wpc",
+        "--youtube-video-ids", ids.join(","),
+        "--limit", String(ids.length),
+        "--concurrency", "1",
+        "--audit-out", auditOut,
+        ...(forceTargetedRetry ? ["--force-targeted-retry"] : []),
+        ...(payload.continue_after_provider_block === true ? ["--continue-after-provider-block"] : []),
+        ...(write ? ["--write"] : ["--dry-run"]),
+      ]);
+    } catch {
+      const partialRecords = readTranscriptRecoveryAudit(auditOut);
+      const partialSummary = summarizeTranscriptRecoveryRecords(partialRecords, write, ids, runId);
+      const blocker = partialRecords.length === 0 ? "runtime_preflight_failed" : "runtime_execution_failed";
+      return {
+        mode: write ? "targeted_write" : "targeted_dry_run",
+        execution_location: spec.execution_location,
+        run_id: runId,
+        requested_youtube_video_ids: ids,
+        selected_records: partialRecords.length,
+        succeeded: partialSummary.succeeded.length,
+        failed: partialSummary.failed.length,
+        blockers: [...new Set([blocker, ...partialSummary.blockers])],
+        audit_out: auditOut,
+        success: false,
+        production_db_writes_performed: partialSummary.production_db_writes_performed,
+        db_rows_mutated: partialSummary.db_rows_mutated,
+        production_call_writes_allowed: false,
+        public_ranking_impact_allowed: false,
+        receipt_path: writeWorkplaneReceipt(job, spec, runId, "blocked", [...new Set([blocker, ...partialSummary.blockers])], "repair canonical worker runtime/configuration; do not bypass Workplane"),
+      };
+    }
+
+    const records = readTranscriptRecoveryAudit(auditOut);
+    const summary = summarizeTranscriptRecoveryRecords(records, write, ids, runId);
     const { succeeded, failed, blockers, result } = summary;
     const receiptPath = writeWorkplaneReceipt(
       job,
@@ -1016,27 +1159,24 @@ export async function runWorkplaneJob(job: PipelineJob): Promise<Record<string, 
 
   if (job.type === "artofwar_campaign_local_model_eval" || job.type === "artofwar_campaign_gemma_eval") {
     const runId = safeWorkplaneRunId(payload.run_id, "artofwar-local-model-eval");
-    const out = `.tmp/workplane-jobs/${job.type}-${runId}.json`;
-    const evaluation = await evaluateArtOfWarCampaignWithLocalModel(payload);
-    const sanitizedPayload = {
-      run_id: runId,
-      out,
-      campaign_id: boundedCampaignString(payload, "campaign_id", "unspecified"),
-      claim: boundedCampaignString(payload, "claim", "No explicit claim supplied."),
-      audience: boundedCampaignString(payload, "audience", "CallScore owned audience"),
-      cta: boundedCampaignString(payload, "cta", "No explicit CTA supplied."),
-      evidence_summary: boundedCampaignString(payload, "evidence_summary", "No evidence summary supplied."),
-      canonical_model: evaluation.model,
-      evaluation: evaluation.evaluation,
-      requested_model_remapped: typeof payload.model === "string" && payload.model !== evaluation.model,
-    };
-    const report = writeReportOnlyArtifact({ ...job, payload: sanitizedPayload }, spec);
+    let evaluation: ArtOfWarLocalModelEvaluation;
+    try {
+      evaluation = await evaluateArtOfWarCampaignWithLocalModel(payload, dependencies.fetchImpl ?? fetch);
+    } catch (error) {
+      const failureClass = classifyLocalModelEvaluationFailure(error);
+      return {
+        ...writeArtOfWarLocalModelEvaluationArtifact(job, spec, runId, null, failureClass),
+        model: CANONICAL_LOCAL_MODEL,
+        local_model_provider_call_attempted: true,
+        external_mutation_performed: false,
+        provider_mutation_performed: false,
+        production_db_writes_performed: false,
+      };
+    }
     return {
-      ...report,
-      mode: "local_model_evaluation",
+      ...writeArtOfWarLocalModelEvaluationArtifact(job, spec, runId, evaluation, null),
       model: evaluation.model,
-      evaluation: evaluation.evaluation,
-      local_model_provider_call_performed: true,
+      local_model_provider_call_attempted: true,
       external_mutation_performed: false,
       provider_mutation_performed: false,
       production_db_writes_performed: false,

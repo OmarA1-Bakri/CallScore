@@ -48,7 +48,7 @@ Resolved:
 - Forced targeted production writes reject direct CLI ownership; the Workplane wrapper is the only supported invocation seam.
 - The generic parser retains a 25-ID hard ceiling for non-writing diagnostics, but graph-owned forced writes are capped at nine.
 - Forced selection requires exact IDs and the two historical failure classes: `bot_verification_required` or `js_challenge_runtime_missing`.
-- Successful rows become `available`; truthful terminal rows become `failed_terminal`. Neither is selected on replay, so a new job cannot repeat the completed cohort mutation.
+- Successful rows become `available`; truthful terminal rows remain `failed` with the explicit error classification `failed_terminal`. Neither is selected on replay, so a new job cannot repeat the completed cohort mutation.
 - The existing write condition also refuses to overwrite a non-empty transcript.
 - Production call/ranking writes remain disabled.
 
@@ -57,12 +57,13 @@ Resolved:
 Resolved for targeted recovery:
 
 - `--cookies-from-browser` is rejected; browser profiles remain laptop-local.
-- The ambiguous `YTDLP_COOKIES` hook is rejected; only a secret-file path under `/run/secrets/` is accepted.
+- The ambiguous `YTDLP_COOKIES` hook is rejected; only a canonical root-owned, root-only regular secret file under `/run/secrets/` is accepted.
 - PO-token HTTP endpoints must use unauthenticated loopback HTTP.
-- WPC must use `/usr/bin/chromium`.
+- The versioned yt-dlp wrapper, local `yt-dlp-ejs` package sentinel, `/usr/local/bin/node` runtime and `/usr/bin/chromium` WPC browser must resolve to exact root-owned regular files with safe modes; missing or replaced files block execution.
+- Remote yt-dlp components are disabled; targeted recovery uses the installed local `yt-dlp-ejs` package.
 - PO-provider names and extractor arguments are allowlisted.
 - Cookie files continue to be copied to private writable temporary state and removed after use.
-- yt-dlp diagnostics are redacted before audit receipt persistence.
+- yt-dlp diagnostics redact cookie paths, token data and generic `Cookie:`/`Authorization:` headers before audit persistence.
 
 ### Dirty-tree quarantine
 
@@ -134,7 +135,22 @@ The superseding remediation in the final review tuple:
 - forces exact `qwen3:4b-instruct-2507-q4_K_M`, loopback Ollama, canonical prompt profile, bounded resource controls, a safe run identifier and canonical artifact location for both shadow aliases;
 - adds a real loopback Ollama campaign evaluation branch for both Art-of-War evaluator aliases, validates the exact returned model and strict JSON output, persists only bounded campaign fields, and grants no mutation/public authority;
 - writes `db_write_performed` on every transcript audit outcome and derives `production_db_writes_performed` plus `db_rows_mutated` from those per-record facts, including failed-row updates;
-- pins HH targeted recovery to the isolated yt-dlp binary and allowlists player clients, JS runtimes, remote components and the canonical container Chromium path while rejecting browser-profile extraction, arbitrary extra args and proxies;
+- pins HH targeted recovery to the isolated yt-dlp binary, canonical local Node and Chromium files, disables remote components, and rejects browser-profile extraction, arbitrary extra args and proxies;
 - adds RED→GREEN regressions for every finding and a live loopback Qwen3 evaluator canary.
 
-Post-remediation parent evidence: focused tests `80/80`, full suite `1432/1432`, TypeScript and `git diff --check` pass. Final reviewers must bind to the exact superseding HEAD named in their dispatch; no verdict against `44d1132` or an uncommitted tree is final acceptance evidence.
+Post-remediation parent evidence for that tuple: focused tests `80/80`, full suite `1432/1432`, TypeScript and `git diff --check` passed. Those verdicts are superseded by the next remediation tuple.
+
+## Third review cycle and final hardening
+
+Batch `deleg_5d169902` reviewed `d44bd8e336e80541f08a892299821a38300b6e4a` and returned three `FAIL` verdicts. Although parent had already superseded that commit to correct the container Chromium path, the remaining findings also applied to the successor and were remediated:
+
+- EJS/WPC recovery now fails closed when the canonical isolated yt-dlp wrapper is missing; bare PATH fallback is impossible for this method. `Dockerfile.hermes` provisions the exact versioned venv and pinned local-EJS marker for a future authorised rebuild.
+- Root ownership, regular-file type, canonical realpath, executable bit and non-writable mode are checked for the pinned yt-dlp wrapper, local `yt-dlp-ejs` package sentinel, Node and Chromium. Cookie files additionally require root-only mode and bounded size.
+- Remote EJS component fetches are disabled; local `yt-dlp-ejs 0.8.0` is required.
+- Workplane-owned dry runs and forced targeted runs traverse the same runtime preflight.
+- Ollama requests reject redirects, and evaluator output requires a non-array JSON object plus native numeric confidence.
+- Evaluator success/failure creates separate `<run-id>.artifact.json` `LocalModelEvaluationReceipt` or legacy `GemmaEvaluationReceipt` compatibility artifacts plus `<run-id>.json` workflow receipts. Parser/model failures become bounded blocked receipts rather than uncaught errors.
+- `transcript_recover_hh` ignores caller-controlled audit paths, reserves an immutable per-run canonical JSONL file, includes the run ID on every audit row, rejects stale/foreign/duplicate rows, preserves valid rows alongside malformed lines, and counts partial DB mutations before reporting execution failures.
+- No evaluator or recovery failure grants public/provider/call/ranking mutation authority.
+
+Final pre-commit parent verification after this hardening: TypeScript passed; focused suite `85/85`; full suite `1437/1437`; Dockerfile build check passed with no warnings; Workplane `OK`; freshness `PASS`; canonical agent audit `51/51`; repository secret hygiene passed. Final acceptance still requires three fresh independent verdicts against the exact final commit. Verdicts against `44d1132`, `d44bd8e`, `809d4a9` or an uncommitted tree are not final acceptance evidence.
