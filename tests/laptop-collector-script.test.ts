@@ -65,9 +65,9 @@ test("laptop collector exposes workplane claim, lock, and HH state publication",
   assert.match(script, /\[string\]\$WslDistro = "Ubuntu"/);
   assert.match(script, /\[string\]\$WslUser = "omar"/);
   assert.match(script, /function Invoke-TransportCommand/);
-  assert.match(script, /wsl\.exe -d \$WslDistro -u \$WslUser -- \$Program @Args/);
+  assert.match(script, /wsl\.exe -d \$WslDistro -u \$WslUser -- \$Program @ProgramArgs/);
   assert.match(script, /function Convert-LocalPathForSshTransport/);
-  assert.match(script, /wsl\.exe -d \$WslDistro -u \$WslUser -- wslpath -a \$Path/);
+  assert.match(script, /wsl\.exe -d \$WslDistro -u \$WslUser -- wslpath -a \$normalizedPath/);
   assert.match(script, /wslpath_failed transport=\$SshTransport/);
   assert.match(script, /Get-HhSshArgs/);
   assert.match(script, /Get-HhScpArgs/);
