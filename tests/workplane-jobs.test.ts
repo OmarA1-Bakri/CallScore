@@ -550,7 +550,7 @@ test("Gemma readiness trusts bounded shadow sample receipts and clean artifacts"
   assert.ok(domains.local_model_shadow_extraction.evidence.some((item) => item.includes("latest_local_model_shadow_sample_receipt=")));
 });
 
-test("Gemma runtime capacity preflight blocks Gemma4 scheduling when host memory is insufficient", () => {
+test("historical Gemma capacity preflight stays compatibility-only for current Qwen3 readiness", () => {
   const root = mkdtempSync(join(tmpdir(), "callscore-gemma-capacity-"));
   const receiptDir = join(root, ".tmp", "workflow-receipts", "gemma_capacity_preflight");
   mkdirSync(receiptDir, { recursive: true });
@@ -585,8 +585,8 @@ test("Gemma runtime capacity preflight blocks Gemma4 scheduling when host memory
   });
 
   assert.equal(domains.local_model_runtime_capacity.status, "BLOCKED");
-  assert.ok(domains.local_model_runtime_capacity.blockers.includes("insufficient_system_memory"));
-  assert.match(String(domains.local_model_runtime_capacity.safe_next_action), /free memory|smaller model|laptop/i);
+  assert.deepEqual(domains.local_model_runtime_capacity.blockers, ["historical_local_model_capacity_receipt_not_current"]);
+  assert.match(String(domains.local_model_runtime_capacity.safe_next_action), /model:capacity-preflight|qwen3:4b-instruct-2507-q4_K_M/i);
   assert.equal(domains.local_model_runtime_capacity.canary_available, false);
 });
 

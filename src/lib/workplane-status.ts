@@ -244,16 +244,32 @@ export function latestLocalModelCapacityPreflightArtifact(repoRoot = process.cwd
   if (!path) return { path: null, exists: false, modified_at: null, malformed: false, summary: {} };
   try {
     const json = readJsonObject(path);
+    const workflowName = typeof json.workflow_name === "string" ? json.workflow_name : null;
+    const schemaVersion = typeof json.schema_version === "string" ? json.schema_version : null;
+    const model = typeof json.model === "string" ? json.model : null;
+    const historicalCompatibility = /gemma|qwen2[._-]?5|qwen25/i.test(`${workflowName ?? ""} ${model ?? ""}`)
+      || path.includes("/gemma_capacity_preflight/");
+    const currentReceiptContract = workflowName === "local_model_capacity_preflight"
+      && schemaVersion === "callscore.local_model_capacity_preflight.v1";
+    const modelContractStatus = historicalCompatibility
+      ? "historical_compatibility_only"
+      : currentReceiptContract && model === CANONICAL_LOCAL_MODEL
+        ? "current"
+        : "unknown_or_noncanonical";
     return {
       path,
       exists: true,
       modified_at: statSync(path).mtime.toISOString(),
       malformed: false,
       summary: {
-        workflow_name: json.workflow_name ?? null,
+        workflow_name: workflowName,
+        schema_version: schemaVersion,
         run_id: json.run_id ?? null,
         result: json.result ?? null,
-        model: json.model ?? null,
+        model,
+        canonical_model: CANONICAL_LOCAL_MODEL,
+        model_contract_status: modelContractStatus,
+        historical_compatibility: historicalCompatibility,
         can_load: json.can_load === true,
         available_memory_gib: numberOrNull(json.available_memory_gib),
         required_memory_gib: numberOrNull(json.required_memory_gib),
@@ -664,8 +680,15 @@ export function buildReadinessDomains(input: {
     : [];
   const gemmaCapacityCanLoad = gemmaCapacityPreflight.exists
     && !gemmaCapacityPreflight.malformed
+    && gemmaCapacitySummary.model_contract_status === "current"
+    && gemmaCapacitySummary.model === CANONICAL_LOCAL_MODEL
     && gemmaCapacitySummary.can_load === true
     && gemmaCapacitySummary.result === "passed";
+  const gemmaCapacityHistorical = gemmaCapacitySummary.model_contract_status === "historical_compatibility_only";
+  const gemmaCapacityNoncanonical = gemmaCapacityPreflight.exists
+    && !gemmaCapacityPreflight.malformed
+    && !gemmaCapacityHistorical
+    && gemmaCapacitySummary.model_contract_status !== "current";
   const gemmaDiffClassificationReceipt = latestWorkflowReceipt("gemma_diff_classification", repoRoot);
   const gemmaShadowSamplePassed = gemmaShadowSampleReceipt.exists
     && !gemmaShadowSampleReceipt.malformed
@@ -786,16 +809,24 @@ export function buildReadinessDomains(input: {
       evidence: [
         gemmaCapacityPreflight.path ? `latest_local_model_capacity_preflight=${gemmaCapacityPreflight.path}` : "latest_local_model_capacity_preflight=missing",
         `model=${gemmaCapacitySummary.model ?? CANONICAL_LOCAL_MODEL}`,
+        `canonical_model=${CANONICAL_LOCAL_MODEL}`,
+        `model_contract_status=${gemmaCapacitySummary.model_contract_status ?? "missing"}`,
         `can_load=${gemmaCapacitySummary.can_load === true}`,
         `available_memory_gib=${gemmaCapacitySummary.available_memory_gib ?? "unknown"}`,
         `required_memory_gib=${gemmaCapacitySummary.required_memory_gib ?? "unknown"}`,
       ],
       blockers: gemmaCapacityCanLoad
         ? []
-        : (gemmaCapacityBlockers.length > 0 ? gemmaCapacityBlockers : [gemmaCapacityPreflight.exists ? "local_model_capacity_preflight_failed" : "local_model_capacity_preflight_missing"]),
+        : (gemmaCapacityHistorical
+          ? ["historical_local_model_capacity_receipt_not_current"]
+          : (gemmaCapacityNoncanonical
+            ? ["local_model_capacity_receipt_noncanonical"]
+            : (gemmaCapacityBlockers.length > 0 ? gemmaCapacityBlockers : [gemmaCapacityPreflight.exists ? "local_model_capacity_preflight_failed" : "local_model_capacity_preflight_missing"]))),
       safe_next_action: gemmaCapacityCanLoad
         ? `schedule bounded ${CANONICAL_LOCAL_MODEL} shadow/eval jobs when higher-value than the current audit-only verifier cadence`
-        : `free memory, use a smaller ${CANONICAL_LOCAL_MODEL} quant, or route local-model jobs to the laptop/GPU side before scheduling always-on work`,
+        : (gemmaCapacityHistorical || gemmaCapacityNoncanonical
+          ? `run npm run model:capacity-preflight for exact canonical model ${CANONICAL_LOCAL_MODEL}; historical/noncanonical receipts remain compatibility-only evidence`
+          : `free memory, use a smaller ${CANONICAL_LOCAL_MODEL} quant, or route local-model jobs to the laptop/GPU side before scheduling always-on work`),
       risky_actions_blocked: [`always-on ${CANONICAL_LOCAL_MODEL} jobs without capacity proof`, "production extractor default switch", "public ranking impact"],
       required_approvals: ["production extractor default change", "host memory/swap/service configuration change"],
       relevant_commands: ["npm run model:capacity-preflight"],

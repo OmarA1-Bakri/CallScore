@@ -82,12 +82,11 @@ async function tryGenerate(input: { readonly host: string; readonly model: strin
 }
 
 export async function runLocalModelCapacityPreflight(input: {
-  readonly model?: string;
   readonly ollamaHost?: string;
   readonly repoRoot?: string;
   readonly createdAt?: string;
 } = {}): Promise<LocalModelCapacityReceipt> {
-  const model = input.model ?? process.env.CALLSCORE_LOCAL_MODEL ?? process.env.GEMMA_CAPACITY_MODEL ?? CANONICAL_LOCAL_MODEL;
+  const model = CANONICAL_LOCAL_MODEL;
   const primaryHost = (input.ollamaHost ?? process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434").replace(/\/$/, "");
   const fallbackHost = "http://127.0.0.1:11434";
   const repoRoot = input.repoRoot ?? process.cwd();
@@ -149,7 +148,6 @@ export const runGemmaCapacityPreflight = runLocalModelCapacityPreflight;
 async function main(): Promise<void> {
   loadEnv();
   const receipt = await runLocalModelCapacityPreflight({
-    model: argValue(process.argv.slice(2), "--model") ?? undefined,
     ollamaHost: argValue(process.argv.slice(2), "--ollama-host") ?? undefined,
   });
   console.log(JSON.stringify(receipt, null, 2));
