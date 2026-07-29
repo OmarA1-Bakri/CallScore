@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import {
@@ -21,6 +23,7 @@ import { generateOperatingReceiptId, writeOperatingReceipt, buildOperatingReceip
 import { bootContextNode, hardGatePreflightNode } from "./node-wrappers/gating-nodes";
 import { runAttioWriteNode } from "./node-wrappers/crm-write-nodes";
 import { runPostHogWriteNode } from "./node-wrappers/crm-analytics-nodes";
+import { runCredentialRotationNode } from "./node-wrappers/credential-rotation-node";
 import { runZohoMailReplyNode, runZohoMailSendNode } from "./node-wrappers/email-reply-nodes";
 import { runDiscordOwnedPublishNode } from "./node-wrappers/discord-publish-nodes";
 import { runWhopListingUpdateNode } from "./node-wrappers/commerce-mutation-nodes";
@@ -149,7 +152,7 @@ function routeAfterExternalMutationPreflight(state: OperatingGraphState) {
         "attio_write_node",
       ]
     : parsed.config.mode === "bounded_write"
-      ? ["posthog_write_node"]
+      ? ["credential_rotation_node", "posthog_write_node"]
       : [];
   for (const nodeId of mutationNodeIds) {
     if (hasGraphMutationInput(parsed, nodeId) && !nodeAlreadyRan(parsed, nodeId)) return nodeId;
@@ -218,6 +221,7 @@ export const externalMutationPreflightNode = wrapDirectFunctionNode({
           "whop_mutation_node",
           "attio_write_node",
           "posthog_write_node",
+          "credential_rotation_node",
         ],
       },
       mutation_flags: DEFAULT_OPERATING_MUTATION_FLAGS,
@@ -353,6 +357,11 @@ function graphOwnedMutationWrapperNode(nodeId: string, runner: (input: Record<st
         input["provider_response"] = result.response;
         input["provider_execution_receipt_id"] = result.executionReceiptId;
         input["provider_execution_receipt_path"] = result.executionReceiptPath;
+        if (result.executionReceiptPath) {
+          input["provider_execution_receipt_sha256"] = createHash("sha256")
+            .update(readFileSync(result.executionReceiptPath))
+            .digest("hex");
+        }
         input["child_receipt_ids"] = [
           ...(Array.isArray(input["child_receipt_ids"])
             ? (input["child_receipt_ids"] as string[])
@@ -701,6 +710,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     .addNode("whop_mutation_node", graphOwnedMutationPlaceholderNode("whop_mutation_node"))
     .addNode("attio_write_node", graphOwnedMutationWrapperNode("attio_write_node", runAttioWriteNode))
     .addNode("posthog_write_node", graphOwnedMutationWrapperNode("posthog_write_node", runPostHogWriteNode))
+    .addNode("credential_rotation_node", graphOwnedMutationWrapperNode("credential_rotation_node", runCredentialRotationNode))
     .addNode("revenue_goal_loop", revenueGoalLoopNode)
     .addNode("data_goal_loop", dataGoalLoopNode)
     .addNode("worker_dispatch_goal_loop", workerDispatchNode)
@@ -760,6 +770,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
       whop_mutation_node: "whop_mutation_node",
       attio_write_node: "attio_write_node",
       posthog_write_node: "posthog_write_node",
+      credential_rotation_node: "credential_rotation_node",
       collect_receipts: "collect_receipts",
     });
 
@@ -806,6 +817,7 @@ export function createCallscoreOperatingGraph(options?: CallscoreOperatingGraphO
     "whop_mutation_node",
     "attio_write_node",
     "posthog_write_node",
+    "credential_rotation_node",
   ] as const) {
     builder.addEdge(node, "collect_receipts");
   }

@@ -94,7 +94,7 @@ test("client instrumentation is mounted and tracks delegated funnel interactions
 test("operating graph owns PostHog provider mutations through the real guarded wrapper", () => {
   const graph = read("src/lib/workplane/callscore-operating-graph.ts");
   assert.match(graph, /import \{ runPostHogWriteNode \} from "\.\/node-wrappers\/crm-analytics-nodes"/);
-  assert.match(graph, /mode === "bounded_write"[\s\S]*\["posthog_write_node"\]/);
+  assert.match(graph, /mode === "bounded_write"[\s\S]*\[[^\]]*"posthog_write_node"[^\]]*\]/);
   assert.match(graph, /addNode\("posthog_write_node", graphOwnedMutationWrapperNode\("posthog_write_node", runPostHogWriteNode\)\)/);
 });
 

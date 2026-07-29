@@ -50,6 +50,7 @@ test("operating graph source wires public graph-owned mutation nodes to real wra
     "runYoutubeMetadataUpdateNode",
     "runDiscordOwnedPublishNode",
     "runWhopListingUpdateNode",
+    "runCredentialRotationNode",
   ];
   for (const wrapper of realWrappers) {
     assert.match(source, new RegExp(wrapper));
@@ -67,6 +68,7 @@ test("operating graph source wires public graph-owned mutation nodes to real wra
     "youtube_metadata_update_node",
     "discord_send_node",
     "whop_listing_update_node",
+    "credential_rotation_node",
   ]) {
     assert.doesNotMatch(source, new RegExp(`\\.addNode\\("${nodeId}", graphOwnedMutationPlaceholderNode`));
   }
