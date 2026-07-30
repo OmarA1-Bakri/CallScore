@@ -230,7 +230,7 @@ with busy exactly `0`.
 
 ### R0A gate
 
-R0A passes only when:
+R0A is `prepared` only when:
 
 - every required file exists in the isolated Workplane commit;
 - explicit RED and GREEN evidence exists;
@@ -242,6 +242,8 @@ R0A passes only when:
 - all Git commands used the immutable empty-hooks procedure and no external index mutation occurred;
 - both modified repos are clean at frozen commits;
 - no live mutation occurred.
+
+`prepared` is not a kernel-fence PASS. It requires `kernel_fence_integration_status=pending_r0c` and permits only R0B code-aware review. R0C must prove the real mount namespace, temporary DAC/setgid/default ACL access, Omar denial, DB/WAL/SHM creation and exact cleanup before live R1 authority exists.
 
 ## Phase R0B — Complete-tuple review
 
@@ -260,14 +262,16 @@ R0C is not executed by the R0A agent or R1 runner.
 From a separate operator shell:
 
 1. verify the reviewed tuple and hashes;
-2. install broker, units, tools, dedicated service UID and trusted signer public key using literal reviewed commands;
-3. run root-required integration tests against disposable paths only;
-4. install signed recurring snapshot policy if the timer is expected to run;
-5. create a value-free read-only R1 proposal with current path/object identities and external-capacity target;
-6. transfer the proposal to `omarslaptop-1`;
-7. sign it with the operator private key under namespace `callscore-r1`;
-8. return signed proposal/signature to the broker ingress;
-9. broker verifies and promotes it to root-controlled authorisation storage.
+2. install broker, units, tools, dedicated `callscore-maint:callscore-state-maint` identity and trusted signer public key using literal reviewed commands;
+3. against a disposable fixture only, record original DAC/ACL state, apply temporary traversal/write ACLs plus setgid/default group access, start the nonce maintenance unit and verify its distinct mount-namespace inode/private bind before the broker applies the host-visible canonical read-only bind;
+4. run the exact root integration command and require maintenance UID access, Omar denial, DB/WAL/SHM creation, hostile-writer denial and clean teardown all `pass`;
+5. restore and byte-verify fixture owner/group/mode/ACLs; any cleanup uncertainty fails R0C;
+6. install signed recurring snapshot policy if the timer is expected to run;
+7. create a value-free read-only R1 proposal with current path/object identities and external-capacity target;
+8. transfer the proposal to `omarslaptop-1`;
+9. sign it with the operator private key under namespace `callscore-r1`;
+10. return signed proposal/signature to the broker ingress;
+11. broker verifies and promotes it to root-controlled authorisation storage.
 
 The operator signing key must not exist on HHVM or in Hermes/Composio.
 

@@ -28,7 +28,7 @@ R0A must not:
 - call a provider, publish, send, spend or deploy;
 - merge, push, amend, reset, stash, clean or alter unrelated work.
 
-If any required behaviour cannot be proven without live mutation, test it with fixtures, mount namespaces and disposable databases only, document the remaining install-time integration test, and stop R0A at `blocked_preparation_gap` rather than touching production.
+Except for the explicitly deferred privileged R0C kernel-fence integration, if any required behaviour cannot be proven without live mutation, test it with fixtures/disposable databases, document the gap, and stop R0A at blocker code `blocked_preparation_gap` rather than touching production.
 
 ## Canonical inputs
 
@@ -39,6 +39,10 @@ Read in full:
   - `docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-specification-fail.md` — `096fa0df4c621a6cad42f15b8bc08f2024d2034d281fde416dae1732997ba498`;
   - `docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-security-fail.md` — `a147a8ec9535071a4f427eec02177f61e17620cdeebb671b8f081dd1585a06e2`;
   - `docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-implementation-timeout.json` — `020e64469f7003c2393a10b69559405f3d349f79779c35c55bc283535e8deaa5`;
+- the three R0A FAIL reviews subsequently reconciled into this revision:
+  - `docs/ops/callscore-r0a/input-reviews/deleg_a7901f50-r0a-security-fail.md` — `a3a646f38698252b957fed2cf1a5ef2249e4c5233235890f1c9fc8ac879cf0f4`;
+  - `docs/ops/callscore-r0a/input-reviews/deleg_c26083f7-r0a-specification-fail.md` — `4551e2a02c0783459ec8c358461b1452ff4f6495faf2e9b9e701cf9e9a7052d2`;
+  - `docs/ops/callscore-r0a/input-reviews/deleg_e17283dc-r0a-implementation-fail.md` — `7fb0c16bff6f5f5ac47058ad9bcbab8c6714021be710ba5c9f0b4c9b13637473`;
 - `/srv/agents/hermes/hermes-agent/hermes_state.py`;
 - `/srv/agents/hermes/hermes-agent/tools/session_search_tool.py`;
 - `/srv/agents/hermes/hermes-agent/gateway/status.py`;
@@ -182,12 +186,14 @@ The R1 service must run as `User=callscore-maint`, with `NoNewPrivileges=yes`, n
 
 The future namespace topology is literal:
 
-1. the root broker opens an `O_PATH` fd to the original profile and creates `/run/callscore-maintenance/<nonce>/original` as a root-only bind anchor;
-2. it bind-mounts the canonical host profile path onto itself and remounts that host-visible bind read-only;
-3. `callscore-r1-maintenance@<nonce>.service` uses systemd `BindPaths=/run/callscore-maintenance/<nonce>/original:/var/lib/callscore-maintenance/state` in its own mount namespace, after root performs the bind and before credentials drop to `callscore-maint`;
-4. maintenance opens only `/var/lib/callscore-maintenance/state/state.db`;
-5. on success, the service stops, broker verifies no private-path holders, unmounts the unit namespace/bind anchor, removes temporary ACLs, unmounts the canonical read-only self-bind and verifies original path identity;
-6. on teardown uncertainty, keep the canonical path read-only and emit a critical blocker.
+1. R0C provisions dedicated UID/GID `callscore-maint:callscore-state-maint`; it records original owner/group/mode/ACLs, then applies temporary traversal/write ACLs plus setgid/default group access needed to create DB/WAL/SHM through the private path;
+2. the root broker opens an `O_PATH` fd to the original profile and creates `/run/callscore-maintenance/<nonce>/original` as a root-only bind anchor;
+3. the broker starts `callscore-r1-maintenance@<nonce>.service`; systemd establishes its private mount namespace and `BindPaths=/run/callscore-maintenance/<nonce>/original:/var/lib/callscore-maintenance/state` before dropping credentials;
+4. the waiting runner reports its PID, mount-namespace inode, private-bind device/inode and DAC write/readiness proof through a root-controlled nonce channel, but performs no DB mutation yet;
+5. the broker verifies namespace isolation/readiness, bind-mounts the canonical host profile path onto itself, remounts that host-visible bind read-only, revalidates all holders and DB identity, then releases the waiting runner;
+6. maintenance opens only `/var/lib/callscore-maintenance/state/state.db`; tests require DB/WAL/SHM creation through the private path while UID `omar` is denied through the canonical path;
+7. on success, the service stops, broker verifies no private-path holders, removes temporary ACL/setgid/default access and verifies original owner/group/mode/ACLs, unmounts the private anchor and canonical read-only self-bind, then verifies original path identity;
+8. on teardown uncertainty, keep the canonical path read-only and emit a critical blocker.
 
 The target host rejects unprivileged mount namespaces. R0A runs hermetic nonprivileged state-machine/syscall-contract tests and generates the privileged disposable-fixture integration-test artifact, but must not claim kernel-fence GREEN. Privileged mount/writer-denial GREEN moves to R0C with exact command:
 
@@ -196,6 +202,8 @@ The target host rejects unprivileged mount namespaces. R0A runs hermetic nonpriv
 ```
 
 Expected exit is `0`; every named assertion must be `pass`; the fixture is outside the live profile and deleted only after object-identity verification.
+
+R0A completion is reported as `prepared`, not `pass`, and must include `kernel_fence_integration_status=pending_r0c` plus `kernel_fence_green_claimed=false`. R0C must prove namespace identity, maintenance DAC access, Omar denial, WAL/SHM creation and cleanup for every finaliser branch before live R1 can be authorised.
 
 ### 3. Snapshot and restore
 
@@ -530,8 +538,10 @@ Return exactly one valid JSON object and no prose outside it:
 ```json
 {
   "schema": "callscore.r0a_maintenance_preparation_result.v1",
-  "status": "pass|blocked|failed",
+  "status": "prepared|blocked|failed",
   "r0b_allowed": false,
+  "kernel_fence_integration_status": "pending_r0c|pass|failed|not_run",
+  "kernel_fence_green_claimed": false,
   "live_mutation_performed": "false|true|unknown",
   "sudo_used": "false|true|unknown",
   "external_index_mutation_performed": "false|true|unknown",
@@ -590,8 +600,8 @@ Return exactly one valid JSON object and no prose outside it:
     "status": "not_required_for_source_only_r0a"
   },
   "blockers": [],
-  "next_action": "Status-dependent: only pass with r0b_allowed=true may proceed to three independent R0B reviews; blocked or failed must return remediation only."
+  "next_action": "Status-dependent: only prepared with r0b_allowed=true may proceed to three independent R0B reviews; blocked or failed must return remediation only."
 }
 ```
 
-The result schema enforces: `status=pass` iff `r0b_allowed=true`, all required tests/manifests validate and every forbidden mutation is evidence-backed `false`. `status=blocked|failed` requires `r0b_allowed=false`, at least one blocker code such as `blocked_preparation_gap`, and remediation-only `next_action`. No observation defaults to false.
+The result schema enforces: `status=prepared` iff `r0b_allowed=true`, all source/static/fixture tests and manifests validate, every forbidden mutation is evidence-backed `false`, `kernel_fence_integration_status=pending_r0c` and `kernel_fence_green_claimed=false`. `status=blocked|failed` requires `r0b_allowed=false`, at least one blocker code such as `blocked_preparation_gap`, and remediation-only `next_action`. R0A may never report kernel-fence integration `pass`. No observation defaults to false.
