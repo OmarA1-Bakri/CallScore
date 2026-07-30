@@ -69,7 +69,7 @@ ESCAPE_CALLS = (
     "copy_file_range(", "splice(", "tee(", "open_by_handle_at(",
     "move_mount(", "fsopen(", "fsmount(", "open_tree(", "pidfd_getfd(",
     "keyctl(", "add_key(", "request_key(", "process_vm_readv(",
-    "chdir(", "fchdir(", "kill(", "tkill(", "tgkill(", "pidfd_send_signal(",
+    "kill(", "tkill(", "tgkill(", "pidfd_send_signal(",
     "symlink(", "symlinkat(",
 )
 
@@ -138,8 +138,9 @@ def example_manifest() -> dict[str, Any]:
         "plan": {"path": "/docs/plan.md", "sha256": "0" * 64},
         "prompt": {"path": "/docs/prompt.md", "sha256": "1" * 64},
         "review_inputs": [{"path": f"/reviews/{i}.md", "sha256": f"{i}" * 64} for i in range(2, 8)],
+        "capture_root": "/captures",
         "mutable_inputs": [
-            {"path": f"/input/{i}", "capture_path": f"/captures/{i}", "sha256": "8" * 64, "device_inode": f"1:{i}", "mode": "0644", "uid": 1000, "gid": 1000}
+            {"path": f"/input/{i}", "capture_name": str(i), "sha256": "8" * 64, "device_inode": f"1:{i}", "mode": "0644", "uid": "1000", "gid": "1000"}
             for i in range(4)
         ],
     }
@@ -170,7 +171,7 @@ def _require_sorted_unique(items: list[dict[str, Any]], name: str) -> None:
 
 
 def validate_manifest(obj: Any) -> None:
-    required = {"schema", "application_base", "workplane_base", "hermes", "plan", "prompt", "review_inputs", "mutable_inputs"}
+    required = {"schema", "application_base", "workplane_base", "hermes", "plan", "prompt", "review_inputs", "capture_root", "mutable_inputs"}
     if not isinstance(obj, dict) or set(obj) != required or obj.get("schema") != SCHEMA:
         raise ValueError("invalid top-level manifest shape/schema")
     _tuple(obj["application_base"], "application_base")
@@ -192,17 +193,19 @@ def validate_manifest(obj: Any) -> None:
     for index, item in enumerate(reviews):
         _hash_path(item, f"review_inputs[{index}]", absolute=True)
     _require_sorted_unique(reviews, "review inputs")
+    if not isinstance(obj["capture_root"], str) or not Path(obj["capture_root"]).is_absolute() or ".." in Path(obj["capture_root"]).parts:
+        raise ValueError("invalid capture_root")
     mutable = obj["mutable_inputs"]
     if not isinstance(mutable, list) or len(mutable) != 4:
         raise ValueError("exactly four mutable inputs are required")
-    mutable_required = {"path", "capture_path", "sha256", "device_inode", "mode", "uid", "gid"}
+    mutable_required = {"path", "capture_name", "sha256", "device_inode", "mode", "uid", "gid"}
     for index, item in enumerate(mutable):
         if not isinstance(item, dict) or set(item) != mutable_required:
             raise ValueError(f"invalid mutable_inputs[{index}] shape")
         if not isinstance(item["path"], str) or not Path(item["path"]).is_absolute():
             raise ValueError(f"invalid mutable_inputs[{index}].path")
-        if not isinstance(item["capture_path"], str) or not Path(item["capture_path"]).is_absolute():
-            raise ValueError(f"invalid mutable_inputs[{index}].capture_path")
+        if not isinstance(item["capture_name"], str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", item["capture_name"]):
+            raise ValueError(f"invalid mutable_inputs[{index}].capture_name")
         if not isinstance(item["sha256"], str) or not HEX64.fullmatch(item["sha256"]):
             raise ValueError(f"invalid mutable_inputs[{index}].sha256")
         if not isinstance(item["device_inode"], str) or not re.fullmatch(r"[0-9]+:[0-9]+", item["device_inode"]):
@@ -210,12 +213,12 @@ def validate_manifest(obj: Any) -> None:
         if not isinstance(item["mode"], str) or not re.fullmatch(r"[0-7]{4}", item["mode"]):
             raise ValueError(f"invalid mutable_inputs[{index}].mode")
         for field in ("uid", "gid"):
-            if not isinstance(item[field], int) or isinstance(item[field], bool) or item[field] < 0:
+            if not isinstance(item[field], str) or not re.fullmatch(r"0|[1-9][0-9]{0,9}", item[field]):
                 raise ValueError(f"invalid mutable_inputs[{index}].{field}")
     _require_sorted_unique(mutable, "mutable inputs")
-    capture_paths = [item["capture_path"] for item in mutable]
-    if len(set(capture_paths)) != len(capture_paths):
-        raise ValueError("mutable capture paths must be unique")
+    capture_names = [item["capture_name"] for item in mutable]
+    if len(set(capture_names)) != len(capture_names):
+        raise ValueError("mutable capture names must be unique")
     _validate_canonical_value(obj)
 
 
@@ -229,18 +232,13 @@ def validate_manifest_identity(obj: dict[str, Any]) -> None:
     expected_names = dict(EXPECTED_MUTABLE_INPUTS)
     if set(item["path"] for item in obj["mutable_inputs"]) != set(expected_names):
         raise ValueError("manifest mutable input identity mismatch")
-    capture_parents: set[Path] = set()
-    for item in obj["mutable_inputs"]:
-        source = item["path"]
-        capture = Path(item["capture_path"])
-        if ".." in capture.parts or capture.name != expected_names[source]:
-            raise ValueError("manifest mutable capture identity mismatch")
-        capture_parents.add(capture.parent)
-    if len(capture_parents) != 1:
-        raise ValueError("manifest capture root mismatch")
-    capture_root = next(iter(capture_parents))
+    capture_root = Path(obj["capture_root"])
     if capture_root.parent != Path("/srv/agents/worktrees") or not re.fullmatch(r"\.r0a-input-captures-[a-z0-9][a-z0-9-]{7,63}", capture_root.name):
         raise ValueError("manifest capture root is not canonical")
+    for item in obj["mutable_inputs"]:
+        source = item["path"]
+        if item["capture_name"] != expected_names[source]:
+            raise ValueError("manifest mutable capture identity mismatch")
 
 
 def validate_spec(obj: Any) -> None:
@@ -326,14 +324,14 @@ def _verify_repo_tuple_open(repo: Path, expected: dict[str, str], hooks: Path, *
     ]
     env = {
         "PATH": "/usr/bin:/bin",
-        "HOME": "/home/omar",
+        "HOME": "/nonexistent",
         "LANG": "C.UTF-8",
         "LC_ALL": "C.UTF-8",
         "GIT_OPTIONAL_LOCKS": "0",
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_CONFIG_GLOBAL": "/dev/null",
-        "GIT_PAGER": "cat",
+        "GIT_PAGER": "/usr/bin/cat",
     }
 
     def run(*arguments: str, allowed_exit: tuple[int, ...] = (0,)) -> bytes:
@@ -396,27 +394,79 @@ def _inside(path: Path, roots: list[Path]) -> bool:
     return False
 
 
-def audit_trace_text(text: str, allowed_write_roots: list[Path], cwd: Path) -> None:
+def _allowed_write(path: Path, roots: list[Path], exact_paths: list[Path]) -> bool:
+    if _inside(path, roots):
+        return True
+    if not path.is_absolute():
+        return False
+    candidate = Path(os.path.normpath(os.fspath(path)))
+    _assert_no_symlink_components(candidate)
+    for exact in exact_paths:
+        if not exact.is_absolute():
+            raise ValueError("write allowlist path is not absolute")
+        normal_exact = Path(os.path.normpath(os.fspath(exact)))
+        _assert_no_symlink_components(normal_exact)
+        if candidate == normal_exact:
+            return True
+    return False
+
+
+def audit_trace_text(
+    text: str,
+    allowed_write_roots: list[Path],
+    cwd: Path,
+    allowed_write_paths: list[Path] | None = None,
+) -> None:
+    allowed_write_paths = allowed_write_paths or []
     network_calls = ("socket(", "socketpair(", "connect(", "bind(", "listen(", "accept(", "accept4(", "sendto(", "sendmsg(", "recvfrom(", "recvmsg(")
+    current_cwd = Path(os.path.normpath(os.fspath(cwd)))
     for line in text.splitlines():
         if any(call in line for call in network_calls):
             raise ValueError("network syscall attempted")
         if any(call in line for call in ESCAPE_CALLS) or (("clone(" in line or "clone3(" in line) and "CLONE_NEW" in line):
             raise ValueError(f"process/kernel escape syscall attempted: {line}")
+        if "chdir(" in line:
+            target_match = re.search(r'chdir\("((?:[^"\\]|\\.)*)"\)', line)
+            if target_match is None:
+                raise ValueError(f"unresolved cwd change: {line}")
+            raw_target = bytes(target_match.group(1), "utf-8").decode("unicode_escape")
+            target = Path(raw_target)
+            if not target.is_absolute():
+                target = current_cwd / target
+            target = Path(os.path.normpath(os.fspath(target)))
+            if not _inside(target, allowed_write_roots):
+                raise ValueError(f"cwd change outside allowlist: {target}")
+            if re.search(r"=\s*0(?:\s|$)", line):
+                current_cwd = target
+            continue
+        if "fchdir(" in line:
+            target_match = re.search(r"fchdir\(\d+<([^>]+)>\)", line)
+            if target_match is None:
+                raise ValueError(f"unresolved fd cwd change: {line}")
+            target = Path(target_match.group(1).removesuffix(" (deleted)"))
+            if not target.is_absolute() or not _inside(target, allowed_write_roots):
+                raise ValueError(f"fd cwd change outside allowlist: {target}")
+            if re.search(r"=\s*0(?:\s|$)", line):
+                current_cwd = target
+            continue
         if "mmap(" in line and "PROT_WRITE" in line and "MAP_SHARED" in line:
             raise ValueError(f"shared writable mapping attempted: {line}")
         fd_mutating = any(call in line for call in FD_MUTATING_CALLS)
         if fd_mutating:
-            fd_match = re.search(r"(?:^|\s)(?:write|writev|pwrite64|pwritev|pwritev2|ftruncate|fallocate|fchmod|fchown|fsetxattr|fremovexattr|sendfile|copy_file_range|splice)\((\d+)(?:<([^>]+)>)?", line)
+            fd_match = re.search(r"(?:^|\s)(?:write|writev|pwrite64|pwritev|pwritev2|ftruncate|fallocate|fchmod|fchown|fsetxattr|fremovexattr|sendfile|copy_file_range|splice)\((\d+)(?:<(.+?)>)?,\s", line)
             if not fd_match:
                 raise ValueError(f"unresolved inherited write fd: {line}")
             fd_number = int(fd_match.group(1))
             fd_target = fd_match.group(2)
             if fd_target is None:
                 raise ValueError(f"unresolved inherited write fd: {line}")
+            if fd_target.startswith("/dev/null<"):
+                fd_target = "/dev/null"
+            if fd_target == "/dev/null":
+                continue
             if fd_target.startswith("pipe:[") and fd_number in (1, 2):
                 continue
-            if not fd_target.startswith("/") or not _inside(Path(fd_target), allowed_write_roots):
+            if not fd_target.startswith("/") or not _allowed_write(Path(fd_target), allowed_write_roots, allowed_write_paths):
                 raise ValueError(f"write fd outside allowlist: {fd_target}")
             continue
         mutating = any(call in line for call in MUTATING_CALLS) or ("open" in line and any(flag in line for flag in WRITE_FLAGS))
@@ -424,12 +474,21 @@ def audit_trace_text(text: str, allowed_write_roots: list[Path], cwd: Path) -> N
             continue
         if (("open(" in line or "openat(" in line or "openat2(" in line or "creat(" in line)
                 and any(flag in line for flag in WRITE_FLAGS + ("creat(",))):
-            result_target = re.search(r"=\s*\d+<([^>]+)>", line)
-            if result_target is None:
-                raise ValueError(f"kernel-resolved mutating fd target missing: {line}")
-            actual_target = result_target.group(1).removesuffix(" (deleted)")
-            if not actual_target.startswith("/") or not _inside(Path(actual_target), allowed_write_roots):
-                raise ValueError(f"mutating open resolved outside allowlist: {actual_target}")
+            failed_result = re.search(r"=\s*-1\b", line) is not None
+            result_fd = re.search(r"=\s*(\d+)(?:<(.+)>)?\s*$", line)
+            if result_fd is None and not failed_result:
+                raise ValueError(f"mutating open result is unresolved: {line}")
+            actual_target = result_fd.group(2) if result_fd is not None else None
+            if actual_target is None and not failed_result:
+                raise ValueError(f"mutating open has no kernel-resolved target: {line}")
+            if actual_target is not None and actual_target.startswith("/dev/null<"):
+                actual_target = "/dev/null"
+            if actual_target == "/dev/null":
+                continue
+            if actual_target is not None:
+                actual_target = actual_target.removesuffix(" (deleted)")
+                if not actual_target.startswith("/") or not _allowed_write(Path(actual_target), allowed_write_roots, allowed_write_paths):
+                    raise ValueError(f"mutating open resolved outside allowlist: {actual_target}")
         matches = re.findall(r'"((?:[^"\\]|\\.)*)"', line)
         if not matches:
             raise ValueError(f"unresolved mutating syscall: {line}")
@@ -439,8 +498,8 @@ def audit_trace_text(text: str, allowed_write_roots: list[Path], cwd: Path) -> N
             candidate = Path(raw)
             if not candidate.is_absolute():
                 relative_count += 1
-                candidate = cwd / candidate
-            if not _inside(candidate, allowed_write_roots):
+                candidate = current_cwd / candidate
+            if not _allowed_write(candidate, allowed_write_roots, allowed_write_paths):
                 raise ValueError(f"write outside allowlist: {candidate}")
         at_style = any(call in line for call in ("openat(", "openat2(", "unlinkat(", "renameat(", "renameat2(", "mkdirat(", "fchmodat(", "fchmodat2(", "fchownat(", "futimesat(", "symlinkat(", "linkat("))
         if at_style and relative_count > line.count("AT_FDCWD"):
@@ -738,7 +797,7 @@ def validate_manifest_files(obj: dict[str, Any]) -> None:
         if sha256_file(Path(item["path"])) != item["sha256"]:
             raise ValueError(f"manifest file hash mismatch: {item['path']}")
     for item in obj["mutable_inputs"]:
-        capture = Path(item["capture_path"])
+        capture = Path(obj["capture_root"]) / item["capture_name"]
         _verify_owned_directory(capture.parent, exact_mode=0o700)
         _verify_private_file(capture)
         if sha256_file(capture) != item["sha256"]:
@@ -758,14 +817,17 @@ def build_manifest(*, application_base: dict[str, str], workplane_base: dict[str
     for item in hermes.get("anchor_files", []):
         if sha256_file(Path(item["path"])) != item["sha256"]:
             raise ValueError(f"Hermes anchor hash mismatch: {item['path']}")
-    mutable = [
-        capture_file(
+    mutable = []
+    for item in mutable_specs:
+        captured = capture_file(
             Path(item["path"]),
             capture_dir / item["name"],
             destination_parent_identity=capture_dir_identity,
         )
-        for item in mutable_specs
-    ]
+        captured["capture_name"] = Path(captured.pop("capture_path")).name
+        captured["uid"] = str(captured["uid"])
+        captured["gid"] = str(captured["gid"])
+        mutable.append(captured)
     manifest = {
         "schema": SCHEMA,
         "application_base": application_base,
@@ -774,6 +836,7 @@ def build_manifest(*, application_base: dict[str, str], workplane_base: dict[str
         "plan": plan,
         "prompt": prompt,
         "review_inputs": sorted(reviews, key=lambda item: item["path"]),
+        "capture_root": str(capture_dir),
         "mutable_inputs": sorted(mutable, key=lambda item: item["path"]),
     }
     validate_manifest(manifest)
@@ -797,6 +860,87 @@ def validate_create_paths(args: argparse.Namespace) -> str:
     return nonce
 
 
+def audit_trace_prefix(
+    trace_prefix: Path,
+    allowed_write_roots: list[Path],
+    cwd: Path,
+    allowed_write_paths: list[Path] | None = None,
+) -> None:
+    allowed_write_paths = allowed_write_paths or []
+    if not trace_prefix.is_absolute() or not cwd.is_absolute() or not allowed_write_roots or any(not root.is_absolute() for root in allowed_write_roots) or any(not path.is_absolute() for path in allowed_write_paths):
+        raise ValueError("trace audit paths must be absolute")
+    parent_fd, _ = _open_stable_directory(trace_prefix.parent)
+    try:
+        parent_info = os.fstat(parent_fd)
+        if parent_info.st_uid != os.getuid() or stat.S_IMODE(parent_info.st_mode) != 0o700:
+            raise ValueError("trace parent must be owner-only")
+        pattern = re.compile(re.escape(trace_prefix.name) + r"\.[1-9][0-9]*")
+        names = sorted(name for name in os.listdir(parent_fd) if pattern.fullmatch(name))
+        if not names:
+            raise ValueError("no per-process trace files found")
+        for name in names:
+            fd = os.open(name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
+            try:
+                info = os.fstat(fd)
+                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_size > 64 * 1024 * 1024:
+                    raise ValueError("invalid trace file")
+                chunks: list[bytes] = []
+                while True:
+                    chunk = os.read(fd, 1024 * 1024)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                text = b"".join(chunks).decode("utf-8", "strict")
+            finally:
+                os.close(fd)
+            audit_trace_text(text, allowed_write_roots, cwd, allowed_write_paths)
+    finally:
+        os.close(parent_fd)
+
+
+def write_failure_receipt(
+    control_root: Path,
+    nonce: str,
+    phase: str,
+    command_id: str,
+    exit_code: int,
+    bootstrap_sha256: str,
+    test_sha256: str,
+    schema_sha256: str,
+) -> Path:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{7,63}", nonce):
+        raise ValueError("invalid failure nonce")
+    if control_root != WORKTREE_ROOT / f".r0a-control-{nonce}":
+        raise ValueError("failure control root is not canonical")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", phase) or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,127}", command_id):
+        raise ValueError("invalid failure phase/command id")
+    if not isinstance(exit_code, int) or isinstance(exit_code, bool) or exit_code < 1 or exit_code > 255:
+        raise ValueError("invalid failure exit code")
+    for value in (bootstrap_sha256, test_sha256, schema_sha256):
+        if not HEX64.fullmatch(value):
+            raise ValueError("invalid failure receipt hash")
+    control_fd, identity = _open_stable_directory(control_root)
+    try:
+        info = os.fstat(control_fd)
+        if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+            raise ValueError("failure control root must be owner-only")
+    finally:
+        os.close(control_fd)
+    receipt = {
+        "schema": "callscore.r0a_failure_receipt.v1",
+        "nonce": nonce,
+        "phase": phase,
+        "command_id": command_id,
+        "exit_code": exit_code,
+        "bootstrap_sha256": bootstrap_sha256,
+        "test_sha256": test_sha256,
+        "manifest_schema_sha256": schema_sha256,
+    }
+    output = control_root / "failure-receipt.json"
+    atomic_write_new(output, canonical_bytes(receipt), expected_parent_identity=identity)
+    return output
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
@@ -805,6 +949,20 @@ def main() -> int:
     canon = sub.add_parser("canonicalize")
     canon.add_argument("--input", type=Path, required=True)
     canon.add_argument("--output", type=Path, required=True)
+    audit = sub.add_parser("audit-trace")
+    audit.add_argument("--trace-prefix", type=Path, required=True)
+    audit.add_argument("--allowed-write-root", type=Path, action="append", required=True)
+    audit.add_argument("--allowed-write-path", type=Path, action="append", default=[])
+    audit.add_argument("--cwd", type=Path, required=True)
+    failure = sub.add_parser("write-failure-receipt")
+    failure.add_argument("--control-root", type=Path, required=True)
+    failure.add_argument("--nonce", required=True)
+    failure.add_argument("--phase", required=True)
+    failure.add_argument("--command-id", required=True)
+    failure.add_argument("--exit-code", type=int, required=True)
+    failure.add_argument("--bootstrap-sha256", required=True)
+    failure.add_argument("--test-sha256", required=True)
+    failure.add_argument("--schema-sha256", required=True)
     create = sub.add_parser("create")
     create.add_argument("--spec", type=Path, required=True)
     create.add_argument("--output", type=Path, required=True)
@@ -822,6 +980,22 @@ def main() -> int:
     create.add_argument("--plan-sha256", required=True)
     create.add_argument("--prompt-sha256", required=True)
     args = parser.parse_args()
+    if args.command == "audit-trace":
+        audit_trace_prefix(args.trace_prefix, args.allowed_write_root, args.cwd, args.allowed_write_path)
+        return 0
+    if args.command == "write-failure-receipt":
+        output = write_failure_receipt(
+            args.control_root,
+            args.nonce,
+            args.phase,
+            args.command_id,
+            args.exit_code,
+            args.bootstrap_sha256,
+            args.test_sha256,
+            args.schema_sha256,
+        )
+        print(output)
+        return 0
     if args.command == "create":
         validate_create_paths(args)
         spec = load_json_strict(read_regular_bytes(args.spec))

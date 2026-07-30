@@ -11,6 +11,7 @@
     "plan",
     "prompt",
     "review_inputs",
+    "capture_root",
     "mutable_inputs"
   ],
   "properties": {
@@ -39,6 +40,10 @@
     },
     "plan": { "$ref": "#/$defs/plan" },
     "prompt": { "$ref": "#/$defs/prompt" },
+    "capture_root": {
+      "type": "string",
+      "pattern": "^/srv/agents/worktrees/\\.r0a-input-captures-[a-z0-9][a-z0-9-]{7,63}$"
+    },
     "review_inputs": {
       "type": "array",
       "minItems": 6,
@@ -156,15 +161,15 @@
     "mutableInput": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "capture_path", "sha256", "device_inode", "mode", "uid", "gid"],
+      "required": ["path", "capture_name", "sha256", "device_inode", "mode", "uid", "gid"],
       "properties": {
         "path": { "$ref": "#/$defs/printableAbsolutePath" },
-        "capture_path": { "$ref": "#/$defs/printableAbsolutePath" },
+        "capture_name": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
         "sha256": { "$ref": "#/$defs/sha256" },
         "device_inode": { "type": "string", "pattern": "^[0-9]+:[0-9]+$" },
         "mode": { "type": "string", "pattern": "^[0-7]{4}$" },
-        "uid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-        "gid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+        "uid": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,9})$" },
+        "gid": { "type": "string", "pattern": "^(0|[1-9][0-9]{0,9})$" }
       }
     },
     "mutableSnapshotService": {
@@ -172,7 +177,7 @@
         { "$ref": "#/$defs/mutableInput" },
         { "properties": {
           "path": { "const": "/etc/systemd/system/agent-snapshot.service" },
-          "capture_path": { "type": "string", "pattern": "^/srv/agents/worktrees/\\.r0a-input-captures-[a-z0-9][a-z0-9-]{7,63}/agent-snapshot\\.service$" }
+          "capture_name": { "const": "agent-snapshot.service" }
         } }
       ]
     },
@@ -181,7 +186,7 @@
         { "$ref": "#/$defs/mutableInput" },
         { "properties": {
           "path": { "const": "/etc/systemd/system/agent-snapshot.timer" },
-          "capture_path": { "type": "string", "pattern": "^/srv/agents/worktrees/\\.r0a-input-captures-[a-z0-9][a-z0-9-]{7,63}/agent-snapshot\\.timer$" }
+          "capture_name": { "const": "agent-snapshot.timer" }
         } }
       ]
     },
@@ -190,7 +195,7 @@
         { "$ref": "#/$defs/mutableInput" },
         { "properties": {
           "path": { "const": "/home/omar/.config/systemd/user/hermes-callscore-gateway.service" },
-          "capture_path": { "type": "string", "pattern": "^/srv/agents/worktrees/\\.r0a-input-captures-[a-z0-9][a-z0-9-]{7,63}/hermes-callscore-gateway\\.service$" }
+          "capture_name": { "const": "hermes-callscore-gateway.service" }
         } }
       ]
     },
@@ -199,7 +204,7 @@
         { "$ref": "#/$defs/mutableInput" },
         { "properties": {
           "path": { "const": "/usr/local/bin/agent-snapshot" },
-          "capture_path": { "type": "string", "pattern": "^/srv/agents/worktrees/\\.r0a-input-captures-[a-z0-9][a-z0-9-]{7,63}/agent-snapshot$" }
+          "capture_name": { "const": "agent-snapshot" }
         } }
       ]
     }

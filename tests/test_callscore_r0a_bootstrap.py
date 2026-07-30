@@ -27,9 +27,13 @@ class BootstrapTests(unittest.TestCase):
         for item, path in zip(manifest["review_inputs"], MODULE.EXPECTED_REVIEW_PATHS):
             item["path"] = path
         expected_names = dict(MODULE.EXPECTED_MUTABLE_INPUTS)
+        manifest["capture_root"] = "/srv/agents/worktrees/.r0a-input-captures-testnonce"
         for item, path in zip(manifest["mutable_inputs"], sorted(expected_names)):
             item["path"] = path
-            item["capture_path"] = f"/srv/agents/worktrees/.r0a-input-captures-testnonce/{expected_names[path]}"
+            item.pop("capture_path", None)
+            item["capture_name"] = expected_names[path]
+            item["uid"] = str(item["uid"])
+            item["gid"] = str(item["gid"])
         return manifest
 
     def test_strict_json_rejects_duplicate_keys(self):
@@ -119,7 +123,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertTrue(list(validator.iter_errors(invalid)))
 
         invalid = json.loads(json.dumps(manifest))
-        invalid["mutable_inputs"][0]["capture_path"] = "relative"
+        invalid["capture_root"] = "relative"
         with self.assertRaises(ValueError):
             MODULE.validate_manifest(invalid)
         self.assertTrue(list(validator.iter_errors(invalid)))
@@ -132,7 +136,19 @@ class BootstrapTests(unittest.TestCase):
         self.assertTrue(list(validator.iter_errors(invalid)))
 
         invalid = json.loads(json.dumps(manifest))
-        invalid["mutable_inputs"][0]["capture_path"] += "\u0000"
+        invalid["mutable_inputs"][0]["capture_name"] += "\u0000"
+        with self.assertRaises(ValueError):
+            MODULE.validate_manifest(invalid)
+        self.assertTrue(list(validator.iter_errors(invalid)))
+
+        invalid = json.loads(json.dumps(manifest))
+        invalid["mutable_inputs"][0]["uid"] = 1000.0
+        with self.assertRaises(ValueError):
+            MODULE.validate_manifest(invalid)
+        self.assertTrue(list(validator.iter_errors(invalid)))
+
+        invalid = json.loads(json.dumps(manifest))
+        invalid["mutable_inputs"][0]["capture_path"] = "/srv/agents/worktrees/.r0a-input-captures-othernonce/agent-snapshot.service"
         with self.assertRaises(ValueError):
             MODULE.validate_manifest(invalid)
         self.assertTrue(list(validator.iter_errors(invalid)))
@@ -289,8 +305,69 @@ class BootstrapTests(unittest.TestCase):
         self.assertIn(".git/objects/", prompt)
         self.assertIn("new loose objects only", prompt)
         self.assertIn("failed nonce is never reused", prompt)
-        self.assertIn("failure receipt", prompt)
-        self.assertIn("runtime validator is authoritative", prompt)
+        self.assertIn(".r0a-control-$R0A_NONCE/failure-receipt.json", prompt)
+        self.assertIn("bootstrap validator plus the committed Draft 2020-12 schema form the composite runtime boundary", prompt)
+        self.assertIn("audit-trace --trace-prefix", prompt)
+        self.assertIn('"HOME": "/nonexistent"', SCRIPT.read_text())
+
+    def test_audit_trace_prefix_requires_owner_only_per_process_files(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            root.chmod(0o700)
+            allowed = root / "allowed"
+            allowed.mkdir(mode=0o700)
+            prefix = root / "trace"
+            (root / "trace.123").write_text(
+                f'openat(AT_FDCWD<{allowed}>, "x", O_WRONLY|O_CREAT, 0600) = 3<{allowed}/x>\n'
+            )
+            MODULE.audit_trace_prefix(prefix, [allowed], allowed)
+            (root / "trace.124").symlink_to(root / "trace.123")
+            with self.assertRaises(OSError):
+                MODULE.audit_trace_prefix(prefix, [allowed], allowed)
+
+            (root / "trace.124").unlink()
+            exact = root / "exact.lock"
+            (root / "trace.125").write_text(
+                f'openat(AT_FDCWD<{allowed}>, "{exact}", O_WRONLY|O_CREAT, 0600) = 4<{exact}>\n'
+            )
+            MODULE.audit_trace_prefix(prefix, [allowed], allowed, [exact])
+            sibling = root / "unexpected"
+            (root / "trace.126").write_text(
+                f'openat(AT_FDCWD<{allowed}>, "{sibling}", O_WRONLY|O_CREAT, 0600) = 5<{sibling}>\n'
+            )
+            with self.assertRaises(ValueError):
+                MODULE.audit_trace_prefix(prefix, [allowed], allowed, [exact])
+
+    def test_failure_receipt_has_exact_create_only_contract(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            nonce = "testnonce"
+            control = root / f".r0a-control-{nonce}"
+            control.mkdir(mode=0o700)
+            old_root = MODULE.WORKTREE_ROOT
+            setattr(MODULE, "WORKTREE_ROOT", root)
+            try:
+                output = MODULE.write_failure_receipt(
+                    control,
+                    nonce,
+                    "preworktree",
+                    "bootstrap-unit-tests",
+                    1,
+                    "a" * 64,
+                    "b" * 64,
+                    "c" * 64,
+                )
+                receipt = MODULE.load_json_strict(output.read_bytes())
+                self.assertEqual(
+                    set(receipt),
+                    {"schema", "nonce", "phase", "command_id", "exit_code", "bootstrap_sha256", "test_sha256", "manifest_schema_sha256"},
+                )
+                self.assertEqual(output.read_bytes(), MODULE.canonical_bytes(receipt))
+                self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+                with self.assertRaises(FileExistsError):
+                    MODULE.write_failure_receipt(control, nonce, "preworktree", "bootstrap-unit-tests", 1, "a" * 64, "b" * 64, "c" * 64)
+            finally:
+                setattr(MODULE, "WORKTREE_ROOT", old_root)
 
     def test_atomic_write_new_refuses_existing_path_and_symlink(self):
         with tempfile.TemporaryDirectory() as td:
@@ -467,7 +544,7 @@ class BootstrapTests(unittest.TestCase):
     def test_prompt_pins_execution_path_dependency_loader_and_maintenance_home(self):
         prompt_path = Path(__file__).resolve().parents[1] / "docs/prompts/2026-07-30-callscore-r0a-maintenance-preparation-prompt.md"
         prompt = prompt_path.read_text()
-        self.assertIn("PATH=/usr/bin:/bin; export PATH", prompt)
+        self.assertIn("/usr/bin/env -i HOME=/nonexistent PATH=/usr/bin:/bin", prompt)
         self.assertNotIn('npm --prefix "$APP_WORKTREE" run hygiene:secrets', prompt)
         self.assertIn(
             'python3 ops/hermes-state-maintenance/r0a_secret_scan.py --root "$APP_WORKTREE" --forbid-relative .tmp/.apify-token.local --require-gitignore-pattern .env --require-gitignore-pattern .env.local --require-gitignore-pattern .tmp/',

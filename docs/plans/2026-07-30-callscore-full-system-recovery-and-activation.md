@@ -242,9 +242,10 @@ R0A is `prepared` only when:
 - the self-reference-free JCS/SHA-256 graph validates;
 - the in-tree manifest binds the Workplane tuple, application **base** tuple, exact changed-path allowlist and all non-self application output leaf hashes, plus the exact Hermes dependency tuple; the external R0B envelope later binds the final application commit/tree and manifest hash without self-reference;
 - the pre-edit input manifest binds the committed review inputs and live unit/script identities consumed by preparation;
-- all Git commands used the immutable empty-hooks procedure; shared Git administration writes were limited to exact nonce refs/reflogs/worktree metadata and newly created content-addressed loose objects, with no modification of pre-existing Git bytes and no external index mutation;
 - every command ran through the prompt's cleared minimal environment and fail-closed full-syscall audit;
-- any blocked/failed nonce was retained with its value-free failure receipt, was never reused, and cannot collide with a fresh reviewed nonce;
+- all Git commands used the immutable empty-hooks procedure; worktree creation and every later Git mutation ran under the fail-closed full-syscall trace audit, and shared Git administration writes were limited to exact nonce refs/reflogs (including transient lock files), exact linked-worktree metadata, create-only parent directories and newly created content-addressed loose objects;
+- the pre-worktree shell and bootstrap Git subprocesses used a cleared environment with `HOME=/nonexistent` and pinned absolute executables;
+- any failed nonce was finalised create-only at `/srv/agents/worktrees/.r0a-control-<nonce>/failure-receipt.json`, retained without automatic cleanup and made ineligible for reuse;
 - both modified repos are clean at frozen commits;
 - no live mutation occurred.
 
