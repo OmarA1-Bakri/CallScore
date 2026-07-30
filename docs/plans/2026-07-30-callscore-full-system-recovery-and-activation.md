@@ -109,7 +109,7 @@ Prepare in an isolated Workplane worktree:
 
 No live install, `sudo`, systemd, cron, gateway, profile, DB, provider or public mutation is allowed.
 
-R0A also forbids Git-hook and Codebase Memory index mutation. Every Git command uses a revalidated empty owner-only `core.hooksPath`; Codebase Memory is limited to read-only queries against an existing index.
+R0A also forbids Git-hook and Codebase Memory index mutation. Every Git command uses a revalidated empty owner-only `core.hooksPath`; Codebase Memory is limited to read-only queries against an existing index. Workplane and application changes occur in separate isolated worktrees; neither primary checkout is modified.
 
 ### R0A architecture
 
@@ -155,7 +155,7 @@ Prepare a root broker that:
 7. starts the nonce-bound maintenance service with no sudo/network/capabilities;
 8. releases the fence only after final verification or verified rollback.
 
-R0A tests this with disposable mount namespaces and same-UID hostile writers, never the live profile.
+The target rejects unprivileged mount namespaces. R0A therefore proves the fence state machine with nonprivileged hermetic tests and emits a fixed privileged disposable-fixture integration test. Actual mount/writer-denial GREEN occurs only in separately authorised R0C. The reviewed topology uses a root-only original bind anchor, a host-visible canonical read-only self-bind and systemd `BindPaths` into the maintenance-unit namespace; teardown uncertainty leaves the canonical path read-only.
 
 #### Snapshot and restore
 
@@ -238,6 +238,7 @@ R0A passes only when:
 - the application repo has the exact committed final R1 prompt, manifest/schema, canonical red/green evidence and evidence-root paths defined by the R0A prompt;
 - the self-reference-free JCS/SHA-256 graph validates;
 - the manifest binds Workplane, application and exact Hermes dependency tuples;
+- the pre-edit input manifest binds the committed review inputs and live unit/script identities consumed by preparation;
 - all Git commands used the immutable empty-hooks procedure and no external index mutation occurred;
 - both modified repos are clean at frozen commits;
 - no live mutation occurred.

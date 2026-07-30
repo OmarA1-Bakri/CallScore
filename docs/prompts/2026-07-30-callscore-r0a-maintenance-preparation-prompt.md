@@ -35,7 +35,10 @@ If any required behaviour cannot be proven without live mutation, test it with f
 Read in full:
 
 - `/opt/crypto-tuber-ranked/docs/plans/2026-07-30-callscore-full-system-recovery-and-activation.md`
-- the three FAIL review summaries for delegation `deleg_1fb6fe24`;
+- the two FAIL summaries and one timeout evidence from delegation `deleg_1fb6fe24` at these committed paths and hashes:
+  - `docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-specification-fail.md` — `096fa0df4c621a6cad42f15b8bc08f2024d2034d281fde416dae1732997ba498`;
+  - `docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-security-fail.md` — `a147a8ec9535071a4f427eec02177f61e17620cdeebb671b8f081dd1585a06e2`;
+  - `docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-implementation-timeout.json` — `020e64469f7003c2393a10b69559405f3d349f79779c35c55bc283535e8deaa5`;
 - `/srv/agents/hermes/hermes-agent/hermes_state.py`;
 - `/srv/agents/hermes/hermes-agent/tools/session_search_tool.py`;
 - `/srv/agents/hermes/hermes-agent/gateway/status.py`;
@@ -98,7 +101,15 @@ r0a/hermes-state-maintenance-<nonce>
 
 Record base commit/tree and dirty-state evidence. Do not infer that the dirty primary checkout belongs to this task.
 
-The application repo `/opt/crypto-tuber-ranked` may be changed only for the final R1 prompt/manifest after the Workplane tooling commit exists. Preserve all unrelated state and use a focused commit.
+Do not modify or commit from the application primary checkout. The immutable R0A review instruction supplies `APP_BASE_COMMIT` and `APP_BASE_TREE`; first verify they equal the reviewed primary `HEAD`/tree, then create a second isolated worktree using the same empty-hooks procedure:
+
+```text
+/srv/agents/worktrees/crypto-tuber-ranked-r0a-<nonce>
+branch: r0a/callscore-maintenance-artifacts-<nonce>
+base: APP_BASE_COMMIT / APP_BASE_TREE from the immutable review tuple
+```
+
+All application output paths below are relative to that application worktree. Preserve the primary checkout byte-for-byte.
 
 Freeze the consumed Hermes dependency before writing tests. Record the Hermes Git commit/tree plus SHA-256 for exactly:
 
@@ -109,6 +120,17 @@ Freeze the consumed Hermes dependency before writing tests. Record the Hermes Gi
 ```
 
 If implementation needs another Hermes file, stop at `blocked_dependency_scope_amendment`; do not silently widen the tuple. The final manifest, final R1 prompt, R1 authorisation schema, installation readback and R1 preflight must bind these exact Hermes bytes. Any later mismatch invalidates the reviews.
+
+Before either worktree is created, generate an owner-only pre-edit input manifest at `/srv/agents/worktrees/.r0a-input-manifest-<nonce>.json`. It binds the reviewed application and Workplane base commits/trees, Hermes commit/tree and consumed-file hashes, the three committed review-input hashes, plus SHA-256/device/inode/mode/owner for:
+
+```text
+/etc/systemd/system/agent-snapshot.service
+/etc/systemd/system/agent-snapshot.timer
+/usr/local/bin/agent-snapshot
+/home/omar/.config/systemd/user/hermes-callscore-gateway.service
+```
+
+Use strict UTF-8 JSON with duplicate-key rejection and RFC 8785 JCS hashing. Abort before worktree creation if a committed input hash or reviewed repository tuple mismatches. Copy the exact validated bytes into the application output path defined below; never re-evaluate mutable inputs later in R0A.
 
 ## Required architecture
 
@@ -158,7 +180,22 @@ Prepare a broker-controlled fence using a dedicated `callscore-maint` service UI
 
 The R1 service must run as `User=callscore-maint`, with `NoNewPrivileges=yes`, no sudo, no network, empty capability bounding set and writable paths limited to the private maintenance bind plus the run's control directory.
 
-Use fixture directories and mount namespaces for R0A tests. Do not mount over the live profile.
+The future namespace topology is literal:
+
+1. the root broker opens an `O_PATH` fd to the original profile and creates `/run/callscore-maintenance/<nonce>/original` as a root-only bind anchor;
+2. it bind-mounts the canonical host profile path onto itself and remounts that host-visible bind read-only;
+3. `callscore-r1-maintenance@<nonce>.service` uses systemd `BindPaths=/run/callscore-maintenance/<nonce>/original:/var/lib/callscore-maintenance/state` in its own mount namespace, after root performs the bind and before credentials drop to `callscore-maint`;
+4. maintenance opens only `/var/lib/callscore-maintenance/state/state.db`;
+5. on success, the service stops, broker verifies no private-path holders, unmounts the unit namespace/bind anchor, removes temporary ACLs, unmounts the canonical read-only self-bind and verifies original path identity;
+6. on teardown uncertainty, keep the canonical path read-only and emit a critical blocker.
+
+The target host rejects unprivileged mount namespaces. R0A runs hermetic nonprivileged state-machine/syscall-contract tests and generates the privileged disposable-fixture integration-test artifact, but must not claim kernel-fence GREEN. Privileged mount/writer-denial GREEN moves to R0C with exact command:
+
+```bash
+/usr/local/sbin/callscore-maintenance-broker integration-test --fixture-root /var/tmp/callscore-r0c-fixture --assert-host-ro --assert-private-rw --assert-hostile-writer-denied --assert-clean-teardown
+```
+
+Expected exit is `0`; every named assertion must be `pass`; the fixture is outside the live profile and deleted only after object-identity verification.
 
 ### 3. Snapshot and restore
 
@@ -218,6 +255,7 @@ ops/hermes-state-maintenance/safe_snapshot_delete.py
 ops/hermes-state-maintenance/authorization_verify.py
 ops/hermes-state-maintenance/r0a_evidence.py
 ops/hermes-state-maintenance/validate_schemas.py
+ops/hermes-state-maintenance/r0a_secret_scan.py
 ops/hermes-state-maintenance/test_broker.py
 ops/hermes-state-maintenance/test_maintenance_runner.py
 ops/hermes-state-maintenance/test_agent_snapshot.py
@@ -228,6 +266,7 @@ ops/hermes-state-maintenance/test_safe_snapshot_delete.py
 ops/hermes-state-maintenance/test_authorization_verify.py
 ops/hermes-state-maintenance/test_r0a_evidence.py
 ops/hermes-state-maintenance/test_validate_schemas.py
+ops/hermes-state-maintenance/test_r0a_secret_scan.py
 ops/hermes-state-maintenance/schemas/callscore-r0a-preparation-receipt-v1.schema.json
 ops/hermes-state-maintenance/schemas/callscore-r1-proposal-v1.schema.json
 ops/hermes-state-maintenance/schemas/callscore-r1-maintenance-authorization-v1.schema.json
@@ -255,6 +294,8 @@ docs/prompts/2026-07-30-callscore-r1-state-gateway-execution-prompt.md
 docs/ops/callscore-r0a/review-manifest.json
 docs/ops/callscore-r0a/review-manifest.json.sha256
 docs/ops/callscore-r0a/schemas/callscore-r0a-review-manifest-v1.schema.json
+docs/ops/callscore-r0a/schemas/callscore-r0a-input-manifest-v1.schema.json
+docs/ops/callscore-r0a/input-manifest.json
 docs/ops/callscore-r0a/evidence/red-results.json
 docs/ops/callscore-r0a/evidence/green-results.json
 docs/ops/callscore-r0a/evidence/evidence-root.json
@@ -401,9 +442,8 @@ Observe each RED failure before implementation. At minimum test:
 - unsigned/unknown/stale/replayed/wrong-hash authorisation rejection;
 - per-transition expiry;
 - no implementation-hash bootstrap assumption;
-- same-UID ordinary writer denied by the kernel fence;
-- direct SQLite writer denied throughout inter-chunk intervals;
-- maintenance UID accepted only through private RW bind;
+- nonprivileged broker/fence state machine rejects invalid topology and unsafe transitions;
+- generated R0C integration artifact covers same-UID writer denial, inter-chunk direct-SQLite denial and private-RW maintenance access;
 - exact PID identity and SIGTERM-only stop;
 - every finaliser branch;
 - online backup during concurrent WAL writes;
@@ -419,15 +459,21 @@ Run tests from disposable fixtures only. Capture explicit RED and GREEN command 
 
 ### Canonical evidence commands and bytes
 
-Create the evidence harness before behavioural tests. It is infrastructure, not the implementation under test. Use these exact fixture-only commands from the isolated Workplane root:
+Create the evidence harness before behavioural tests. It is infrastructure, not the implementation under test. No package installation or network access is authorised. Preflight `python3` plus `jsonschema==4.10.3`; a missing/wrong dependency is `blocked_dependency_bootstrap`. Applicable scope is exactly `ops/hermes-state-maintenance/**`; all vendored `control-plane/**` trees are excluded. Use these exact commands from the isolated Workplane root:
 
 ```bash
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase red --command-id unit -- python3 -m pytest -q ops/hermes-state-maintenance
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id unit -- python3 -m pytest -q ops/hermes-state-maintenance
+python3 -c "import importlib.metadata as m; assert m.version('jsonschema') == '4.10.3'"
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase red --command-id unit -- python3 -m unittest discover -s ops/hermes-state-maintenance -p 'test_*.py' -v
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id unit -- python3 -m unittest discover -s ops/hermes-state-maintenance -p 'test_*.py' -v
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id schema-negatives -- python3 -m unittest -v ops.hermes-state-maintenance.test_validate_schemas
 python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id compile -- python3 -m compileall -q ops/hermes-state-maintenance
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id lint -- python3 -m tabnanny -v ops/hermes-state-maintenance
 python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id schemas -- python3 ops/hermes-state-maintenance/validate_schemas.py
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id secret-scan -- python3 ops/hermes-state-maintenance/r0a_secret_scan.py --root ops/hermes-state-maintenance
 git -c core.hooksPath=/srv/agents/worktrees/.r0a-empty-hooks-<nonce> diff --check
 ```
+
+Every command uses the isolated Workplane root as cwd and expects exit `0`, except RED unit, which expects nonzero plus the exact planned assertion IDs. The isolated application worktree additionally runs `npm run hygiene:secrets` and no-hook `git diff --check` from its root with exit `0`. The manifest records exact argv, cwd token, included/excluded scope, expected/actual exit and normalised stdout/stderr hashes for every command.
 
 `r0a_evidence.py` must run with a cleared/minimal environment, fixture-only temp roots and no network. It normalises result bytes by stripping ANSI sequences, converting CRLF to LF, replacing exact worktree/temp prefixes with `<WORKTREE>` and `<TMP>`, preserving a single final LF, and rejecting NUL or undecodable bytes. `red-results.json` and `green-results.json` are RFC 8785 JCS objects sorted by `command_id`, with `additionalProperties: false`, recording exact argv, argv SHA-256, exit code, normalised stdout/stderr SHA-256 and fixture-root identity. RED requires the intended behavioural tests to fail for expected assertion IDs; GREEN requires zero exit for all commands. No wall-clock timestamps, random paths, secrets or raw environment are included.
 
@@ -453,20 +499,21 @@ Validate every object against the exact committed manifest/schema set before the
 7. Run secret hygiene against new source and fixtures.
 8. Commit only exact R0A files in the isolated Worktree.
 9. Parent reads committed bytes, schemas, units, tests and results.
-10. Generate an immutable R0A review manifest binding:
+10. Generate and schema-validate the final R1 prompt first, then hash it.
+11. Generate the immutable R0A review manifest last, binding:
     - Workplane base/commit/tree;
     - Hermes commit/tree and exact consumed-file hashes;
     - every source/unit/schema/test hash;
     - literal future installation commands;
     - plan and R0A prompt commit/tree/hashes;
     - test commands and result hashes.
-11. In `/opt/crypto-tuber-ranked`, generate the final R1 execution prompt only after these hashes exist. The R1 prompt must prohibit source edits and bind the frozen Workplane tuple.
-12. Commit only the exact application output paths using the same owner-only empty-hooks Git procedure.
-13. Stop. Do not install or execute R1.
+12. Validate the pre-edit input manifest, final R1 prompt, evidence root and review manifest against schemas and the binding graph.
+13. Commit only the exact application output paths from the isolated application worktree using the owner-only empty-hooks procedure.
+14. Stop. Do not install or execute R1.
 
 ## Required reviews after R0A
 
-Dispatch three fresh independent reviews against the complete two-repository tuple:
+Dispatch three fresh independent reviews against the complete application, Workplane and Hermes-dependency tuple:
 
 1. code, test and unit correctness;
 2. operational/kernel/systemd/SQLite feasibility;
@@ -484,10 +531,12 @@ Return exactly one valid JSON object and no prose outside it:
 {
   "schema": "callscore.r0a_maintenance_preparation_result.v1",
   "status": "pass|blocked|failed",
-  "live_mutation_performed": false,
-  "sudo_used": false,
-  "external_index_mutation_performed": false,
-  "git_hooks_executed": false,
+  "r0b_allowed": false,
+  "live_mutation_performed": "false|true|unknown",
+  "sudo_used": "false|true|unknown",
+  "external_index_mutation_performed": "false|true|unknown",
+  "git_hooks_executed": "false|true|unknown",
+  "evidence_refs": [],
   "empty_hooks_proof": {
     "path": "",
     "device_inode": "",
@@ -507,8 +556,11 @@ Return exactly one valid JSON object and no prose outside it:
     "files": []
   },
   "application_repo": {
+    "base_commit": "",
+    "base_tree": "",
     "commit": "",
     "tree": "",
+    "worktree": "",
     "files": []
   },
   "tests": {
@@ -523,21 +575,23 @@ Return exactly one valid JSON object and no prose outside it:
     "sha256": ""
   },
   "mutations_performed": {
-    "live_state": false,
-    "systemd": false,
-    "cron": false,
-    "snapshot": false,
-    "session_prune": false,
-    "production_database": false,
-    "provider": false,
-    "public": false,
-    "credentials": false,
-    "deployment": false
+    "live_state": "false|true|unknown",
+    "systemd": "false|true|unknown",
+    "cron": "false|true|unknown",
+    "snapshot": "false|true|unknown",
+    "session_prune": "false|true|unknown",
+    "production_database": "false|true|unknown",
+    "provider": "false|true|unknown",
+    "public": "false|true|unknown",
+    "credentials": "false|true|unknown",
+    "deployment": "false|true|unknown"
   },
   "langfuse_checked": {
     "status": "not_required_for_source_only_r0a"
   },
   "blockers": [],
-  "next_action": "Run three independent reviews against the complete frozen R0A tuple; do not install or execute R1 before all pass."
+  "next_action": "Status-dependent: only pass with r0b_allowed=true may proceed to three independent R0B reviews; blocked or failed must return remediation only."
 }
 ```
+
+The result schema enforces: `status=pass` iff `r0b_allowed=true`, all required tests/manifests validate and every forbidden mutation is evidence-backed `false`. `status=blocked|failed` requires `r0b_allowed=false`, at least one blocker code such as `blocked_preparation_gap`, and remediation-only `next_action`. No observation defaults to false.

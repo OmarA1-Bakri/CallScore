@@ -1,0 +1,9 @@
+{
+  "delegation_id": "deleg_1fb6fe24",
+  "exit_reason": "timeout",
+  "schema": "callscore.r0a_review_timeout_evidence.v1",
+  "source_manifest_sha256": "3e96483140b19e59819d6ecc1780725b42a8ff2e09cba53b7caebc10d3c077de",
+  "status": "timeout",
+  "summary_present": false,
+  "task_index": 1
+}
