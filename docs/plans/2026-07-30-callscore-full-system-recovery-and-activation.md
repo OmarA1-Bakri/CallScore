@@ -34,6 +34,8 @@ Canonical Workplane repo: `/srv/agents/repos/callscore-workplane`.
 
 Canonical Hermes source: `/srv/agents/hermes/hermes-agent`.
 
+R0A freezes the Hermes commit/tree and SHA-256 of `hermes_state.py`, `tools/session_search_tool.py` and `gateway/status.py`. Any additional dependency requires plan amendment.
+
 Sole activation entry point: `/srv/agents/hermes/profiles/callscore/skills/orchestration/callscore-system-activation/`.
 
 Frozen diagnostic receipt: `/opt/crypto-tuber-ranked/.tmp/system-status/callscore-whole-system-20260730T022510Z.json`.
@@ -106,6 +108,8 @@ Prepare in an isolated Workplane worktree:
 - operator signing/install documentation.
 
 No live install, `sudo`, systemd, cron, gateway, profile, DB, provider or public mutation is allowed.
+
+R0A also forbids Git-hook and Codebase Memory index mutation. Every Git command uses a revalidated empty owner-only `core.hooksPath`; Codebase Memory is limited to read-only queries against an existing index.
 
 ### R0A architecture
 
@@ -231,13 +235,16 @@ R0A passes only when:
 - every required file exists in the isolated Workplane commit;
 - explicit RED and GREEN evidence exists;
 - full applicable tests/static/secret checks pass;
-- the application repo has a generated final R1 prompt/manifest binding actual source hashes;
-- both repos are clean at frozen commits;
+- the application repo has the exact committed final R1 prompt, manifest/schema, canonical red/green evidence and evidence-root paths defined by the R0A prompt;
+- the self-reference-free JCS/SHA-256 graph validates;
+- the manifest binds Workplane, application and exact Hermes dependency tuples;
+- all Git commands used the immutable empty-hooks procedure and no external index mutation occurred;
+- both modified repos are clean at frozen commits;
 - no live mutation occurred.
 
 ## Phase R0B — Complete-tuple review
 
-Review the complete two-repository tuple, not plan prose alone:
+Review the complete three-repository/dependency tuple, not plan prose alone:
 
 1. source/tests/units/schema correctness;
 2. Linux mount/systemd/SQLite operational feasibility;

@@ -58,7 +58,7 @@ Load and follow:
 - `github/committing-user-work-safely`
 - `github/safe-git-worktree-operations`
 
-Use Codebase Memory MCP for both repositories before changing source.
+Codebase Memory is read-only in R0A. Use only existing-index read operations such as architecture/search/snippet queries. `index_repository`, `detect_changes`, `ingest_traces`, `manage_adr`, project deletion and every other index mutation are forbidden. If an existing index is unavailable, inspect source with local read-only tools and record `codebase_memory_existing_index=unavailable`; do not create one.
 
 ## Repository safety
 
@@ -69,6 +69,20 @@ Canonical Workplane source repository:
 ```
 
 Its primary checkout contains unrelated dirty/untracked work. Do not modify, stage or commit there.
+
+The application repository has a `post-commit` hook that calls Codebase Memory indexing. R0A must bypass all repository hooks. Before the first Git mutation, create an empty owner-only directory outside every repository:
+
+```text
+/srv/agents/worktrees/.r0a-empty-hooks-<nonce>
+```
+
+Require owner `omar`, mode `0700`, zero members and a recorded device/inode. Execute **every** Git command in either repository, including worktree creation, status, diff, add and commit, as:
+
+```bash
+git -c core.hooksPath=/srv/agents/worktrees/.r0a-empty-hooks-<nonce> <subcommand>
+```
+
+Do not set a persistent Git configuration value. Revalidate that the hooks directory is still empty immediately before each commit. Bind the path, device/inode, mode, empty-member proof and literal no-hook argv in the review manifest. A hook execution or external index mutation is an R0A failure.
 
 Create an isolated worktree from its current `HEAD`:
 
@@ -85,6 +99,16 @@ r0a/hermes-state-maintenance-<nonce>
 Record base commit/tree and dirty-state evidence. Do not infer that the dirty primary checkout belongs to this task.
 
 The application repo `/opt/crypto-tuber-ranked` may be changed only for the final R1 prompt/manifest after the Workplane tooling commit exists. Preserve all unrelated state and use a focused commit.
+
+Freeze the consumed Hermes dependency before writing tests. Record the Hermes Git commit/tree plus SHA-256 for exactly:
+
+```text
+/srv/agents/hermes/hermes-agent/hermes_state.py
+/srv/agents/hermes/hermes-agent/tools/session_search_tool.py
+/srv/agents/hermes/hermes-agent/gateway/status.py
+```
+
+If implementation needs another Hermes file, stop at `blocked_dependency_scope_amendment`; do not silently widen the tuple. The final manifest, final R1 prompt, R1 authorisation schema, installation readback and R1 preflight must bind these exact Hermes bytes. Any later mismatch invalidates the reviews.
 
 ## Required architecture
 
@@ -192,6 +216,8 @@ ops/hermes-state-maintenance/fts_verify.py
 ops/hermes-state-maintenance/restore.py
 ops/hermes-state-maintenance/safe_snapshot_delete.py
 ops/hermes-state-maintenance/authorization_verify.py
+ops/hermes-state-maintenance/r0a_evidence.py
+ops/hermes-state-maintenance/validate_schemas.py
 ops/hermes-state-maintenance/test_broker.py
 ops/hermes-state-maintenance/test_maintenance_runner.py
 ops/hermes-state-maintenance/test_agent_snapshot.py
@@ -200,6 +226,8 @@ ops/hermes-state-maintenance/test_fts_verify.py
 ops/hermes-state-maintenance/test_restore.py
 ops/hermes-state-maintenance/test_safe_snapshot_delete.py
 ops/hermes-state-maintenance/test_authorization_verify.py
+ops/hermes-state-maintenance/test_r0a_evidence.py
+ops/hermes-state-maintenance/test_validate_schemas.py
 ops/hermes-state-maintenance/schemas/callscore-r0a-preparation-receipt-v1.schema.json
 ops/hermes-state-maintenance/schemas/callscore-r1-proposal-v1.schema.json
 ops/hermes-state-maintenance/schemas/callscore-r1-maintenance-authorization-v1.schema.json
@@ -217,6 +245,23 @@ ops/hermes-state-maintenance/docs/operator-signing-and-install.md
 ```
 
 Do not invent additional production files without stopping for plan amendment.
+
+## Exact application-repository outputs
+
+After the Workplane commit exists, create only these additional application-repository paths:
+
+```text
+docs/prompts/2026-07-30-callscore-r1-state-gateway-execution-prompt.md
+docs/ops/callscore-r0a/review-manifest.json
+docs/ops/callscore-r0a/review-manifest.json.sha256
+docs/ops/callscore-r0a/schemas/callscore-r0a-review-manifest-v1.schema.json
+docs/ops/callscore-r0a/evidence/red-results.json
+docs/ops/callscore-r0a/evidence/green-results.json
+docs/ops/callscore-r0a/evidence/evidence-root.json
+docs/ops/callscore-r0a/evidence/evidence-root.json.sha256
+```
+
+Do not add install receipts or live authorisations in R0A.
 
 ## Exact future installed paths
 
@@ -372,10 +417,35 @@ Observe each RED failure before implementation. At minimum test:
 
 Run tests from disposable fixtures only. Capture explicit RED and GREEN command output.
 
+### Canonical evidence commands and bytes
+
+Create the evidence harness before behavioural tests. It is infrastructure, not the implementation under test. Use these exact fixture-only commands from the isolated Workplane root:
+
+```bash
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase red --command-id unit -- python3 -m pytest -q ops/hermes-state-maintenance
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id unit -- python3 -m pytest -q ops/hermes-state-maintenance
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id compile -- python3 -m compileall -q ops/hermes-state-maintenance
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id schemas -- python3 ops/hermes-state-maintenance/validate_schemas.py
+git -c core.hooksPath=/srv/agents/worktrees/.r0a-empty-hooks-<nonce> diff --check
+```
+
+`r0a_evidence.py` must run with a cleared/minimal environment, fixture-only temp roots and no network. It normalises result bytes by stripping ANSI sequences, converting CRLF to LF, replacing exact worktree/temp prefixes with `<WORKTREE>` and `<TMP>`, preserving a single final LF, and rejecting NUL or undecodable bytes. `red-results.json` and `green-results.json` are RFC 8785 JCS objects sorted by `command_id`, with `additionalProperties: false`, recording exact argv, argv SHA-256, exit code, normalised stdout/stderr SHA-256 and fixture-root identity. RED requires the intended behavioural tests to fail for expected assertion IDs; GREEN requires zero exit for all commands. No wall-clock timestamps, random paths, secrets or raw environment are included.
+
+Self-reference-free binding order:
+
+1. hash immutable Hermes dependency bytes and committed Workplane source/unit/schema/test bytes;
+2. hash canonical red/green result objects;
+3. create `evidence-root.json` containing those leaf hashes but no self-hash, then place its SHA-256 only in `evidence-root.json.sha256`;
+4. create the final R1 prompt containing the frozen dependency/source hashes and manifest **path**, but not the manifest hash;
+5. create `review-manifest.json` containing repository tuples, all leaf hashes, evidence-root hash, final R1 prompt hash and literal install/test/Git argv, but no self-hash;
+6. place only the JCS SHA-256 of the manifest in `review-manifest.json.sha256`.
+
+Validate every object against the exact committed manifest/schema set before the focused application commit. Duplicate JSON keys, non-JCS numbers and Unicode non-conformance fail.
+
 ## R0A completion sequence
 
-1. Read repository instructions and inspect both repos.
-2. Create isolated Workplane worktree/branch.
+1. Read repository instructions and inspect the application, Workplane and exact Hermes dependency files.
+2. Freeze the Hermes commit/tree/file hashes, create the empty hook directory, and create the isolated Workplane worktree/branch using the literal no-hook Git form.
 3. Write tests first and observe RED.
 4. Implement minimum code/templates/docs.
 5. Observe GREEN.
@@ -385,12 +455,13 @@ Run tests from disposable fixtures only. Capture explicit RED and GREEN command 
 9. Parent reads committed bytes, schemas, units, tests and results.
 10. Generate an immutable R0A review manifest binding:
     - Workplane base/commit/tree;
+    - Hermes commit/tree and exact consumed-file hashes;
     - every source/unit/schema/test hash;
     - literal future installation commands;
     - plan and R0A prompt commit/tree/hashes;
     - test commands and result hashes.
 11. In `/opt/crypto-tuber-ranked`, generate the final R1 execution prompt only after these hashes exist. The R1 prompt must prohibit source edits and bind the frozen Workplane tuple.
-12. Commit only the final R1 prompt/manifest update in the application repo.
+12. Commit only the exact application output paths using the same owner-only empty-hooks Git procedure.
 13. Stop. Do not install or execute R1.
 
 ## Required reviews after R0A
@@ -415,6 +486,19 @@ Return exactly one valid JSON object and no prose outside it:
   "status": "pass|blocked|failed",
   "live_mutation_performed": false,
   "sudo_used": false,
+  "external_index_mutation_performed": false,
+  "git_hooks_executed": false,
+  "empty_hooks_proof": {
+    "path": "",
+    "device_inode": "",
+    "mode": "0700",
+    "member_count": 0
+  },
+  "hermes_dependency": {
+    "commit": "",
+    "tree": "",
+    "files": []
+  },
   "workplane": {
     "base_commit": "",
     "commit": "",
