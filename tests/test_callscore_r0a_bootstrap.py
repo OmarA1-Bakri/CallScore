@@ -168,6 +168,10 @@ class BootstrapTests(unittest.TestCase):
             commit = subprocess.check_output([*base, "rev-parse", "HEAD"], text=True).strip()
             tree = subprocess.check_output([*base, "rev-parse", "HEAD^{tree}"], text=True).strip()
             MODULE.verify_repo_tuple(repo, {"commit": commit, "tree": tree}, hooks, require_clean=True)
+            linked_repo = root / "linked-repo"
+            linked_repo.symlink_to(repo, target_is_directory=True)
+            with self.assertRaises((OSError, ValueError)):
+                MODULE.verify_repo_tuple(linked_repo, {"commit": commit, "tree": tree}, hooks, require_clean=True)
             subprocess.run([*base, "config", "CoRe.AtTrIbUtEsFiLe", str(root / "attrs")], check=True)
             with self.assertRaises(ValueError):
                 MODULE.verify_repo_tuple(repo, {"commit": commit, "tree": tree}, hooks, require_clean=True)
@@ -209,6 +213,8 @@ class BootstrapTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 MODULE.audit_trace_text('openat(AT_FDCWD, "/etc/x", O_WRONLY|O_CREAT, 0666) = 3\n', [allowed], root)
             with self.assertRaises(ValueError):
+                MODULE.audit_trace_text('creat("/etc/x", 0666) = 3\n', [allowed], root)
+            with self.assertRaises(ValueError):
                 MODULE.audit_trace_text('socket(AF_INET, SOCK_STREAM, IPPROTO_IP) = 3\n', [allowed], root)
             with self.assertRaises(ValueError):
                 MODULE.audit_trace_text('socket(AF_UNIX, SOCK_STREAM, 0) = 3\n', [allowed], root)
@@ -220,6 +226,33 @@ class BootstrapTests(unittest.TestCase):
             allowed = Path(td) / "allowed"
             allowed.mkdir()
             MODULE.audit_trace_text(f'openat(AT_FDCWD, "{allowed}/x", O_WRONLY|O_CREAT, 0666) = 3\n', [allowed], Path(td))
+            MODULE.audit_trace_text(f'write(5<{allowed}/x>, "x", 1) = 1\n', [allowed], Path(td))
+            MODULE.audit_trace_text('write(1<pipe:[123]>, "ok", 2) = 2\n', [allowed], Path(td))
+
+    def test_trace_rejects_fd_only_writes_and_escape_syscalls(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            allowed = root / "allowed"
+            allowed.mkdir()
+            forbidden = [
+                'write(7</etc/passwd>, "x", 1) = 1\n',
+                'pwrite64(7</etc/passwd>, "x", 1, 0) = 1\n',
+                'writev(7, [{iov_base="x", iov_len=1}], 1) = 1\n',
+                'ptrace(PTRACE_ATTACH, 1) = 0\n',
+                'unshare(CLONE_NEWNS) = 0\n',
+                'setns(7, CLONE_NEWNS) = 0\n',
+                'mount("none", "/tmp/x", "tmpfs", 0, NULL) = 0\n',
+                'umount2("/tmp/x", MNT_DETACH) = 0\n',
+                'bpf(BPF_MAP_CREATE, NULL, 0) = 3\n',
+                'io_uring_setup(8, {}) = 3\n',
+                'clone3({flags=CLONE_NEWUSER}, 88) = 42\n',
+                'copy_file_range(4</tmp/in>, NULL, 5</etc/out>, NULL, 1, 0) = 1\n',
+                'mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, 7</etc/out>, 0) = 0x1\n',
+                'keyctl(KEYCTL_READ, 1, NULL, 0) = 0\n',
+            ]
+            for trace in forbidden:
+                with self.subTest(trace=trace), self.assertRaises(ValueError):
+                    MODULE.audit_trace_text(trace, [allowed], root)
 
     def test_atomic_write_new_refuses_existing_path_and_symlink(self):
         with tempfile.TemporaryDirectory() as td:
@@ -246,13 +279,68 @@ class BootstrapTests(unittest.TestCase):
             real_link = os.link
 
             def race(source, destination, **kwargs):
-                Path(destination).write_bytes(b"intruder")
+                destination_fd = os.open(
+                    destination,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=kwargs["dst_dir_fd"],
+                )
+                try:
+                    os.write(destination_fd, b"intruder")
+                finally:
+                    os.close(destination_fd)
                 return real_link(source, destination, **kwargs)
 
             with mock.patch.object(MODULE.os, "link", side_effect=race):
                 with self.assertRaises(FileExistsError):
                     MODULE.atomic_write_new(output, b"new")
             self.assertEqual(output.read_bytes(), b"intruder")
+
+    def test_atomic_write_new_rejects_parent_directory_substitution(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            expected = root / "expected"
+            substitute = root / "substitute"
+            displaced = root / "displaced"
+            expected.mkdir()
+            substitute.mkdir()
+            output = expected / "manifest.json"
+            real_verify = MODULE._verify_owned_directory
+
+            def swap_after_verify(path, **kwargs):
+                result = real_verify(path, **kwargs)
+                expected.rename(displaced)
+                substitute.rename(expected)
+                return result
+
+            with mock.patch.object(MODULE, "_verify_owned_directory", side_effect=swap_after_verify):
+                with self.assertRaises(ValueError):
+                    MODULE.atomic_write_new(output, b"new")
+            self.assertFalse((expected / "manifest.json").exists())
+            self.assertFalse((displaced / "manifest.json").exists())
+
+    def test_read_regular_bytes_rejects_parent_directory_substitution(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            expected = root / "expected"
+            substitute = root / "substitute"
+            displaced = root / "displaced"
+            expected.mkdir()
+            substitute.mkdir()
+            source = expected / "input"
+            source.write_bytes(b"expected")
+            (substitute / "input").write_bytes(b"substituted")
+            real_assert = MODULE._assert_no_symlink_components
+
+            def swap_after_check(path):
+                result = real_assert(path)
+                expected.rename(displaced)
+                substitute.rename(expected)
+                return result
+
+            with mock.patch.object(MODULE, "_assert_no_symlink_components", side_effect=swap_after_check):
+                with self.assertRaises(ValueError):
+                    MODULE.read_regular_bytes(source)
 
     def test_prepare_private_dir_rejects_symlink_and_non_private_mode(self):
         with tempfile.TemporaryDirectory() as td:
@@ -337,6 +425,23 @@ class BootstrapTests(unittest.TestCase):
             MODULE.validate_manifest_files(manifest)
             self.assertEqual(len(manifest["mutable_inputs"]), 4)
             self.assertTrue((root / "captures" / "capture-0").is_file())
+
+    def test_prompt_pins_execution_path_dependency_loader_and_maintenance_home(self):
+        prompt_path = Path(__file__).resolve().parents[1] / "docs/prompts/2026-07-30-callscore-r0a-maintenance-preparation-prompt.md"
+        prompt = prompt_path.read_text()
+        self.assertIn("PATH=/usr/bin:/bin; export PATH", prompt)
+        self.assertNotIn('npm --prefix "$APP_WORKTREE" run hygiene:secrets', prompt)
+        self.assertIn(
+            'python3 ops/hermes-state-maintenance/r0a_secret_scan.py --root "$APP_WORKTREE" --forbid-relative .tmp/.apify-token.local --require-gitignore-pattern .env --require-gitignore-pattern .env.local --require-gitignore-pattern .tmp/',
+            prompt,
+        )
+        self.assertIn("Environment=HERMES_HOME=/var/lib/callscore-maintenance/state", prompt)
+        self.assertIn("must not pass `--profile callscore`", prompt)
+        plan_path = Path(__file__).resolve().parents[1] / "docs/plans/2026-07-30-callscore-full-system-recovery-and-activation.md"
+        plan = plan_path.read_text()
+        self.assertNotIn("hermes --profile callscore", plan)
+        self.assertIn("Environment=HERMES_HOME=/var/lib/callscore-maintenance/state", plan)
+        self.assertIn("/usr/local/bin/callscore-r1-maintenance optimize-storage --state-db /var/lib/callscore-maintenance/state/state.db --no-vacuum", plan)
 
 
 if __name__ == "__main__":

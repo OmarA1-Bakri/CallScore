@@ -182,6 +182,8 @@ External capacity must cover the current anchor, the maximum failed `state.db`/W
 
 - `User=callscore-maint`;
 - `Group=callscore-state-maint`;
+- `Environment=HERMES_HOME=/var/lib/callscore-maintenance/state` and `HOME=/nonexistent`;
+- invokes the pinned Hermes `SessionDB` implementation against the explicit private-bind database path and never resolves `--profile callscore`;
 - `NoNewPrivileges=yes`;
 - no sudo;
 - no network;
@@ -313,7 +315,7 @@ Branches are explicit:
 6. Run supported compact migration:
 
 ```bash
-hermes --profile callscore sessions optimize-storage --no-vacuum --yes
+/usr/local/bin/callscore-r1-maintenance optimize-storage --state-db /var/lib/callscore-maintenance/state/state.db --no-vacuum
 ```
 
 7. Verify exact external-content schemas, triggers, all FTS integrity checks and all search routes.

@@ -50,11 +50,24 @@ EXPECTED_MUTABLE_INPUTS = (
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 WRITE_FLAGS = ("O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC", "O_APPEND")
 MUTATING_CALLS = (
-    "unlink(", "unlinkat(", "rename(", "renameat(", "renameat2(",
+    "creat(", "unlink(", "unlinkat(", "rename(", "renameat(", "renameat2(",
     "mkdir(", "mkdirat(", "rmdir(", "chmod(", "fchmodat(", "chown(",
     "fchownat(", "symlink(", "symlinkat(", "link(", "linkat(",
     "truncate(", "mknod(", "mknodat(", "setxattr(", "lsetxattr(",
     "removexattr(", "lremovexattr(", "utime(", "utimes(", "utimensat(",
+)
+FD_MUTATING_CALLS = (
+    "write(", "writev(", "pwrite64(", "pwritev(", "pwritev2(",
+    "ftruncate(", "fallocate(", "fchmod(", "fchown(", "fsetxattr(",
+    "fremovexattr(", "sendfile(", "copy_file_range(", "splice(",
+)
+ESCAPE_CALLS = (
+    "ptrace(", "unshare(", "setns(", "mount(", "umount(", "umount2(",
+    "pivot_root(", "chroot(", "bpf(", "io_uring_setup(",
+    "io_uring_enter(", "io_uring_register(", "process_vm_writev(",
+    "copy_file_range(", "splice(", "tee(", "open_by_handle_at(",
+    "move_mount(", "fsopen(", "fsmount(", "open_tree(", "pidfd_getfd(",
+    "keyctl(", "add_key(", "request_key(", "process_vm_readv(",
 )
 
 
@@ -267,10 +280,13 @@ def validate_git_command(argv: list[str], hooks: Path) -> None:
         raise ValueError("Git executable is not pinned to /usr/bin/git")
     if not hooks.is_absolute():
         raise ValueError("hooks path must be absolute")
-    _assert_no_symlink_components(hooks)
-    info = hooks.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700 or any(hooks.iterdir()):
-        raise ValueError("hooks directory must be owner-only, non-symlink and empty")
+    hooks_fd, _ = _open_stable_directory(hooks)
+    try:
+        info = os.fstat(hooks_fd)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700 or os.listdir(hooks_fd):
+            raise ValueError("hooks directory must be owner-only, non-symlink and empty")
+    finally:
+        os.close(hooks_fd)
     required = f"core.hooksPath={hooks}"
     hook_values: list[str] = []
     for index, argument in enumerate(argv):
@@ -285,11 +301,19 @@ def validate_git_command(argv: list[str], hooks: Path) -> None:
 def verify_repo_tuple(repo: Path, expected: dict[str, str], hooks: Path, *, require_clean: bool) -> None:
     if not repo.is_absolute() or not hooks.is_absolute():
         raise ValueError("repository and hooks paths must be absolute")
+    repo_fd, _ = _open_stable_directory(repo)
+    try:
+        _verify_repo_tuple_open(repo, expected, hooks, require_clean=require_clean, repo_fd=repo_fd)
+    finally:
+        os.close(repo_fd)
+
+
+def _verify_repo_tuple_open(repo: Path, expected: dict[str, str], hooks: Path, *, require_clean: bool, repo_fd: int) -> None:
     _tuple(expected, "repository")
     base = [
         "/usr/bin/git",
         "-C",
-        str(repo),
+        f"/proc/self/fd/{repo_fd}",
         "-c",
         f"core.hooksPath={hooks}",
         "-c",
@@ -312,7 +336,7 @@ def verify_repo_tuple(repo: Path, expected: dict[str, str], hooks: Path, *, requ
     def run(*arguments: str, allowed_exit: tuple[int, ...] = (0,)) -> bytes:
         argv = [*base, *arguments]
         validate_git_command(argv, hooks)
-        result = subprocess.run(argv, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+        result = subprocess.run(argv, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, pass_fds=(repo_fd,))
         if result.returncode not in allowed_exit:
             raise subprocess.CalledProcessError(result.returncode, argv, result.stdout, result.stderr)
         return result.stdout
@@ -364,6 +388,24 @@ def audit_trace_text(text: str, allowed_write_roots: list[Path], cwd: Path) -> N
     for line in text.splitlines():
         if any(call in line for call in network_calls):
             raise ValueError("network syscall attempted")
+        if any(call in line for call in ESCAPE_CALLS) or (("clone(" in line or "clone3(" in line) and "CLONE_NEW" in line):
+            raise ValueError(f"process/kernel escape syscall attempted: {line}")
+        if "mmap(" in line and "PROT_WRITE" in line and "MAP_SHARED" in line:
+            raise ValueError(f"shared writable mapping attempted: {line}")
+        fd_mutating = any(call in line for call in FD_MUTATING_CALLS)
+        if fd_mutating:
+            fd_match = re.search(r"(?:^|\s)(?:write|writev|pwrite64|pwritev|pwritev2|ftruncate|fallocate|fchmod|fchown|fsetxattr|fremovexattr|sendfile|copy_file_range|splice)\((\d+)(?:<([^>]+)>)?", line)
+            if not fd_match:
+                raise ValueError(f"unresolved inherited write fd: {line}")
+            fd_number = int(fd_match.group(1))
+            fd_target = fd_match.group(2)
+            if fd_target is None:
+                raise ValueError(f"unresolved inherited write fd: {line}")
+            if fd_target.startswith("pipe:[") and fd_number in (1, 2):
+                continue
+            if not fd_target.startswith("/") or not _inside(Path(fd_target), allowed_write_roots):
+                raise ValueError(f"write fd outside allowlist: {fd_target}")
+            continue
         mutating = any(call in line for call in MUTATING_CALLS) or ("open" in line and any(flag in line for flag in WRITE_FLAGS))
         if not mutating:
             continue
@@ -397,11 +439,54 @@ def _assert_no_symlink_components(path: Path) -> None:
             raise ValueError(f"symlink path component forbidden: {current}")
 
 
+def _open_stable_parent(path: Path, *, expected_identity: tuple[int, int] | None = None) -> tuple[int, tuple[int, int]]:
+    parent = path.parent
+    before = parent.stat(follow_symlinks=False)
+    before_identity = (before.st_dev, before.st_ino)
+    if expected_identity is not None and before_identity != expected_identity:
+        raise ValueError(f"parent identity drift: {parent}")
+    _assert_no_symlink_components(parent)
+    fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(fd)
+        after = parent.stat(follow_symlinks=False)
+        after_identity = (after.st_dev, after.st_ino)
+        if (opened.st_dev, opened.st_ino) != before_identity or after_identity != before_identity:
+            raise ValueError(f"parent identity drift: {parent}")
+        return fd, before_identity
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _open_stable_directory(path: Path, *, expected_identity: tuple[int, int] | None = None) -> tuple[int, tuple[int, int]]:
+    if not path.is_absolute() or ".." in path.parts or path.name in {"", ".", ".."}:
+        raise ValueError("directory path must be absolute and lexically normalised")
+    parent_fd, _ = _open_stable_parent(path)
+    try:
+        before = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        identity = (before.st_dev, before.st_ino)
+        if expected_identity is not None and identity != expected_identity:
+            raise ValueError(f"directory identity drift: {path}")
+        fd = os.open(path.name, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
+        try:
+            opened = os.fstat(fd)
+            after = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+            if (opened.st_dev, opened.st_ino) != identity or (after.st_dev, after.st_ino) != identity:
+                raise ValueError(f"directory identity drift: {path}")
+            return fd, identity
+        except BaseException:
+            os.close(fd)
+            raise
+    finally:
+        os.close(parent_fd)
+
+
 def read_regular_bytes(path: Path) -> bytes:
     if not path.is_absolute() or ".." in path.parts:
         raise ValueError("input path must be absolute and lexically normalised")
-    _assert_no_symlink_components(path)
-    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    parent_fd, parent_identity = _open_stable_parent(path)
+    fd = os.open(path.name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
     try:
         before = os.fstat(fd)
         if not stat.S_ISREG(before.st_mode):
@@ -417,95 +502,153 @@ def read_regular_bytes(path: Path) -> bytes:
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
         ):
             raise ValueError(f"input changed during read: {path}")
-        path_stat = path.stat(follow_symlinks=False)
+        path_stat = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
         if (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino):
             raise ValueError(f"input path identity drift: {path}")
+        lexical_parent = path.parent.stat(follow_symlinks=False)
+        if (lexical_parent.st_dev, lexical_parent.st_ino) != parent_identity:
+            raise ValueError(f"input parent identity drift: {path.parent}")
         return b"".join(chunks)
+    finally:
+        os.close(fd)
+        os.close(parent_fd)
+
+
+def _verify_private_file(path: Path) -> None:
+    parent_fd, _ = _open_stable_parent(path)
+    fd = os.open(path.name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
+    try:
+        info = os.fstat(fd)
+        readback = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (info.st_dev, info.st_ino) != (readback.st_dev, readback.st_ino):
+            raise ValueError(f"private file identity drift: {path}")
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+            raise ValueError(f"file is not an owner-only regular file: {path}")
+    finally:
+        os.close(fd)
+        os.close(parent_fd)
+
+
+def _verify_owned_directory(path: Path, *, exact_mode: int | None = None) -> None:
+    fd, _ = _open_stable_directory(path)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+            raise ValueError(f"directory is not owned by the current uid: {path}")
+        mode = stat.S_IMODE(info.st_mode)
+        if exact_mode is not None and mode != exact_mode:
+            raise ValueError(f"directory mode must be {exact_mode:04o}: {path}")
+        if mode & 0o022:
+            raise ValueError(f"directory is group/world writable: {path}")
     finally:
         os.close(fd)
 
 
-def _verify_private_file(path: Path) -> None:
-    _assert_no_symlink_components(path)
-    info = path.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
-        raise ValueError(f"file is not an owner-only regular file: {path}")
+def prepare_private_dir(path: Path) -> tuple[int, int]:
+    if not path.is_absolute() or ".." in path.parts or path.name in {"", ".", ".."}:
+        raise ValueError("private directory path must be absolute and lexically normalised")
+    parent_fd, parent_identity = _open_stable_parent(path)
+    try:
+        parent_info = os.fstat(parent_fd)
+        parent_mode = stat.S_IMODE(parent_info.st_mode)
+        if not stat.S_ISDIR(parent_info.st_mode) or parent_info.st_uid != os.getuid() or parent_mode & 0o022:
+            raise ValueError(f"private directory parent is not safely owned: {path.parent}")
+        os.mkdir(path.name, mode=0o700, dir_fd=parent_fd)
+        child_fd = os.open(path.name, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
+        try:
+            info = os.fstat(child_fd)
+            readback = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+            if (info.st_dev, info.st_ino) != (readback.st_dev, readback.st_ino):
+                raise ValueError(f"private directory identity drift: {path}")
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+                raise ValueError(f"private directory is not owner-only: {path}")
+            if os.listdir(child_fd):
+                raise ValueError(f"private directory must be empty: {path}")
+            lexical_parent = path.parent.stat(follow_symlinks=False)
+            lexical_child = path.stat(follow_symlinks=False)
+            if (lexical_parent.st_dev, lexical_parent.st_ino) != parent_identity or (lexical_child.st_dev, lexical_child.st_ino) != (info.st_dev, info.st_ino):
+                raise ValueError(f"private directory identity drift: {path}")
+            return (info.st_dev, info.st_ino)
+        finally:
+            os.close(child_fd)
+    finally:
+        os.close(parent_fd)
 
 
-def _verify_owned_directory(path: Path, *, exact_mode: int | None = None) -> None:
-    _assert_no_symlink_components(path)
-    info = path.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
-        raise ValueError(f"directory is not owned by the current uid: {path}")
-    mode = stat.S_IMODE(info.st_mode)
-    if exact_mode is not None and mode != exact_mode:
-        raise ValueError(f"directory mode must be {exact_mode:04o}: {path}")
-    if mode & 0o022:
-        raise ValueError(f"directory is group/world writable: {path}")
-
-
-def prepare_private_dir(path: Path) -> None:
-    if not path.is_absolute():
-        raise ValueError("private directory path must be absolute")
-    _verify_owned_directory(path.parent)
-    path.mkdir(mode=0o700)
-    _verify_owned_directory(path, exact_mode=0o700)
-    if any(path.iterdir()):
-        raise ValueError(f"private directory must be empty: {path}")
-
-
-def atomic_write_new(path: Path, data: bytes, *, mode: int = 0o600) -> None:
+def atomic_write_new(path: Path, data: bytes, *, mode: int = 0o600, expected_parent_identity: tuple[int, int] | None = None) -> None:
     if not path.is_absolute():
         raise ValueError("output path must be absolute")
+    parent_identity = expected_parent_identity
+    if parent_identity is None:
+        parent_info = path.parent.stat(follow_symlinks=False)
+        parent_identity = (parent_info.st_dev, parent_info.st_ino)
     _verify_owned_directory(path.parent)
-    try:
-        path.lstat()
-    except FileNotFoundError:
-        pass
-    else:
-        raise FileExistsError(path)
-    temp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    fd = os.open(temp, flags, mode)
-    try:
-        view = memoryview(data)
-        while view:
-            written = os.write(fd, view)
-            if written <= 0:
-                raise OSError("short write")
-            view = view[written:]
-        os.fsync(fd)
-    except BaseException:
-        os.close(fd)
-        temp.unlink(missing_ok=True)
-        raise
-    else:
-        os.close(fd)
-    directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    directory_fd, _ = _open_stable_parent(path, expected_identity=parent_identity)
     try:
         try:
-            os.link(temp, path, follow_symlinks=False)
+            os.stat(path.name, dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            raise FileExistsError(path)
+        temp_name = f".{path.name}.tmp-{os.getpid()}"
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(temp_name, flags, mode, dir_fd=directory_fd)
+        try:
+            view = memoryview(data)
+            while view:
+                written = os.write(fd, view)
+                if written <= 0:
+                    raise OSError("short write")
+                view = view[written:]
+            os.fsync(fd)
         except BaseException:
-            temp.unlink(missing_ok=True)
+            os.close(fd)
+            try:
+                os.unlink(temp_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+            raise
+        else:
+            os.close(fd)
+        temp_info = os.stat(temp_name, dir_fd=directory_fd, follow_symlinks=False)
+        try:
+            os.link(temp_name, path.name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd, follow_symlinks=False)
+        except BaseException:
+            try:
+                os.unlink(temp_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
             os.fsync(directory_fd)
             raise
+        destination_info = os.stat(path.name, dir_fd=directory_fd, follow_symlinks=False)
+        lexical_parent = path.parent.stat(follow_symlinks=False)
+        destination_matches = (destination_info.st_dev, destination_info.st_ino) == (temp_info.st_dev, temp_info.st_ino)
+        parent_matches = (lexical_parent.st_dev, lexical_parent.st_ino) == parent_identity
+        if not destination_matches or not parent_matches:
+            if destination_matches:
+                os.unlink(path.name, dir_fd=directory_fd)
+            os.unlink(temp_name, dir_fd=directory_fd)
+            os.fsync(directory_fd)
+            raise ValueError(f"output identity drift: {path}")
         os.fsync(directory_fd)
-        temp.unlink()
+        os.unlink(temp_name, dir_fd=directory_fd)
         os.fsync(directory_fd)
     finally:
         os.close(directory_fd)
 
 
-def capture_file(source: Path, destination: Path) -> dict[str, Any]:
+def capture_file(source: Path, destination: Path, *, destination_parent_identity: tuple[int, int] | None = None) -> dict[str, Any]:
     if not source.is_absolute() or not destination.is_absolute():
         raise ValueError("capture paths must be absolute")
     if ".." in source.parts or ".." in destination.parts or destination.name in {"", ".", ".."}:
         raise ValueError("capture paths must be lexically normalised")
-    _assert_no_symlink_components(source)
     _verify_owned_directory(destination.parent, exact_mode=0o700)
-    fd = os.open(source, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    destination_parent_fd, destination_identity = _open_stable_parent(destination, expected_identity=destination_parent_identity)
+    source_parent_fd, source_parent_identity = _open_stable_parent(source)
+    fd = os.open(source.name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=source_parent_fd)
     try:
         before = os.fstat(fd)
         if not stat.S_ISREG(before.st_mode):
@@ -521,21 +664,26 @@ def capture_file(source: Path, destination: Path) -> dict[str, Any]:
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
         ):
             raise ValueError(f"input drift while reading: {source}")
-        path_stat = source.stat(follow_symlinks=False)
+        path_stat = os.stat(source.name, dir_fd=source_parent_fd, follow_symlinks=False)
         if (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino):
             raise ValueError(f"input path identity drift: {source}")
+        lexical_source_parent = source.parent.stat(follow_symlinks=False)
+        if (lexical_source_parent.st_dev, lexical_source_parent.st_ino) != source_parent_identity:
+            raise ValueError(f"mutable input parent identity drift: {source.parent}")
         data = b"".join(chunks)
-        atomic_write_new(destination, data)
+        atomic_write_new(destination, data, expected_parent_identity=destination_identity)
         return {"path": str(source), "capture_path": str(destination), "sha256": hashlib.sha256(data).hexdigest(), "device_inode": f"{after.st_dev}:{after.st_ino}", "mode": f"{stat.S_IMODE(after.st_mode):04o}", "uid": after.st_uid, "gid": after.st_gid}
     finally:
         os.close(fd)
+        os.close(source_parent_fd)
+        os.close(destination_parent_fd)
 
 
 def sha256_file(path: Path) -> str:
     if not path.is_absolute():
         raise ValueError("hashed path must be absolute")
-    _assert_no_symlink_components(path)
-    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    parent_fd, parent_identity = _open_stable_parent(path)
+    fd = os.open(path.name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
     try:
         before = os.fstat(fd)
         if not stat.S_ISREG(before.st_mode):
@@ -551,12 +699,16 @@ def sha256_file(path: Path) -> str:
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
         ):
             raise ValueError(f"hashed input changed during read: {path}")
-        path_stat = path.stat(follow_symlinks=False)
+        path_stat = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
         if (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino):
             raise ValueError(f"hashed input path identity drift: {path}")
+        lexical_parent = path.parent.stat(follow_symlinks=False)
+        if (lexical_parent.st_dev, lexical_parent.st_ino) != parent_identity:
+            raise ValueError(f"hashed input parent identity drift: {path.parent}")
         return digest.hexdigest()
     finally:
         os.close(fd)
+        os.close(parent_fd)
 
 
 def validate_manifest_files(obj: dict[str, Any]) -> None:
@@ -567,9 +719,7 @@ def validate_manifest_files(obj: dict[str, Any]) -> None:
     for item in obj["mutable_inputs"]:
         capture = Path(item["capture_path"])
         _verify_owned_directory(capture.parent, exact_mode=0o700)
-        info = capture.lstat()
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
-            raise ValueError(f"mutable capture is not an owner-only regular file: {capture}")
+        _verify_private_file(capture)
         if sha256_file(capture) != item["sha256"]:
             raise ValueError(f"mutable capture hash mismatch: {capture}")
 
@@ -577,7 +727,7 @@ def validate_manifest_files(obj: dict[str, Any]) -> None:
 def build_manifest(*, application_base: dict[str, str], workplane_base: dict[str, str], hermes: dict[str, Any], plan: dict[str, str], prompt: dict[str, str], reviews: list[dict[str, str]], mutable_specs: list[dict[str, str]], capture_dir: Path) -> dict[str, Any]:
     if len(reviews) != 6 or len(mutable_specs) != 4:
         raise ValueError("six reviews and four mutable inputs are required")
-    prepare_private_dir(capture_dir)
+    capture_dir_identity = prepare_private_dir(capture_dir)
     for item in reviews:
         if sha256_file(Path(item["path"])) != item["sha256"]:
             raise ValueError(f"review hash mismatch: {item['path']}")
@@ -587,7 +737,14 @@ def build_manifest(*, application_base: dict[str, str], workplane_base: dict[str
     for item in hermes.get("anchor_files", []):
         if sha256_file(Path(item["path"])) != item["sha256"]:
             raise ValueError(f"Hermes anchor hash mismatch: {item['path']}")
-    mutable = [capture_file(Path(item["path"]), capture_dir / item["name"]) for item in mutable_specs]
+    mutable = [
+        capture_file(
+            Path(item["path"]),
+            capture_dir / item["name"],
+            destination_parent_identity=capture_dir_identity,
+        )
+        for item in mutable_specs
+    ]
     manifest = {
         "schema": SCHEMA,
         "application_base": application_base,

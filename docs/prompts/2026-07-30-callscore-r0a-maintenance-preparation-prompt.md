@@ -44,8 +44,8 @@ Read in full:
   - `docs/ops/callscore-r0a/input-reviews/deleg_c26083f7-r0a-specification-fail.md` — `4551e2a02c0783459ec8c358461b1452ff4f6495faf2e9b9e701cf9e9a7052d2`;
   - `docs/ops/callscore-r0a/input-reviews/deleg_e17283dc-r0a-implementation-fail.md` — `7fb0c16bff6f5f5ac47058ad9bcbab8c6714021be710ba5c9f0b4c9b13637473`;
 - immutable pre-worktree bootstrap inputs:
-  - `scripts/callscore-r0a-bootstrap.py` — `0d4bc25bfc901b96b4f71ba58e7fddf9881b0cd13a7d16b3e791ddfa62dc2de8`;
-  - `tests/test_callscore_r0a_bootstrap.py` — `d44ac1d96c2bdb8d463294bfc8476f8428f044dea803711e5ffdaa63bfc8f5e4`;
+  - `scripts/callscore-r0a-bootstrap.py` — `4a7318d461b26c37b0cb30d4364b78596b43bdd4492cd66e8f215415a19fb1dc`;
+  - `tests/test_callscore_r0a_bootstrap.py` — `dd03b962a20379bbc55af46e54828d6a050ffe8fa9e511514ae5eeae858b13fe`;
   - `docs/ops/callscore-r0a/bootstrap/callscore-r0a-input-manifest-v1.schema.json` — `f1f8a277e5ab0e3cb6f23f3304280fc5d7fcfdebfeb08ab1e46fa4f59846996e`;
   - `docs/ops/callscore-r0a/bootstrap/input-spec.json` — `085630cb45fcf842d53de1270b2d2a88c6ed29b9b6dab0189d8711e638c1a492`;
 - `/srv/agents/hermes/hermes-agent/hermes_state.py`;
@@ -153,11 +153,13 @@ The exact-tuple execution envelope must provide nonempty ASCII `R0A_NONCE`, `APP
 Literal pre-worktree commands, cwd `/opt/crypto-tuber-ranked`, expected exit `0`; the four bootstrap SHA-256 values are the immutable values in **Canonical inputs** above:
 
 ```bash
+PATH=/usr/bin:/bin; export PATH
+unset BASH_ENV ENV CDPATH PYTHONPATH PYTHONHOME GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 test -n "$R0A_NONCE" && printf '%s' "$R0A_NONCE" | grep -Eq '^[a-z0-9][a-z0-9-]{7,63}$'
 HOOKS_DIR="/srv/agents/worktrees/.r0a-empty-hooks-$R0A_NONCE"; export HOOKS_DIR
 mkdir -m 0700 -- "$HOOKS_DIR"
 test ! -L "$HOOKS_DIR" && test "$(stat -c '%u:%a' "$HOOKS_DIR")" = "$(id -u omar):700" && test -z "$(find "$HOOKS_DIR" -mindepth 1 -maxdepth 1 -print -quit)"
-printf '%s  %s\n' '0d4bc25bfc901b96b4f71ba58e7fddf9881b0cd13a7d16b3e791ddfa62dc2de8' scripts/callscore-r0a-bootstrap.py 'd44ac1d96c2bdb8d463294bfc8476f8428f044dea803711e5ffdaa63bfc8f5e4' tests/test_callscore_r0a_bootstrap.py 'f1f8a277e5ab0e3cb6f23f3304280fc5d7fcfdebfeb08ab1e46fa4f59846996e' docs/ops/callscore-r0a/bootstrap/callscore-r0a-input-manifest-v1.schema.json '085630cb45fcf842d53de1270b2d2a88c6ed29b9b6dab0189d8711e638c1a492' docs/ops/callscore-r0a/bootstrap/input-spec.json | sha256sum -c -
+printf '%s  %s\n' '4a7318d461b26c37b0cb30d4364b78596b43bdd4492cd66e8f215415a19fb1dc' scripts/callscore-r0a-bootstrap.py 'dd03b962a20379bbc55af46e54828d6a050ffe8fa9e511514ae5eeae858b13fe' tests/test_callscore_r0a_bootstrap.py 'f1f8a277e5ab0e3cb6f23f3304280fc5d7fcfdebfeb08ab1e46fa4f59846996e' docs/ops/callscore-r0a/bootstrap/callscore-r0a-input-manifest-v1.schema.json '085630cb45fcf842d53de1270b2d2a88c6ed29b9b6dab0189d8711e638c1a492' docs/ops/callscore-r0a/bootstrap/input-spec.json | sha256sum -c -
 python3 -m unittest -v tests/test_callscore_r0a_bootstrap.py
 python3 scripts/callscore-r0a-bootstrap.py create --spec /opt/crypto-tuber-ranked/docs/ops/callscore-r0a/bootstrap/input-spec.json --output "/srv/agents/worktrees/.r0a-input-manifest-$R0A_NONCE.json" --capture-dir "/srv/agents/worktrees/.r0a-input-captures-$R0A_NONCE" --hooks-dir "$HOOKS_DIR" --application-repo /opt/crypto-tuber-ranked --workplane-repo /srv/agents/repos/callscore-workplane --hermes-repo /srv/agents/hermes/hermes-agent --application-commit "$APP_BASE_COMMIT" --application-tree "$APP_BASE_TREE" --workplane-commit "$WORKPLANE_BASE_COMMIT" --workplane-tree "$WORKPLANE_BASE_TREE" --hermes-commit 3c388db06b6543821f15ed62efb9d8e7cd9bb9be --hermes-tree ad9824f4ba7e007b42bf6aa2fd171df6916790a8 --plan-sha256 "$PLAN_SHA256" --prompt-sha256 "$R0A_PROMPT_SHA256"
 python3 scripts/callscore-r0a-bootstrap.py validate --manifest "/srv/agents/worktrees/.r0a-input-manifest-$R0A_NONCE.json"
@@ -395,6 +397,7 @@ No R1 executor sudoers entry is allowed.
 ### R1 maintenance unit
 
 - `User=callscore-maint` and `Group=callscore-state-maint`;
+- `Environment=HERMES_HOME=/var/lib/callscore-maintenance/state` and `HOME=/nonexistent`; every Hermes CLI invocation must resolve this explicit maintenance state root and must not pass `--profile callscore`;
 - `NoNewPrivileges=yes`;
 - empty `CapabilityBoundingSet` and `AmbientCapabilities`;
 - network namespace denied;
@@ -522,12 +525,14 @@ python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command
 python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id lint --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 -m tabnanny -v ops/hermes-state-maintenance
 python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id schemas --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 ops/hermes-state-maintenance/validate_schemas.py --workplane-root "$WORKPLANE_WORKTREE" --application-root "$APP_WORKTREE"
 python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id secret-scan --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 ops/hermes-state-maintenance/r0a_secret_scan.py --root ops/hermes-state-maintenance
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id app-secret-scan --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- npm --prefix "$APP_WORKTREE" run hygiene:secrets
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id app-secret-scan --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 ops/hermes-state-maintenance/r0a_secret_scan.py --root "$APP_WORKTREE" --forbid-relative .tmp/.apify-token.local --require-gitignore-pattern .env --require-gitignore-pattern .env.local --require-gitignore-pattern .tmp/
 python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id workplane-diff-check --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- /usr/bin/git -C "$WORKPLANE_WORKTREE" -c core.hooksPath="$HOOKS_DIR" -c core.fsmonitor=false -c core.untrackedCache=false diff --check
 python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id app-diff-check --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- /usr/bin/git -C "$APP_WORKTREE" -c core.hooksPath="$HOOKS_DIR" -c core.fsmonitor=false -c core.untrackedCache=false diff --check
 ```
 
 Every harness command uses the isolated Workplane root as cwd and expects exit `0`, except RED unit, which expects nonzero plus the exact planned assertion IDs. Cross-repository commands use explicit `--prefix` or `git -C`; every Git argv includes the revalidated empty `core.hooksPath`. The manifest records exact expanded argv, cwd, included/excluded scope, expected/actual exit and normalised stdout/stderr hashes for every command.
+
+`r0a_secret_scan.py` accepts the exact repeated `--forbid-relative` and `--require-gitignore-pattern` options above. It rejects an escaping/absolute forbidden-relative path, fails when a forbidden member exists without following symlinks, and requires each literal pattern in the selected root's `.gitignore`. This stdlib-only path replaces dependency on mutable application `node_modules` bytes.
 
 `r0a_evidence.py` atomically replaces each result file via same-directory `fsync` plus `os.replace`, rejects duplicate `command_id`, retains prior entries, and rewrites entries sorted by `command_id`. The evidence-results schema owns both red and green files; the evidence-root schema owns `evidence-root.json`. `final-r1-prompt.contract.json` is the machine-readable structural contract for the Markdown prompt and is validated by `validate_schemas.py`; Markdown itself is not described as schema-valid.
 
