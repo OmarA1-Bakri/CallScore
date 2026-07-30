@@ -1,0 +1,692 @@
+#!/usr/bin/env python3
+"""Source-only bootstrap primitives for CallScore R0A.
+
+This file intentionally uses only the Python standard library.  Its JSON
+profile is an ASCII/string/integer subset of RFC 8785, so Python key sorting
+is byte-identical to JCS for accepted values.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import subprocess
+import sys
+import unicodedata
+from typing import Any
+
+SCHEMA = "callscore.r0a_input_manifest.v1"
+SPEC_SCHEMA = "callscore.r0a_bootstrap_spec.v1"
+PLAN_PATH = "/opt/crypto-tuber-ranked/docs/plans/2026-07-30-callscore-full-system-recovery-and-activation.md"
+PROMPT_PATH = "/opt/crypto-tuber-ranked/docs/prompts/2026-07-30-callscore-r0a-maintenance-preparation-prompt.md"
+APPLICATION_REPO = Path("/opt/crypto-tuber-ranked")
+WORKPLANE_REPO = Path("/srv/agents/repos/callscore-workplane")
+HERMES_REPO = Path("/srv/agents/hermes/hermes-agent")
+WORKTREE_ROOT = Path("/srv/agents/worktrees")
+SPEC_PATH = APPLICATION_REPO / "docs/ops/callscore-r0a/bootstrap/input-spec.json"
+EXPECTED_HERMES_ANCHORS = (
+    "/srv/agents/hermes/hermes-agent/gateway/status.py",
+    "/srv/agents/hermes/hermes-agent/hermes_state.py",
+    "/srv/agents/hermes/hermes-agent/tools/session_search_tool.py",
+)
+EXPECTED_REVIEW_PATHS = (
+    "/opt/crypto-tuber-ranked/docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-implementation-timeout.json",
+    "/opt/crypto-tuber-ranked/docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-security-fail.md",
+    "/opt/crypto-tuber-ranked/docs/ops/callscore-r0a/input-reviews/deleg_1fb6fe24-specification-fail.md",
+    "/opt/crypto-tuber-ranked/docs/ops/callscore-r0a/input-reviews/deleg_a7901f50-r0a-security-fail.md",
+    "/opt/crypto-tuber-ranked/docs/ops/callscore-r0a/input-reviews/deleg_c26083f7-r0a-specification-fail.md",
+    "/opt/crypto-tuber-ranked/docs/ops/callscore-r0a/input-reviews/deleg_e17283dc-r0a-implementation-fail.md",
+)
+EXPECTED_MUTABLE_INPUTS = (
+    ("/etc/systemd/system/agent-snapshot.service", "agent-snapshot.service"),
+    ("/etc/systemd/system/agent-snapshot.timer", "agent-snapshot.timer"),
+    ("/usr/local/bin/agent-snapshot", "agent-snapshot"),
+    ("/home/omar/.config/systemd/user/hermes-callscore-gateway.service", "hermes-callscore-gateway.service"),
+)
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
+WRITE_FLAGS = ("O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC", "O_APPEND")
+MUTATING_CALLS = (
+    "unlink(", "unlinkat(", "rename(", "renameat(", "renameat2(",
+    "mkdir(", "mkdirat(", "rmdir(", "chmod(", "fchmodat(", "chown(",
+    "fchownat(", "symlink(", "symlinkat(", "link(", "linkat(",
+    "truncate(", "mknod(", "mknodat(", "setxattr(", "lsetxattr(",
+    "removexattr(", "lremovexattr(", "utime(", "utimes(", "utimensat(",
+)
+
+
+def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in out:
+            raise ValueError(f"duplicate JSON key: {key}")
+        out[key] = value
+    return out
+
+
+def load_json_strict(data: bytes) -> Any:
+    try:
+        text = data.decode("utf-8", "strict")
+    except UnicodeDecodeError as exc:
+        raise ValueError("manifest is not strict UTF-8") from exc
+    return json.loads(text, object_pairs_hook=_pairs, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f"invalid constant: {x}")))
+
+
+def _validate_canonical_value(value: Any) -> None:
+    if value is None or isinstance(value, bool):
+        return
+    if isinstance(value, int) and not isinstance(value, bool):
+        if not -(2**53 - 1) <= value <= 2**53 - 1:
+            raise ValueError("integers must fit the RFC 8785 interoperable safe range")
+        return
+    if isinstance(value, float):
+        raise ValueError("floats are forbidden in the restricted JCS profile")
+    if isinstance(value, str):
+        if not all(0x20 <= ord(ch) <= 0x7E for ch in value) or unicodedata.normalize("NFC", value) != value:
+            raise ValueError("strings must be printable ASCII/NFC")
+        return
+    if isinstance(value, list):
+        for item in value:
+            _validate_canonical_value(item)
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str) or not all(0x20 <= ord(ch) <= 0x7E for ch in key):
+                raise ValueError("object keys must be printable ASCII strings")
+            _validate_canonical_value(item)
+        return
+    raise ValueError(f"unsupported canonical type: {type(value).__name__}")
+
+
+def canonical_bytes(value: Any) -> bytes:
+    _validate_canonical_value(value)
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("ascii")
+
+
+def example_manifest() -> dict[str, Any]:
+    return {
+        "schema": SCHEMA,
+        "application_base": {"commit": "a" * 40, "tree": "b" * 40},
+        "workplane_base": {"commit": "c" * 40, "tree": "d" * 40},
+        "hermes": {
+            "commit": "e" * 40,
+            "tree": "f" * 40,
+            "anchor_files": [
+                {"path": f"/hermes/{i}.py", "sha256": f"{i}" * 64}
+                for i in range(2, 5)
+            ],
+        },
+        "plan": {"path": "/docs/plan.md", "sha256": "0" * 64},
+        "prompt": {"path": "/docs/prompt.md", "sha256": "1" * 64},
+        "review_inputs": [{"path": f"/reviews/{i}.md", "sha256": f"{i}" * 64} for i in range(2, 8)],
+        "mutable_inputs": [
+            {"path": f"/input/{i}", "capture_path": f"/captures/{i}", "sha256": "8" * 64, "device_inode": f"1:{i}", "mode": "0644", "uid": 1000, "gid": 1000}
+            for i in range(4)
+        ],
+    }
+
+
+def _tuple(obj: Any, name: str) -> None:
+    if not isinstance(obj, dict) or set(obj) != {"commit", "tree"}:
+        raise ValueError(f"{name} must contain only commit/tree")
+    for field in ("commit", "tree"):
+        if not isinstance(obj[field], str) or not re.fullmatch(r"[0-9a-f]{40}", obj[field]):
+            raise ValueError(f"invalid {name}.{field}")
+
+
+def _hash_path(obj: Any, name: str, *, absolute: bool = False) -> None:
+    if not isinstance(obj, dict) or set(obj) != {"path", "sha256"}:
+        raise ValueError(f"invalid {name} shape")
+    path = obj["path"]
+    if not isinstance(path, str) or not path or (absolute and not Path(path).is_absolute()):
+        raise ValueError(f"invalid {name}.path")
+    if not isinstance(obj["sha256"], str) or not HEX64.fullmatch(obj["sha256"]):
+        raise ValueError(f"invalid {name}.sha256")
+
+
+def _require_sorted_unique(items: list[dict[str, Any]], name: str) -> None:
+    paths = [item["path"] for item in items]
+    if paths != sorted(paths) or len(set(paths)) != len(paths):
+        raise ValueError(f"{name} must be unique and sorted by path")
+
+
+def validate_manifest(obj: Any) -> None:
+    required = {"schema", "application_base", "workplane_base", "hermes", "plan", "prompt", "review_inputs", "mutable_inputs"}
+    if not isinstance(obj, dict) or set(obj) != required or obj.get("schema") != SCHEMA:
+        raise ValueError("invalid top-level manifest shape/schema")
+    _tuple(obj["application_base"], "application_base")
+    _tuple(obj["workplane_base"], "workplane_base")
+    hermes = obj["hermes"]
+    if not isinstance(hermes, dict) or set(hermes) != {"commit", "tree", "anchor_files"}:
+        raise ValueError("invalid Hermes boundary")
+    _tuple({"commit": hermes["commit"], "tree": hermes["tree"]}, "hermes")
+    if not isinstance(hermes["anchor_files"], list) or len(hermes["anchor_files"]) != 3:
+        raise ValueError("exactly three Hermes anchors are required")
+    for index, item in enumerate(hermes["anchor_files"]):
+        _hash_path(item, f"hermes.anchor_files[{index}]", absolute=True)
+    _require_sorted_unique(hermes["anchor_files"], "Hermes anchors")
+    for name in ("plan", "prompt"):
+        _hash_path(obj[name], name, absolute=True)
+    reviews = obj["review_inputs"]
+    if not isinstance(reviews, list) or len(reviews) != 6:
+        raise ValueError("exactly six review inputs are required")
+    for index, item in enumerate(reviews):
+        _hash_path(item, f"review_inputs[{index}]", absolute=True)
+    _require_sorted_unique(reviews, "review inputs")
+    mutable = obj["mutable_inputs"]
+    if not isinstance(mutable, list) or len(mutable) != 4:
+        raise ValueError("exactly four mutable inputs are required")
+    mutable_required = {"path", "capture_path", "sha256", "device_inode", "mode", "uid", "gid"}
+    for index, item in enumerate(mutable):
+        if not isinstance(item, dict) or set(item) != mutable_required:
+            raise ValueError(f"invalid mutable_inputs[{index}] shape")
+        if not isinstance(item["path"], str) or not Path(item["path"]).is_absolute():
+            raise ValueError(f"invalid mutable_inputs[{index}].path")
+        if not isinstance(item["capture_path"], str) or not Path(item["capture_path"]).is_absolute():
+            raise ValueError(f"invalid mutable_inputs[{index}].capture_path")
+        if not isinstance(item["sha256"], str) or not HEX64.fullmatch(item["sha256"]):
+            raise ValueError(f"invalid mutable_inputs[{index}].sha256")
+        if not isinstance(item["device_inode"], str) or not re.fullmatch(r"[0-9]+:[0-9]+", item["device_inode"]):
+            raise ValueError(f"invalid mutable_inputs[{index}].device_inode")
+        if not isinstance(item["mode"], str) or not re.fullmatch(r"[0-7]{4}", item["mode"]):
+            raise ValueError(f"invalid mutable_inputs[{index}].mode")
+        for field in ("uid", "gid"):
+            if not isinstance(item[field], int) or isinstance(item[field], bool) or item[field] < 0:
+                raise ValueError(f"invalid mutable_inputs[{index}].{field}")
+    _require_sorted_unique(mutable, "mutable inputs")
+    capture_paths = [item["capture_path"] for item in mutable]
+    if len(set(capture_paths)) != len(capture_paths):
+        raise ValueError("mutable capture paths must be unique")
+    _validate_canonical_value(obj)
+
+
+def validate_manifest_identity(obj: dict[str, Any]) -> None:
+    if obj["plan"]["path"] != PLAN_PATH or obj["prompt"]["path"] != PROMPT_PATH:
+        raise ValueError("manifest document identity mismatch")
+    if tuple(item["path"] for item in obj["hermes"]["anchor_files"]) != EXPECTED_HERMES_ANCHORS:
+        raise ValueError("manifest Hermes anchor identity/order mismatch")
+    if tuple(item["path"] for item in obj["review_inputs"]) != EXPECTED_REVIEW_PATHS:
+        raise ValueError("manifest review identity/order mismatch")
+    expected_names = dict(EXPECTED_MUTABLE_INPUTS)
+    if set(item["path"] for item in obj["mutable_inputs"]) != set(expected_names):
+        raise ValueError("manifest mutable input identity mismatch")
+    capture_parents: set[Path] = set()
+    for item in obj["mutable_inputs"]:
+        source = item["path"]
+        capture = Path(item["capture_path"])
+        if ".." in capture.parts or capture.name != expected_names[source]:
+            raise ValueError("manifest mutable capture identity mismatch")
+        capture_parents.add(capture.parent)
+    if len(capture_parents) != 1:
+        raise ValueError("manifest capture root mismatch")
+    capture_root = next(iter(capture_parents))
+    if capture_root.parent != Path("/srv/agents/worktrees") or not re.fullmatch(r"\.r0a-input-captures-[a-z0-9][a-z0-9-]{7,63}", capture_root.name):
+        raise ValueError("manifest capture root is not canonical")
+
+
+def validate_spec(obj: Any) -> None:
+    required = {"schema", "plan_path", "prompt_path", "hermes_anchor_files", "review_inputs", "mutable_inputs"}
+    if not isinstance(obj, dict) or set(obj) != required or obj.get("schema") != SPEC_SCHEMA:
+        raise ValueError("invalid bootstrap spec shape/schema")
+    if obj["plan_path"] != PLAN_PATH or obj["prompt_path"] != PROMPT_PATH:
+        raise ValueError("bootstrap spec document paths are not canonical")
+    anchors = obj["hermes_anchor_files"]
+    reviews = obj["review_inputs"]
+    mutable = obj["mutable_inputs"]
+    if not isinstance(anchors, list) or len(anchors) != len(EXPECTED_HERMES_ANCHORS):
+        raise ValueError("invalid Hermes anchor set")
+    if not isinstance(reviews, list) or len(reviews) != len(EXPECTED_REVIEW_PATHS):
+        raise ValueError("invalid review input set")
+    if not isinstance(mutable, list) or len(mutable) != len(EXPECTED_MUTABLE_INPUTS):
+        raise ValueError("invalid mutable input set")
+    for index, item in enumerate(anchors):
+        _hash_path(item, f"hermes_anchor_files[{index}]", absolute=True)
+    for index, item in enumerate(reviews):
+        _hash_path(item, f"review_inputs[{index}]", absolute=True)
+    if tuple(item["path"] for item in anchors) != EXPECTED_HERMES_ANCHORS:
+        raise ValueError("Hermes anchor identity/order mismatch")
+    if tuple(item["path"] for item in reviews) != EXPECTED_REVIEW_PATHS:
+        raise ValueError("review input identity/order mismatch")
+    actual_mutable: list[tuple[str, str]] = []
+    for index, item in enumerate(mutable):
+        if not isinstance(item, dict) or set(item) != {"path", "name"}:
+            raise ValueError(f"invalid mutable_inputs[{index}] shape")
+        if not isinstance(item["path"], str) or not isinstance(item["name"], str):
+            raise ValueError(f"invalid mutable_inputs[{index}]")
+        actual_mutable.append((item["path"], item["name"]))
+    if tuple(actual_mutable) != EXPECTED_MUTABLE_INPUTS:
+        raise ValueError("mutable input identity/order mismatch")
+    _validate_canonical_value(obj)
+
+
+def validate_git_command(argv: list[str], hooks: Path) -> None:
+    if not argv or Path(argv[0]) != Path("/usr/bin/git"):
+        raise ValueError("Git executable is not pinned to /usr/bin/git")
+    if not hooks.is_absolute():
+        raise ValueError("hooks path must be absolute")
+    _assert_no_symlink_components(hooks)
+    info = hooks.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700 or any(hooks.iterdir()):
+        raise ValueError("hooks directory must be owner-only, non-symlink and empty")
+    required = f"core.hooksPath={hooks}"
+    hook_values: list[str] = []
+    for index, argument in enumerate(argv):
+        if argument == "-c" and index + 1 < len(argv) and argv[index + 1].lower().startswith("core.hookspath="):
+            hook_values.append(argv[index + 1])
+        if argument.lower().startswith("--config-env=core.hookspath="):
+            raise ValueError("Git config-env may not override core.hooksPath")
+    if hook_values != [required]:
+        raise ValueError("git command must contain exactly one pinned empty core.hooksPath")
+
+
+def verify_repo_tuple(repo: Path, expected: dict[str, str], hooks: Path, *, require_clean: bool) -> None:
+    if not repo.is_absolute() or not hooks.is_absolute():
+        raise ValueError("repository and hooks paths must be absolute")
+    _tuple(expected, "repository")
+    base = [
+        "/usr/bin/git",
+        "-C",
+        str(repo),
+        "-c",
+        f"core.hooksPath={hooks}",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.untrackedCache=false",
+    ]
+    env = {
+        "PATH": "/usr/bin:/bin",
+        "HOME": "/home/omar",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_PAGER": "cat",
+    }
+
+    def run(*arguments: str, allowed_exit: tuple[int, ...] = (0,)) -> bytes:
+        argv = [*base, *arguments]
+        validate_git_command(argv, hooks)
+        result = subprocess.run(argv, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+        if result.returncode not in allowed_exit:
+            raise subprocess.CalledProcessError(result.returncode, argv, result.stdout, result.stderr)
+        return result.stdout
+
+    commit = run("rev-parse", "--verify", "HEAD").decode("ascii").strip()
+    tree = run("rev-parse", "--verify", "HEAD^{tree}").decode("ascii").strip()
+    if commit != expected["commit"] or tree != expected["tree"]:
+        raise ValueError(f"repository tuple mismatch: {repo}")
+    config_names = run("config", "--includes", "--name-only", "--list", "-z").split(b"\0")
+    for raw_name in config_names:
+        name = raw_name.decode("utf-8", "strict").lower()
+        if name.startswith("filter.") or name == "core.attributesfile":
+            raise ValueError(f"external Git filter/attributes configuration is forbidden: {repo}")
+    tree_paths = run("ls-tree", "-r", "-z", "--name-only", commit).split(b"\0")
+    for raw_path in tree_paths:
+        if not raw_path:
+            continue
+        path = raw_path.decode("utf-8", "strict")
+        if Path(path).name != ".gitattributes":
+            continue
+        attributes = run("show", f"{commit}:{path}")
+        for line in attributes.splitlines():
+            content = line.split(b"#", 1)[0].lower()
+            if re.search(rb"(?:^|[ \t])[-!]?filter(?:=|[ \t]|$)", content):
+                raise ValueError(f"Git filter attribute is forbidden: {repo}:{path}")
+    info_attribute_text = run("rev-parse", "--git-path", "info/attributes").decode("utf-8", "strict").strip()
+    info_attributes = Path(info_attribute_text)
+    if not info_attributes.is_absolute():
+        info_attributes = repo / info_attributes
+    try:
+        info_attributes.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        for line in read_regular_bytes(info_attributes).splitlines():
+            if line.split(b"#", 1)[0].strip():
+                raise ValueError(f"Git info/attributes must be empty: {repo}")
+    if require_clean and run("status", "--porcelain=v1", "-z", "--untracked-files=all"):
+        raise ValueError(f"repository is not clean: {repo}")
+
+
+def _inside(path: Path, roots: list[Path]) -> bool:
+    resolved = path.resolve(strict=False)
+    return any(resolved == root.resolve(strict=False) or root.resolve(strict=False) in resolved.parents for root in roots)
+
+
+def audit_trace_text(text: str, allowed_write_roots: list[Path], cwd: Path) -> None:
+    network_calls = ("socket(", "socketpair(", "connect(", "bind(", "listen(", "accept(", "accept4(", "sendto(", "sendmsg(", "recvfrom(", "recvmsg(")
+    for line in text.splitlines():
+        if any(call in line for call in network_calls):
+            raise ValueError("network syscall attempted")
+        mutating = any(call in line for call in MUTATING_CALLS) or ("open" in line and any(flag in line for flag in WRITE_FLAGS))
+        if not mutating:
+            continue
+        matches = re.findall(r'"((?:[^"\\]|\\.)*)"', line)
+        if not matches:
+            raise ValueError(f"unresolved mutating syscall: {line}")
+        relative_count = 0
+        for match in matches:
+            raw = bytes(match, "utf-8").decode("unicode_escape")
+            candidate = Path(raw)
+            if not candidate.is_absolute():
+                relative_count += 1
+                candidate = cwd / candidate
+            if not _inside(candidate, allowed_write_roots):
+                raise ValueError(f"write outside allowlist: {candidate}")
+        at_style = any(call in line for call in ("openat(", "openat2(", "unlinkat(", "renameat(", "renameat2(", "mkdirat(", "fchmodat(", "fchownat(", "symlinkat(", "linkat("))
+        if at_style and relative_count > line.count("AT_FDCWD"):
+            raise ValueError(f"unresolved relative dirfd in mutating syscall: {line}")
+
+
+def _assert_no_symlink_components(path: Path) -> None:
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current = current / part
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            return
+        if stat.S_ISLNK(info.st_mode):
+            raise ValueError(f"symlink path component forbidden: {current}")
+
+
+def read_regular_bytes(path: Path) -> bytes:
+    if not path.is_absolute() or ".." in path.parts:
+        raise ValueError("input path must be absolute and lexically normalised")
+    _assert_no_symlink_components(path)
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError(f"input is not a regular file: {path}")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(fd)
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
+        ):
+            raise ValueError(f"input changed during read: {path}")
+        path_stat = path.stat(follow_symlinks=False)
+        if (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino):
+            raise ValueError(f"input path identity drift: {path}")
+        return b"".join(chunks)
+    finally:
+        os.close(fd)
+
+
+def _verify_private_file(path: Path) -> None:
+    _assert_no_symlink_components(path)
+    info = path.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+        raise ValueError(f"file is not an owner-only regular file: {path}")
+
+
+def _verify_owned_directory(path: Path, *, exact_mode: int | None = None) -> None:
+    _assert_no_symlink_components(path)
+    info = path.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid():
+        raise ValueError(f"directory is not owned by the current uid: {path}")
+    mode = stat.S_IMODE(info.st_mode)
+    if exact_mode is not None and mode != exact_mode:
+        raise ValueError(f"directory mode must be {exact_mode:04o}: {path}")
+    if mode & 0o022:
+        raise ValueError(f"directory is group/world writable: {path}")
+
+
+def prepare_private_dir(path: Path) -> None:
+    if not path.is_absolute():
+        raise ValueError("private directory path must be absolute")
+    _verify_owned_directory(path.parent)
+    path.mkdir(mode=0o700)
+    _verify_owned_directory(path, exact_mode=0o700)
+    if any(path.iterdir()):
+        raise ValueError(f"private directory must be empty: {path}")
+
+
+def atomic_write_new(path: Path, data: bytes, *, mode: int = 0o600) -> None:
+    if not path.is_absolute():
+        raise ValueError("output path must be absolute")
+    _verify_owned_directory(path.parent)
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        raise FileExistsError(path)
+    temp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(temp, flags, mode)
+    try:
+        view = memoryview(data)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                raise OSError("short write")
+            view = view[written:]
+        os.fsync(fd)
+    except BaseException:
+        os.close(fd)
+        temp.unlink(missing_ok=True)
+        raise
+    else:
+        os.close(fd)
+    directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        try:
+            os.link(temp, path, follow_symlinks=False)
+        except BaseException:
+            temp.unlink(missing_ok=True)
+            os.fsync(directory_fd)
+            raise
+        os.fsync(directory_fd)
+        temp.unlink()
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def capture_file(source: Path, destination: Path) -> dict[str, Any]:
+    if not source.is_absolute() or not destination.is_absolute():
+        raise ValueError("capture paths must be absolute")
+    if ".." in source.parts or ".." in destination.parts or destination.name in {"", ".", ".."}:
+        raise ValueError("capture paths must be lexically normalised")
+    _assert_no_symlink_components(source)
+    _verify_owned_directory(destination.parent, exact_mode=0o700)
+    fd = os.open(source, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError(f"mutable input is not a regular file: {source}")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(fd)
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
+        ):
+            raise ValueError(f"input drift while reading: {source}")
+        path_stat = source.stat(follow_symlinks=False)
+        if (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino):
+            raise ValueError(f"input path identity drift: {source}")
+        data = b"".join(chunks)
+        atomic_write_new(destination, data)
+        return {"path": str(source), "capture_path": str(destination), "sha256": hashlib.sha256(data).hexdigest(), "device_inode": f"{after.st_dev}:{after.st_ino}", "mode": f"{stat.S_IMODE(after.st_mode):04o}", "uid": after.st_uid, "gid": after.st_gid}
+    finally:
+        os.close(fd)
+
+
+def sha256_file(path: Path) -> str:
+    if not path.is_absolute():
+        raise ValueError("hashed path must be absolute")
+    _assert_no_symlink_components(path)
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError(f"hashed input is not a regular file: {path}")
+        digest = hashlib.sha256()
+        while True:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+        after = os.fstat(fd)
+        if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+            after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns
+        ):
+            raise ValueError(f"hashed input changed during read: {path}")
+        path_stat = path.stat(follow_symlinks=False)
+        if (after.st_dev, after.st_ino) != (path_stat.st_dev, path_stat.st_ino):
+            raise ValueError(f"hashed input path identity drift: {path}")
+        return digest.hexdigest()
+    finally:
+        os.close(fd)
+
+
+def validate_manifest_files(obj: dict[str, Any]) -> None:
+    static_items = [obj["plan"], obj["prompt"], *obj["review_inputs"], *obj["hermes"]["anchor_files"]]
+    for item in static_items:
+        if sha256_file(Path(item["path"])) != item["sha256"]:
+            raise ValueError(f"manifest file hash mismatch: {item['path']}")
+    for item in obj["mutable_inputs"]:
+        capture = Path(item["capture_path"])
+        _verify_owned_directory(capture.parent, exact_mode=0o700)
+        info = capture.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o600:
+            raise ValueError(f"mutable capture is not an owner-only regular file: {capture}")
+        if sha256_file(capture) != item["sha256"]:
+            raise ValueError(f"mutable capture hash mismatch: {capture}")
+
+
+def build_manifest(*, application_base: dict[str, str], workplane_base: dict[str, str], hermes: dict[str, Any], plan: dict[str, str], prompt: dict[str, str], reviews: list[dict[str, str]], mutable_specs: list[dict[str, str]], capture_dir: Path) -> dict[str, Any]:
+    if len(reviews) != 6 or len(mutable_specs) != 4:
+        raise ValueError("six reviews and four mutable inputs are required")
+    prepare_private_dir(capture_dir)
+    for item in reviews:
+        if sha256_file(Path(item["path"])) != item["sha256"]:
+            raise ValueError(f"review hash mismatch: {item['path']}")
+    for item in (plan, prompt):
+        if sha256_file(Path(item["path"])) != item["sha256"]:
+            raise ValueError(f"document hash mismatch: {item['path']}")
+    for item in hermes.get("anchor_files", []):
+        if sha256_file(Path(item["path"])) != item["sha256"]:
+            raise ValueError(f"Hermes anchor hash mismatch: {item['path']}")
+    mutable = [capture_file(Path(item["path"]), capture_dir / item["name"]) for item in mutable_specs]
+    manifest = {
+        "schema": SCHEMA,
+        "application_base": application_base,
+        "workplane_base": workplane_base,
+        "hermes": hermes,
+        "plan": plan,
+        "prompt": prompt,
+        "review_inputs": sorted(reviews, key=lambda item: item["path"]),
+        "mutable_inputs": sorted(mutable, key=lambda item: item["path"]),
+    }
+    validate_manifest(manifest)
+    return manifest
+
+
+def validate_create_paths(args: argparse.Namespace) -> str:
+    if args.spec != SPEC_PATH:
+        raise ValueError("bootstrap spec path is not canonical")
+    if args.application_repo != APPLICATION_REPO or args.workplane_repo != WORKPLANE_REPO or args.hermes_repo != HERMES_REPO:
+        raise ValueError("repository path is not canonical")
+    for path in (args.output, args.capture_dir, args.hooks_dir):
+        if not path.is_absolute() or ".." in path.parts or path.parent != WORKTREE_ROOT:
+            raise ValueError("bootstrap output/control path is not canonical")
+    match = re.fullmatch(r"\.r0a-empty-hooks-([a-z0-9][a-z0-9-]{7,63})", args.hooks_dir.name)
+    if not match:
+        raise ValueError("hooks path has no valid R0A nonce")
+    nonce = match.group(1)
+    if args.output.name != f".r0a-input-manifest-{nonce}.json" or args.capture_dir.name != f".r0a-input-captures-{nonce}":
+        raise ValueError("bootstrap paths do not share one nonce")
+    return nonce
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    validate = sub.add_parser("validate")
+    validate.add_argument("--manifest", type=Path, required=True)
+    canon = sub.add_parser("canonicalize")
+    canon.add_argument("--input", type=Path, required=True)
+    canon.add_argument("--output", type=Path, required=True)
+    create = sub.add_parser("create")
+    create.add_argument("--spec", type=Path, required=True)
+    create.add_argument("--output", type=Path, required=True)
+    create.add_argument("--capture-dir", type=Path, required=True)
+    create.add_argument("--hooks-dir", type=Path, required=True)
+    create.add_argument("--application-repo", type=Path, required=True)
+    create.add_argument("--workplane-repo", type=Path, required=True)
+    create.add_argument("--hermes-repo", type=Path, required=True)
+    create.add_argument("--application-commit", required=True)
+    create.add_argument("--application-tree", required=True)
+    create.add_argument("--workplane-commit", required=True)
+    create.add_argument("--workplane-tree", required=True)
+    create.add_argument("--hermes-commit", required=True)
+    create.add_argument("--hermes-tree", required=True)
+    create.add_argument("--plan-sha256", required=True)
+    create.add_argument("--prompt-sha256", required=True)
+    args = parser.parse_args()
+    if args.command == "create":
+        validate_create_paths(args)
+        spec = load_json_strict(read_regular_bytes(args.spec))
+        validate_spec(spec)
+        application_base = {"commit": args.application_commit, "tree": args.application_tree}
+        workplane_base = {"commit": args.workplane_commit, "tree": args.workplane_tree}
+        hermes_tuple = {"commit": args.hermes_commit, "tree": args.hermes_tree}
+        verify_repo_tuple(args.application_repo, application_base, args.hooks_dir, require_clean=True)
+        verify_repo_tuple(args.workplane_repo, workplane_base, args.hooks_dir, require_clean=False)
+        verify_repo_tuple(args.hermes_repo, hermes_tuple, args.hooks_dir, require_clean=True)
+        obj = build_manifest(
+            application_base=application_base,
+            workplane_base=workplane_base,
+            hermes={"commit": args.hermes_commit, "tree": args.hermes_tree, "anchor_files": spec["hermes_anchor_files"]},
+            plan={"path": spec["plan_path"], "sha256": args.plan_sha256},
+            prompt={"path": spec["prompt_path"], "sha256": args.prompt_sha256},
+            reviews=spec["review_inputs"],
+            mutable_specs=spec["mutable_inputs"],
+            capture_dir=args.capture_dir,
+        )
+        validate_manifest_identity(obj)
+        validate_manifest_files(obj)
+        payload = canonical_bytes(obj)
+        atomic_write_new(args.output, payload)
+        print(hashlib.sha256(payload).hexdigest())
+        return 0
+    input_path = args.manifest if args.command == "validate" else args.input
+    if args.command == "validate":
+        _verify_private_file(input_path)
+    input_bytes = read_regular_bytes(input_path)
+    obj = load_json_strict(input_bytes)
+    if args.command == "validate":
+        validate_manifest(obj)
+        validate_manifest_identity(obj)
+        validate_manifest_files(obj)
+        if input_bytes != canonical_bytes(obj):
+            raise ValueError("manifest bytes are not canonical")
+    else:
+        payload = canonical_bytes(obj)
+        atomic_write_new(args.output, payload)
+        print(hashlib.sha256(payload).hexdigest())
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

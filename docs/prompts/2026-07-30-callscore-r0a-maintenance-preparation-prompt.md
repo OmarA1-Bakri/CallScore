@@ -43,6 +43,11 @@ Read in full:
   - `docs/ops/callscore-r0a/input-reviews/deleg_a7901f50-r0a-security-fail.md` — `a3a646f38698252b957fed2cf1a5ef2249e4c5233235890f1c9fc8ac879cf0f4`;
   - `docs/ops/callscore-r0a/input-reviews/deleg_c26083f7-r0a-specification-fail.md` — `4551e2a02c0783459ec8c358461b1452ff4f6495faf2e9b9e701cf9e9a7052d2`;
   - `docs/ops/callscore-r0a/input-reviews/deleg_e17283dc-r0a-implementation-fail.md` — `7fb0c16bff6f5f5ac47058ad9bcbab8c6714021be710ba5c9f0b4c9b13637473`;
+- immutable pre-worktree bootstrap inputs:
+  - `scripts/callscore-r0a-bootstrap.py` — `0d4bc25bfc901b96b4f71ba58e7fddf9881b0cd13a7d16b3e791ddfa62dc2de8`;
+  - `tests/test_callscore_r0a_bootstrap.py` — `d44ac1d96c2bdb8d463294bfc8476f8428f044dea803711e5ffdaa63bfc8f5e4`;
+  - `docs/ops/callscore-r0a/bootstrap/callscore-r0a-input-manifest-v1.schema.json` — `f1f8a277e5ab0e3cb6f23f3304280fc5d7fcfdebfeb08ab1e46fa4f59846996e`;
+  - `docs/ops/callscore-r0a/bootstrap/input-spec.json` — `085630cb45fcf842d53de1270b2d2a88c6ed29b9b6dab0189d8711e638c1a492`;
 - `/srv/agents/hermes/hermes-agent/hermes_state.py`;
 - `/srv/agents/hermes/hermes-agent/tools/session_search_tool.py`;
 - `/srv/agents/hermes/hermes-agent/gateway/status.py`;
@@ -77,16 +82,16 @@ Canonical Workplane source repository:
 
 Its primary checkout contains unrelated dirty/untracked work. Do not modify, stage or commit there.
 
-The application repository has a `post-commit` hook that calls Codebase Memory indexing. R0A must bypass all repository hooks. Before the first Git mutation, create an empty owner-only directory outside every repository:
+The application repository has a `post-commit` hook that calls Codebase Memory indexing. R0A must bypass all repository hooks. Before the first Git mutation, create an empty owner-only directory outside every repository from the validated nonce:
 
 ```text
-/srv/agents/worktrees/.r0a-empty-hooks-<nonce>
+/srv/agents/worktrees/.r0a-empty-hooks-$R0A_NONCE
 ```
 
-Require owner `omar`, mode `0700`, zero members and a recorded device/inode. Execute **every** Git command in either repository, including worktree creation, status, diff, add and commit, as:
+Require owner `omar`, mode `0700`, zero members and a recorded device/inode. Execute **every** Git command in either repository, including worktree creation, status, diff, add and commit, with exactly one pinned empty hook override:
 
 ```bash
-git -c core.hooksPath=/srv/agents/worktrees/.r0a-empty-hooks-<nonce> <subcommand>
+env -i HOME=/home/omar PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 GIT_OPTIONAL_LOCKS=0 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null /usr/bin/git -c core.hooksPath="$HOOKS_DIR" -c core.fsmonitor=false -c core.untrackedCache=false <reviewed-subcommand-and-argv>
 ```
 
 Do not set a persistent Git configuration value. Revalidate that the hooks directory is still empty immediately before each commit. Bind the path, device/inode, mode, empty-member proof and literal no-hook argv in the review manifest. A hook execution or external index mutation is an R0A failure.
@@ -94,13 +99,13 @@ Do not set a persistent Git configuration value. Revalidate that the hooks direc
 Create an isolated worktree from its current `HEAD`:
 
 ```text
-/srv/agents/worktrees/callscore-workplane-r0a-<nonce>
+/srv/agents/worktrees/callscore-workplane-r0a-$R0A_NONCE
 ```
 
 Use a dedicated branch:
 
 ```text
-r0a/hermes-state-maintenance-<nonce>
+r0a/hermes-state-maintenance-$R0A_NONCE
 ```
 
 Record base commit/tree and dirty-state evidence. Do not infer that the dirty primary checkout belongs to this task.
@@ -108,24 +113,31 @@ Record base commit/tree and dirty-state evidence. Do not infer that the dirty pr
 Do not modify or commit from the application primary checkout. The immutable R0A review instruction supplies `APP_BASE_COMMIT` and `APP_BASE_TREE`; first verify they equal the reviewed primary `HEAD`/tree, then create a second isolated worktree using the same empty-hooks procedure:
 
 ```text
-/srv/agents/worktrees/crypto-tuber-ranked-r0a-<nonce>
-branch: r0a/callscore-maintenance-artifacts-<nonce>
+/srv/agents/worktrees/crypto-tuber-ranked-r0a-$R0A_NONCE
+branch: r0a/callscore-maintenance-artifacts-$R0A_NONCE
 base: APP_BASE_COMMIT / APP_BASE_TREE from the immutable review tuple
 ```
 
 All application output paths below are relative to that application worktree. Preserve the primary checkout byte-for-byte.
 
-Freeze the consumed Hermes dependency before writing tests. Record the Hermes Git commit/tree plus SHA-256 for exactly:
+The executable Hermes dependency boundary is the complete clean commit/tree:
 
 ```text
-/srv/agents/hermes/hermes-agent/hermes_state.py
-/srv/agents/hermes/hermes-agent/tools/session_search_tool.py
-/srv/agents/hermes/hermes-agent/gateway/status.py
+commit 3c388db06b6543821f15ed62efb9d8e7cd9bb9be
+tree   ad9824f4ba7e007b42bf6aa2fd171df6916790a8
 ```
 
-If implementation needs another Hermes file, stop at `blocked_dependency_scope_amendment`; do not silently widen the tuple. The final manifest, final R1 prompt, R1 authorisation schema, installation readback and R1 preflight must bind these exact Hermes bytes. Any later mismatch invalidates the reviews.
+Require `git status --porcelain=v1` empty and bind the whole commit/tree in R0B, installation readback and R1 preflight. Also record diagnostic anchor hashes:
 
-Before either worktree is created, generate an owner-only pre-edit input manifest at `/srv/agents/worktrees/.r0a-input-manifest-<nonce>.json`. It binds the reviewed application and Workplane base commits/trees, Hermes commit/tree and consumed-file hashes, the three committed review-input hashes, plus SHA-256/device/inode/mode/owner for:
+```text
+/srv/agents/hermes/hermes-agent/hermes_state.py — 8b4e56aaead7e7622677f19142aa1fa5ceeb292ec9b0f8f75e84880d65deb216
+/srv/agents/hermes/hermes-agent/tools/session_search_tool.py — 221c78b285827277d9e1605bc11f505eaba30cd1b5c47816309466da9e8304f7
+/srv/agents/hermes/hermes-agent/gateway/status.py — bd46abb12ea2314cee6f0c3c9d3f06844b516af50d63fe526cc1f1422d0dfb75
+```
+
+Imports may use files within that exact clean tree; no uncommitted or outside-tree Hermes code is permitted. Any commit/tree or anchor mismatch invalidates review.
+
+Before either worktree is created, run the already-reviewed bootstrap test, then generate and validate an owner-only pre-edit input manifest at `/srv/agents/worktrees/.r0a-input-manifest-$R0A_NONCE.json` using the immutable bootstrap script/schema above. It binds the plan and R0A prompt hashes, reviewed application and Workplane base commits/trees, complete Hermes commit/tree plus anchor hashes, all six committed review-input path/hash pairs, and SHA-256/device/inode/mode/owner for:
 
 ```text
 /etc/systemd/system/agent-snapshot.service
@@ -134,7 +146,30 @@ Before either worktree is created, generate an owner-only pre-edit input manifes
 /home/omar/.config/systemd/user/hermes-callscore-gateway.service
 ```
 
-Use strict UTF-8 JSON with duplicate-key rejection and RFC 8785 JCS hashing. Abort before worktree creation if a committed input hash or reviewed repository tuple mismatches. Copy the exact validated bytes into the application output path defined below; never re-evaluate mutable inputs later in R0A.
+Use strict UTF-8 JSON with duplicate-key rejection and the bootstrap's restricted ASCII/safe-integer RFC 8785 profile. Open every mutable file once with `O_NOFOLLOW`, use pre/post `fstat`, hash and capture those exact fd bytes into `/srv/agents/worktrees/.r0a-input-captures-$R0A_NONCE/`, then bind the captures. Abort before worktree creation on drift. Copy the already-captured bytes and validated manifest into exact application output paths; never reopen mutable inputs later.
+
+The exact-tuple execution envelope must provide nonempty ASCII `R0A_NONCE`, `APP_BASE_COMMIT`, `APP_BASE_TREE`, `WORKPLANE_BASE_COMMIT`, `WORKPLANE_BASE_TREE`, `PLAN_SHA256` and `R0A_PROMPT_SHA256`. Derive `HOOKS_DIR=/srv/agents/worktrees/.r0a-empty-hooks-$R0A_NONCE`; reject a nonce outside `^[a-z0-9][a-z0-9-]{7,63}$`. Before any Git command, create that new directory with mode `0700`, require owner UID `$(id -u omar)`, record device/inode, and require zero members. No `<nonce>` pseudo-token is executable input.
+
+Literal pre-worktree commands, cwd `/opt/crypto-tuber-ranked`, expected exit `0`; the four bootstrap SHA-256 values are the immutable values in **Canonical inputs** above:
+
+```bash
+test -n "$R0A_NONCE" && printf '%s' "$R0A_NONCE" | grep -Eq '^[a-z0-9][a-z0-9-]{7,63}$'
+HOOKS_DIR="/srv/agents/worktrees/.r0a-empty-hooks-$R0A_NONCE"; export HOOKS_DIR
+mkdir -m 0700 -- "$HOOKS_DIR"
+test ! -L "$HOOKS_DIR" && test "$(stat -c '%u:%a' "$HOOKS_DIR")" = "$(id -u omar):700" && test -z "$(find "$HOOKS_DIR" -mindepth 1 -maxdepth 1 -print -quit)"
+printf '%s  %s\n' '0d4bc25bfc901b96b4f71ba58e7fddf9881b0cd13a7d16b3e791ddfa62dc2de8' scripts/callscore-r0a-bootstrap.py 'd44ac1d96c2bdb8d463294bfc8476f8428f044dea803711e5ffdaa63bfc8f5e4' tests/test_callscore_r0a_bootstrap.py 'f1f8a277e5ab0e3cb6f23f3304280fc5d7fcfdebfeb08ab1e46fa4f59846996e' docs/ops/callscore-r0a/bootstrap/callscore-r0a-input-manifest-v1.schema.json '085630cb45fcf842d53de1270b2d2a88c6ed29b9b6dab0189d8711e638c1a492' docs/ops/callscore-r0a/bootstrap/input-spec.json | sha256sum -c -
+python3 -m unittest -v tests/test_callscore_r0a_bootstrap.py
+python3 scripts/callscore-r0a-bootstrap.py create --spec /opt/crypto-tuber-ranked/docs/ops/callscore-r0a/bootstrap/input-spec.json --output "/srv/agents/worktrees/.r0a-input-manifest-$R0A_NONCE.json" --capture-dir "/srv/agents/worktrees/.r0a-input-captures-$R0A_NONCE" --hooks-dir "$HOOKS_DIR" --application-repo /opt/crypto-tuber-ranked --workplane-repo /srv/agents/repos/callscore-workplane --hermes-repo /srv/agents/hermes/hermes-agent --application-commit "$APP_BASE_COMMIT" --application-tree "$APP_BASE_TREE" --workplane-commit "$WORKPLANE_BASE_COMMIT" --workplane-tree "$WORKPLANE_BASE_TREE" --hermes-commit 3c388db06b6543821f15ed62efb9d8e7cd9bb9be --hermes-tree ad9824f4ba7e007b42bf6aa2fd171df6916790a8 --plan-sha256 "$PLAN_SHA256" --prompt-sha256 "$R0A_PROMPT_SHA256"
+python3 scripts/callscore-r0a-bootstrap.py validate --manifest "/srv/agents/worktrees/.r0a-input-manifest-$R0A_NONCE.json"
+WORKPLANE_WORKTREE="/srv/agents/worktrees/callscore-workplane-r0a-$R0A_NONCE"; export WORKPLANE_WORKTREE
+APP_WORKTREE="/srv/agents/worktrees/crypto-tuber-ranked-r0a-$R0A_NONCE"; export APP_WORKTREE
+test -z "$(find "$HOOKS_DIR" -mindepth 1 -maxdepth 1 -print -quit)"
+env -i HOME=/home/omar PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 GIT_OPTIONAL_LOCKS=0 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null /usr/bin/git -C /srv/agents/repos/callscore-workplane -c core.hooksPath="$HOOKS_DIR" -c core.fsmonitor=false -c core.untrackedCache=false worktree add -b "r0a/hermes-state-maintenance-$R0A_NONCE" "$WORKPLANE_WORKTREE" "$WORKPLANE_BASE_COMMIT"
+test -z "$(find "$HOOKS_DIR" -mindepth 1 -maxdepth 1 -print -quit)"
+env -i HOME=/home/omar PATH=/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 GIT_OPTIONAL_LOCKS=0 GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null /usr/bin/git -C /opt/crypto-tuber-ranked -c core.hooksPath="$HOOKS_DIR" -c core.fsmonitor=false -c core.untrackedCache=false worktree add -b "r0a/callscore-maintenance-artifacts-$R0A_NONCE" "$APP_WORKTREE" "$APP_BASE_COMMIT"
+```
+
+Input-manifest generation uses the reviewed bootstrap module's `capture_file`, `canonical_bytes`, `validate_manifest`, `validate_manifest_identity` and `validate_manifest_files` functions with the exact tuple/path/hash values above; the resulting bytes have no trailing LF. No later-created Workplane/application validator is part of this pre-worktree gate.
 
 ## Required architecture
 
@@ -142,15 +177,14 @@ R0A prepares but does not install three security boundaries.
 
 ### 1. Signed root broker
 
-Prepare a root broker that accepts only an operator-signed, schema-valid authorisation from a preconfigured SSH allowed-signers trust store.
+Prepare a root broker that accepts only the exact operator-signed JCS bytes of `callscore-r1-maintenance-authorization-v1` from a preconfigured SSH allowed-signers trust store. There is no separate proposal schema and no broker promotion/transformation. R0C creates the final unsigned authorization candidate; `omarslaptop-1` signs those exact bytes unchanged:
 
-The future operator flow must use:
-
-```text
-ssh-keygen -Y verify
-namespace: callscore-r1
-operator principal: bound by the authorisation
+```bash
+ssh-keygen -Y sign -f <operator-private-key-path> -n callscore-r1 callscore-r1-maintenance-authorization-v1.json
+ssh-keygen -Y verify -f /etc/callscore/allowed_signers -I omar-callscore-r1 -n callscore-r1 -s callscore-r1-maintenance-authorization-v1.json.sig < callscore-r1-maintenance-authorization-v1.json
 ```
+
+The `.json` is strict RFC 8785 JCS with no trailing LF. The `.sig` is the unmodified OpenSSH armored signature emitted by `ssh-keygen`, ending in one LF. Broker ingress stores both exact byte strings in root-controlled storage, records their SHA-256 values, re-runs the literal verify argv and derives every action only from signed fields. The authorization binds principal `omar-callscore-r1`, namespace `callscore-r1`, target/profile, exact actions/argv, reviewed tuples, mutable input identities, expiries and maximum duration.
 
 The broker must reject:
 
@@ -205,6 +239,8 @@ Expected exit is `0`; every named assertion must be `pass`; the fixture is outsi
 
 R0A completion is reported as `prepared`, not `pass`, and must include `kernel_fence_integration_status=pending_r0c` plus `kernel_fence_green_claimed=false`. R0C must prove namespace identity, maintenance DAC access, Omar denial, WAL/SHM creation and cleanup for every finaliser branch before live R1 can be authorised.
 
+The reviewed R0C DAC sequence records `stat -c '%u:%g:%a:%d:%i'` and `getfacl -p` bytes first, then uses exactly `groupadd --system callscore-state-maint`, `useradd --system --gid callscore-state-maint --no-create-home --shell /usr/sbin/nologin callscore-maint`, `chgrp callscore-state-maint <fixture-profile>`, `chmod 2770 <fixture-profile>`, `setfacl -m u:callscore-maint:rwx,m::rwx <fixture-profile>`, `setfacl -m d:u:callscore-maint:rwx,d:m::rwx <fixture-profile>`, and `setfacl -m u:callscore-maint:rw- <fixture-profile>/state.db`. Creation is idempotent only when existing UID/GID definitions match the signed authorization. Cleanup stops the unit first, then runs `setfacl --restore=<pre-acl-file>`, restores recorded owner/group/mode in reverse order, and requires exact `stat` plus `getfacl -p` byte-hash readback. Existing identities, mismatches, or any cleanup discrepancy fail closed.
+
 ### 3. Snapshot and restore
 
 Prepare an owner-only, online-SQLite snapshot tool and a staged rollback tool.
@@ -246,7 +282,7 @@ Rollback after any post-mutation DB/FTS/count/search/checkpoint failure must:
 10. reverify before any writer restarts;
 11. keep the fence and gateway stopped if restoration fails.
 
-The R1 authorisation must require external capacity for both the current anchor and potential failed-DB forensic preservation plus 2 GiB. R0A does not provision that capacity.
+Before gateway stop or DB mutation, R1 authorisation and readback must prove external capacity for the current anchor, maximum failed `state.db`/WAL/SHM forensic set, a full sibling staged-restore copy, and 2 GiB safety margin. Capacity or target-identity drift takes the pre-anchor blocked finalizer with zero live mutation. R0A does not provision capacity.
 
 ## Exact source files
 
@@ -275,8 +311,7 @@ ops/hermes-state-maintenance/test_authorization_verify.py
 ops/hermes-state-maintenance/test_r0a_evidence.py
 ops/hermes-state-maintenance/test_validate_schemas.py
 ops/hermes-state-maintenance/test_r0a_secret_scan.py
-ops/hermes-state-maintenance/schemas/callscore-r0a-preparation-receipt-v1.schema.json
-ops/hermes-state-maintenance/schemas/callscore-r1-proposal-v1.schema.json
+ops/hermes-state-maintenance/schemas/callscore-r0a-preparation-result-v1.schema.json
 ops/hermes-state-maintenance/schemas/callscore-r1-maintenance-authorization-v1.schema.json
 ops/hermes-state-maintenance/schemas/callscore-snapshot-policy-v1.schema.json
 ops/hermes-state-maintenance/schemas/callscore-state-snapshot-manifest-v1.schema.json
@@ -303,11 +338,20 @@ docs/ops/callscore-r0a/review-manifest.json
 docs/ops/callscore-r0a/review-manifest.json.sha256
 docs/ops/callscore-r0a/schemas/callscore-r0a-review-manifest-v1.schema.json
 docs/ops/callscore-r0a/schemas/callscore-r0a-input-manifest-v1.schema.json
+docs/ops/callscore-r0a/schemas/callscore-r0a-evidence-results-v1.schema.json
+docs/ops/callscore-r0a/schemas/callscore-r0a-evidence-root-v1.schema.json
+docs/ops/callscore-r0a/schemas/callscore-r0a-preparation-result-v1.schema.json
+docs/ops/callscore-r0a/schemas/callscore-r1-prompt-contract-v1.schema.json
 docs/ops/callscore-r0a/input-manifest.json
+docs/ops/callscore-r0a/inputs/live/agent-snapshot.service
+docs/ops/callscore-r0a/inputs/live/agent-snapshot.timer
+docs/ops/callscore-r0a/inputs/live/agent-snapshot
+docs/ops/callscore-r0a/inputs/live/hermes-callscore-gateway.service
 docs/ops/callscore-r0a/evidence/red-results.json
 docs/ops/callscore-r0a/evidence/green-results.json
 docs/ops/callscore-r0a/evidence/evidence-root.json
 docs/ops/callscore-r0a/evidence/evidence-root.json.sha256
+docs/ops/callscore-r0a/final-r1-prompt.contract.json
 ```
 
 Do not add install receipts or live authorisations in R0A.
@@ -350,7 +394,7 @@ No R1 executor sudoers entry is allowed.
 
 ### R1 maintenance unit
 
-- `User=callscore-maint` and `Group=callscore-maint`;
+- `User=callscore-maint` and `Group=callscore-state-maint`;
 - `NoNewPrivileges=yes`;
 - empty `CapabilityBoundingSet` and `AmbientCapabilities`;
 - network namespace denied;
@@ -471,19 +515,27 @@ Create the evidence harness before behavioural tests. It is infrastructure, not 
 
 ```bash
 python3 -c "import importlib.metadata as m; assert m.version('jsonschema') == '4.10.3'"
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase red --command-id unit -- python3 -m unittest discover -s ops/hermes-state-maintenance -p 'test_*.py' -v
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id unit -- python3 -m unittest discover -s ops/hermes-state-maintenance -p 'test_*.py' -v
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id schema-negatives -- python3 -m unittest -v ops.hermes-state-maintenance.test_validate_schemas
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id compile -- python3 -m compileall -q ops/hermes-state-maintenance
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id lint -- python3 -m tabnanny -v ops/hermes-state-maintenance
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id schemas -- python3 ops/hermes-state-maintenance/validate_schemas.py
-python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id secret-scan -- python3 ops/hermes-state-maintenance/r0a_secret_scan.py --root ops/hermes-state-maintenance
-git -c core.hooksPath=/srv/agents/worktrees/.r0a-empty-hooks-<nonce> diff --check
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase red --command-id unit --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/red-results.json" -- python3 -m unittest discover -s ops/hermes-state-maintenance -p 'test_*.py' -v
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id unit --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 -m unittest discover -s ops/hermes-state-maintenance -p 'test_*.py' -v
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id schema-negatives --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 -m unittest -v ops/hermes-state-maintenance/test_validate_schemas.py
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id compile --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 -m compileall -q ops/hermes-state-maintenance
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id lint --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 -m tabnanny -v ops/hermes-state-maintenance
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id schemas --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 ops/hermes-state-maintenance/validate_schemas.py --workplane-root "$WORKPLANE_WORKTREE" --application-root "$APP_WORKTREE"
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id secret-scan --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- python3 ops/hermes-state-maintenance/r0a_secret_scan.py --root ops/hermes-state-maintenance
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id app-secret-scan --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- npm --prefix "$APP_WORKTREE" run hygiene:secrets
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id workplane-diff-check --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- /usr/bin/git -C "$WORKPLANE_WORKTREE" -c core.hooksPath="$HOOKS_DIR" -c core.fsmonitor=false -c core.untrackedCache=false diff --check
+python3 ops/hermes-state-maintenance/r0a_evidence.py run --phase green --command-id app-diff-check --results-file "$APP_WORKTREE/docs/ops/callscore-r0a/evidence/green-results.json" -- /usr/bin/git -C "$APP_WORKTREE" -c core.hooksPath="$HOOKS_DIR" -c core.fsmonitor=false -c core.untrackedCache=false diff --check
 ```
 
-Every command uses the isolated Workplane root as cwd and expects exit `0`, except RED unit, which expects nonzero plus the exact planned assertion IDs. The isolated application worktree additionally runs `npm run hygiene:secrets` and no-hook `git diff --check` from its root with exit `0`. The manifest records exact argv, cwd token, included/excluded scope, expected/actual exit and normalised stdout/stderr hashes for every command.
+Every harness command uses the isolated Workplane root as cwd and expects exit `0`, except RED unit, which expects nonzero plus the exact planned assertion IDs. Cross-repository commands use explicit `--prefix` or `git -C`; every Git argv includes the revalidated empty `core.hooksPath`. The manifest records exact expanded argv, cwd, included/excluded scope, expected/actual exit and normalised stdout/stderr hashes for every command.
 
-`r0a_evidence.py` must run with a cleared/minimal environment, fixture-only temp roots and no network. It normalises result bytes by stripping ANSI sequences, converting CRLF to LF, replacing exact worktree/temp prefixes with `<WORKTREE>` and `<TMP>`, preserving a single final LF, and rejecting NUL or undecodable bytes. `red-results.json` and `green-results.json` are RFC 8785 JCS objects sorted by `command_id`, with `additionalProperties: false`, recording exact argv, argv SHA-256, exit code, normalised stdout/stderr SHA-256 and fixture-root identity. RED requires the intended behavioural tests to fail for expected assertion IDs; GREEN requires zero exit for all commands. No wall-clock timestamps, random paths, secrets or raw environment are included.
+`r0a_evidence.py` atomically replaces each result file via same-directory `fsync` plus `os.replace`, rejects duplicate `command_id`, retains prior entries, and rewrites entries sorted by `command_id`. The evidence-results schema owns both red and green files; the evidence-root schema owns `evidence-root.json`. `final-r1-prompt.contract.json` is the machine-readable structural contract for the Markdown prompt and is validated by `validate_schemas.py`; Markdown itself is not described as schema-valid.
+
+`r0a_evidence.py` must run with a cleared/minimal environment, fixture-only temp roots and no network. It launches every post-worktree command under `strace -ff -qq -s 4096 -yy -e trace=all`, with `close_fds=true`, stdin from `/dev/null`, and only captured stdout/stderr fds inherited. The audit rejects every network syscall (including AF_UNIX), `ptrace`, namespace/mount/BPF escape, unresolved relative dirfd, inherited write fd, Git argv without exactly one final pinned empty `core.hooksPath`, and every write/mutation outside the two nonce worktrees, the nonce control/evidence paths and declared owner-only fixture roots. It records one audit object per process tree. Missing `strace`, a truncated/unparsed trace, unknown fd/path identity or a write outside the allowlist makes the associated mutation observations `unknown|true` and blocks `prepared`.
+
+Before any checkout/status that can materialise files, the immutable bootstrap rejects local `filter.*`, `core.attributesFile`, all committed `.gitattributes` filter attributes, multiple/later `core.hooksPath` overrides, nonempty/symlink hook directories and inherited `GIT_*` repository/config redirection. The evidence harness repeats those checks before every Git command. This command/audit boundary is the proof source for the per-class `observations` object: systemd/cron/live DB/index mutations require forbidden filesystem or AF_UNIX activity; provider/public/deployment activity requires forbidden network or credential access; sudo/hooks are derived from exact exec/Git records. An absent class-specific audit reference never becomes `false`.
+
+It normalises result bytes by stripping ANSI sequences, converting CRLF to LF, replacing exact worktree/temp prefixes with `<WORKTREE>` and `<TMP>`, preserving a single final LF, and rejecting NUL or undecodable bytes. `red-results.json` and `green-results.json` are RFC 8785 JCS objects sorted by `command_id`, with `additionalProperties: false`, recording exact argv, argv SHA-256, exit code, normalised stdout/stderr SHA-256 and fixture-root identity. RED requires the intended behavioural tests to fail for expected assertion IDs; GREEN requires zero exit for all commands. No wall-clock timestamps, random paths, secrets or raw environment are included.
 
 Self-reference-free binding order:
 
@@ -491,15 +543,17 @@ Self-reference-free binding order:
 2. hash canonical red/green result objects;
 3. create `evidence-root.json` containing those leaf hashes but no self-hash, then place its SHA-256 only in `evidence-root.json.sha256`;
 4. create the final R1 prompt containing the frozen dependency/source hashes and manifest **path**, but not the manifest hash;
-5. create `review-manifest.json` containing repository tuples, all leaf hashes, evidence-root hash, final R1 prompt hash and literal install/test/Git argv, but no self-hash;
+5. create `review-manifest.json` containing the application base commit/tree, exact changed-path allowlist, hashes of every application output leaf except `review-manifest.json` and its sidecar, Workplane/Hermes tuples, evidence-root hash, final R1 prompt/contract hashes and literal install/test/Git argv, but no final application commit/tree or self-hash;
 6. place only the JCS SHA-256 of the manifest in `review-manifest.json.sha256`.
+
+Every JCS object has no trailing LF. Every `.sha256` sidecar is exactly 64 lowercase ASCII hex characters plus one LF. After application commit, the final R0A result binds its resulting commit/tree plus manifest hash. R0B independently recomputes that closure and creates owner-only `/srv/agents/worktrees/r0b-review-<nonce>/callscore-r0b-review-envelope.json`, binding final application commit/tree, manifest SHA-256, Workplane commit/tree and complete Hermes commit/tree. The in-tree manifest never binds its containing commit.
 
 Validate every object against the exact committed manifest/schema set before the focused application commit. Duplicate JSON keys, non-JCS numbers and Unicode non-conformance fail.
 
 ## R0A completion sequence
 
 1. Read repository instructions and inspect the application, Workplane and exact Hermes dependency files.
-2. Freeze the Hermes commit/tree/file hashes, create the empty hook directory, and create the isolated Workplane worktree/branch using the literal no-hook Git form.
+2. Freeze the Hermes commit/tree/file hashes; create/revalidate the empty hook directory; verify immutable bootstrap hashes; run bootstrap tests; create and validate the pre-edit input manifest; only then create either isolated worktree/branch using the literal no-hook Git form.
 3. Write tests first and observe RED.
 4. Implement minimum code/templates/docs.
 5. Observe GREEN.
@@ -507,7 +561,7 @@ Validate every object against the exact committed manifest/schema set before the
 7. Run secret hygiene against new source and fixtures.
 8. Commit only exact R0A files in the isolated Worktree.
 9. Parent reads committed bytes, schemas, units, tests and results.
-10. Generate and schema-validate the final R1 prompt first, then hash it.
+10. Generate the final R1 Markdown prompt, generate/schema-validate `final-r1-prompt.contract.json`, run the named deterministic Markdown contract validator, then hash the prompt bytes.
 11. Generate the immutable R0A review manifest last, binding:
     - Workplane base/commit/tree;
     - Hermes commit/tree and exact consumed-file hashes;
@@ -529,79 +583,20 @@ Dispatch three fresh independent reviews against the complete application, Workp
 
 All must return PASS. A timeout is not PASS. Any edit invalidates all reviews.
 
-Only after PASS may Omar, through a separate operator shell and private signing key, authorise installation/broker setup and later sign the exact R1 proposal.
+Only after PASS may Omar, through a separate operator shell and private signing key, authorise installation/broker setup and later sign the exact final R1 authorisation bytes.
 
 ## Final response
 
-Return exactly one valid JSON object and no prose outside it:
+Return exactly one strict RFC 8785/JCS JSON object and no prose outside it. Do **not** copy a union-valued JSON pseudo-template. Construct the concrete object only after the application commit exists, validate it with `ops/hermes-state-maintenance/schemas/callscore-r0a-preparation-result-v1.schema.json`, and emit the exact canonical bytes that validated.
 
-```json
-{
-  "schema": "callscore.r0a_maintenance_preparation_result.v1",
-  "status": "prepared|blocked|failed",
-  "r0b_allowed": false,
-  "kernel_fence_integration_status": "pending_r0c|pass|failed|not_run",
-  "kernel_fence_green_claimed": false,
-  "live_mutation_performed": "false|true|unknown",
-  "sudo_used": "false|true|unknown",
-  "external_index_mutation_performed": "false|true|unknown",
-  "git_hooks_executed": "false|true|unknown",
-  "evidence_refs": [],
-  "empty_hooks_proof": {
-    "path": "",
-    "device_inode": "",
-    "mode": "0700",
-    "member_count": 0
-  },
-  "hermes_dependency": {
-    "commit": "",
-    "tree": "",
-    "files": []
-  },
-  "workplane": {
-    "base_commit": "",
-    "commit": "",
-    "tree": "",
-    "worktree": "",
-    "files": []
-  },
-  "application_repo": {
-    "base_commit": "",
-    "base_tree": "",
-    "commit": "",
-    "tree": "",
-    "worktree": "",
-    "files": []
-  },
-  "tests": {
-    "red_observed": false,
-    "green_passed": false,
-    "full_applicable_suite": null,
-    "static_checks": null,
-    "secret_hygiene": null
-  },
-  "review_manifest": {
-    "path": "",
-    "sha256": ""
-  },
-  "mutations_performed": {
-    "live_state": "false|true|unknown",
-    "systemd": "false|true|unknown",
-    "cron": "false|true|unknown",
-    "snapshot": "false|true|unknown",
-    "session_prune": "false|true|unknown",
-    "production_database": "false|true|unknown",
-    "provider": "false|true|unknown",
-    "public": "false|true|unknown",
-    "credentials": "false|true|unknown",
-    "deployment": "false|true|unknown"
-  },
-  "langfuse_checked": {
-    "status": "not_required_for_source_only_r0a"
-  },
-  "blockers": [],
-  "next_action": "Status-dependent: only prepared with r0b_allowed=true may proceed to three independent R0B reviews; blocked or failed must return remediation only."
-}
-```
+Required top-level fields are: `schema`, `status`, `r0b_allowed`, `kernel_fence_integration_status`, `kernel_fence_green_claimed`, `observations`, `empty_hooks_proof`, `hermes_dependency`, `workplane`, `application_repo`, `tests`, `review_manifest`, `blockers`, `next_action` and `langfuse_checked`. Tuple/file objects contain actual nonempty paths, commits, trees and SHA-256 values; placeholders and union strings are forbidden.
 
-The result schema enforces: `status=prepared` iff `r0b_allowed=true`, all source/static/fixture tests and manifests validate, every forbidden mutation is evidence-backed `false`, `kernel_fence_integration_status=pending_r0c` and `kernel_fence_green_claimed=false`. `status=blocked|failed` requires `r0b_allowed=false`, at least one blocker code such as `blocked_preparation_gap`, and remediation-only `next_action`. R0A may never report kernel-fence integration `pass`. No observation defaults to false.
+`observations` has exactly these keys: `live_state`, `systemd`, `cron`, `snapshot`, `session_prune`, `production_database`, `provider`, `public`, `credentials`, `deployment`, `external_index`, `git_hooks` and `sudo`. Every observation is an object with exactly `state` (`false|true|unknown`) and a nonempty `evidence_refs` array. Evidence references must point to the command/audit/pre-post records that prove that specific field; a generic unassigned evidence list is invalid. Missing, incomplete or contradictory evidence leaves that field `unknown`.
+
+The result schema enforces three disjoint status branches:
+
+- `prepared`: `r0b_allowed=true`; `kernel_fence_integration_status=pending_r0c`; `kernel_fence_green_claimed=false`; all required RED/GREEN/static/schema/secret/binding checks passed; every forbidden observation is evidence-backed `false`; `blockers=[]`; and `next_action` authorises only three independent exact-tuple R0B reviews.
+- `blocked`: `r0b_allowed=false`; no kernel-fence pass claim; at least one concrete blocker code such as `blocked_preparation_gap`; any unproven observation remains `unknown`; and `next_action` is remediation only.
+- `failed`: `r0b_allowed=false`; no kernel-fence pass claim; at least one concrete failure code; every detected forbidden mutation is `true` with dedicated evidence; and `next_action` is containment/remediation only.
+
+R0A may never report kernel-fence integration `pass`. No observation defaults to `false`. Schema-validation failure of the final response is itself `failed_result_contract` and must be corrected before returning.

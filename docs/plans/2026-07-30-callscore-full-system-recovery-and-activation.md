@@ -62,7 +62,7 @@ DIAGNOSTIC
   -> R0A_TOOLING_PREPARED
   -> R0B_COMPLETE_TUPLE_REVIEWED
   -> R0C_BROKER_AND_POLICIES_INSTALLED_BY_OPERATOR
-  -> R1_SIGNED_PROPOSAL_ACCEPTED
+  -> R1_SIGNED_AUTHORIZATION_ACCEPTED
   -> R1_CURRENT_ANCHOR_VERIFIED
   -> R1_KERNEL_FENCE_ACTIVE
   -> R1_STATE_COMPACTED_OR_ROLLED_BACK
@@ -115,7 +115,7 @@ R0A also forbids Git-hook and Codebase Memory index mutation. Every Git command 
 
 #### Signed authority
 
-Future live authorisation is a JSON document signed outside Hermes with an operator private key unavailable on `hermes-agent-box`.
+Future live authorisation is an RFC 8785/JCS JSON document whose exact bytes are signed outside Hermes with an operator private key unavailable on `hermes-agent-box`. The broker installs those exact verified bytes unchanged; it may not promote or transform an unsigned proposal into executable authority. Any read-only proposal is merely an operator aid and is never executable input.
 
 Broker verification uses SSH signatures:
 
@@ -174,13 +174,14 @@ Snapshot deletion must bind parent/snapshot device and inode, owner, run ID, exa
 
 Rollback after any irreversible DB-stage failure must keep the fence, preserve failed DB/WAL/SHM to the authorised forensic target, stage and validate the pre-R1 anchor, fsync file and directory, atomically replace `state.db`, safely disposition stale WAL/SHM, and reverify before restarting. If rollback fails, the gateway remains stopped and fence remains active.
 
-External capacity must cover the current anchor, a possible failed-DB forensic copy and 2 GiB overhead. The live root currently cannot be assumed to satisfy this.
+External capacity must cover the current anchor, the maximum failed `state.db`/WAL/SHM forensic set, a full sibling staged-restore copy and 2 GiB safety margin. Capacity or target-identity drift before anchoring performs zero live mutation and takes the pre-anchor blocked finaliser branch. The live root currently cannot be assumed to satisfy this.
 
 #### Systemd contracts
 
 `callscore-r1-maintenance@.service`:
 
 - `User=callscore-maint`;
+- `Group=callscore-state-maint`;
 - `NoNewPrivileges=yes`;
 - no sudo;
 - no network;
@@ -237,7 +238,7 @@ R0A is `prepared` only when:
 - full applicable tests/static/secret checks pass;
 - the application repo has the exact committed final R1 prompt, manifest/schema, canonical red/green evidence and evidence-root paths defined by the R0A prompt;
 - the self-reference-free JCS/SHA-256 graph validates;
-- the manifest binds Workplane, application and exact Hermes dependency tuples;
+- the in-tree manifest binds the Workplane tuple, application **base** tuple, exact changed-path allowlist and all non-self application output leaf hashes, plus the exact Hermes dependency tuple; the external R0B envelope later binds the final application commit/tree and manifest hash without self-reference;
 - the pre-edit input manifest binds the committed review inputs and live unit/script identities consumed by preparation;
 - all Git commands used the immutable empty-hooks procedure and no external index mutation occurred;
 - both modified repos are clean at frozen commits;
@@ -263,15 +264,15 @@ From a separate operator shell:
 
 1. verify the reviewed tuple and hashes;
 2. install broker, units, tools, dedicated `callscore-maint:callscore-state-maint` identity and trusted signer public key using literal reviewed commands;
-3. against a disposable fixture only, record original DAC/ACL state, apply temporary traversal/write ACLs plus setgid/default group access, start the nonce maintenance unit and verify its distinct mount-namespace inode/private bind before the broker applies the host-visible canonical read-only bind;
+3. against a disposable fixture only, record original DAC/ACL state, provision/use `User=callscore-maint` and `Group=callscore-state-maint`, apply literal temporary traversal/write ACLs plus setgid/default group access, start the nonce maintenance unit and verify its distinct mount-namespace inode/private bind before the broker applies the host-visible canonical read-only bind;
 4. run the exact root integration command and require maintenance UID access, Omar denial, DB/WAL/SHM creation, hostile-writer denial and clean teardown all `pass`;
 5. restore and byte-verify fixture owner/group/mode/ACLs; any cleanup uncertainty fails R0C;
 6. install signed recurring snapshot policy if the timer is expected to run;
 7. create a value-free read-only R1 proposal with current path/object identities and external-capacity target;
-8. transfer the proposal to `omarslaptop-1`;
-9. sign it with the operator private key under namespace `callscore-r1`;
-10. return signed proposal/signature to the broker ingress;
-11. broker verifies and promotes it to root-controlled authorisation storage.
+8. on `omarslaptop-1`, reconcile the proposal into the final `callscore-r1-maintenance-authorization-v1` JCS object;
+9. sign those exact final authorisation bytes with the operator private key under namespace `callscore-r1`;
+10. return the unchanged authorisation bytes plus detached signature to the broker ingress;
+11. broker runs the reviewed literal `ssh-keygen -Y verify` argv and, only after a valid principal/namespace/signature result, atomically installs the same bytes unchanged in root-controlled authorisation storage.
 
 The operator signing key must not exist on HHVM or in Hermes/Composio.
 
@@ -286,7 +287,7 @@ Require:
 - complete R0B PASS tuple;
 - installed hashes equal reviewed hashes;
 - valid signed authorisation and snapshot policy;
-- external capacity for current anchor plus failed-DB forensic preservation plus 2 GiB;
+- external capacity for the current anchor, maximum failed DB/WAL/SHM forensic preservation set, a full sibling staged-restore copy and 2 GiB safety margin;
 - exact existing snapshot object identity;
 - exact paused cron/unit action set;
 - unexpired per-transition authority.
@@ -304,7 +305,7 @@ Branches are explicit:
 
 ### Live sequence
 
-1. Read-only baseline and signed proposal reconciliation.
+1. Read-only baseline and exact signed-authorisation reconciliation.
 2. Pause exact provider-capable jobs and disable the daily write timer.
 3. Create/verify current pre-R1 external anchor before gateway stop or DB mutation.
 4. Broker stops only the exact PID after PID-file, UID, executable, cmdline, profile and start-time validation.
