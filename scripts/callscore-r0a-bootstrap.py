@@ -66,11 +66,11 @@ ESCAPE_CALLS = (
     "ptrace(", "unshare(", "setns(", "mount(", "umount(", "umount2(",
     "pivot_root(", "chroot(", "bpf(", "io_uring_setup(",
     "io_uring_enter(", "io_uring_register(", "process_vm_writev(",
-    "copy_file_range(", "splice(", "tee(", "open_by_handle_at(",
+    "copy_file_range(", "splice(", "tee(", "vmsplice(", "ioctl(",
     "move_mount(", "fsopen(", "fsmount(", "open_tree(", "pidfd_getfd(",
     "keyctl(", "add_key(", "request_key(", "process_vm_readv(",
     "kill(", "tkill(", "tgkill(", "pidfd_send_signal(",
-    "symlink(", "symlinkat(",
+    "symlink(", "symlinkat(", "link(", "linkat(",
 )
 
 
@@ -89,6 +89,74 @@ def load_json_strict(data: bytes) -> Any:
     except UnicodeDecodeError as exc:
         raise ValueError("manifest is not strict UTF-8") from exc
     return json.loads(text, object_pairs_hook=_pairs, parse_constant=lambda x: (_ for _ in ()).throw(ValueError(f"invalid constant: {x}")))
+
+
+def _split_trace_args(value: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    quote = False
+    escape = False
+    round_depth = square_depth = curly_depth = angle_depth = 0
+    for index, char in enumerate(value):
+        if quote:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                quote = False
+            continue
+        if char == '"':
+            quote = True
+        elif char == "(":
+            round_depth += 1
+        elif char == ")":
+            round_depth -= 1
+        elif char == "[":
+            square_depth += 1
+        elif char == "]":
+            square_depth -= 1
+        elif char == "{":
+            curly_depth += 1
+        elif char == "}":
+            curly_depth -= 1
+        elif char == "<":
+            angle_depth += 1
+        elif char == ">":
+            angle_depth -= 1
+        elif char == "," and round_depth == square_depth == curly_depth == angle_depth == 0:
+            parts.append(value[start:index].strip())
+            start = index + 1
+    if quote or any(depth != 0 for depth in (round_depth, square_depth, curly_depth, angle_depth)):
+        raise ValueError("unbalanced strace argument list")
+    parts.append(value[start:].strip())
+    return parts
+
+
+def _decode_trace_string(value: str) -> str:
+    try:
+        return bytes(value, "utf-8").decode("unicode_escape")
+    except UnicodeDecodeError as exc:
+        raise ValueError("trace contains invalid path escape") from exc
+
+
+def _trace_arg_path(value: str) -> Path:
+    match = re.fullmatch(r'"((?:[^"\\]|\\.)*)"', value)
+    if match is None:
+        raise ValueError(f"unresolved strace path argument: {value}")
+    return Path(_decode_trace_string(match.group(1)))
+
+
+def _trace_dirfd_base(value: str, current_cwd: Path) -> Path:
+    if value == "AT_FDCWD" or value.startswith("AT_FDCWD<"):
+        return current_cwd
+    match = re.fullmatch(r"-?\d+<(.+)>", value)
+    if match is None:
+        raise ValueError(f"unresolved strace dirfd: {value}")
+    target = match.group(1).removesuffix(" (deleted)")
+    if not target.startswith("/"):
+        raise ValueError(f"non-path strace dirfd: {value}")
+    return Path(target)
 
 
 def _validate_canonical_value(value: Any) -> None:
@@ -453,7 +521,7 @@ def audit_trace_text(
             raise ValueError(f"shared writable mapping attempted: {line}")
         fd_mutating = any(call in line for call in FD_MUTATING_CALLS)
         if fd_mutating:
-            fd_match = re.search(r"(?:^|\s)(?:write|writev|pwrite64|pwritev|pwritev2|ftruncate|fallocate|fchmod|fchown|fsetxattr|fremovexattr|sendfile|copy_file_range|splice)\((\d+)(?:<(.+?)>)?,\s", line)
+            fd_match = re.search(r"(?:^|\s)(?:write|writev|pwrite64|pwritev|pwritev2|ftruncate|fallocate|fchmod|fchown|fsetxattr|fremovexattr|sendfile|copy_file_range|splice|ioctl)\((\d+)(?:<(.+?)>)?,\s", line)
             if not fd_match:
                 raise ValueError(f"unresolved inherited write fd: {line}")
             fd_number = int(fd_match.group(1))
@@ -489,6 +557,33 @@ def audit_trace_text(
                 actual_target = actual_target.removesuffix(" (deleted)")
                 if not actual_target.startswith("/") or not _allowed_write(Path(actual_target), allowed_write_roots, allowed_write_paths):
                     raise ValueError(f"mutating open resolved outside allowlist: {actual_target}")
+        call_match = re.match(r"\s*([a-zA-Z0-9_]+)\((.*)\)\s+=", line)
+        at_pairs = {
+            "openat": ((0, 1),),
+            "openat2": ((0, 1),),
+            "mkdirat": ((0, 1),),
+            "mknodat": ((0, 1),),
+            "unlinkat": ((0, 1),),
+            "fchmodat": ((0, 1),),
+            "fchmodat2": ((0, 1),),
+            "fchownat": ((0, 1),),
+            "futimesat": ((0, 1),),
+            "utimensat": ((0, 1),),
+            "renameat": ((0, 1), (2, 3)),
+            "renameat2": ((0, 1), (2, 3)),
+        }
+        if call_match is not None and call_match.group(1) in at_pairs:
+            args = _split_trace_args(call_match.group(2))
+            for dirfd_index, path_index in at_pairs[call_match.group(1)]:
+                if max(dirfd_index, path_index) >= len(args):
+                    raise ValueError(f"truncated dirfd mutator: {line}")
+                candidate = _trace_arg_path(args[path_index])
+                if not candidate.is_absolute():
+                    candidate = _trace_dirfd_base(args[dirfd_index], current_cwd) / candidate
+                candidate = Path(os.path.normpath(os.fspath(candidate)))
+                if not _allowed_write(candidate, allowed_write_roots, allowed_write_paths):
+                    raise ValueError(f"write outside dirfd allowlist: {candidate}")
+            continue
         matches = re.findall(r'"((?:[^"\\]|\\.)*)"', line)
         if not matches:
             raise ValueError(f"unresolved mutating syscall: {line}")
@@ -893,6 +988,9 @@ def audit_trace_prefix(
                 text = b"".join(chunks).decode("utf-8", "strict")
             finally:
                 os.close(fd)
+            lines = [line.strip() for line in text.splitlines() if line.strip()]
+            if not lines or re.fullmatch(r"exit_group\(0\)\s+=\s+\?", lines[-1]) is None:
+                raise ValueError(f"trace shard did not complete successfully: {name}")
             audit_trace_text(text, allowed_write_roots, cwd, allowed_write_paths)
     finally:
         os.close(parent_fd)

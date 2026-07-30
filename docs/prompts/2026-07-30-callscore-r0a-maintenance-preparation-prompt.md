@@ -44,8 +44,8 @@ Read in full:
   - `docs/ops/callscore-r0a/input-reviews/deleg_c26083f7-r0a-specification-fail.md` — `4551e2a02c0783459ec8c358461b1452ff4f6495faf2e9b9e701cf9e9a7052d2`;
   - `docs/ops/callscore-r0a/input-reviews/deleg_e17283dc-r0a-implementation-fail.md` — `7fb0c16bff6f5f5ac47058ad9bcbab8c6714021be710ba5c9f0b4c9b13637473`;
 - immutable pre-worktree bootstrap inputs:
-  - `scripts/callscore-r0a-bootstrap.py` — `18ab5d7bd2cbbebf1544b73dfc481329947dade6057a0a85f3cd80d1593d992b`;
-  - `tests/test_callscore_r0a_bootstrap.py` — `9206cb1e743cf4f68d68b5be960bd05fae979aa3d53b1a25452c750f5022c65c`;
+  - `scripts/callscore-r0a-bootstrap.py` — `db7a3d9b656295501888eade12d2523f37446a74ce39368c63e56ceb29400fdc`;
+  - `tests/test_callscore_r0a_bootstrap.py` — `3754a02ea98721e3f4df87870ad9dbe962202476caee877bb31805c1f7532873`;
   - `docs/ops/callscore-r0a/bootstrap/callscore-r0a-input-manifest-v1.schema.json` — `1e281a113cfa61b43bda6d3a192deb1907d1238c0cea0473d9c4f24a0fb99213`;
   - `docs/ops/callscore-r0a/bootstrap/input-spec.json` — `085630cb45fcf842d53de1270b2d2a88c6ed29b9b6dab0189d8711e638c1a492`;
 - `/srv/agents/hermes/hermes-agent/hermes_state.py`;
@@ -170,8 +170,8 @@ APP_ADMIN_NAME="$(/usr/bin/basename "$APP_WORKTREE")"
 /usr/bin/test ! -L "$HOOKS_DIR" && /usr/bin/test "$(/usr/bin/stat -c '%u:%a' "$HOOKS_DIR")" = "$(/usr/bin/id -u omar):700" && /usr/bin/test -z "$(/usr/bin/find "$HOOKS_DIR" -mindepth 1 -maxdepth 1 -print -quit)"
 /usr/bin/test ! -L "$CONTROL_ROOT" && /usr/bin/test "$(/usr/bin/stat -c '%u:%a' "$CONTROL_ROOT")" = "$(/usr/bin/id -u omar):700" && /usr/bin/test -z "$(/usr/bin/find "$CONTROL_ROOT" -mindepth 1 -maxdepth 1 -print -quit)"
 R0A_COMMAND_ID=immutable-hash-check
-/usr/bin/printf '%s  %s\n' '18ab5d7bd2cbbebf1544b73dfc481329947dade6057a0a85f3cd80d1593d992b' scripts/callscore-r0a-bootstrap.py '9206cb1e743cf4f68d68b5be960bd05fae979aa3d53b1a25452c750f5022c65c' tests/test_callscore_r0a_bootstrap.py '1e281a113cfa61b43bda6d3a192deb1907d1238c0cea0473d9c4f24a0fb99213' docs/ops/callscore-r0a/bootstrap/callscore-r0a-input-manifest-v1.schema.json '085630cb45fcf842d53de1270b2d2a88c6ed29b9b6dab0189d8711e638c1a492' docs/ops/callscore-r0a/bootstrap/input-spec.json | /usr/bin/sha256sum -c -
-r0a_failure() { rc=$?; trap - ERR; /usr/bin/python3 scripts/callscore-r0a-bootstrap.py write-failure-receipt --control-root "$CONTROL_ROOT" --nonce "$R0A_NONCE" --phase preworktree --command-id "$R0A_COMMAND_ID" --exit-code "$rc" --bootstrap-sha256 18ab5d7bd2cbbebf1544b73dfc481329947dade6057a0a85f3cd80d1593d992b --test-sha256 9206cb1e743cf4f68d68b5be960bd05fae979aa3d53b1a25452c750f5022c65c --schema-sha256 1e281a113cfa61b43bda6d3a192deb1907d1238c0cea0473d9c4f24a0fb99213; exit "$rc"; }
+/usr/bin/printf '%s  %s\n' 'db7a3d9b656295501888eade12d2523f37446a74ce39368c63e56ceb29400fdc' scripts/callscore-r0a-bootstrap.py '3754a02ea98721e3f4df87870ad9dbe962202476caee877bb31805c1f7532873' tests/test_callscore_r0a_bootstrap.py '1e281a113cfa61b43bda6d3a192deb1907d1238c0cea0473d9c4f24a0fb99213' docs/ops/callscore-r0a/bootstrap/callscore-r0a-input-manifest-v1.schema.json '085630cb45fcf842d53de1270b2d2a88c6ed29b9b6dab0189d8711e638c1a492' docs/ops/callscore-r0a/bootstrap/input-spec.json | /usr/bin/sha256sum --check --strict
+r0a_failure() { rc=$?; trap - ERR; /usr/bin/python3 scripts/callscore-r0a-bootstrap.py write-failure-receipt --control-root "$CONTROL_ROOT" --nonce "$R0A_NONCE" --phase preworktree --command-id "$R0A_COMMAND_ID" --exit-code "$rc" --bootstrap-sha256 db7a3d9b656295501888eade12d2523f37446a74ce39368c63e56ceb29400fdc --test-sha256 3754a02ea98721e3f4df87870ad9dbe962202476caee877bb31805c1f7532873 --schema-sha256 1e281a113cfa61b43bda6d3a192deb1907d1238c0cea0473d9c4f24a0fb99213; exit "$rc"; }
 trap r0a_failure ERR
 R0A_COMMAND_ID=bootstrap-unit-tests
 /usr/bin/python3 -m unittest -v tests/test_callscore_r0a_bootstrap.py

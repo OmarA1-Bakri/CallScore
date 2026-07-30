@@ -293,6 +293,9 @@ class BootstrapTests(unittest.TestCase):
                 f'symlink("target", "{allowed}/link") = 0\n',
                 'fchmodat2(AT_FDCWD, "/etc/x", 0600, 0) = 0\n',
                 'futimesat(AT_FDCWD, "/etc/x", NULL) = 0\n',
+                f'renameat(7</etc>, "passwd", AT_FDCWD<{allowed}>, "{allowed}/out") = 0\n',
+                'ioctl(9</etc/passwd>, FS_IOC_SETFLAGS, [FS_IMMUTABLE_FL]) = 0\n',
+                f'renameat2(AT_FDCWD<{allowed}>, "{allowed}/a", AT_FDCWD<{allowed}>, "{allowed}/b", {{BROKEN) = 0\n',
             ]
             for trace in forbidden:
                 with self.subTest(trace=trace), self.assertRaises(ValueError):
@@ -318,7 +321,7 @@ class BootstrapTests(unittest.TestCase):
             allowed.mkdir(mode=0o700)
             prefix = root / "trace"
             (root / "trace.123").write_text(
-                f'openat(AT_FDCWD<{allowed}>, "x", O_WRONLY|O_CREAT, 0600) = 3<{allowed}/x>\n'
+                f'openat(AT_FDCWD<{allowed}>, "x", O_WRONLY|O_CREAT, 0600) = 3<{allowed}/x>\nexit_group(0) = ?\n'
             )
             MODULE.audit_trace_prefix(prefix, [allowed], allowed)
             (root / "trace.124").symlink_to(root / "trace.123")
@@ -328,15 +331,29 @@ class BootstrapTests(unittest.TestCase):
             (root / "trace.124").unlink()
             exact = root / "exact.lock"
             (root / "trace.125").write_text(
-                f'openat(AT_FDCWD<{allowed}>, "{exact}", O_WRONLY|O_CREAT, 0600) = 4<{exact}>\n'
+                f'openat(AT_FDCWD<{allowed}>, "{exact}", O_WRONLY|O_CREAT, 0600) = 4<{exact}>\nexit_group(0) = ?\n'
             )
             MODULE.audit_trace_prefix(prefix, [allowed], allowed, [exact])
             sibling = root / "unexpected"
             (root / "trace.126").write_text(
-                f'openat(AT_FDCWD<{allowed}>, "{sibling}", O_WRONLY|O_CREAT, 0600) = 5<{sibling}>\n'
+                f'openat(AT_FDCWD<{allowed}>, "{sibling}", O_WRONLY|O_CREAT, 0600) = 5<{sibling}>\nexit_group(0) = ?\n'
             )
             with self.assertRaises(ValueError):
                 MODULE.audit_trace_prefix(prefix, [allowed], allowed, [exact])
+
+    def test_trace_prefix_rejects_incomplete_or_failed_process_trace(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            root.chmod(0o700)
+            allowed = root / "allowed"
+            allowed.mkdir(mode=0o700)
+            prefix = root / "trace"
+            (root / "trace.123").write_text('read(0</dev/null>, "", 1) = 0\n')
+            with self.assertRaises(ValueError):
+                MODULE.audit_trace_prefix(prefix, [allowed], allowed)
+            (root / "trace.123").write_text("exit_group(1) = ?\n")
+            with self.assertRaises(ValueError):
+                MODULE.audit_trace_prefix(prefix, [allowed], allowed)
 
     def test_failure_receipt_has_exact_create_only_contract(self):
         with tempfile.TemporaryDirectory() as td:
