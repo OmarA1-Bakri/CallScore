@@ -1,426 +1,486 @@
 # CallScore Full-System Recovery and Activation Plan
 
-> **For Hermes:** Execute this plan phase-by-phase with `software-development/subagent-driven-development`, strict RED -> GREEN for code changes, three independent reviews, and parent verification. The next authorised prompt covers Phase R1 only.
+> **Revision:** R1 safety amendment v2 after three independent FAIL reviews of commit `6ba9323503adc783dc578f2824a67f63dd8648fd`.
+> **Execution:** Run each phase from a clean, isolated context. Use strict RED -> GREEN for changed safety boundaries and parent verification for every receipt.
 
-**Goal:** Restore CallScore from its current degraded-but-live state to a receipt-backed, canonically supervised, credential-safe, freshly activated autonomous system without losing session history, bypassing Workplane/LangGraph, or claiming public/commercial outcomes that have not been read back.
+**Goal:** Restore CallScore's degraded autonomous control plane without disturbing healthy public/read surfaces, then rotate affected credentials, reactivate the canonical system, restore cadence, and prove measured outcomes.
 
-**Architecture:** Recovery is a sequential state machine. Storage and gateway supervision are repaired first because they are already breaking scheduled writes. Credential replacement then runs only through `credential_rotation_node` with provider-specific `SECRET_GATE` approvals and a graph-owned secret sink. Only affected runtimes are recreated, canonical activation restarts from Phase 0, and data/content/video lanes are re-armed only after activation passes.
+**Current disposition:** `DEGRADED_BLOCKED`, not wholly down. Public website/read surfaces, mandatory workers, Workplane, Sentinel and Langfuse had positive evidence. State writes, snapshotting, canonical gateway ownership, credentials, activation, cadence and commercial outcomes remain blocked or unproven.
 
-**Tech stack:** Hermes Agent SQLite/WAL session store, user and system systemd units, Docker workers, PostgreSQL queues, LangGraph/Workplane, Composio MCP, Langfuse, Node.js/TypeScript, Python, shell, Git.
+**Canonical application repository:** `/opt/crypto-tuber-ranked`
 
----
+**Canonical Workplane repository:** `/srv/agents/repos/callscore-workplane`
 
-## 1. Frozen live baseline
+**Sole activation entry point:** `/srv/agents/hermes/profiles/callscore/skills/orchestration/callscore-system-activation/`
 
-Baseline receipt:
+**Frozen diagnostic receipt:** `/opt/crypto-tuber-ranked/.tmp/system-status/callscore-whole-system-20260730T022510Z.json`
 
-- `/opt/crypto-tuber-ranked/.tmp/system-status/callscore-whole-system-20260730T022510Z.json`
-- SHA-256: `5df31df161df670c9aac654750aba41aa4f9d6e0973eb770ff474fd47a981549`
+## Non-negotiable boundaries
 
-Repository baseline:
+1. The plan is not standing mutation authority.
+2. Each mutation phase requires a separate operator authorisation record binding its exact commit, hashes, nonce, action set and expiry.
+3. State/gateway maintenance, optional session pruning, credential rotation, runtime adoption, revocation, activation, cadence restoration and autopilot are separate transitions.
+4. External/provider/public mutations are graph-owned and receipt-backed. Parent shell/provider success is never provider execution proof.
+5. Replacement secrets flow directly into the graph-owned secret sink. Never put values in graph state, logs, receipts, diagnostics, snapshots or chat.
+6. No old credential is revoked before replacement creation, storage, affected-runtime adoption and fingerprint-only readback pass.
+7. The historical failed activation receipt remains immutable. Any later activation starts at Phase 0.
+8. Autopilot remains forbidden until a new canonical activation receipt is independently verified `pass`.
+9. Stop at the first mandatory failed gate. Execute a mandatory finaliser; never strand gateway/timer supervision silently.
+10. Preserve unrelated Git work. No reset, clean, stash, amend, force-push or deployment.
+11. Use top-level `schema` in receipts, never `receipt_type` or `receipt_schema`.
+12. No session pruning occurs in Phase R1. Optional pruning is Phase R1B with separate authority and a manifest-bound compare-and-swap tool.
 
-- Repo: `/opt/crypto-tuber-ranked`
-- Branch: `master`
-- HEAD: `76424e87f1c08514c780c2f20773f8d5c24a4681`
-- Tree: `d96364271a275de87c0b9cdd60cfe6058a3c7612`
-- Clean at the diagnostic boundary
-- 31 commits ahead of `origin/master`, 0 behind, unpushed
-- Full suite: `1474/1474`
-- Credential-focused tests: `18/18`
-- Canonical agent audit: `51/51`
-
-Current operational truth:
-
-| Layer | Status | Evidence-backed meaning |
-|---|---|---|
-| Public website/read surface | LIVE | Freshness proof passed; leaderboard API and rendered rows agreed at 40 |
-| Mandatory workers | LIVE | Both containers run, accept exec probes, and have restart count 0 |
-| Workplane | OK / `CONTROLLED_FULL` | Control-plane readiness, not global activation authority |
-| Hermes state storage | DEGRADED | Root is 95% used; `state.db` is about 13.8 GB; writes have failed with `No space left on device` |
-| Gateway | DEGRADED | Manual gateway PID is live; enabled canonical user service is failed |
-| Canonical activation | BLOCKED | Latest immutable run failed Phase 2; it has not been rerun after worker recovery |
-| Credentials | BLOCKED | 41 require authoritative rotation; no replacement, readback, revocation or provider mutation occurred |
-| Data cadence | DEGRADED | Candle refresh is live; daily pipeline and scoring/fresh-call cadence are stale or failed |
-| CMO/public content | DEGRADED | CMO cron is enabled but its latest run failed before provider mutation; no fresh accepted canonical package |
-| YouTube | BLOCKED | Production consumer paused; zero video jobs |
-| Learning/outcomes | NOT PROVEN | Durable learning schemas exist, but current conversion/subscriber/revenue results are absent |
-
-Additional current storage facts discovered during plan authoring:
-
-- Live state DB schema version is 23, but `messages_fts` and `messages_fts_trigram` still use the legacy content-owning layout.
-- `hermes sessions optimize-storage` is the supported migration to compact external-content FTS.
-- The supported `--no-vacuum` migration requires about 30% of current DB size; current free space exceeds that preflight.
-- Dry-run candidates at plan time were:
-  - ended `cron` sessions inactive over 1 day: 2,296;
-  - ended `subagent` sessions inactive over 1 day: 458;
-  - ended `cli` sessions inactive over 7 days: 470.
-- CLI sessions are valuable user history and are not authorised for pruning by the Phase R1 prompt.
-- Existing local rollback candidate: `/srv/agents/hermes/profiles/callscore/state-snapshots/20260728-025055-pre-update/`.
-- That candidate contains secret-bearing files. No receipt may print or copy their values.
-- `/usr/local/bin/agent-snapshot` currently attempts to tar live, changing Hermes files; its latest run failed after about 21 minutes. The failed partial archive was removed and `/srv/agents/backups` contained no completed archive.
-
-## 2. Authority and invariants
-
-This plan is not mutation authority by itself.
-
-### Allowed only when the phase-specific operator prompt explicitly authorises it
-
-- Stop and start the canonical CallScore gateway.
-- Stop and restore the two affected system timers during a bounded maintenance window.
-- Migrate the Hermes FTS index to the supported compact layout.
-- Prune only the exact ended background-session cohorts named by the prompt.
-- Replace the broken snapshot implementation through its canonical source and install path.
-- Delete exactly one superseded local state snapshot only after a newer snapshot passes integrity, manifest, permission and restore-readback checks.
-
-### Always forbidden without a separate later gate
-
-- Direct provider or public mutations.
-- Credential values in chat, logs, graph state or receipts.
-- Ad hoc `.env.hermes` replacement.
-- Old-credential revocation before replacement creation, graph-owned storage, runtime adoption and replacement readback.
-- Deployment, image rebuild, scale change, DB/schema mutation, paid spend, email/DM/newsletter, Whop/payment/customer mutation, or public publication.
-- Broad `rm`, globs, `git clean`, reset, stash, amend, force-push or unrelated file deletion.
-- Pruning CLI, messaging, active, pinned or archived sessions in Phase R1.
-- Treating Workplane `READY_PUBLIC_OWNED` as a substitute for a fresh activation receipt.
-
-### Required receipt shape
-
-Every phase receipt uses a top-level `schema` field, never `receipt_type` or `receipt_schema`. Minimum fields:
-
-```json
-{
-  "schema": "callscore.system_recovery_phase_receipt.v1",
-  "run_id": "<bounded-id>",
-  "phase": "<phase-id>",
-  "status": "pass|blocked|failed",
-  "started_at_utc": "<ISO-8601>",
-  "completed_at_utc": "<ISO-8601>",
-  "authority": {},
-  "before": {},
-  "actions": [],
-  "after": {},
-  "blockers": [],
-  "rollback": {},
-  "next_action": "<one exact action>"
-}
-```
-
-Receipts must include absolute path, SHA-256 and semantic validation. Parent-injected success objects are not execution proof.
-
-## 3. Recovery state machine
+## Recovery state machine
 
 ```text
-R0_PLAN_FROZEN
-  -> R1_STORAGE_AND_GATEWAY_PASS
-  -> R2_SECRET_GATE_MATRIX_PASS
-  -> R3_REPLACEMENTS_ADOPTED_AND_READ_BACK
-  -> R4_OLD_CREDENTIALS_REVOKED_AND_PROVEN
-  -> R5_CANONICAL_ACTIVATION_PASS
-  -> R6_DATA_CONTENT_VIDEO_CADENCE_PASS
-  -> R7_MEASURED_OUTCOMES_ACTIVE
+DIAGNOSTIC
+  -> R0_REVIEWED
+  -> R1_AUTHORISED
+  -> R1_OUT_OF_BAND_READY
+  -> CURRENT_RESTORE_POINT_VERIFIED
+  -> WRITERS_QUIESCED
+  -> FTS_COMPACTED
+  -> PHYSICAL_STORAGE_RECLAIMED
+  -> SNAPSHOT_CANARY_VERIFIED
+  -> GATEWAY_CANONICAL
+  -> R1_PASS
+  -> optional R1B_EXACT_PRUNE_PASS
+  -> R2_SECRET_AUTHORITY_READY
+  -> R3_REPLACEMENTS_ADOPTED
+  -> R4_OLD_CREDENTIALS_REVOKED
+  -> R5_ACTIVATION_PASS
+  -> R6_CADENCE_HEALTHY
+  -> R7_MEASURED_OUTCOMES
 ```
 
-A failed mandatory gate stops the chain. Later phases may not infer success from earlier green tests.
+No transition may be skipped or inferred from freshness alone.
 
----
+## Phase R0 — Freeze and independently review the target
 
-## 4. Phase R0 — Freeze and validate the recovery target
+### Deliverables
 
-**Objective:** Bind execution to an immutable plan and current live baseline.
+- This plan.
+- The bounded R1 prompt at `docs/prompts/2026-07-30-callscore-state-gateway-maintenance-prompt.md`.
+- Three independent reviews against one immutable tuple:
+  - specification and operations contract;
+  - implementation and operational feasibility;
+  - security, data-loss and rollback.
 
-**Files:**
+### Gate
 
-- Plan: `/opt/crypto-tuber-ranked/docs/plans/2026-07-30-callscore-full-system-recovery-and-activation.md`
-- Prompt: `/opt/crypto-tuber-ranked/docs/prompts/2026-07-30-callscore-state-gateway-maintenance-prompt.md`
-- Runtime control directory: `/opt/crypto-tuber-ranked/.tmp/system-recovery/<run-id>/`
-- Master state: `/opt/crypto-tuber-ranked/.tmp/system-recovery/<run-id>/master-state.json`
+All three reviewers must return `PASS` against the same commit/tree and plan/prompt SHA-256 values. Any edit invalidates all reviews.
 
-**Steps:**
+Before R1 execution, the parent must produce an operator-authorised, root-owned read-only record at:
 
-1. Commit the plan and prompt together.
-2. Compute both file SHA-256 values and record the commit SHA.
-3. Obtain three independent verdicts against the exact commit and hashes: specification/operations, implementation/feasibility, and security/rollback.
-4. If either file changes, invalidate all verdicts and rerun all three reviews.
-5. Before execution, recapture Git state, root bytes/inodes, DB/WAL/SHM sizes, systemd unit state, gateway PID ownership, worker health, Workplane, Langfuse and public freshness.
-6. Write `master-state.json` atomically with mode `0600`.
+```text
+/var/lib/callscore/approvals/r1/<nonce>.json
+```
 
-**Acceptance:** Three PASS verdicts and parent reconciliation against the exact immutable target. No mutation has occurred.
+Required schema: `callscore.r1_maintenance_authorization.v1`.
 
----
+It must bind:
 
-## 5. Phase R1 — Repair storage, snapshotting and canonical gateway supervision
+- nonce and expiry;
+- executor UID and dedicated maintenance-profile path;
+- plan/prompt commit, tree and SHA-256 values;
+- three authoritative review-result paths and SHA-256 values;
+- exact target profile and state DB;
+- exact systemd units;
+- exact cron job IDs permitted to be paused;
+- exact existing snapshot path permitted for final deletion;
+- exact temporary pre-R1 restore-point path/target;
+- exact command and installed-artifact hashes;
+- explicitly forbidden transitions.
 
-**Objective:** Restore durable session writes, safe disk headroom, one verified rollback snapshot, a passing snapshot timer and systemd-owned gateway supervision.
+The executor may not write, replace or chmod this record.
 
-**Authority:** The bounded execution prompt authorises this phase only.
+## Phase R1 — State, snapshot and gateway recovery
 
-### R1.1 Baseline and emergency halt
+### Purpose
 
-1. Create `/opt/crypto-tuber-ranked/.tmp/system-recovery/<run-id>/` with mode `0700`.
-2. Persist secret-safe baseline JSON and command logs with mode `0600`.
-3. Record `df -B1`, `df -i`, `stat` for DB/WAL/SHM, `PRAGMA page_size/page_count/freelist_count`, FTS schema shape, session counts by source, Docker worker status, and exact active timers.
-4. Halt immediately if root free space falls below 3 GiB, root usage reaches 97%, a worker regresses, a protected path is unreadable, Git changes unexpectedly, or any secret value appears.
+Repair Hermes storage and canonical supervision only. Do not prune sessions, write production PostgreSQL, rotate credentials, publish, deploy or activate the full system.
 
-### R1.2 Validate the existing rollback candidate
+### R1 execution-context gate
 
-1. Read no secret-bearing file contents.
-2. Record names, modes, owners, sizes and hashes only.
-3. Run SQLite `PRAGMA quick_check` against the snapshot DB in read-only mode with a bounded timeout.
-4. Verify its schema and recoverability without opening it as the live Hermes home.
-5. If it fails, stop before state mutation; do not invent backup success.
+R1 destructive work must not run from the target CallScore gateway, target CallScore CLI/TUI, or any process holding the target `state.db`, WAL or SHM.
 
-### R1.3 Quiesce scheduled writers
+Use one of:
 
-1. Record active/enabled state for:
-   - user `hermes-callscore-gateway.service`;
-   - system `agent-snapshot.timer` and `.service`;
-   - system `callscore-daily-pipeline.timer` and `.service`.
-2. Stop the two system timers for the maintenance window; do not disable unrelated timers.
-3. Stop the manual CallScore gateway through the Hermes CLI and verify its PID exited.
-4. Confirm no CallScore cron run is active and no pipeline/channel task is running.
-5. Do not stop Docker workers unless a later probe proves they hold the Hermes state DB.
+- a dedicated Hermes maintenance profile whose state DB is outside `/srv/agents/hermes/profiles/callscore`; or
+- a reviewed transient systemd maintenance unit running as `User=omar` with state outside the target profile.
 
-### R1.4 Convert the legacy FTS layout
+Abort if the executor or parent process has any open handle to the target DB files.
 
-1. Reconfirm at least 30% of current DB size is available on the filesystem.
-2. Run the supported migration:
+The executor UID must be Omar's UID, never `0`. Root-only installation/system-unit steps may use exact reviewed `sudo` commands, but the executor must never write or replace the root-owned authorisation record.
+
+The out-of-band runner must:
+
+1. acquire `/run/user/<omar-uid>/callscore-r1-maintenance.lock`;
+2. install a mandatory `EXIT`, `ERR`, `INT` and `TERM` finaliser;
+3. record original gateway/unit/timer/cron states and installed hashes;
+4. block new target-profile writers by an exact maintenance guard after existing writers drain;
+5. inventory `/proc/*/fd` immediately before every SQLite mutation;
+6. prove stable SQLite `data_version`, WAL size and writer inventory across two bounded observations;
+7. release the guard only in the finaliser.
+
+### Exact canonical source paths
+
+Implement changed safety boundaries in a clean isolated worktree from the current Workplane `HEAD` without touching its dirty primary worktree:
+
+```text
+/srv/agents/worktrees/callscore-workplane-r1-<nonce>/ops/hermes-state-maintenance/r1_maintenance.py
+/srv/agents/worktrees/callscore-workplane-r1-<nonce>/ops/hermes-state-maintenance/agent_snapshot.py
+/srv/agents/worktrees/callscore-workplane-r1-<nonce>/ops/hermes-state-maintenance/session_probe.py
+/srv/agents/worktrees/callscore-workplane-r1-<nonce>/ops/hermes-state-maintenance/test_r1_maintenance.py
+/srv/agents/worktrees/callscore-workplane-r1-<nonce>/ops/hermes-state-maintenance/test_agent_snapshot.py
+/srv/agents/worktrees/callscore-workplane-r1-<nonce>/ops/hermes-state-maintenance/test_session_probe.py
+/srv/agents/worktrees/callscore-workplane-r1-<nonce>/ops/hermes-state-maintenance/schemas/callscore-state-snapshot-manifest-v1.schema.json
+/srv/agents/worktrees/callscore-workplane-r1-<nonce>/ops/systemd/agent-snapshot.service
+```
+
+Installed artifacts:
+
+```text
+/usr/local/bin/callscore-r1-maintenance
+/usr/local/bin/agent-snapshot
+/usr/local/bin/callscore-session-store-probe
+/etc/systemd/system/agent-snapshot.service
+```
+
+Every install receipt binds source commit, source bytes hash, installed bytes hash, owner, mode and exact argv.
+
+### TDD requirements
+
+Observe intentional RED before implementation and GREEN afterwards for:
+
+- refusing execution from a target-DB-holding process;
+- exact manual gateway PID validation and stop;
+- mandatory finaliser on every exit path;
+- raw live-DB tar rejection;
+- SQLite online backup consistency during concurrent WAL writes;
+- snapshot quick-check/integrity/restore failure preventing promotion;
+- opaque state DB allowlist and secret-file denial;
+- symlink/special-file rejection;
+- private permission enforcement;
+- no unapproved retention deletion;
+- zero-provider/zero-PostgreSQL session create/read/end/delete probe;
+- FTS integrity and deterministic canary search parity;
+- review/authorisation hash mismatch fail-closed.
+
+### Secret and snapshot boundary
+
+The state DB is authorised only as an opaque encrypted-or-owner-only rollback payload. Do not inspect or extract potential values while copying it.
+
+Snapshot allowlist is exactly:
+
+- SQLite online backup output named `state.db`;
+- generated `manifest.json`;
+- generated `restore-readback.json`;
+- value-free repository commit/tree identifiers in `recovery-metadata.json`.
+
+Default-deny `.env*`, `auth.json`, provider configuration, key material, credential caches, logs, session exports, process environments, raw command output and Git object bundles.
+
+Require snapshot root/directory mode `0700`, files `0600`, owner `omar:omar` unless the authorisation record names a different owner. Reject symlinks and special files.
+
+### R1 sequence
+
+#### 1. Read-only baseline
+
+Record value-free evidence for disk/inodes, DB/WAL/SHM metadata, schema/page/freelist, session/message/source counts, FTS definitions, open handles, gateway PID/unit, named units/timers, relevant cron jobs, workers, queues, Workplane, Sentinel, Langfuse and live website.
+
+Do not persist session titles, bodies, chat/user metadata, process environments or secret-bearing argv.
+
+#### 2. Build and verify maintenance tooling
+
+Create the isolated Workplane worktree. Implement the exact files above with RED -> GREEN. Run the applicable full suite, static checks and `git diff --check`. Commit only those files on a dedicated branch. Do not merge or push.
+
+Install only after independent parent readback and checksum verification.
+
+#### 3. Restrict and validate the existing rollback candidate
+
+For `/srv/agents/hermes/profiles/callscore/state-snapshots/20260728-025055-pre-update/`:
+
+- reject symlinks/special files;
+- tighten directory/file modes to `0700`/`0600` before inspection;
+- hash opaque files without reading secret-bearing content into logs;
+- run bounded read-only SQLite quick-check and FTS integrity checks on its state DB;
+- record counts and schema;
+- keep it until the current pre-R1 restore point is verified.
+
+#### 4. Pause prohibited schedulers and provider-capable jobs
+
+Disable/stop `callscore-daily-pipeline.timer`; do not start its service in R1. Its installed unit runs `pipeline:daily -- --write` and is outside R1 authority.
+
+Stop `agent-snapshot.timer` for implementation replacement.
+
+Pause and verify paused these exact jobs before any gateway restart:
+
+- `9c03a6eea969` — live CMO loop;
+- `144c3a9cc860` — CMO cooldown watcher;
+- `be1a78217918` — engagement executor.
+
+Keep them paused through R1. Audit all other enabled jobs read-only; if another provider-, PostgreSQL- or public-mutation-capable job is enabled, stop and request amended authority rather than broad-pausing it.
+
+#### 5. Create a current pre-mutation restore point
+
+This occurs before FTS migration, session deletion or VACUUM.
+
+Use SQLite online backup to the exact temporary target bound in the authorisation record. The target must be on a filesystem with enough verified free capacity for the full backup plus 2 GiB. On the current single-root layout, abort with `blocked_current_restore_point_capacity` unless an authorised external/attached target provides that capacity.
+
+Require:
+
+- source writer inventory and WAL state recorded;
+- online backup under controlled concurrent WAL-write test;
+- quick-check exactly `ok`;
+- FTS5 integrity-check for every present index;
+- source/backup schema and canonical counts equal;
+- manifest SHA-256 verification;
+- isolated restore/readback;
+- owner-only permissions.
+
+Retain this immutable pre-R1 anchor until every R1 acceptance gate passes.
+
+#### 6. Quiesce writers and stop the manual gateway out-of-band
+
+Never use `hermes gateway stop` for the current topology.
+
+The reviewed helper must validate `/srv/agents/hermes/profiles/callscore/gateway.pid`, file owner/mode, PID start time, UID, executable, full `/proc/<pid>/cmdline`, profile path and gateway identity. It may send `SIGTERM` only to that exact PID, wait a bounded interval, and fail rather than use broad process matching or `SIGKILL`.
+
+Verify:
+
+- PID exited;
+- user canonical unit is stopped/reset separately;
+- no target cron execution remains active;
+- no PostgreSQL pipeline/channel item is running;
+- no unapproved process has DB/WAL/SHM handles;
+- `data_version` and WAL state are stable;
+- the maintenance guard blocks a deliberately attempted unapproved target-profile write.
+
+#### 7. Migrate FTS and reclaim physical storage
+
+Require free bytes at least 30% of live DB size before:
 
 ```bash
 hermes --profile callscore sessions optimize-storage --no-vacuum --yes
 ```
 
-3. Require compact external-content FTS definitions and no legacy `messages_fts_content` or `messages_fts_trigram_content` ownership tables.
-4. Run `PRAGMA quick_check`; stop on anything except `ok`.
+Then require:
 
-### R1.5 Prune only authorised ended background sessions
+- compact v23 external-content FTS definitions;
+- legacy content-owning shadow tables absent;
+- no rebuild/trash markers;
+- SQLite quick-check `ok`;
+- FTS5 `integrity-check` pass for every index;
+- canonical row counts unchanged;
+- a known synthetic, non-secret session/message token is found through both canonical search paths and disappears after exact canary deletion;
+- no session pruning occurred.
 
-1. Regenerate dry-run manifests immediately before deletion.
-2. Allowed filters are exactly:
+Before VACUUM compute:
 
-```bash
-hermes --profile callscore sessions prune --source cron --older-than 1d --dry-run
-hermes --profile callscore sessions prune --source subagent --older-than 1d --dry-run
+```text
+compact_used_bytes = (page_count - freelist_count) * page_size
 ```
 
-3. Verify every candidate is ended, inactive beyond the bound, not pinned, not archived, and in the named source.
-4. Persist candidate IDs and manifest hash without message bodies.
-5. Execute the same two filters with `--yes`.
-6. Do not prune `cli`, messaging, `tool`, `callscore-child-agent`, active, pinned or archived sessions.
-
-### R1.6 Reclaim physical bytes
-
-1. Compute compact used bytes as `(page_count - freelist_count) * page_size`.
-2. Require filesystem free bytes to exceed compact used bytes plus 2 GiB before VACUUM.
-3. Run:
+Require filesystem free bytes at least `compact_used_bytes + 2147483648`, then run:
 
 ```bash
 hermes --profile callscore sessions optimize
 ```
 
-4. Verify `PRAGMA quick_check=ok`, WAL checkpoint success, fresh `hermes sessions stats`, and root free space at least 20 GiB. Target at least 30 GiB; if below target, produce an exact non-protected candidate manifest rather than deleting more.
+Require WAL checkpoint output with `busy=0`, quick-check `ok`, FTS integrity pass and stable counts.
 
-### R1.7 Replace the failing snapshot path using TDD
+#### 8. Restore canonical gateway ownership
 
-Canonical source must live in `/srv/agents/repos/callscore-workplane`; `/usr/local/bin/agent-snapshot` is an installed artifact, not the only source.
+Run the mandatory finaliser path if any earlier step failed. If DB integrity passes, restore canonical supervision even on a blocked R1; otherwise keep it deliberately stopped with an explicit critical blocker and exact rollback command.
 
-Required behavior, implemented RED -> GREEN:
-
-1. SQLite online backup API produces a consistent state copy; raw tar of a live DB/WAL/SHM is forbidden.
-2. Snapshot is assembled in a private staging directory, checked, hashed, and atomically renamed.
-3. Snapshot includes the state DB, non-secret profile configuration and a manifest. Secret values are not copied into new snapshots; credentials remain in their canonical control plane/live sink.
-4. Local repository recovery metadata includes HEAD/tree/status and bundles for unpushed refs where needed, without copying build caches.
-5. Exactly one verified canonical local rollback snapshot is retained.
-6. Old snapshot deletion occurs only after the new snapshot passes quick-check, manifest hash, permissions and restore-readback in an isolated temporary Hermes home.
-7. Deletion uses one reviewed absolute path with `--one-file-system`; no broad glob.
-8. Snapshot timer failure leaves the prior verified snapshot untouched.
-
-Minimum tests:
-
-- RED: raw changing DB input is rejected.
-- RED: failed quick-check prevents promotion and retention deletion.
-- RED: secret-bearing files are excluded from the new manifest.
-- RED: failed atomic promotion preserves the old snapshot.
-- RED: retention never deletes more than the one superseded exact path.
-- GREEN: temporary SQLite fixture is backed up, verified, promoted, restored and read back.
-
-### R1.8 Establish canonical gateway ownership
-
-1. Preserve `/home/omar/.config/systemd/user/hermes-callscore-gateway.service` unless a verified defect requires a minimum diff.
-2. Run `systemctl --user daemon-reload` and `systemctl --user reset-failed hermes-callscore-gateway.service`.
-3. Start the canonical user service once.
-4. Prove:
-   - service is active;
-   - `MainPID` is nonzero;
-   - the gateway status PID matches `MainPID`;
-   - no second gateway process exists;
-   - legacy `hermes-gateway.service` remains masked/disabled;
-   - cron ticker advances;
-   - a safe local heartbeat cron run persists a new session and receipt.
-
-### R1.9 Re-arm safe timers and verify
-
-1. Install the tested snapshot artifact and unit only after source tests pass.
-2. Start one snapshot canary and require exit 0 plus restore-readback.
-3. Re-enable/restart `agent-snapshot.timer` only after the canary passes.
-4. Start one graph-owned daily-pipeline canary only after root free space and Workplane checks pass.
-5. Restore its timer only after the canary passes.
-6. Keep provider-capable CMO/publication and YouTube-consumer lanes paused until Phase R5 activation passes. Read-only monitoring and cooldown accounting may remain enabled if their receipts prove they cannot mutate providers.
-7. Rerun Workplane, canonical audit, Sentinel, Langfuse and public freshness.
-
-**R1 acceptance:**
-
-- Root free space >= 20 GiB and usage below 90%; target >= 30 GiB.
-- State DB quick-check returns `ok`.
-- Compact external-content FTS is active.
-- Authorised background-session prune has an exact manifest and count receipt.
-- Exactly one verified canonical local rollback snapshot exists.
-- Snapshot service and timer pass.
-- Canonical gateway user unit is active and owns the only gateway PID.
-- A fresh Hermes session write succeeds.
-- Daily pipeline canary no longer fails on storage.
-- Mandatory workers, Workplane, Langfuse and public website remain healthy.
-- No provider, public, credential, deployment, image, scale or production-DB mutation occurred.
-
-Rollback: stop the canonical gateway, preserve the failed live DB as evidence, restore only from the verified snapshot through the tested restore path, then revalidate before reopening writers.
-
----
-
-## 6. Phase R2 — Build the exact credential authority matrix
-
-**Objective:** Make every affected credential either safely automatable or explicitly operator-only.
-
-1. Start from the checksum-backed operator handoff; use names/classifications only.
-2. For each of 41 affected credentials, bind:
-   - provider and authoritative account;
-   - exact create/replacement tool;
-   - exact canonical payload hash;
-   - graph-owned secret sink destination;
-   - affected runtimes;
-   - fingerprint-only readback method;
-   - revocation-only tool;
-   - rollback window.
-3. Create no replacement and revoke nothing in this phase.
-4. Require exact, durable, unexpired `SECRET_GATE` approval per provider payload.
-5. Any missing adapter, sink, readback or revocation-only capability remains blocked.
-
-**Acceptance:** 41/41 classified; no secret values persisted; no generic rotate tool accepted; safely automatable count is evidence-based.
-
----
-
-## 7. Phase R3 — Create replacements, adopt them, and read them back
-
-**Objective:** Install replacements without losing rollback capability.
-
-For each approved provider batch:
-
-1. Invoke `credential_rotation_node` in replacement-creation mode through the operating graph.
-2. Provider-generated material goes directly to the graph-owned secret sink, never ordinary graph state, logs, diagnostics, chat or receipts.
-3. Update only dependent runtimes.
-4. Recreate only affected runtimes; no image rebuild or scale change unless separately approved.
-5. Verify each runtime uses the replacement through a fingerprint-only or provider-authenticated readback.
-6. Persist durable provider-execution and replacement-readback evidence.
-7. Keep old credentials valid until the entire batch passes.
-
-**Acceptance:** Every changed credential has creation, sink, adoption and readback receipts; no old credential is revoked yet.
-
----
-
-## 8. Phase R4 — Revoke old credentials
-
-**Objective:** Close the rollback window only after replacements are proven.
-
-1. Invoke `credential_rotation_node` with `credential_rotation_phase="revoke_old"`.
-2. Require a revocation-only provider tool; reject any tool that can create or rotate replacements.
-3. Bind the call to prior creation, sink, adoption and readback receipts.
-4. Verify old credentials fail and replacements still pass without exposing values.
-5. Stop at the first failed provider batch.
-
-**Acceptance:** 41/41 either rotated and old credential proven invalid, or explicitly blocked with no false success.
-
----
-
-## 9. Phase R5 — Restart canonical activation from Phase 0
-
-**Objective:** Produce a new authoritative activation receipt without rewriting history.
-
-1. Use only `/srv/agents/hermes/profiles/callscore/skills/orchestration/callscore-system-activation/` as the activation entry point.
-2. Preserve the failed `20260729T110151Z` receipt unchanged.
-3. Start a new run at Phase 0 and execute sequentially.
-4. Stop at the first mandatory failure.
-5. Require repository, Codebase Memory, 51-agent audit, topology/workers, Workplane, LangGraph goals, canonical package gates, observability and provider-path checks.
-6. Do not enable autopilot unless the final activation receipt semantically validates as `pass`.
-
-**Acceptance:** New activation receipt is `pass`, checksum-verified and parent-verified; autopilot enablement has its own receipt.
-
----
-
-## 10. Phase R6 — Restore data, content and video cadence
-
-**Objective:** Resume safe production work without loosening gates.
-
-1. Data lane:
-   - rerun daily pipeline through `operating:goal`;
-   - clear scoring staleness;
-   - process fresh-call candidates through canonical admission policy;
-   - reduce transcript backlog in bounded graph-owned batches;
-   - require fresh-call and leaderboard Sentinel green.
-2. CMO lane:
-   - keep public mutation disabled until canonical activation pass;
-   - create a fresh final draft and all required editorial/platform/visual/originality/design/media receipts;
-   - permit public provider handoff only when the complete canonical operational package passes and cooldown allows it;
-   - require provider readback, rollback and publication receipt.
-3. YouTube lane:
-   - resume the consumer only after script, packaging, thumbnail, publish-package and analytics receipts pass;
-   - use the canonical design bundle, lockup and Omar Voice only;
-   - never publish call 24458; it remains old test/style material.
-
-**Acceptance:** Fresh successful pipeline/scoring receipts, fresh accepted channel package or explicit cooldown/block receipt, and a YouTube production package or explicit evidence-backed blocker.
-
----
-
-## 11. Phase R7 — Close the outcome loop
-
-**Objective:** Replace infrastructure activity with measurable user-visible outcomes.
-
-1. Persist `learning_event.v1`, `agent_performance_ledger.v1`, `learning_delta.v1` and `experiment_result.v1` for every production experiment.
-2. Read back 24h, 72h and 7d platform performance where APIs permit.
-3. Record subscribers, retention, conversions and revenue only from authoritative provider or DB evidence.
-4. No filename or local `published_graph_owned` artifact alone proves external publication or impact.
-5. Feed accepted deltas back into content and channel policy without self-training on unverified model output.
-
-**Acceptance:** At least one current experiment has complete measurements, or a receipt-backed provider/data blocker names the exact missing authority.
-
----
-
-## 12. Verification matrix
-
-Every execution run must end with:
+For the success path:
 
 ```bash
-/usr/bin/python3 /srv/agents/hermes/scripts/callscore-canonical-agent-audit.py
-npm run workplane:status
-npm run sentinel:fresh-calls
-npm run sentinel:leaderboard:v2
-npm run hygiene:secrets
-npx tsc --noEmit
-git diff --check
-/srv/agents/hermes/scripts/callscore-live-website-freshness-proof.sh
+OMAR_UID="$(id -u omar)"
+sudo -u omar env \
+  XDG_RUNTIME_DIR="/run/user/${OMAR_UID}" \
+  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${OMAR_UID}/bus" \
+  systemctl --user daemon-reload
+sudo -u omar env \
+  XDG_RUNTIME_DIR="/run/user/${OMAR_UID}" \
+  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${OMAR_UID}/bus" \
+  systemctl --user reset-failed hermes-callscore-gateway.service
+sudo -u omar env \
+  XDG_RUNTIME_DIR="/run/user/${OMAR_UID}" \
+  DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${OMAR_UID}/bus" \
+  systemctl --user start hermes-callscore-gateway.service
 ```
 
-Also require phase-specific tests, Docker worker probes, systemd status, SQLite quick-check, gateway PID reconciliation, Langfuse HTTP/read trace evidence, queue aggregates and semantic receipt validation.
+The out-of-band/root runner must target Omar's user manager exactly as above. Bare root `systemctl --user` is forbidden because it addresses the wrong service manager.
 
-## 13. Reporting contract
+Require:
 
-Return exactly one JSON object containing:
+- unit active;
+- nonzero `MainPID`;
+- gateway status PID equals `MainPID`;
+- exactly one gateway process;
+- legacy `hermes-gateway.service` disabled;
+- provider-capable cron jobs remain paused.
 
-- `status`;
-- `phase`;
-- `actions_performed`;
-- `mutations_performed` by risk class;
-- `evidence` with absolute paths and hashes;
-- `verification` including `langfuse_checked`;
-- `blockers`;
-- `rollback_status`;
-- top-level `next_action`.
+Run `/usr/local/bin/callscore-session-store-probe` with a generated non-secret nonce. It must use Hermes `SessionDB` only to create, append, read back, end and delete one canary session. It must call no model/provider, network or PostgreSQL path. Verify the canary is present then absent and FTS parity follows both transitions.
 
-Do not describe the whole system as failed when healthy layers remain live. Do not call the system autonomous until Phase R5 passes and the relevant production lane has current external readback.
+#### 9. Snapshot service canary under live WAL activity
+
+With the canonical gateway live and after the session probe, start `agent-snapshot.service` once. This is the single final snapshot creation/promotion operation.
+
+Require:
+
+- online backup consistency under live WAL activity;
+- quick-check and all FTS integrity checks;
+- source/snapshot canonical counts equal at one captured backup boundary;
+- manifest and restore-readback pass;
+- private modes and allowlist compliance;
+- systemd `InvocationID`, journal cursor, executable hash and exit status in the receipt.
+
+The service may delete only the exact superseded July 28 snapshot path authorised in the root-owned record. The temporary pre-R1 anchor remains until all other R1 gates pass; its final exact deletion must also be bound in that record and performed only at the R1 commit point. Verify exactly one canonical snapshot remains afterwards.
+
+Re-enable/start `agent-snapshot.timer` only after the live-WAL canary passes.
+
+#### 10. Zero-write storage and scheduler checks
+
+Do not start or enable `callscore-daily-pipeline.service` or timer in R1.
+
+Use only:
+
+- a local `mktemp`/write/fsync/read/hash/delete filesystem canary;
+- the zero-provider SessionDB probe;
+- Workplane/Sentinel/Langfuse/website read checks.
+
+`production_database` must be `false` only when independent readback proves no producer was started. If any write producer starts, report `true` or `unknown`; never default it to false.
+
+#### 11. Final verification and commit point
+
+Parent independently verifies live state, not receipt claims alone:
+
+- root free at least 20 GiB and usage below 90%; target 30 GiB;
+- DB quick-check, FTS integrity, external-content schema and `busy=0` checkpoint;
+- one verified canonical snapshot and isolated restore-readback;
+- canonical gateway ownership;
+- zero-provider session write/read/delete;
+- snapshot unit/timer healthy;
+- daily pipeline unit/timer deliberately disabled pending later authority;
+- exact three provider-capable cron jobs paused;
+- workers, Workplane, Sentinel, Langfuse and website healthy;
+- no session pruning;
+- no credential/provider/public/deployment/image/scale/PostgreSQL mutation.
+
+Only after every check passes may the authorised temporary pre-R1 anchor be deleted. Any failure runs the finaliser and reports only the exact R1 remediation. Set `phase_r2_allowed=false` unless R1 passed.
+
+### R1 acceptance
+
+- Current pre-R1 restore point existed before mutation and was independently restorable.
+- State DB is compact-layout, integral and writable.
+- Root free space threshold passes.
+- Exactly one canonical private snapshot remains.
+- Snapshot service/timer are healthy.
+- Canonical user gateway owns the only gateway PID.
+- Daily write timer remains disabled.
+- Provider-capable jobs remain paused.
+- No sessions were pruned.
+- Production PostgreSQL, provider, public, credential, deployment, image and scale mutation flags are independently `false`.
+- Finaliser state is verified.
+
+## Phase R1B — Optional manifest-bound background-session pruning
+
+R1B is optional and separately authorised only if root headroom remains insufficient after R1.
+
+Do not use Hermes age/source prune commands for execution because preview and delete recalculate membership.
+
+First implement a TDD tool that:
+
+1. freezes one absolute UTC cutoff;
+2. creates an IDs-only manifest with exact metadata and child relationships;
+3. excludes pinned, archived, active and child-linked sessions unless separately named;
+4. hashes the manifest;
+5. in one `BEGIN IMMEDIATE` transaction requires exact candidate-set and metadata equality;
+6. deletes exactly manifest IDs or zero rows;
+7. aborts on newly eligible, newly pinned, newly archived, changed or child-linked rows;
+8. persists counts/hashes only, never titles or messages.
+
+A separate root-owned authorisation record must bind the exact manifest hash and IDs count. Parent verifies retained-child links, counts, FTS integrity and rollback.
+
+## Phase R2 — Credential authority and provider-adapter readiness
+
+After R1 pass only:
+
+- reconcile the 41 credential names against authoritative providers;
+- map each to exact provider adapter/tool, graph payload schema, secret sink, affected runtime, fingerprint readback and revocation-only tool;
+- create separate `SECRET_GATE` receipts per provider/action/payload;
+- prove the graph-owned secret sink is available;
+- stop if any credential lacks an exact provider path.
+
+No credential mutation occurs in R2.
+
+## Phase R3 — Replacement creation and affected-runtime adoption
+
+For one credential at a time:
+
+1. create replacement through the approved graph-owned provider adapter;
+2. write plaintext directly to the graph-owned secret sink;
+3. persist provider-execution evidence without values;
+4. update/recreate only named affected runtimes;
+5. perform fingerprint-only readback;
+6. verify service health and rollback readiness.
+
+No old credential is revoked in R3. No image rebuild or scale change without separate authority.
+
+## Phase R4 — Old-credential revocation
+
+For each fully adopted replacement:
+
+- obtain separate revocation authorisation;
+- prove the selected tool is revocation-only;
+- execute through the graph-owned adapter;
+- require durable provider-execution evidence and old-key rejection/new-key acceptance;
+- stop on any mismatch.
+
+## Phase R5 — Canonical activation from Phase 0
+
+Use only the canonical activation skill. Preserve the historical failed receipt. Create a new run ID and begin at Phase 0.
+
+Require each phase receipt to pass sequentially, including workers, Workplane, canonical 51-agent audit, learning cluster, content/video gates, receipts, observability and cooldown handling.
+
+Autopilot remains off until the new final activation receipt is independently verified `pass`.
+
+## Phase R6 — Restore data, content and video cadence
+
+With separate graph-owned write/public gates:
+
+- replace the unsafe daily-pipeline fixed approval with an actual bound authorisation receipt;
+- run bounded scoring/ingestion and verify DB deltas;
+- restore CMO and cooldown jobs only after activation pass;
+- require the full canonical operational package for public handoff;
+- require design/media v2 receipts for visual output;
+- require all YouTube production receipts for YouTube readiness;
+- preserve cooldown as a receipt-backed valid outcome.
+
+## Phase R7 — Durable learning and measured outcomes
+
+Require:
+
+- `learning_event.v1`;
+- `agent_performance_ledger.v1`;
+- `learning_delta.v1`;
+- `experiment_result.v1`.
+
+Measure subscribers, retention, conversion, revenue and operational performance from authoritative sources. Do not infer outcomes from artifact freshness or publication counts.
+
+## Global completion criteria
+
+CallScore is fully recovered only when:
+
+1. R1 storage/snapshot/gateway pass is verified.
+2. Optional R1B is either unnecessary or separately passed.
+3. All affected credentials are replaced, adopted and old credentials revoked with provider proof.
+4. A new activation run passes from Phase 0.
+5. Safe cadence is healthy under canonical receipts.
+6. Autopilot is enabled only after activation pass.
+7. Learning is durable.
+8. Measured product/commercial outcomes exist.
+
+Until then report the precise layer status: healthy public/read/runtime layers, degraded schedulers where applicable, and blocked autonomy.
