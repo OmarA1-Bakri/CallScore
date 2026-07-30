@@ -51,14 +51,15 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 WRITE_FLAGS = ("O_WRONLY", "O_RDWR", "O_CREAT", "O_TRUNC", "O_APPEND")
 MUTATING_CALLS = (
     "creat(", "unlink(", "unlinkat(", "rename(", "renameat(", "renameat2(",
-    "mkdir(", "mkdirat(", "rmdir(", "chmod(", "fchmodat(", "chown(",
-    "fchownat(", "symlink(", "symlinkat(", "link(", "linkat(",
+    "mkdir(", "mkdirat(", "rmdir(", "chmod(", "fchmodat(", "fchmodat2(", "chown(",
+    "lchown(", "fchownat(", "symlink(", "symlinkat(", "link(", "linkat(",
     "truncate(", "mknod(", "mknodat(", "setxattr(", "lsetxattr(",
-    "removexattr(", "lremovexattr(", "utime(", "utimes(", "utimensat(",
+    "removexattr(", "lremovexattr(", "utime(", "utimes(", "lutimes(",
+    "futimesat(", "utimensat(",
 )
 FD_MUTATING_CALLS = (
     "write(", "writev(", "pwrite64(", "pwritev(", "pwritev2(",
-    "ftruncate(", "fallocate(", "fchmod(", "fchown(", "fsetxattr(",
+    "ftruncate(", "fallocate(", "fchmod(", "fchown(", "futimes(", "fsetxattr(",
     "fremovexattr(", "sendfile(", "copy_file_range(", "splice(",
 )
 ESCAPE_CALLS = (
@@ -68,6 +69,8 @@ ESCAPE_CALLS = (
     "copy_file_range(", "splice(", "tee(", "open_by_handle_at(",
     "move_mount(", "fsopen(", "fsmount(", "open_tree(", "pidfd_getfd(",
     "keyctl(", "add_key(", "request_key(", "process_vm_readv(",
+    "chdir(", "fchdir(", "kill(", "tkill(", "tgkill(", "pidfd_send_signal(",
+    "symlink(", "symlinkat(",
 )
 
 
@@ -379,8 +382,18 @@ def _verify_repo_tuple_open(repo: Path, expected: dict[str, str], hooks: Path, *
 
 
 def _inside(path: Path, roots: list[Path]) -> bool:
-    resolved = path.resolve(strict=False)
-    return any(resolved == root.resolve(strict=False) or root.resolve(strict=False) in resolved.parents for root in roots)
+    if not path.is_absolute():
+        return False
+    candidate = Path(os.path.normpath(os.fspath(path)))
+    _assert_no_symlink_components(candidate)
+    for root in roots:
+        if not root.is_absolute():
+            raise ValueError(f"write root must be absolute: {root}")
+        lexical_root = Path(os.path.normpath(os.fspath(root)))
+        _assert_no_symlink_components(lexical_root)
+        if candidate == lexical_root or lexical_root in candidate.parents:
+            return True
+    return False
 
 
 def audit_trace_text(text: str, allowed_write_roots: list[Path], cwd: Path) -> None:
@@ -409,6 +422,14 @@ def audit_trace_text(text: str, allowed_write_roots: list[Path], cwd: Path) -> N
         mutating = any(call in line for call in MUTATING_CALLS) or ("open" in line and any(flag in line for flag in WRITE_FLAGS))
         if not mutating:
             continue
+        if (("open(" in line or "openat(" in line or "openat2(" in line or "creat(" in line)
+                and any(flag in line for flag in WRITE_FLAGS + ("creat(",))):
+            result_target = re.search(r"=\s*\d+<([^>]+)>", line)
+            if result_target is None:
+                raise ValueError(f"kernel-resolved mutating fd target missing: {line}")
+            actual_target = result_target.group(1).removesuffix(" (deleted)")
+            if not actual_target.startswith("/") or not _inside(Path(actual_target), allowed_write_roots):
+                raise ValueError(f"mutating open resolved outside allowlist: {actual_target}")
         matches = re.findall(r'"((?:[^"\\]|\\.)*)"', line)
         if not matches:
             raise ValueError(f"unresolved mutating syscall: {line}")
@@ -421,7 +442,7 @@ def audit_trace_text(text: str, allowed_write_roots: list[Path], cwd: Path) -> N
                 candidate = cwd / candidate
             if not _inside(candidate, allowed_write_roots):
                 raise ValueError(f"write outside allowlist: {candidate}")
-        at_style = any(call in line for call in ("openat(", "openat2(", "unlinkat(", "renameat(", "renameat2(", "mkdirat(", "fchmodat(", "fchownat(", "symlinkat(", "linkat("))
+        at_style = any(call in line for call in ("openat(", "openat2(", "unlinkat(", "renameat(", "renameat2(", "mkdirat(", "fchmodat(", "fchmodat2(", "fchownat(", "futimesat(", "symlinkat(", "linkat("))
         if at_style and relative_count > line.count("AT_FDCWD"):
             raise ValueError(f"unresolved relative dirfd in mutating syscall: {line}")
 

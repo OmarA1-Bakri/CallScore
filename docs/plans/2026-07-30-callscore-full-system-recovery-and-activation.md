@@ -242,7 +242,9 @@ R0A is `prepared` only when:
 - the self-reference-free JCS/SHA-256 graph validates;
 - the in-tree manifest binds the Workplane tuple, application **base** tuple, exact changed-path allowlist and all non-self application output leaf hashes, plus the exact Hermes dependency tuple; the external R0B envelope later binds the final application commit/tree and manifest hash without self-reference;
 - the pre-edit input manifest binds the committed review inputs and live unit/script identities consumed by preparation;
-- all Git commands used the immutable empty-hooks procedure and no external index mutation occurred;
+- all Git commands used the immutable empty-hooks procedure; shared Git administration writes were limited to exact nonce refs/reflogs/worktree metadata and newly created content-addressed loose objects, with no modification of pre-existing Git bytes and no external index mutation;
+- every command ran through the prompt's cleared minimal environment and fail-closed full-syscall audit;
+- any blocked/failed nonce was retained with its value-free failure receipt, was never reused, and cannot collide with a fresh reviewed nonce;
 - both modified repos are clean at frozen commits;
 - no live mutation occurred.
 

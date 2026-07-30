@@ -225,9 +225,17 @@ class BootstrapTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             allowed = Path(td) / "allowed"
             allowed.mkdir()
-            MODULE.audit_trace_text(f'openat(AT_FDCWD, "{allowed}/x", O_WRONLY|O_CREAT, 0666) = 3\n', [allowed], Path(td))
+            MODULE.audit_trace_text(f'openat(AT_FDCWD, "{allowed}/x", O_WRONLY|O_CREAT, 0666) = 3<{allowed}/x>\n', [allowed], Path(td))
             MODULE.audit_trace_text(f'write(5<{allowed}/x>, "x", 1) = 1\n', [allowed], Path(td))
             MODULE.audit_trace_text('write(1<pipe:[123]>, "ok", 2) = 2\n', [allowed], Path(td))
+
+    def test_trace_requires_kernel_resolved_target_for_mutating_open(self):
+        with tempfile.TemporaryDirectory() as td:
+            allowed = Path(td) / "allowed"
+            allowed.mkdir()
+            trace = f'openat(AT_FDCWD, "{allowed}/x", O_WRONLY|O_CREAT, 0666) = 3\n'
+            with self.assertRaises(ValueError):
+                MODULE.audit_trace_text(trace, [allowed], Path(td))
 
     def test_trace_rejects_fd_only_writes_and_escape_syscalls(self):
         with tempfile.TemporaryDirectory() as td:
@@ -253,6 +261,36 @@ class BootstrapTests(unittest.TestCase):
             for trace in forbidden:
                 with self.subTest(trace=trace), self.assertRaises(ValueError):
                     MODULE.audit_trace_text(trace, [allowed], root)
+
+    def test_trace_rejects_cwd_shift_signals_and_extended_mutators(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            allowed = root / "allowed"
+            allowed.mkdir()
+            forbidden = [
+                'chdir("/etc") = 0\ncreat("relative-after-chdir", 0600) = 3</etc/relative-after-chdir>\n',
+                'fchdir(9</etc>) = 0\ncreat("relative-after-fchdir", 0600) = 3</etc/relative-after-fchdir>\n',
+                'kill(1234, SIGTERM) = 0\n',
+                'tkill(1234, SIGKILL) = 0\n',
+                'tgkill(1234, 1235, SIGSTOP) = 0\n',
+                'pidfd_send_signal(7, SIGTERM, NULL, 0) = 0\n',
+                f'symlink("target", "{allowed}/link") = 0\n',
+                'fchmodat2(AT_FDCWD, "/etc/x", 0600, 0) = 0\n',
+                'futimesat(AT_FDCWD, "/etc/x", NULL) = 0\n',
+            ]
+            for trace in forbidden:
+                with self.subTest(trace=trace), self.assertRaises(ValueError):
+                    MODULE.audit_trace_text(trace, [allowed], allowed)
+
+    def test_prompt_defines_minimal_bootstrap_git_admin_and_failure_contracts(self):
+        prompt = (SCRIPT.parents[1] / "docs/prompts/2026-07-30-callscore-r0a-maintenance-preparation-prompt.md").read_text()
+        self.assertIn("/usr/bin/env -i HOME=/nonexistent PATH=/usr/bin:/bin", prompt)
+        self.assertIn("R0A_GIT_ADMIN_ALLOWLIST", prompt)
+        self.assertIn(".git/objects/", prompt)
+        self.assertIn("new loose objects only", prompt)
+        self.assertIn("failed nonce is never reused", prompt)
+        self.assertIn("failure receipt", prompt)
+        self.assertIn("runtime validator is authoritative", prompt)
 
     def test_atomic_write_new_refuses_existing_path_and_symlink(self):
         with tempfile.TemporaryDirectory() as td:
