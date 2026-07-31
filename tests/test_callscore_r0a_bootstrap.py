@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import os
@@ -258,6 +259,12 @@ class BootstrapTests(unittest.TestCase):
             root = Path(td)
             allowed = root / "allowed"
             allowed.mkdir()
+            MODULE.audit_trace_text(
+                'mmap(NULL, 4096, PROT_READ, MAP_SHARED, 3</usr/lib/cache>, 0) = 0x3000\n'
+                'munmap(0x3000, 4096) = 0\n',
+                [allowed],
+                root,
+            )
             forbidden = [
                 'write(7</etc/passwd>, "x", 1) = 1\n',
                 'pwrite64(7</etc/passwd>, "x", 1, 0) = 1\n',
@@ -270,22 +277,51 @@ class BootstrapTests(unittest.TestCase):
                 'bpf(BPF_MAP_CREATE, NULL, 0) = 3\n',
                 'io_uring_setup(8, {}) = 3\n',
                 'clone3({flags=CLONE_NEWUSER}, 88) = 42\n',
+                'clone(child_stack=NULL, flags=CLONE_UNTRACED|SIGCHLD) = 4242\n',
                 'copy_file_range(4</tmp/in>, NULL, 5</etc/out>, NULL, 1, 0) = 1\n',
                 'mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_SHARED, 7</etc/out>, 0) = 0x1\n',
+                'mmap(NULL, 4096, PROT_READ, MAP_SHARED, 7</etc/out>, 0) = 0x1000\n'
+                'mprotect(0x1000, 4096, PROT_READ|PROT_WRITE) = 0\n',
+                'mmap(NULL, 4096, PROT_READ, MAP_SHARED, 7</etc/out>, 0) = 0x2000\n'
+                'pkey_mprotect(0x2000, 4096, PROT_READ|PROT_WRITE, 0) = 0\n',
+                'sendmmsg(7<socket:[123]>, [{msg_hdr={}}], 1, 0) = 1\n',
+                'read(7<socket:[123]>, "x", 1) = 1\n',
+                'read(7<UNIX-STREAM:[123]>, "x", 1) = 1\n',
                 'keyctl(KEYCTL_READ, 1, NULL, 0) = 0\n',
             ]
             for trace in forbidden:
                 with self.subTest(trace=trace), self.assertRaises(ValueError):
                     MODULE.audit_trace_text(trace, [allowed], root)
 
-    def test_trace_rejects_cwd_shift_signals_and_extended_mutators(self):
+    def test_trace_tracks_resolved_cwd_and_rejects_signals_and_extended_mutators(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             allowed = root / "allowed"
             allowed.mkdir()
+            MODULE.audit_trace_text(
+                'chdir("/etc") = 0\n'
+                'fchdir(5</etc>) = 0\n',
+                [allowed],
+                root,
+            )
+            MODULE.audit_trace_text(
+                f'chdir("{allowed}") = 0\n'
+                f'creat("relative-after-chdir", 0600) = 3<{allowed}/relative-after-chdir>\n'
+                f'unlinkat(AT_FDCWD<{allowed}>, "stale.lock", 0) = 0\n'
+                f'ioctl(3</dev/null<char 1:3>>, TCGETS, 0xffff) = -1 ENOTTY (Inappropriate ioctl for device)\n',
+                [allowed],
+                root,
+            )
+            MODULE.audit_trace_text(
+                f'fchdir(9<{allowed}>) = 0\n'
+                f'openat(AT_FDCWD<{allowed}>, "relative-after-fchdir", O_WRONLY|O_CREAT, 0600) = 4<{allowed}/relative-after-fchdir>\n',
+                [allowed],
+                root,
+            )
             forbidden = [
                 'chdir("/etc") = 0\ncreat("relative-after-chdir", 0600) = 3</etc/relative-after-chdir>\n',
                 'fchdir(9</etc>) = 0\ncreat("relative-after-fchdir", 0600) = 3</etc/relative-after-fchdir>\n',
+                'fchdir(9) = 0\ncreat("unresolved-after-fchdir", 0600) = 3\n',
                 'kill(1234, SIGTERM) = 0\n',
                 'tkill(1234, SIGKILL) = 0\n',
                 'tgkill(1234, 1235, SIGSTOP) = 0\n',
@@ -310,8 +346,49 @@ class BootstrapTests(unittest.TestCase):
         self.assertIn("failed nonce is never reused", prompt)
         self.assertIn(".r0a-control-$R0A_NONCE/failure-receipt.json", prompt)
         self.assertIn("bootstrap validator plus the committed Draft 2020-12 schema form the composite runtime boundary", prompt)
-        self.assertIn("audit-trace --trace-prefix", prompt)
+        self.assertIn("run-audited --trace-prefix", prompt)
+        self.assertIn("bootstrap_blocked_unreceipted", prompt)
         self.assertIn('"HOME": "/nonexistent"', SCRIPT.read_text())
+
+    def test_verify_pins_rejects_hash_mismatch(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "input"
+            path.write_bytes(b"fixed")
+            expected = hashlib.sha256(b"fixed").hexdigest()
+            MODULE.verify_pins([f"{expected}={path}"])
+            with self.assertRaises(ValueError):
+                MODULE.verify_pins([f"{'0' * 64}={path}"])
+
+    def test_run_audited_uses_minimal_environment_and_rejects_network(self):
+        tracer_pid = next(
+            line.split(":", 1)[1].strip()
+            for line in Path("/proc/self/status").read_text().splitlines()
+            if line.startswith("TracerPid:")
+        )
+        if tracer_pid != "0":
+            self.skipTest("nested ptrace is not permitted")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            os.chmod(root, 0o700)
+            stdout_path, stderr_path = MODULE.run_audited_command(
+                root / "true.trace",
+                root,
+                [root],
+                [],
+                [],
+                ["/usr/bin/true"],
+            )
+            self.assertEqual(stdout_path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(stderr_path.stat().st_mode & 0o777, 0o600)
+            with self.assertRaises(ValueError):
+                MODULE.run_audited_command(
+                    root / "network.trace",
+                    root,
+                    [root],
+                    [],
+                    [],
+                    ["/usr/bin/python3", "-c", "import socket; socket.socket()"],
+                )
 
     def test_audit_trace_prefix_requires_owner_only_per_process_files(self):
         with tempfile.TemporaryDirectory() as td:
@@ -354,6 +431,8 @@ class BootstrapTests(unittest.TestCase):
             (root / "trace.123").write_text("exit_group(1) = ?\n")
             with self.assertRaises(ValueError):
                 MODULE.audit_trace_prefix(prefix, [allowed], allowed)
+            (root / "trace.123").write_text("exit(0) = ?\n")
+            MODULE.audit_trace_prefix(prefix, [allowed], allowed)
 
     def test_failure_receipt_has_exact_create_only_contract(self):
         with tempfile.TemporaryDirectory() as td:

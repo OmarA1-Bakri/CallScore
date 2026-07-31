@@ -27,6 +27,13 @@ APPLICATION_REPO = Path("/opt/crypto-tuber-ranked")
 WORKPLANE_REPO = Path("/srv/agents/repos/callscore-workplane")
 HERMES_REPO = Path("/srv/agents/hermes/hermes-agent")
 WORKTREE_ROOT = Path("/srv/agents/worktrees")
+MINIMAL_ENV = {
+    "HOME": "/nonexistent",
+    "PATH": "/usr/bin:/bin",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "PYTHONDONTWRITEBYTECODE": "1",
+}
 SPEC_PATH = APPLICATION_REPO / "docs/ops/callscore-r0a/bootstrap/input-spec.json"
 EXPECTED_HERMES_ANCHORS = (
     "/srv/agents/hermes/hermes-agent/gateway/status.py",
@@ -66,12 +73,21 @@ ESCAPE_CALLS = (
     "ptrace(", "unshare(", "setns(", "mount(", "umount(", "umount2(",
     "pivot_root(", "chroot(", "bpf(", "io_uring_setup(",
     "io_uring_enter(", "io_uring_register(", "process_vm_writev(",
-    "copy_file_range(", "splice(", "tee(", "vmsplice(", "ioctl(",
+    "copy_file_range(", "splice(", "tee(", "vmsplice(",
     "move_mount(", "fsopen(", "fsmount(", "open_tree(", "pidfd_getfd(",
     "keyctl(", "add_key(", "request_key(", "process_vm_readv(",
     "kill(", "tkill(", "tgkill(", "pidfd_send_signal(",
-    "symlink(", "symlinkat(", "link(", "linkat(",
 )
+SAFE_IOCTL_REQUESTS = frozenset({
+    "FIOCLEX",
+    "FIONCLEX",
+    "TCGETS",
+    "TCGETS2",
+    "TIOCGWINSZ",
+    "FIONREAD",
+    "FS_IOC_GETFLAGS",
+    "FS_IOC_GETVERSION",
+})
 
 
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -148,8 +164,14 @@ def _trace_arg_path(value: str) -> Path:
 
 
 def _trace_dirfd_base(value: str, current_cwd: Path) -> Path:
-    if value == "AT_FDCWD" or value.startswith("AT_FDCWD<"):
+    if value == "AT_FDCWD":
         return current_cwd
+    cwd_match = re.fullmatch(r"AT_FDCWD<(.+)>", value)
+    if cwd_match is not None:
+        target = cwd_match.group(1).removesuffix(" (deleted)")
+        if not target.startswith("/"):
+            raise ValueError(f"non-path strace cwd annotation: {value}")
+        return Path(target)
     match = re.fullmatch(r"-?\d+<(.+)>", value)
     if match is None:
         raise ValueError(f"unresolved strace dirfd: {value}")
@@ -157,6 +179,13 @@ def _trace_dirfd_base(value: str, current_cwd: Path) -> Path:
     if not target.startswith("/"):
         raise ValueError(f"non-path strace dirfd: {value}")
     return Path(target)
+
+
+def _trace_int(value: str) -> int:
+    token = value.strip()
+    if re.fullmatch(r"(?:0[xX][0-9a-fA-F]+|[0-9]+)", token) is None:
+        raise ValueError(f"unresolved strace integer: {value}")
+    return int(token, 0)
 
 
 def _validate_canonical_value(value: Any) -> None:
@@ -484,16 +513,54 @@ def audit_trace_text(
     allowed_write_roots: list[Path],
     cwd: Path,
     allowed_write_paths: list[Path] | None = None,
+    allowed_fixture_roots: list[Path] | None = None,
 ) -> None:
     allowed_write_paths = allowed_write_paths or []
-    network_calls = ("socket(", "socketpair(", "connect(", "bind(", "listen(", "accept(", "accept4(", "sendto(", "sendmsg(", "recvfrom(", "recvmsg(")
+    allowed_fixture_roots = allowed_fixture_roots or []
+    network_calls = (
+        "socket(", "socketpair(", "connect(", "bind(", "listen(", "accept(", "accept4(",
+        "sendto(", "sendmsg(", "sendmmsg(", "recvfrom(", "recvmsg(", "recvmmsg(", "shutdown(",
+        "getsockname(", "getpeername(", "getsockopt(", "setsockopt(",
+    )
     current_cwd = Path(os.path.normpath(os.fspath(cwd)))
+    shared_mappings: list[tuple[int, int]] = []
     for line in text.splitlines():
-        if any(call in line for call in network_calls):
+        stripped_line = line.lstrip()
+        if any(stripped_line.startswith(call) for call in network_calls) or re.search(
+            r"\d+<(?:socket|TCP|TCPv6|UDP|UDPv6|UNIX(?:-[A-Z]+)?|NETLINK)(?:[:<\[])", line
+        ) is not None:
             raise ValueError("network syscall attempted")
-        if any(call in line for call in ESCAPE_CALLS) or (("clone(" in line or "clone3(" in line) and "CLONE_NEW" in line):
+        ioctl_match = re.match(r"\s*ioctl\((.*)\)\s+=", line)
+        if ioctl_match is not None:
+            ioctl_args = _split_trace_args(ioctl_match.group(1))
+            if len(ioctl_args) < 2 or ioctl_args[1] not in SAFE_IOCTL_REQUESTS:
+                raise ValueError(f"mutating or unknown ioctl attempted: {line}")
+            continue
+        symlink_match = re.match(r"\s*(symlink|symlinkat)\((.*)\)\s+=", line)
+        if symlink_match is not None:
+            symlink_args = _split_trace_args(symlink_match.group(2))
+            if symlink_match.group(1) == "symlink":
+                if len(symlink_args) < 2:
+                    raise ValueError(f"truncated symlink trace: {line}")
+                destination = _trace_arg_path(symlink_args[1])
+                if not destination.is_absolute():
+                    destination = current_cwd / destination
+            else:
+                if len(symlink_args) < 3:
+                    raise ValueError(f"truncated symlinkat trace: {line}")
+                destination = _trace_arg_path(symlink_args[2])
+                if not destination.is_absolute():
+                    destination = _trace_dirfd_base(symlink_args[1], current_cwd) / destination
+            destination = Path(os.path.normpath(os.fspath(destination)))
+            if not allowed_fixture_roots or not _inside(destination, allowed_fixture_roots):
+                raise ValueError(f"symlink creation outside disposable fixture root: {destination}")
+            continue
+        clone_escape = (stripped_line.startswith("clone(") or stripped_line.startswith("clone3(")) and (
+            "CLONE_NEW" in line or "CLONE_UNTRACED" in line
+        )
+        if any(stripped_line.startswith(call) for call in ESCAPE_CALLS) or clone_escape:
             raise ValueError(f"process/kernel escape syscall attempted: {line}")
-        if "chdir(" in line:
+        if re.match(r"\s*chdir\(", line) is not None:
             target_match = re.search(r'chdir\("((?:[^"\\]|\\.)*)"\)', line)
             if target_match is None:
                 raise ValueError(f"unresolved cwd change: {line}")
@@ -502,26 +569,76 @@ def audit_trace_text(
             if not target.is_absolute():
                 target = current_cwd / target
             target = Path(os.path.normpath(os.fspath(target)))
-            if not _inside(target, allowed_write_roots):
-                raise ValueError(f"cwd change outside allowlist: {target}")
             if re.search(r"=\s*0(?:\s|$)", line):
                 current_cwd = target
             continue
-        if "fchdir(" in line:
+        if stripped_line.startswith("fchdir("):
             target_match = re.search(r"fchdir\(\d+<([^>]+)>\)", line)
             if target_match is None:
                 raise ValueError(f"unresolved fd cwd change: {line}")
             target = Path(target_match.group(1).removesuffix(" (deleted)"))
-            if not target.is_absolute() or not _inside(target, allowed_write_roots):
-                raise ValueError(f"fd cwd change outside allowlist: {target}")
+            if not target.is_absolute():
+                raise ValueError(f"unresolved fd cwd change: {target}")
             if re.search(r"=\s*0(?:\s|$)", line):
                 current_cwd = target
             continue
-        if "mmap(" in line and "PROT_WRITE" in line and "MAP_SHARED" in line:
-            raise ValueError(f"shared writable mapping attempted: {line}")
-        fd_mutating = any(call in line for call in FD_MUTATING_CALLS)
+        mmap_match = re.match(r"\s*mmap2?\((.*)\)\s+=\s*(\S+)", line)
+        if mmap_match is not None:
+            mmap_args = _split_trace_args(mmap_match.group(1))
+            if len(mmap_args) < 4:
+                raise ValueError(f"truncated mmap trace: {line}")
+            if "MAP_SHARED" in mmap_args[3]:
+                if "PROT_WRITE" in mmap_args[2]:
+                    raise ValueError(f"shared writable mapping attempted: {line}")
+                if mmap_match.group(2) != "-1":
+                    start = _trace_int(mmap_match.group(2))
+                    length = _trace_int(mmap_args[1])
+                    if length <= 0:
+                        raise ValueError(f"invalid shared mapping length: {line}")
+                    shared_mappings.append((start, start + length))
+            continue
+        protection_match = re.match(r"\s*(?:pkey_)?mprotect\((.*)\)\s+=", line)
+        if protection_match is not None:
+            protection_args = _split_trace_args(protection_match.group(1))
+            if len(protection_args) < 3:
+                raise ValueError(f"truncated mprotect trace: {line}")
+            if "PROT_WRITE" in protection_args[2]:
+                start = _trace_int(protection_args[0])
+                end = start + _trace_int(protection_args[1])
+                if any(start < mapped_end and mapped_start < end for mapped_start, mapped_end in shared_mappings):
+                    raise ValueError(f"shared mapping made writable: {line}")
+            continue
+        munmap_match = re.match(r"\s*munmap\((.*)\)\s+=\s*0(?:\s|$)", line)
+        if munmap_match is not None:
+            munmap_args = _split_trace_args(munmap_match.group(1))
+            if len(munmap_args) < 2:
+                raise ValueError(f"truncated munmap trace: {line}")
+            start = _trace_int(munmap_args[0])
+            end = start + _trace_int(munmap_args[1])
+            remaining: list[tuple[int, int]] = []
+            for mapped_start, mapped_end in shared_mappings:
+                if end <= mapped_start or start >= mapped_end:
+                    remaining.append((mapped_start, mapped_end))
+                    continue
+                if mapped_start < start:
+                    remaining.append((mapped_start, start))
+                if end < mapped_end:
+                    remaining.append((end, mapped_end))
+            shared_mappings = remaining
+            continue
+        mremap_match = re.match(r"\s*mremap\((.*)\)\s+=", line)
+        if mremap_match is not None and shared_mappings:
+            mremap_args = _split_trace_args(mremap_match.group(1))
+            if len(mremap_args) < 2:
+                raise ValueError(f"truncated mremap trace: {line}")
+            start = _trace_int(mremap_args[0])
+            end = start + _trace_int(mremap_args[1])
+            if any(start < mapped_end and mapped_start < end for mapped_start, mapped_end in shared_mappings):
+                raise ValueError(f"shared mapping remap attempted: {line}")
+            continue
+        fd_mutating = any(stripped_line.startswith(call) for call in FD_MUTATING_CALLS)
         if fd_mutating:
-            fd_match = re.search(r"(?:^|\s)(?:write|writev|pwrite64|pwritev|pwritev2|ftruncate|fallocate|fchmod|fchown|fsetxattr|fremovexattr|sendfile|copy_file_range|splice|ioctl)\((\d+)(?:<(.+?)>)?,\s", line)
+            fd_match = re.search(r"(?:^|\s)(?:write|writev|pwrite64|pwritev|pwritev2|ftruncate|fallocate|fchmod|fchown|fsetxattr|fremovexattr|sendfile|copy_file_range|splice)\((\d+)(?:<(.+?)>)?,\s", line)
             if not fd_match:
                 raise ValueError(f"unresolved inherited write fd: {line}")
             fd_number = int(fd_match.group(1))
@@ -537,7 +654,10 @@ def audit_trace_text(
             if not fd_target.startswith("/") or not _allowed_write(Path(fd_target), allowed_write_roots, allowed_write_paths):
                 raise ValueError(f"write fd outside allowlist: {fd_target}")
             continue
-        mutating = any(call in line for call in MUTATING_CALLS) or ("open" in line and any(flag in line for flag in WRITE_FLAGS))
+        mutating = any(stripped_line.startswith(call) for call in MUTATING_CALLS) or (
+            (stripped_line.startswith("open(") or stripped_line.startswith("openat(") or stripped_line.startswith("openat2("))
+            and any(flag in line for flag in WRITE_FLAGS)
+        )
         if not mutating:
             continue
         if (("open(" in line or "openat(" in line or "openat2(" in line or "creat(" in line)
@@ -571,6 +691,7 @@ def audit_trace_text(
             "utimensat": ((0, 1),),
             "renameat": ((0, 1), (2, 3)),
             "renameat2": ((0, 1), (2, 3)),
+            "linkat": ((0, 1), (2, 3)),
         }
         if call_match is not None and call_match.group(1) in at_pairs:
             args = _split_trace_args(call_match.group(2))
@@ -596,7 +717,7 @@ def audit_trace_text(
                 candidate = current_cwd / candidate
             if not _allowed_write(candidate, allowed_write_roots, allowed_write_paths):
                 raise ValueError(f"write outside allowlist: {candidate}")
-        at_style = any(call in line for call in ("openat(", "openat2(", "unlinkat(", "renameat(", "renameat2(", "mkdirat(", "fchmodat(", "fchmodat2(", "fchownat(", "futimesat(", "symlinkat(", "linkat("))
+        at_style = any(stripped_line.startswith(call) for call in ("openat(", "openat2(", "unlinkat(", "renameat(", "renameat2(", "mkdirat(", "fchmodat(", "fchmodat2(", "fchownat(", "futimesat(", "symlinkat(", "linkat("))
         if at_style and relative_count > line.count("AT_FDCWD"):
             raise ValueError(f"unresolved relative dirfd in mutating syscall: {line}")
 
@@ -960,9 +1081,11 @@ def audit_trace_prefix(
     allowed_write_roots: list[Path],
     cwd: Path,
     allowed_write_paths: list[Path] | None = None,
+    allowed_fixture_roots: list[Path] | None = None,
 ) -> None:
     allowed_write_paths = allowed_write_paths or []
-    if not trace_prefix.is_absolute() or not cwd.is_absolute() or not allowed_write_roots or any(not root.is_absolute() for root in allowed_write_roots) or any(not path.is_absolute() for path in allowed_write_paths):
+    allowed_fixture_roots = allowed_fixture_roots or []
+    if not trace_prefix.is_absolute() or not cwd.is_absolute() or not allowed_write_roots or any(not root.is_absolute() for root in allowed_write_roots) or any(not path.is_absolute() for path in allowed_write_paths) or any(not root.is_absolute() for root in allowed_fixture_roots):
         raise ValueError("trace audit paths must be absolute")
     parent_fd, _ = _open_stable_directory(trace_prefix.parent)
     try:
@@ -989,11 +1112,112 @@ def audit_trace_prefix(
             finally:
                 os.close(fd)
             lines = [line.strip() for line in text.splitlines() if line.strip()]
-            if not lines or re.fullmatch(r"exit_group\(0\)\s+=\s+\?", lines[-1]) is None:
+            if not lines or re.fullmatch(r"(?:exit|exit_group)\(0\)\s+=\s+\?", lines[-1]) is None:
                 raise ValueError(f"trace shard did not complete successfully: {name}")
-            audit_trace_text(text, allowed_write_roots, cwd, allowed_write_paths)
+            audit_trace_text(text, allowed_write_roots, cwd, allowed_write_paths, allowed_fixture_roots)
     finally:
         os.close(parent_fd)
+
+
+def run_audited_command(
+    trace_prefix: Path,
+    cwd: Path,
+    allowed_write_roots: list[Path],
+    allowed_write_paths: list[Path],
+    env_overrides: list[str],
+    command: list[str],
+    allowed_fixture_roots: list[Path] | None = None,
+) -> tuple[Path, Path]:
+    allowed_fixture_roots = allowed_fixture_roots or []
+    if not trace_prefix.is_absolute() or not cwd.is_absolute() or not command:
+        raise ValueError("audited command paths and argv are required")
+    executable = Path(command[0])
+    if not executable.is_absolute():
+        raise ValueError("audited executable must be absolute")
+    resolved_executable = executable.resolve(strict=True)
+    _assert_no_symlink_components(resolved_executable)
+    executable_info = resolved_executable.stat(follow_symlinks=False)
+    if not stat.S_ISREG(executable_info.st_mode):
+        raise ValueError("audited executable must resolve to a regular file")
+    command = [str(resolved_executable), *command[1:]]
+    if any("\x00" in arg or any(ord(char) < 0x20 for char in arg) for arg in command):
+        raise ValueError("audited argv contains control characters")
+    env = dict(MINIMAL_ENV)
+    for binding in env_overrides:
+        key, separator, value = binding.partition("=")
+        if separator != "=" or key not in {"TMPDIR", "PYTHONPYCACHEPREFIX"} or not value.startswith("/") or "\x00" in value or "\n" in value:
+            raise ValueError("invalid audited environment override")
+        env[key] = value
+    parent_fd, _ = _open_stable_directory(trace_prefix.parent)
+    stdout_path = trace_prefix.with_name(trace_prefix.name + "-stdout.bin")
+    stderr_path = trace_prefix.with_name(trace_prefix.name + "-stderr.bin")
+    output_fds: list[int] = []
+    try:
+        parent_info = os.fstat(parent_fd)
+        if parent_info.st_uid != os.getuid() or stat.S_IMODE(parent_info.st_mode) != 0o700:
+            raise ValueError("audited trace parent must be owner-only")
+        if any(name.startswith(trace_prefix.name + ".") for name in os.listdir(parent_fd)):
+            raise FileExistsError("audited trace prefix already exists")
+        for output_path in (stdout_path, stderr_path):
+            fd = os.open(
+                output_path.name,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                0o600,
+                dir_fd=parent_fd,
+            )
+            output_fds.append(fd)
+        previous_umask = os.umask(0o077)
+        try:
+            completed = subprocess.run(
+                [
+                    "/usr/bin/strace", "-ff", "-qq", "-s", "4096", "-yy",
+                    "-e", "trace=all", "-o", str(trace_prefix), *command,
+                ],
+                cwd=cwd,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=output_fds[0],
+                stderr=output_fds[1],
+                close_fds=True,
+                check=False,
+            )
+        finally:
+            os.umask(previous_umask)
+    finally:
+        for fd in output_fds:
+            os.close(fd)
+        os.close(parent_fd)
+    executable_post = resolved_executable.stat(follow_symlinks=False)
+    if (executable_info.st_dev, executable_info.st_ino, executable_info.st_mode, executable_info.st_uid, executable_info.st_gid) != (
+        executable_post.st_dev, executable_post.st_ino, executable_post.st_mode, executable_post.st_uid, executable_post.st_gid
+    ):
+        raise ValueError("audited executable identity drifted")
+    audit_trace_prefix(
+        trace_prefix,
+        allowed_write_roots,
+        cwd,
+        [*allowed_write_paths, stdout_path, stderr_path],
+        allowed_fixture_roots,
+    )
+    if completed.returncode != 0:
+        raise ValueError(f"audited command failed with exit {completed.returncode}")
+    _verify_private_file(stdout_path)
+    _verify_private_file(stderr_path)
+    return stdout_path, stderr_path
+
+
+def verify_pins(bindings: list[str]) -> None:
+    if not bindings:
+        raise ValueError("at least one immutable pin is required")
+    seen: set[Path] = set()
+    for binding in bindings:
+        expected, separator, raw_path = binding.partition("=")
+        path = Path(raw_path)
+        if separator != "=" or HEX64.fullmatch(expected) is None or not path.is_absolute() or path in seen:
+            raise ValueError("invalid immutable pin")
+        if sha256_file(path) != expected:
+            raise ValueError(f"immutable pin mismatch: {path}")
+        seen.add(path)
 
 
 def write_failure_receipt(
@@ -1051,7 +1275,18 @@ def main() -> int:
     audit.add_argument("--trace-prefix", type=Path, required=True)
     audit.add_argument("--allowed-write-root", type=Path, action="append", required=True)
     audit.add_argument("--allowed-write-path", type=Path, action="append", default=[])
+    audit.add_argument("--allowed-fixture-root", type=Path, action="append", default=[])
     audit.add_argument("--cwd", type=Path, required=True)
+    audited_run = sub.add_parser("run-audited")
+    audited_run.add_argument("--trace-prefix", type=Path, required=True)
+    audited_run.add_argument("--allowed-write-root", type=Path, action="append", required=True)
+    audited_run.add_argument("--allowed-write-path", type=Path, action="append", default=[])
+    audited_run.add_argument("--allowed-fixture-root", type=Path, action="append", default=[])
+    audited_run.add_argument("--cwd", type=Path, required=True)
+    audited_run.add_argument("--env", action="append", default=[])
+    audited_run.add_argument("argv", nargs=argparse.REMAINDER)
+    pins = sub.add_parser("verify-pins")
+    pins.add_argument("--pin", action="append", required=True)
     failure = sub.add_parser("write-failure-receipt")
     failure.add_argument("--control-root", type=Path, required=True)
     failure.add_argument("--nonce", required=True)
@@ -1078,8 +1313,25 @@ def main() -> int:
     create.add_argument("--plan-sha256", required=True)
     create.add_argument("--prompt-sha256", required=True)
     args = parser.parse_args()
+    if args.command == "verify-pins":
+        verify_pins(args.pin)
+        return 0
+    if args.command == "run-audited":
+        command = args.argv[1:] if args.argv and args.argv[0] == "--" else args.argv
+        stdout_path, stderr_path = run_audited_command(
+            args.trace_prefix,
+            args.cwd,
+            args.allowed_write_root,
+            args.allowed_write_path,
+            args.env,
+            command,
+            args.allowed_fixture_root,
+        )
+        print(stdout_path)
+        print(stderr_path)
+        return 0
     if args.command == "audit-trace":
-        audit_trace_prefix(args.trace_prefix, args.allowed_write_root, args.cwd, args.allowed_write_path)
+        audit_trace_prefix(args.trace_prefix, args.allowed_write_root, args.cwd, args.allowed_write_path, args.allowed_fixture_root)
         return 0
     if args.command == "write-failure-receipt":
         output = write_failure_receipt(
