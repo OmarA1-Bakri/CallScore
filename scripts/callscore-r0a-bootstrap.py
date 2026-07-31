@@ -16,8 +16,10 @@ import re
 import stat
 import subprocess
 import sys
+import tempfile
 import unicodedata
 from typing import Any
+
 
 SCHEMA = "callscore.r0a_input_manifest.v1"
 SPEC_SCHEMA = "callscore.r0a_bootstrap_spec.v1"
@@ -33,6 +35,11 @@ MINIMAL_ENV = {
     "LANG": "C.UTF-8",
     "LC_ALL": "C.UTF-8",
     "PYTHONDONTWRITEBYTECODE": "1",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_OPTIONAL_LOCKS": "0",
+    "GIT_PAGER": "/usr/bin/cat",
 }
 SPEC_PATH = APPLICATION_REPO / "docs/ops/callscore-r0a/bootstrap/input-spec.json"
 EXPECTED_HERMES_ANCHORS = (
@@ -186,6 +193,54 @@ def _trace_int(value: str) -> int:
     if re.fullmatch(r"(?:0[xX][0-9a-fA-F]+|[0-9]+)", token) is None:
         raise ValueError(f"unresolved strace integer: {value}")
     return int(token, 0)
+
+
+def _normalise_trace_records(text: str, *, require_timestamps: bool = False) -> list[tuple[float, str]]:
+    records: list[tuple[float, str]] = []
+    pending: tuple[float, str, str] | None = None
+    sequence = 0
+    for raw_line in text.splitlines():
+        if not raw_line.strip():
+            continue
+        timestamp = float(sequence)
+        line = raw_line.strip()
+        timestamp_match = re.match(r"^([0-9]+\.[0-9]+)\s+(.*)$", line)
+        if timestamp_match is not None:
+            timestamp = float(timestamp_match.group(1))
+            line = timestamp_match.group(2)
+        elif require_timestamps:
+            raise ValueError(f"trace record has no absolute timestamp: {raw_line}")
+        sequence += 1
+        unfinished = re.search(r"<unfinished \.\.\.>$", line)
+        if unfinished is not None:
+            if pending is not None:
+                raise ValueError("nested unfinished strace records")
+            call_match = re.match(r"\s*([A-Za-z0-9_]+)\(", line)
+            if call_match is None:
+                raise ValueError(f"unparsed unfinished strace record: {line}")
+            pending = (timestamp, call_match.group(1), line[:unfinished.start()])
+            continue
+        resumed = re.match(r"<\.\.\.\s+([A-Za-z0-9_]+) resumed>(.*)$", line)
+        if resumed is not None:
+            if pending is None or resumed.group(1) != pending[1]:
+                raise ValueError(f"unmatched resumed strace record: {line}")
+            records.append((pending[0], pending[2] + resumed.group(2)))
+            pending = None
+            continue
+        records.append((timestamp, line))
+    if pending is not None:
+        raise ValueError(f"unfinished strace record: {pending[1]}")
+    return records
+
+
+def _trace_exec_argv(value: str) -> list[str]:
+    token = value.strip()
+    if not token.startswith("[") or not token.endswith("]") or "..." in token:
+        raise ValueError("truncated exec argv")
+    encoded = re.findall(r'"((?:[^"\\]|\\.)*)"', token)
+    if not encoded and token != "[]":
+        raise ValueError("unresolved exec argv")
+    return [_decode_trace_string(item) for item in encoded]
 
 
 def _validate_canonical_value(value: Any) -> None:
@@ -514,18 +569,46 @@ def audit_trace_text(
     cwd: Path,
     allowed_write_paths: list[Path] | None = None,
     allowed_fixture_roots: list[Path] | None = None,
-) -> None:
+    allowed_exec_paths: list[Path] | None = None,
+    trace_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     allowed_write_paths = allowed_write_paths or []
     allowed_fixture_roots = allowed_fixture_roots or []
+    allowed_exec_paths = allowed_exec_paths or []
     network_calls = (
         "socket(", "socketpair(", "connect(", "bind(", "listen(", "accept(", "accept4(",
         "sendto(", "sendmsg(", "sendmmsg(", "recvfrom(", "recvmsg(", "recvmmsg(", "shutdown(",
         "getsockname(", "getpeername(", "getsockopt(", "setsockopt(",
     )
-    current_cwd = Path(os.path.normpath(os.fspath(cwd)))
-    shared_mappings: list[tuple[int, int]] = []
-    for line in text.splitlines():
+    if trace_state is None:
+        trace_state = {"cwd": Path(os.path.normpath(os.fspath(cwd))), "shared_mappings": []}
+    current_cwd = Path(trace_state["cwd"])
+    shared_mappings: list[tuple[int, int]] = list(trace_state["shared_mappings"])
+    for _, line in _normalise_trace_records(text):
         stripped_line = line.lstrip()
+        execveat_match = re.match(r"\s*execveat\(", line)
+        if execveat_match is not None:
+            raise ValueError(f"execveat is not authorised: {line}")
+        exec_match = re.match(r"\s*execve\((.*)\)\s+=", line)
+        if exec_match is not None:
+            exec_args = _split_trace_args(exec_match.group(1))
+            if len(exec_args) < 2:
+                raise ValueError(f"truncated execve trace: {line}")
+            executable = _trace_arg_path(exec_args[0])
+            if not executable.is_absolute():
+                executable = current_cwd / executable
+            executable = Path(os.path.normpath(os.fspath(executable)))
+            approved = {Path(os.path.normpath(os.fspath(path))) for path in allowed_exec_paths}
+            if executable not in approved:
+                raise ValueError(f"unapproved execve target: {executable}")
+            argv = _trace_exec_argv(exec_args[1])
+            if not argv or Path(argv[0]).name != executable.name:
+                raise ValueError(f"execve argv identity mismatch: {line}")
+            if re.search(r"=\s*0(?:\s|$)", line):
+                shared_mappings.clear()
+            continue
+        if stripped_line.startswith("msync("):
+            raise ValueError(f"msync is forbidden: {line}")
         if any(stripped_line.startswith(call) for call in network_calls) or re.search(
             r"\d+<(?:socket|TCP|TCPv6|UDP|UDPv6|UNIX(?:-[A-Z]+)?|NETLINK)(?:[:<\[])", line
         ) is not None:
@@ -720,6 +803,9 @@ def audit_trace_text(
         at_style = any(stripped_line.startswith(call) for call in ("openat(", "openat2(", "unlinkat(", "renameat(", "renameat2(", "mkdirat(", "fchmodat(", "fchmodat2(", "fchownat(", "futimesat(", "symlinkat(", "linkat("))
         if at_style and relative_count > line.count("AT_FDCWD"):
             raise ValueError(f"unresolved relative dirfd in mutating syscall: {line}")
+    trace_state["cwd"] = current_cwd
+    trace_state["shared_mappings"] = shared_mappings
+    return trace_state
 
 
 def _assert_no_symlink_components(path: Path) -> None:
@@ -1082,25 +1168,34 @@ def audit_trace_prefix(
     cwd: Path,
     allowed_write_paths: list[Path] | None = None,
     allowed_fixture_roots: list[Path] | None = None,
+    allowed_exec_paths: list[Path] | None = None,
 ) -> None:
     allowed_write_paths = allowed_write_paths or []
     allowed_fixture_roots = allowed_fixture_roots or []
-    if not trace_prefix.is_absolute() or not cwd.is_absolute() or not allowed_write_roots or any(not root.is_absolute() for root in allowed_write_roots) or any(not path.is_absolute() for path in allowed_write_paths) or any(not root.is_absolute() for root in allowed_fixture_roots):
+    allowed_exec_paths = allowed_exec_paths or []
+    if not trace_prefix.is_absolute() or not cwd.is_absolute() or not allowed_write_roots or any(not root.is_absolute() for root in allowed_write_roots) or any(not path.is_absolute() for path in allowed_write_paths) or any(not root.is_absolute() for root in allowed_fixture_roots) or any(not path.is_absolute() for path in allowed_exec_paths):
         raise ValueError("trace audit paths must be absolute")
-    parent_fd, _ = _open_stable_directory(trace_prefix.parent)
+    parent_fd, parent_identity = _open_stable_directory(trace_prefix.parent)
+    events: list[tuple[float, int, str]] = []
     try:
         parent_info = os.fstat(parent_fd)
         if parent_info.st_uid != os.getuid() or stat.S_IMODE(parent_info.st_mode) != 0o700:
             raise ValueError("trace parent must be owner-only")
-        pattern = re.compile(re.escape(trace_prefix.name) + r"\.[1-9][0-9]*")
+        pattern = re.compile(re.escape(trace_prefix.name) + r"\.([1-9][0-9]*)")
         names = sorted(name for name in os.listdir(parent_fd) if pattern.fullmatch(name))
         if not names:
             raise ValueError("no per-process trace files found")
         for name in names:
+            pid_match = pattern.fullmatch(name)
+            if pid_match is None:
+                raise ValueError("invalid trace shard name")
+            pid = int(pid_match.group(1))
             fd = os.open(name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
             try:
-                info = os.fstat(fd)
-                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_size > 64 * 1024 * 1024:
+                before = os.fstat(fd)
+                if (not stat.S_ISREG(before.st_mode) or before.st_uid != os.getuid()
+                        or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1
+                        or before.st_size <= 0 or before.st_size > 64 * 1024 * 1024):
                     raise ValueError("invalid trace file")
                 chunks: list[bytes] = []
                 while True:
@@ -1108,15 +1203,55 @@ def audit_trace_prefix(
                     if not chunk:
                         break
                     chunks.append(chunk)
+                after = os.fstat(fd)
+                path_after = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                stable_fields = ("st_dev", "st_ino", "st_mode", "st_uid", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
+                if any(getattr(before, field) != getattr(after, field) or getattr(before, field) != getattr(path_after, field) for field in stable_fields):
+                    raise ValueError(f"trace file identity drift: {name}")
                 text = b"".join(chunks).decode("utf-8", "strict")
             finally:
                 os.close(fd)
-            lines = [line.strip() for line in text.splitlines() if line.strip()]
-            if not lines or re.fullmatch(r"(?:exit|exit_group)\(0\)\s+=\s+\?", lines[-1]) is None:
+            records = _normalise_trace_records(text, require_timestamps=True)
+            if not records or re.fullmatch(r"(?:exit|exit_group)\(0\)\s+=\s+\?", records[-1][1]) is None:
                 raise ValueError(f"trace shard did not complete successfully: {name}")
-            audit_trace_text(text, allowed_write_roots, cwd, allowed_write_paths, allowed_fixture_roots)
+            if any(re.match(r"\s*(?:exit|exit_group)\(", line) for _, line in records[:-1]):
+                raise ValueError(f"trace shard continued after process exit: {name}")
+            events.extend((timestamp, pid, line) for timestamp, line in records)
+        parent_after = os.fstat(parent_fd)
+        live_parent = trace_prefix.parent.stat(follow_symlinks=False)
+        if (parent_after.st_dev, parent_after.st_ino) != parent_identity or (live_parent.st_dev, live_parent.st_ino) != parent_identity:
+            raise ValueError("trace parent identity drift")
     finally:
         os.close(parent_fd)
+    events.sort(key=lambda item: (item[0], item[1]))
+    if not events:
+        raise ValueError("empty trace event set")
+    root_pid = events[0][1]
+    states: dict[int, dict[str, Any]] = {
+        root_pid: {"cwd": Path(os.path.normpath(os.fspath(cwd))), "shared_mappings": []}
+    }
+    for _, pid, line in events:
+        state = states.get(pid)
+        if state is None:
+            raise ValueError(f"trace child has no audited ancestry: {pid}")
+        audit_trace_text(
+            line,
+            allowed_write_roots,
+            cwd,
+            allowed_write_paths,
+            allowed_fixture_roots,
+            allowed_exec_paths,
+            state,
+        )
+        clone_match = re.match(r"\s*(?:clone|clone3|fork|vfork)\(.*\)\s+=\s*([1-9][0-9]*)", line)
+        if clone_match is not None:
+            child_pid = int(clone_match.group(1))
+            if child_pid in states:
+                raise ValueError(f"duplicate traced child pid: {child_pid}")
+            states[child_pid] = {
+                "cwd": Path(state["cwd"]),
+                "shared_mappings": list(state["shared_mappings"]),
+            }
 
 
 def run_audited_command(
@@ -1127,8 +1262,15 @@ def run_audited_command(
     env_overrides: list[str],
     command: list[str],
     allowed_fixture_roots: list[Path] | None = None,
+    allowed_exec_paths: list[Path] | None = None,
+    expected_trace_parent_identity: tuple[int, int] | None = None,
 ) -> tuple[Path, Path]:
     allowed_fixture_roots = allowed_fixture_roots or []
+    allowed_exec_paths = allowed_exec_paths or []
+    for candidate in [*allowed_write_roots, *allowed_write_paths]:
+        parts = Path(os.path.normpath(os.fspath(candidate))).parts
+        if any(parts[index] == ".git" and index + 1 < len(parts) and parts[index + 1] == "objects" for index in range(len(parts))):
+            raise ValueError("shared Git object storage cannot be a generic write allowlist")
     if not trace_prefix.is_absolute() or not cwd.is_absolute() or not command:
         raise ValueError("audited command paths and argv are required")
     executable = Path(command[0])
@@ -1139,6 +1281,15 @@ def run_audited_command(
     executable_info = resolved_executable.stat(follow_symlinks=False)
     if not stat.S_ISREG(executable_info.st_mode):
         raise ValueError("audited executable must resolve to a regular file")
+    approved_exec_paths = {executable, resolved_executable}
+    for approved_path in allowed_exec_paths:
+        if not approved_path.is_absolute():
+            raise ValueError("allowed executable path must be absolute")
+        approved_resolved = approved_path.resolve(strict=True)
+        _assert_no_symlink_components(approved_resolved)
+        if not approved_resolved.is_file():
+            raise ValueError("allowed executable must resolve to a regular file")
+        approved_exec_paths.update((approved_path, approved_resolved))
     command = [str(resolved_executable), *command[1:]]
     if any("\x00" in arg or any(ord(char) < 0x20 for char in arg) for arg in command):
         raise ValueError("audited argv contains control characters")
@@ -1148,7 +1299,7 @@ def run_audited_command(
         if separator != "=" or key not in {"TMPDIR", "PYTHONPYCACHEPREFIX"} or not value.startswith("/") or "\x00" in value or "\n" in value:
             raise ValueError("invalid audited environment override")
         env[key] = value
-    parent_fd, _ = _open_stable_directory(trace_prefix.parent)
+    parent_fd, _ = _open_stable_directory(trace_prefix.parent, expected_identity=expected_trace_parent_identity)
     stdout_path = trace_prefix.with_name(trace_prefix.name + "-stdout.bin")
     stderr_path = trace_prefix.with_name(trace_prefix.name + "-stderr.bin")
     output_fds: list[int] = []
@@ -1170,7 +1321,7 @@ def run_audited_command(
         try:
             completed = subprocess.run(
                 [
-                    "/usr/bin/strace", "-ff", "-qq", "-s", "4096", "-yy",
+                    "/usr/bin/strace", "-ff", "-qq", "-ttt", "-s", "4096", "-yy",
                     "-e", "trace=all", "-o", str(trace_prefix), *command,
                 ],
                 cwd=cwd,
@@ -1198,6 +1349,7 @@ def run_audited_command(
         cwd,
         [*allowed_write_paths, stdout_path, stderr_path],
         allowed_fixture_roots,
+        sorted(approved_exec_paths, key=os.fspath),
     )
     if completed.returncode != 0:
         raise ValueError(f"audited command failed with exit {completed.returncode}")
@@ -1220,6 +1372,32 @@ def verify_pins(bindings: list[str]) -> None:
         seen.add(path)
 
 
+def prepare_private_directory(parent: Path, name: str) -> tuple[int, int]:
+    if parent != WORKTREE_ROOT or not re.fullmatch(r"\.r0a-(?:empty-hooks|control)-[a-z0-9][a-z0-9-]{7,63}", name):
+        raise ValueError("private bootstrap directory is not canonical")
+    parent_fd, parent_identity = _open_stable_directory(parent)
+    try:
+        os.mkdir(name, 0o700, dir_fd=parent_fd)
+        child_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd)
+        try:
+            info = os.fstat(child_fd)
+            path_info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+                    or stat.S_IMODE(info.st_mode) != 0o700 or info.st_nlink < 2
+                    or (info.st_dev, info.st_ino) != (path_info.st_dev, path_info.st_ino)
+                    or os.listdir(child_fd)):
+                raise ValueError("private bootstrap directory validation failed")
+            identity = (info.st_dev, info.st_ino)
+        finally:
+            os.close(child_fd)
+        parent_after = os.fstat(parent_fd)
+        if (parent_after.st_dev, parent_after.st_ino) != parent_identity:
+            raise ValueError("bootstrap parent identity drift")
+        return identity
+    finally:
+        os.close(parent_fd)
+
+
 def write_failure_receipt(
     control_root: Path,
     nonce: str,
@@ -1229,6 +1407,7 @@ def write_failure_receipt(
     bootstrap_sha256: str,
     test_sha256: str,
     schema_sha256: str,
+    expected_control_identity: tuple[int, int],
 ) -> Path:
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]{7,63}", nonce):
         raise ValueError("invalid failure nonce")
@@ -1241,7 +1420,7 @@ def write_failure_receipt(
     for value in (bootstrap_sha256, test_sha256, schema_sha256):
         if not HEX64.fullmatch(value):
             raise ValueError("invalid failure receipt hash")
-    control_fd, identity = _open_stable_directory(control_root)
+    control_fd, identity = _open_stable_directory(control_root, expected_identity=expected_control_identity)
     try:
         info = os.fstat(control_fd)
         if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
@@ -1276,17 +1455,24 @@ def main() -> int:
     audit.add_argument("--allowed-write-root", type=Path, action="append", required=True)
     audit.add_argument("--allowed-write-path", type=Path, action="append", default=[])
     audit.add_argument("--allowed-fixture-root", type=Path, action="append", default=[])
+    audit.add_argument("--allowed-exec", type=Path, action="append", default=[])
     audit.add_argument("--cwd", type=Path, required=True)
     audited_run = sub.add_parser("run-audited")
     audited_run.add_argument("--trace-prefix", type=Path, required=True)
     audited_run.add_argument("--allowed-write-root", type=Path, action="append", required=True)
     audited_run.add_argument("--allowed-write-path", type=Path, action="append", default=[])
     audited_run.add_argument("--allowed-fixture-root", type=Path, action="append", default=[])
+    audited_run.add_argument("--allowed-exec", type=Path, action="append", default=[])
+    audited_run.add_argument("--trace-parent-device", type=int)
+    audited_run.add_argument("--trace-parent-inode", type=int)
     audited_run.add_argument("--cwd", type=Path, required=True)
     audited_run.add_argument("--env", action="append", default=[])
     audited_run.add_argument("argv", nargs=argparse.REMAINDER)
     pins = sub.add_parser("verify-pins")
     pins.add_argument("--pin", action="append", required=True)
+    prepare = sub.add_parser("prepare-private-directory")
+    prepare.add_argument("--parent", type=Path, required=True)
+    prepare.add_argument("--name", required=True)
     failure = sub.add_parser("write-failure-receipt")
     failure.add_argument("--control-root", type=Path, required=True)
     failure.add_argument("--nonce", required=True)
@@ -1296,6 +1482,8 @@ def main() -> int:
     failure.add_argument("--bootstrap-sha256", required=True)
     failure.add_argument("--test-sha256", required=True)
     failure.add_argument("--schema-sha256", required=True)
+    failure.add_argument("--control-device", type=int, required=True)
+    failure.add_argument("--control-inode", type=int, required=True)
     create = sub.add_parser("create")
     create.add_argument("--spec", type=Path, required=True)
     create.add_argument("--output", type=Path, required=True)
@@ -1313,11 +1501,18 @@ def main() -> int:
     create.add_argument("--plan-sha256", required=True)
     create.add_argument("--prompt-sha256", required=True)
     args = parser.parse_args()
+    if args.command == "prepare-private-directory":
+        device, inode = prepare_private_directory(args.parent, args.name)
+        print(f"{device}:{inode}")
+        return 0
     if args.command == "verify-pins":
         verify_pins(args.pin)
         return 0
     if args.command == "run-audited":
         command = args.argv[1:] if args.argv and args.argv[0] == "--" else args.argv
+        if (args.trace_parent_device is None) != (args.trace_parent_inode is None):
+            raise ValueError("trace parent device and inode must be provided together")
+        expected_trace_parent_identity = None if args.trace_parent_device is None else (args.trace_parent_device, args.trace_parent_inode)
         stdout_path, stderr_path = run_audited_command(
             args.trace_prefix,
             args.cwd,
@@ -1326,12 +1521,14 @@ def main() -> int:
             args.env,
             command,
             args.allowed_fixture_root,
+            args.allowed_exec,
+            expected_trace_parent_identity,
         )
         print(stdout_path)
         print(stderr_path)
         return 0
     if args.command == "audit-trace":
-        audit_trace_prefix(args.trace_prefix, args.allowed_write_root, args.cwd, args.allowed_write_path, args.allowed_fixture_root)
+        audit_trace_prefix(args.trace_prefix, args.allowed_write_root, args.cwd, args.allowed_write_path, args.allowed_fixture_root, args.allowed_exec)
         return 0
     if args.command == "write-failure-receipt":
         output = write_failure_receipt(
@@ -1343,6 +1540,7 @@ def main() -> int:
             args.bootstrap_sha256,
             args.test_sha256,
             args.schema_sha256,
+            (args.control_device, args.control_inode),
         )
         print(output)
         return 0

@@ -342,13 +342,35 @@ class BootstrapTests(unittest.TestCase):
         self.assertIn("/usr/bin/env -i HOME=/nonexistent PATH=/usr/bin:/bin", prompt)
         self.assertIn("R0A_GIT_ADMIN_ALLOWLIST", prompt)
         self.assertIn(".git/objects/", prompt)
-        self.assertIn("new loose objects only", prompt)
+        self.assertIn("new content-addressed objects only", prompt)
+        self.assertIn("prepare-private-directory", prompt)
+        self.assertIn("--trace-parent-device", prompt)
+        self.assertIn("--allowed-exec /usr/bin/git", prompt)
+        self.assertIn("strace -ff -qq -ttt -s 4096 -yy -e trace=all", prompt)
         self.assertIn("failed nonce is never reused", prompt)
         self.assertIn(".r0a-control-$R0A_NONCE/failure-receipt.json", prompt)
         self.assertIn("bootstrap validator plus the committed Draft 2020-12 schema form the composite runtime boundary", prompt)
         self.assertIn("run-audited --trace-prefix", prompt)
         self.assertIn("bootstrap_blocked_unreceipted", prompt)
         self.assertIn('"HOME": "/nonexistent"', SCRIPT.read_text())
+
+    def test_prepare_private_directory_is_create_only_and_descriptor_bound(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            root.chmod(0o700)
+            old_root = MODULE.WORKTREE_ROOT
+            setattr(MODULE, "WORKTREE_ROOT", root)
+            try:
+                name = ".r0a-control-testnonce"
+                identity = MODULE.prepare_private_directory(root, name)
+                created = root / name
+                self.assertEqual(identity, (created.stat().st_dev, created.stat().st_ino))
+                self.assertEqual(stat.S_IMODE(created.stat().st_mode), 0o700)
+                self.assertEqual(list(created.iterdir()), [])
+                with self.assertRaises(FileExistsError):
+                    MODULE.prepare_private_directory(root, name)
+            finally:
+                setattr(MODULE, "WORKTREE_ROOT", old_root)
 
     def test_verify_pins_rejects_hash_mismatch(self):
         with tempfile.TemporaryDirectory() as td:
@@ -380,6 +402,17 @@ class BootstrapTests(unittest.TestCase):
             )
             self.assertEqual(stdout_path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(stderr_path.stat().st_mode & 0o777, 0o600)
+            git_objects = root / ".git" / "objects"
+            git_objects.mkdir(parents=True)
+            with self.assertRaises(ValueError):
+                MODULE.run_audited_command(
+                    root / "objects.trace",
+                    root,
+                    [git_objects],
+                    [],
+                    [],
+                    ["/usr/bin/true"],
+                )
             with self.assertRaises(ValueError):
                 MODULE.run_audited_command(
                     root / "network.trace",
@@ -397,24 +430,38 @@ class BootstrapTests(unittest.TestCase):
             allowed = root / "allowed"
             allowed.mkdir(mode=0o700)
             prefix = root / "trace"
-            (root / "trace.123").write_text(
-                f'openat(AT_FDCWD<{allowed}>, "x", O_WRONLY|O_CREAT, 0600) = 3<{allowed}/x>\nexit_group(0) = ?\n'
+            trace = root / "trace.123"
+            trace.write_text(
+                f'1.000000 openat(AT_FDCWD<{allowed}>, "x", O_WRONLY|O_CREAT, 0600) = 3<{allowed}/x>\n'
+                '1.000001 exit_group(0) = ?\n'
             )
+            trace.chmod(0o644)
+            with self.assertRaises(ValueError):
+                MODULE.audit_trace_prefix(prefix, [allowed], allowed)
+            trace.chmod(0o600)
             MODULE.audit_trace_prefix(prefix, [allowed], allowed)
             (root / "trace.124").symlink_to(root / "trace.123")
             with self.assertRaises(OSError):
                 MODULE.audit_trace_prefix(prefix, [allowed], allowed)
 
             (root / "trace.124").unlink()
+            trace.unlink()
             exact = root / "exact.lock"
-            (root / "trace.125").write_text(
-                f'openat(AT_FDCWD<{allowed}>, "{exact}", O_WRONLY|O_CREAT, 0600) = 4<{exact}>\nexit_group(0) = ?\n'
+            trace = root / "trace.125"
+            trace.write_text(
+                f'2.000000 openat(AT_FDCWD<{allowed}>, "{exact}", O_WRONLY|O_CREAT, 0600) = 4<{exact}>\n'
+                '2.000001 exit_group(0) = ?\n'
             )
+            trace.chmod(0o600)
             MODULE.audit_trace_prefix(prefix, [allowed], allowed, [exact])
+            trace.unlink()
             sibling = root / "unexpected"
-            (root / "trace.126").write_text(
-                f'openat(AT_FDCWD<{allowed}>, "{sibling}", O_WRONLY|O_CREAT, 0600) = 5<{sibling}>\nexit_group(0) = ?\n'
+            trace = root / "trace.126"
+            trace.write_text(
+                f'3.000000 openat(AT_FDCWD<{allowed}>, "{sibling}", O_WRONLY|O_CREAT, 0600) = 5<{sibling}>\n'
+                '3.000001 exit_group(0) = ?\n'
             )
+            trace.chmod(0o600)
             with self.assertRaises(ValueError):
                 MODULE.audit_trace_prefix(prefix, [allowed], allowed, [exact])
 
@@ -425,14 +472,93 @@ class BootstrapTests(unittest.TestCase):
             allowed = root / "allowed"
             allowed.mkdir(mode=0o700)
             prefix = root / "trace"
-            (root / "trace.123").write_text('read(0</dev/null>, "", 1) = 0\n')
+            trace = root / "trace.123"
+            trace.write_text('1.000000 read(0</dev/null>, "", 1) = 0\n')
+            trace.chmod(0o600)
             with self.assertRaises(ValueError):
                 MODULE.audit_trace_prefix(prefix, [allowed], allowed)
-            (root / "trace.123").write_text("exit_group(1) = ?\n")
+            trace.write_text("1.000000 exit_group(1) = ?\n")
             with self.assertRaises(ValueError):
                 MODULE.audit_trace_prefix(prefix, [allowed], allowed)
-            (root / "trace.123").write_text("exit(0) = ?\n")
+            trace.write_text("1.000000 exit(0) = ?\n")
             MODULE.audit_trace_prefix(prefix, [allowed], allowed)
+
+    def test_trace_rejects_unfinished_exec_msync_and_cross_shard_inheritance_bypasses(self):
+        with self.assertRaises(ValueError):
+            MODULE.audit_trace_text('read(0</dev/null>, "", 1 <unfinished ...>\n', [Path("/tmp")], Path("/tmp"))
+        with self.assertRaises(ValueError):
+            MODULE.audit_trace_text('<... read resumed>) = 0\n', [Path("/tmp")], Path("/tmp"))
+        with self.assertRaises(ValueError):
+            MODULE.audit_trace_text('msync(0x1000, 4096, MS_SYNC) = 0\n', [Path("/tmp")], Path("/tmp"))
+        with self.assertRaises(ValueError):
+            MODULE.audit_trace_text('execve("/tmp/hook", ["/tmp/hook"], 0x0) = 0\n', [Path("/tmp")], Path("/tmp"))
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            root.chmod(0o700)
+            allowed = root / "allowed"
+            allowed.mkdir(mode=0o700)
+            prefix = root / "trace"
+
+            parent = root / "trace.123"
+            child = root / "trace.124"
+            parent.write_text(
+                '1.000000 chdir("/etc") = 0\n'
+                '2.000000 clone(child_stack=NULL, flags=SIGCHLD) = 124\n'
+                '5.000000 exit_group(0) = ?\n'
+            )
+            child.write_text(
+                '3.000000 unlink("passwd") = 0\n'
+                '4.000000 exit(0) = ?\n'
+            )
+            parent.chmod(0o600)
+            child.chmod(0o600)
+            with self.assertRaises(ValueError):
+                MODULE.audit_trace_prefix(prefix, [allowed], allowed)
+
+            parent.unlink()
+            child.unlink()
+            parent = root / "trace.125"
+            child = root / "trace.126"
+            parent.write_text(
+                '10.000000 mmap(NULL, 4096, PROT_READ, MAP_SHARED, 3</tmp/cache>, 0) = 0x1000\n'
+                '11.000000 clone(child_stack=NULL, flags=SIGCHLD) = 126\n'
+                '14.000000 exit_group(0) = ?\n'
+            )
+            child.write_text(
+                '12.000000 mprotect(0x1000, 4096, PROT_READ|PROT_WRITE) = 0\n'
+                '13.000000 exit(0) = ?\n'
+            )
+            parent.chmod(0o600)
+            child.chmod(0o600)
+            with self.assertRaises(ValueError):
+                MODULE.audit_trace_prefix(prefix, [allowed], allowed)
+
+    def test_trace_file_replacement_during_read_is_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            root.chmod(0o700)
+            allowed = root / "allowed"
+            allowed.mkdir(mode=0o700)
+            trace = root / "trace.123"
+            trace.write_text('1.000000 exit_group(0) = ?\n')
+            trace.chmod(0o600)
+            real_read = MODULE.os.read
+            replaced = False
+
+            def racing_read(fd, size):
+                nonlocal replaced
+                chunk = real_read(fd, size)
+                if chunk and not replaced:
+                    replaced = True
+                    trace.rename(root / "trace.original")
+                    trace.write_text('1.000000 openat(AT_FDCWD</etc>, "passwd", O_WRONLY) = 3</etc/passwd>\n1.000001 exit_group(0) = ?\n')
+                    trace.chmod(0o600)
+                return chunk
+
+            with mock.patch.object(MODULE.os, "read", side_effect=racing_read):
+                with self.assertRaises(ValueError):
+                    MODULE.audit_trace_prefix(root / "trace", [allowed], allowed)
 
     def test_failure_receipt_has_exact_create_only_contract(self):
         with tempfile.TemporaryDirectory() as td:
@@ -452,6 +578,7 @@ class BootstrapTests(unittest.TestCase):
                     "a" * 64,
                     "b" * 64,
                     "c" * 64,
+                    (control.stat().st_dev, control.stat().st_ino),
                 )
                 receipt = MODULE.load_json_strict(output.read_bytes())
                 self.assertEqual(
@@ -461,7 +588,13 @@ class BootstrapTests(unittest.TestCase):
                 self.assertEqual(output.read_bytes(), MODULE.canonical_bytes(receipt))
                 self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
                 with self.assertRaises(FileExistsError):
-                    MODULE.write_failure_receipt(control, nonce, "preworktree", "bootstrap-unit-tests", 1, "a" * 64, "b" * 64, "c" * 64)
+                    MODULE.write_failure_receipt(control, nonce, "preworktree", "bootstrap-unit-tests", 1, "a" * 64, "b" * 64, "c" * 64, (control.stat().st_dev, control.stat().st_ino))
+                original_identity = (control.stat().st_dev, control.stat().st_ino)
+                displaced = root / "displaced-control"
+                control.rename(displaced)
+                control.mkdir(mode=0o700)
+                with self.assertRaises(ValueError):
+                    MODULE.write_failure_receipt(control, nonce, "preworktree", "replacement", 1, "a" * 64, "b" * 64, "c" * 64, original_identity)
             finally:
                 setattr(MODULE, "WORKTREE_ROOT", old_root)
 
