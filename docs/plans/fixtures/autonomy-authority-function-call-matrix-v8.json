@@ -2,9 +2,9 @@
   "contract": "Every SECURITY DEFINER authority function has fixed search_path, explicit ACL ownership/grants, and a direct fixture call or installed-caller path. Exact positive and fail-closed predicates are in the referenced SQL lines.",
   "coverage_issues": [],
   "fixed_search_path_security_definer_count": 49,
-  "fixture_path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v7.sql",
-  "fixture_sha256": "9fefe55a0b82c6e6e818e22d9f374bd491c98751b3c21f29e365a07547db849b",
-  "fixture_start_line": 3401,
+  "fixture_path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v8.sql",
+  "fixture_sha256": "d1ad86357f8e2f397813e085304e157fad99a80ba9cb15d58e84d163af795ea3",
+  "fixture_start_line": 3428,
   "function_count": 50,
   "functions": [
     {
@@ -13,7 +13,9 @@
       "fixture_call_lines": [],
       "function": "set_ledger_hash",
       "granted_roles": [],
-      "internal_call_lines": [],
+      "internal_call_lines": [
+        1098
+      ],
       "security_definer": true
     },
     {
@@ -22,7 +24,10 @@
       "fixture_call_lines": [],
       "function": "reject_append_only_mutation",
       "granted_roles": [],
-      "internal_call_lines": [],
+      "internal_call_lines": [
+        1102,
+        1121
+      ],
       "security_definer": true
     },
     {
@@ -31,7 +36,9 @@
       "fixture_call_lines": [],
       "function": "reject_projection_delete",
       "granted_roles": [],
-      "internal_call_lines": [],
+      "internal_call_lines": [
+        1113
+      ],
       "security_definer": true
     },
     {
@@ -49,7 +56,7 @@
       "definition_line": 1150,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3412
+        3437
       ],
       "function": "enqueue_autonomy_workflow",
       "granted_roles": [
@@ -62,7 +69,7 @@
       "definition_line": 1189,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3418
+        3443
       ],
       "function": "backfill_legacy_channel_tasks",
       "granted_roles": [],
@@ -75,16 +82,18 @@
       "fixture_call_lines": [],
       "function": "reject_legacy_channel_task_reactivation",
       "granted_roles": [],
-      "internal_call_lines": [],
+      "internal_call_lines": [
+        1260
+      ],
       "security_definer": true
     },
     {
       "definition_line": 1262,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3466,
-        4433,
-        4434
+        3491,
+        4474,
+        4475
       ],
       "function": "set_activation_fence",
       "granted_roles": [
@@ -97,166 +106,166 @@
       "definition_line": 1295,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3607,
-        3608,
-        3609
+        3632,
+        3633,
+        3634
       ],
       "function": "record_specialist_requirement",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3394
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1330,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3635,
-        3653,
-        3679,
-        3774,
-        4224
+        3660,
+        3678,
+        3704,
+        3799,
+        4249
       ],
       "function": "create_agent_delegation",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3395
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1367,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3705,
-        3717
+        3730,
+        3742
       ],
       "function": "record_child_join_manifest",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3396
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1405,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3660,
-        3661,
-        3666,
-        3678,
+        3685,
         3686,
-        3687,
-        3694,
-        3778,
-        3779,
-        3786
+        3691,
+        3703,
+        3711,
+        3712,
+        3719,
+        3803,
+        3804,
+        3811
       ],
       "function": "record_agent_delegation_event",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3397
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1464,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3516,
-        3589,
-        3590,
-        3649,
-        3650,
-        3651,
-        3652,
-        3699,
-        3723,
+        3541,
+        3614,
+        3615,
+        3674,
+        3675,
+        3676,
+        3677,
         3724,
-        3725,
-        3726,
-        3727,
-        3729,
-        3730,
-        3772,
-        3773,
-        3794,
-        3795,
-        3796,
+        3748,
+        3749,
+        3750,
+        3751,
+        3752,
+        3754,
+        3755,
         3797,
         3798,
-        3824,
-        3825,
-        3826,
-        3827,
-        3828,
-        3829,
-        3830,
-        3831,
-        3832,
-        3833,
-        3834,
-        3835,
-        3836,
-        3837,
-        3838,
-        4077,
-        4083,
+        3819,
+        3820,
+        3821,
+        3822,
+        3823,
+        3849,
+        3850,
+        3851,
+        3852,
+        3853,
+        3854,
+        3855,
+        3856,
+        3857,
+        3858,
+        3859,
+        3860,
+        3861,
+        3862,
+        3863,
+        4102,
         4108,
-        4114,
-        4150,
-        4155,
-        4393,
-        4394,
-        4395,
-        4396,
-        4397,
-        4398,
-        4399,
-        4400
+        4133,
+        4139,
+        4175,
+        4180,
+        4418,
+        4419,
+        4420,
+        4421,
+        4422,
+        4423,
+        4424,
+        4425
       ],
       "function": "record_autonomy_artifact",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3398
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1485,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3459,
-        3540,
-        3593,
-        3599,
-        3674,
-        3675,
-        3690,
-        3691,
-        3782,
-        3783,
-        3801,
-        3842,
-        3876,
-        3893,
-        3950,
-        3973,
-        3988,
-        4092,
-        4121,
-        4178,
-        4184,
-        4291,
-        4404,
-        4405,
-        4406,
-        4407,
-        4408,
-        4409,
-        4425
+        3484,
+        3565,
+        3618,
+        3624,
+        3699,
+        3700,
+        3715,
+        3716,
+        3807,
+        3808,
+        3826,
+        3867,
+        3901,
+        3918,
+        3975,
+        3998,
+        4013,
+        4117,
+        4146,
+        4203,
+        4209,
+        4316,
+        4429,
+        4446,
+        4447,
+        4448,
+        4449,
+        4450,
+        4466
       ],
       "function": "record_verified_evidence_binding",
       "granted_roles": [
@@ -269,7 +278,7 @@
       "definition_line": 1524,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3849
+        3874
       ],
       "function": "record_canonical_policy_snapshot",
       "granted_roles": [
@@ -295,9 +304,9 @@
         2135,
         2210,
         2243,
-        2569,
-        2624,
-        2931
+        2594,
+        2649,
+        2956
       ],
       "security_definer": true
     },
@@ -305,112 +314,112 @@
       "definition_line": 1572,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3473,
-        4314
+        3498,
+        4339
       ],
       "function": "claim_autonomy_workflow",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3388
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1608,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3615
+        3640
       ],
       "function": "schedule_autonomy_retry",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3389
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1673,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3623
+        3648
       ],
       "function": "resume_due_autonomy_retry",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3390
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1719,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3502,
-        3510
+        3527,
+        3535
       ],
       "function": "resume_or_reclaim_autonomy_workflow",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3391
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1751,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3611,
-        3719,
-        3768,
-        3819,
-        3918,
-        3999,
-        4000,
-        4145,
-        4146,
-        4147,
-        4326
+        3636,
+        3744,
+        3793,
+        3844,
+        3943,
+        4024,
+        4025,
+        4170,
+        4171,
+        4172,
+        4351
       ],
       "function": "transition_autonomy_workflow",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3393
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1859,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3474
+        3499
       ],
       "function": "heartbeat_autonomy_workflow",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3392
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1886,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3869,
-        3908
+        3894,
+        3933
       ],
       "function": "create_provider_operation_intent",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3403
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 1918,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3904,
-        3915
+        3929,
+        3940
       ],
       "function": "mint_ready_public_owned_grant",
       "granted_roles": [
@@ -423,12 +432,10 @@
       "definition_line": 1973,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3931
+        3956
       ],
       "function": "revoke_external_action_grant",
-      "granted_roles": [
-        "callscore_plan_policy_writer"
-      ],
+      "granted_roles": [],
       "internal_call_lines": [],
       "security_definer": true
     },
@@ -436,97 +443,97 @@
       "definition_line": 1991,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3735,
-        3748,
-        3756,
-        3762,
-        3787
+        3760,
+        3773,
+        3781,
+        3787,
+        3812
       ],
       "function": "record_generation_provenance",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3399
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2079,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3810,
-        3811,
-        3812,
-        3813,
-        3814
+        3835,
+        3836,
+        3837,
+        3838,
+        3839
       ],
       "function": "record_quality_gate_evidence",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3400
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2117,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3815
+        3840
       ],
       "function": "record_quality_evaluation",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3401
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2201,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4485
+        4701
       ],
       "function": "record_artifact_revision",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3402
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2232,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3919,
-        3924
+        3944,
+        3949
       ],
       "function": "create_provider_operation",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3404
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2274,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        3941,
-        3947,
-        4284,
-        4344
+        3966,
+        3972,
+        4309,
+        4369
       ],
       "function": "mark_provider_dispatching",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3405
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2298,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4413
+        4454
       ],
       "function": "record_review_execution_attestation",
       "granted_roles": [
@@ -539,256 +546,253 @@
       "definition_line": 2334,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4422,
-        4423,
-        4424
+        4463,
+        4464,
+        4465
       ],
       "function": "record_autonomy_review_receipt",
-      "granted_roles": [
-        "callscore_plan_report_verifier"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3420
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2359,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4454,
-        4473
+        4653,
+        4677
       ],
       "function": "record_provider_object_rollback_receipt",
-      "granted_roles": [
-        "callscore_plan_report_verifier"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3421
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2389,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4455
+        4654,
+        4682
       ],
       "function": "record_runtime_variant_rollback_receipt",
-      "granted_roles": [
-        "callscore_plan_report_verifier"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3422
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
       "definition_line": 2428,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4460,
-        4516
+        4660,
+        4732
       ],
       "function": "insert_verified_autonomy_report",
-      "granted_roles": [
-        "callscore_plan_report_verifier"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3423
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
-      "definition_line": 2549,
+      "definition_line": 2574,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4005,
-        4016
+        4030,
+        4041
       ],
       "function": "record_outcome_measurement",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3411
       ],
-      "internal_call_lines": [],
       "security_definer": true
     },
     {
-      "definition_line": 2609,
+      "definition_line": 2634,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4100,
-        4134
+        4125,
+        4159
       ],
       "function": "record_canonical_learning_set",
-      "granted_roles": [
-        "callscore_plan_runtime"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 2693,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        4283
-      ],
-      "function": "reclaim_provider_claim",
-      "granted_roles": [
-        "callscore_plan_runtime"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 2728,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        4536
-      ],
-      "function": "compute_runtime_experiment_statistics",
-      "granted_roles": [
-        "callscore_plan_runtime"
-      ],
+      "granted_roles": [],
       "internal_call_lines": [
-        3026,
-        3072
+        3412
       ],
       "security_definer": true
     },
     {
-      "definition_line": 2817,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        3552,
-        3553,
-        3556,
-        4196,
-        4207
-      ],
-      "function": "import_runtime_experiment_bundle",
-      "granted_roles": [
-        "callscore_plan_policy_writer"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 2900,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        4202
-      ],
-      "function": "conclude_runtime_experiment",
-      "granted_roles": [
-        "callscore_plan_policy_writer"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 2923,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        3610,
-        3659,
-        3685,
-        3777
-      ],
-      "function": "assign_runtime_variant",
-      "granted_roles": [
-        "callscore_plan_runtime"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 2989,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        4494
-      ],
-      "function": "promote_runtime_variant",
-      "granted_roles": [
-        "callscore_plan_runtime"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 3055,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        4502
-      ],
-      "function": "rollback_runtime_variant",
-      "granted_roles": [
-        "callscore_plan_runtime"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 3102,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        3960,
-        3983,
-        4301,
-        4359,
-        4368,
-        4378
-      ],
-      "function": "record_provider_readback_evidence",
-      "granted_roles": [
-        "callscore_plan_report_verifier"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 3159,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        3967,
-        3995
-      ],
-      "function": "record_provider_result",
-      "granted_roles": [
-        "callscore_plan_runtime"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 3220,
-      "fixed_search_path": true,
-      "fixture_call_lines": [
-        4288
-      ],
-      "function": "reconcile_ambiguous_provider_dispatch",
-      "granted_roles": [
-        "callscore_plan_runtime"
-      ],
-      "internal_call_lines": [],
-      "security_definer": true
-    },
-    {
-      "definition_line": 3243,
+      "definition_line": 2718,
       "fixed_search_path": true,
       "fixture_call_lines": [
         4308
       ],
-      "function": "confirm_provider_not_performed",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "function": "reclaim_provider_claim",
+      "granted_roles": [],
+      "internal_call_lines": [
+        3406
       ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2753,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        4615,
+        4756
+      ],
+      "function": "compute_runtime_experiment_statistics",
+      "granted_roles": [],
+      "internal_call_lines": [
+        3051,
+        3097,
+        3413
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2842,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3577,
+        3578,
+        3581,
+        4221,
+        4232
+      ],
+      "function": "import_runtime_experiment_bundle",
+      "granted_roles": [],
       "internal_call_lines": [],
       "security_definer": true
     },
     {
-      "definition_line": 3272,
+      "definition_line": 2925,
       "fixed_search_path": true,
       "fixture_call_lines": [
-        4309
+        4227
+      ],
+      "function": "conclude_runtime_experiment",
+      "granted_roles": [],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2948,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3635,
+        3684,
+        3710,
+        3802
+      ],
+      "function": "assign_runtime_variant",
+      "granted_roles": [],
+      "internal_call_lines": [
+        3413
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 3014,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        4624,
+        4710
+      ],
+      "function": "promote_runtime_variant",
+      "granted_roles": [],
+      "internal_call_lines": [
+        3414
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 3080,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        4647,
+        4718
+      ],
+      "function": "rollback_runtime_variant",
+      "granted_roles": [],
+      "internal_call_lines": [
+        3414
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 3127,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3985,
+        4008,
+        4326,
+        4384,
+        4393,
+        4403
+      ],
+      "function": "record_provider_readback_evidence",
+      "granted_roles": [],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 3184,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3992,
+        4020
+      ],
+      "function": "record_provider_result",
+      "granted_roles": [],
+      "internal_call_lines": [
+        3407
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 3245,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        4313
+      ],
+      "function": "reconcile_ambiguous_provider_dispatch",
+      "granted_roles": [],
+      "internal_call_lines": [
+        3408
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 3268,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        4333
+      ],
+      "function": "confirm_provider_not_performed",
+      "granted_roles": [],
+      "internal_call_lines": [
+        3409
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 3297,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        4334
       ],
       "function": "reclaim_confirmed_not_performed",
-      "granted_roles": [
-        "callscore_plan_runtime"
+      "granted_roles": [],
+      "internal_call_lines": [
+        3410
       ],
-      "internal_call_lines": [],
       "security_definer": true
     }
   ]

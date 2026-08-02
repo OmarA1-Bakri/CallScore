@@ -23,14 +23,11 @@ PHASES = ("A0", *tuple("ABCDEFGHIJ"))
 REVIEW_TYPES = ("contract", "implementation", "security")
 EVIDENCE_VALIDATOR: Draft202012Validator | None = None
 FROZEN_EVIDENCE: dict[Path, bytes] = {}
+REVIEW_ATTESTATION_LEDGER: dict[str, dict[str, Any]] = {}
 
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
-
-
-def load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def artifact_paths(report: dict[str, Any]) -> set[Path]:
@@ -50,6 +47,18 @@ def artifact_paths(report: dict[str, Any]) -> set[Path]:
 
     visit(report)
     return paths
+
+
+def frozen_json(path: Path) -> dict[str, Any]:
+    """Parse semantics only from the exact byte snapshot captured before verification."""
+    resolved = path.resolve(strict=False)
+    data = FROZEN_EVIDENCE.get(resolved)
+    if data is None:
+        raise ValueError(f"path was not frozen: {resolved}")
+    payload = json.loads(data)
+    if not isinstance(payload, dict):
+        raise ValueError(f"expected JSON object: {resolved}")
+    return payload
 
 
 def verify_artifact(ref: dict[str, Any], errors: list[str], label: str) -> None:
@@ -100,11 +109,11 @@ def verify_json_receipt(
     verify_artifact(ref, errors, label)
     if ref.get("schema") != expected_schema:
         errors.append(f"{label}: expected schema {expected_schema}")
-    path = Path(ref.get("path", ""))
-    if not path.is_file():
+    path = Path(ref.get("path", "")).resolve(strict=False)
+    if path not in FROZEN_EVIDENCE:
         return None
     try:
-        payload = load_json(path)
+        payload = json.loads(FROZEN_EVIDENCE[path])
     except Exception as exc:  # noqa: BLE001
         errors.append(f"{label}: invalid JSON: {exc}")
         return None
@@ -177,6 +186,18 @@ def verify_review_execution_attestation(
             errors.append(f"{label}: authenticated execution binding mismatch: {key}")
     if ref.get("producer_agent_id") != "callscore-review-identity-attestor":
         errors.append(f"{label}: attestation was not produced by the DB-authenticated identity role")
+    ledger_row = REVIEW_ATTESTATION_LEDGER.get(str(payload.get("review_execution_id")))
+    if ledger_row is None:
+        errors.append(f"{label}: review execution is absent from the externally anchored DB attestation ledger")
+    else:
+        for key in (
+            "scope", "reviewer_agent_id", "hermes_session_id", "delegation_batch_id",
+            "target_tuple", "reviewed_artifact_sha256", "review_output_sha256",
+            "process_identity_sha256", "verdict",
+        ):
+            expected_value = "PASS" if key == "verdict" else payload.get(key)
+            if ledger_row.get(key) != expected_value:
+                errors.append(f"{label}: DB attestation ledger mismatch: {key}")
 
 
 def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse.Namespace) -> list[str]:
@@ -203,12 +224,14 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
         if source.get(key) != value:
             errors.append(f"source_tuple.{key} mismatch")
 
-    deployment_manifest = Path(args.deployment_manifest)
-    if not deployment_manifest.is_file():
-        errors.append("deployment manifest missing")
+    deployment_manifest = Path(args.deployment_manifest).resolve(strict=False)
+    deployment_bytes = FROZEN_EVIDENCE.get(deployment_manifest)
+    if deployment_bytes is None:
+        errors.append("deployment manifest was not frozen")
     else:
-        deployment_bytes = deployment_manifest.read_bytes()
         deployment = report["deployment_tuple"]
+        if sha256_bytes(deployment_bytes) != args.expected_deployment_manifest_sha256:
+            errors.append("deployment manifest does not match externally expected hash")
         if sha256_bytes(deployment_bytes) != deployment["deployment_manifest_sha256"]:
             errors.append("deployment manifest hash mismatch")
         try:
@@ -231,6 +254,9 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
             for report_key, manifest_key in manifest_bindings.items():
                 if deployment.get(report_key) != deployment_payload.get(manifest_key):
                     errors.append(f"deployment manifest binding mismatch: {report_key}")
+            if deployment_payload.get("phase_manifest_index_sha256") != args.expected_phase_manifest_index_sha256:
+                errors.append("deployment manifest phase-manifest-index binding mismatch")
+
         except Exception as exc:  # noqa: BLE001
             errors.append(f"deployment manifest JSON invalid: {exc}")
 
@@ -239,6 +265,19 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
         errors.append("phase gates must contain exactly A0-J")
 
     deployment = report["deployment_tuple"]
+    phase_index_path = Path(args.phase_manifest_index).resolve(strict=False)
+    phase_index_bytes = FROZEN_EVIDENCE.get(phase_index_path)
+    phase_index: dict[str, Any] = {}
+    if phase_index_bytes is None or sha256_bytes(phase_index_bytes) != args.expected_phase_manifest_index_sha256:
+        errors.append("externally anchored phase manifest index missing or hash mismatch")
+    else:
+        try:
+            phase_index = json.loads(phase_index_bytes)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"phase manifest index JSON invalid: {exc}")
+    if phase_index.get("schema") != "callscore.phase_execution_manifest_index.v1" or set(phase_index.get("phases", {})) != set(PHASES):
+        errors.append("phase manifest index schema/phase set mismatch")
+    expected_repo_root = str(phase_index.get("repo_root", ""))
     expected_target = {
         "app_commit_sha": args.expected_app_sha,
         "workplane_commit_sha": args.expected_workplane_sha,
@@ -256,6 +295,13 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
     for phase in PHASES:
         gate = phases[phase]
         phase_target = gate["target_tuple"]
+        phase_spec = phase_index.get("phases", {}).get(phase, {})
+        phase_manifest_path = Path(str(phase_spec.get("path", ""))).resolve(strict=False)
+        phase_manifest_bytes = FROZEN_EVIDENCE.get(phase_manifest_path)
+        if phase_manifest_bytes is None or sha256_bytes(phase_manifest_bytes) != phase_spec.get("sha256"):
+            errors.append(f"phase {phase}: externally indexed phase manifest missing or hash mismatch")
+        if phase_target.get("phase_manifest_sha256") != phase_spec.get("sha256"):
+            errors.append(f"phase {phase}: report phase-manifest hash is not externally anchored")
         if gate["phase_id"] != phase or phase_target.get("phase_id") != phase:
             errors.append(f"phase {phase}: phase identity mismatch")
         if phase_target.get("plan_commit_sha") != args.expected_plan_sha:
@@ -275,12 +321,16 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
                 errors.append(f"phase {phase}.{field}: semantic binding mismatch")
             if payload:
                 command = payload.get("command", [])
+                if command != phase_spec.get("commands", {}).get(stage):
+                    errors.append(f"phase {phase}.{field}: command does not match externally indexed phase command")
                 if not command or not Path(command[0]).is_absolute() or not Path(command[0]).is_file() or not os.access(command[0], os.X_OK):
                     errors.append(f"phase {phase}.{field}: command executable must be absolute, present, and executable")
                 elif sha256_bytes(FROZEN_EVIDENCE.get(Path(command[0]).resolve(strict=False), b"")) != payload.get("command_executable_sha256"):
                     errors.append(f"phase {phase}.{field}: command executable hash mismatch")
                 if not Path(str(payload.get("cwd", ""))).is_absolute() or not Path(str(payload.get("cwd", ""))).is_dir():
                     errors.append(f"phase {phase}.{field}: cwd must be an absolute existing directory")
+                if str(payload.get("cwd")) != expected_repo_root or payload.get("scope", {}).get("repo_root") != expected_repo_root:
+                    errors.append(f"phase {phase}.{field}: cwd/scope repo root is not externally anchored")
                 if payload.get("scope", {}).get("phase_manifest_sha256") != phase_target.get("phase_manifest_sha256"):
                     errors.append(f"phase {phase}.{field}: command scope is not bound to phase manifest")
                 for stream in ("stdout", "stderr"):
@@ -525,6 +575,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--schema", required=True)
     parser.add_argument("--evidence-schema", required=True)
     parser.add_argument("--deployment-manifest", required=True)
+    parser.add_argument("--expected-deployment-manifest-sha256", required=True)
+    parser.add_argument("--phase-manifest-index", required=True)
+    parser.add_argument("--expected-phase-manifest-index-sha256", required=True)
+    parser.add_argument("--review-attestation-ledger", required=True)
+    parser.add_argument("--expected-review-attestation-ledger-sha256", required=True)
     parser.add_argument("--expected-app-sha", required=True)
     parser.add_argument("--expected-workplane-sha", required=True)
     parser.add_argument("--expected-plan-sha", required=True)
@@ -542,44 +597,73 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    global EVIDENCE_VALIDATOR, FROZEN_EVIDENCE
+    global EVIDENCE_VALIDATOR, FROZEN_EVIDENCE, REVIEW_ATTESTATION_LEDGER
     args = parse_args()
     verifier_script_path = Path(__file__).resolve()
     report_path = Path(args.report).resolve(strict=True)
     schema_path = Path(args.schema).resolve(strict=True)
     evidence_schema_path = Path(args.evidence_schema).resolve(strict=True)
     deployment_path = Path(args.deployment_manifest).resolve(strict=True)
+    phase_index_path = Path(args.phase_manifest_index).resolve(strict=True)
+    review_ledger_path = Path(args.review_attestation_ledger).resolve(strict=True)
     script_path = verifier_script_path
     output = Path(args.out).resolve(strict=False)
     report_bytes = report_path.read_bytes()
     schema_bytes = schema_path.read_bytes()
     evidence_schema_bytes = evidence_schema_path.read_bytes()
     deployment_bytes = deployment_path.read_bytes()
+    phase_index_bytes = phase_index_path.read_bytes()
+    review_ledger_bytes = review_ledger_path.read_bytes()
     script_bytes = script_path.read_bytes()
     report = json.loads(report_bytes)
+    if sha256_bytes(deployment_bytes) != args.expected_deployment_manifest_sha256:
+        raise SystemExit("deployment manifest pre-freeze hash mismatch")
+    if sha256_bytes(phase_index_bytes) != args.expected_phase_manifest_index_sha256:
+        raise SystemExit("phase manifest index pre-freeze hash mismatch")
+    if sha256_bytes(review_ledger_bytes) != args.expected_review_attestation_ledger_sha256:
+        raise SystemExit("review attestation ledger pre-freeze hash mismatch")
+    phase_index = json.loads(phase_index_bytes)
+    review_ledger = json.loads(review_ledger_bytes)
+    REVIEW_ATTESTATION_LEDGER = {
+        str(row["review_execution_id"]): row for row in review_ledger.get("attestations", [])
+    }
     evidence_paths = artifact_paths(report)
-    for gate in report.get("phase_gates", {}).values():
-        for field in ("red_receipt", "green_receipt", "refactor_receipt"):
-            receipt_ref = gate.get(field, {})
-            receipt_path = Path(str(receipt_ref.get("path", ""))).resolve(strict=False)
-            if receipt_path.is_file():
-                try:
-                    receipt_payload = json.loads(receipt_path.read_bytes())
-                    evidence_paths.update(artifact_paths(receipt_payload))
-                    command = receipt_payload.get("command", [])
-                    if command and Path(command[0]).is_absolute():
-                        evidence_paths.add(Path(command[0]).resolve(strict=False))
-                except Exception:  # verifier reports malformed receipts later
-                    pass
-    protected_paths = {report_path, schema_path, evidence_schema_path, deployment_path, verifier_script_path}
-    if output in protected_paths or output in evidence_paths:
+    evidence_paths.update({deployment_path, phase_index_path, review_ledger_path})
+    for spec in phase_index.get("phases", {}).values():
+        evidence_paths.add(Path(str(spec.get("path", ""))).resolve(strict=False))
+        for command in spec.get("commands", {}).values():
+            if command and Path(command[0]).is_absolute():
+                evidence_paths.add(Path(command[0]).resolve(strict=False))
+    # Capture each path once. Nested raw artifacts and command executables are
+    # discovered from frozen bytes only, closing swap-validate-restore TOCTOU.
+    FROZEN_EVIDENCE = {}
+    queue = list(evidence_paths)
+    while queue:
+        path = queue.pop()
+        if path in FROZEN_EVIDENCE:
+            continue
+        if not path.is_file():
+            raise SystemExit(f"referenced evidence missing before verification: {path}")
+        data = path.read_bytes()
+        FROZEN_EVIDENCE[path] = data
+        try:
+            payload = json.loads(data)
+        except Exception:
+            continue
+        for nested in artifact_paths(payload):
+            if nested not in FROZEN_EVIDENCE:
+                queue.append(nested)
+        command = payload.get("command", []) if isinstance(payload, dict) else []
+        if command and Path(command[0]).is_absolute():
+            queue.append(Path(command[0]).resolve(strict=False))
+    protected_paths = {
+        report_path, schema_path, evidence_schema_path, deployment_path,
+        phase_index_path, review_ledger_path, verifier_script_path,
+    }
+    if output in protected_paths or output in FROZEN_EVIDENCE:
         raise SystemExit("--out must not alias an input or referenced evidence artifact")
     if output.exists():
         raise SystemExit("--out is create-only and must not already exist")
-    for path in evidence_paths:
-        if not path.is_file():
-            raise SystemExit(f"referenced evidence missing before verification: {path}")
-    FROZEN_EVIDENCE = {path: path.read_bytes() for path in evidence_paths}
     schema = json.loads(schema_bytes)
     evidence_schema = json.loads(evidence_schema_bytes)
     EVIDENCE_VALIDATOR = Draft202012Validator(evidence_schema, format_checker=FormatChecker())
@@ -591,14 +675,24 @@ def main() -> int:
          for path, data in sorted(FROZEN_EVIDENCE.items(), key=lambda item: str(item[0]))],
         separators=(",", ":"), sort_keys=True,
     ).encode("utf-8")
+    final_review_execution_ids = [
+        frozen_json(Path(review["review_execution_attestation"]["path"]))["review_execution_id"]
+        for review in report.get("final_reviews", [])
+    ]
+    canary_execution_payload = frozen_json(Path(report["canary"]["execution_receipt"]["path"])) if report.get("canary") else {}
     receipt = {
-        "schema": "callscore.autonomy_report_verification_receipt.v2",
+        "schema": "callscore.autonomy_report_verification_receipt.v3",
         "status": "FAIL" if errors else "PASS",
         "report_id": report.get("report_id"),
         "report_sha256": sha256_bytes(report_bytes),
         "report_schema_sha256": sha256_bytes(schema_bytes),
         "evidence_schema_sha256": sha256_bytes(evidence_schema_bytes),
         "deployment_manifest_sha256": sha256_bytes(deployment_bytes),
+        "phase_manifest_index_sha256": sha256_bytes(phase_index_bytes),
+        "review_attestation_ledger_sha256": sha256_bytes(review_ledger_bytes),
+        "final_review_execution_ids": final_review_execution_ids,
+        "canary_generation_id": canary_execution_payload.get("generation_id"),
+        "canary_accepted_evaluation_id": canary_execution_payload.get("accepted_evaluation_id"),
         "verifier_script_sha256": sha256_bytes(script_bytes),
         "frozen_evidence_manifest_sha256": sha256_bytes(frozen_evidence_manifest),
         "frozen_evidence_count": len(FROZEN_EVIDENCE),
@@ -631,6 +725,8 @@ def main() -> int:
         schema_path: sha256_bytes(schema_bytes),
         evidence_schema_path: sha256_bytes(evidence_schema_bytes),
         deployment_path: sha256_bytes(deployment_bytes),
+        phase_index_path: sha256_bytes(phase_index_bytes),
+        review_ledger_path: sha256_bytes(review_ledger_bytes),
         script_path: sha256_bytes(script_bytes),
         **{path: sha256_bytes(data) for path, data in FROZEN_EVIDENCE.items()},
     }

@@ -1,6 +1,15 @@
-# CallScore Autonomous LangGraph Completion Plan v7
+# CallScore Autonomous LangGraph Completion Plan v8
 
-> Supersedes failed v1 commit `10129ae81e3f1eac385292ced0cedc5c8390129d`, failed v2 commit `c435c49a3aafcd7de63a74988d68ea6d64b3006c`, failed v3 commit `640329f4fed5f3fb276d2fd4ca8941179f2e43f2`, failed v4 commit `f0ab5d538041b36b2b609bd71b2d1a6541a01130`, failed v5 commit `1ecb690bc272345cd03740e5f71178ebaf51bd06`, and failed v6 commit `97352dcb9e3c79333fd17c8d01e38ff927a4fca3`. V7 closes v6's independently reproduced causal-join, post-synthesis evaluation, exact-generation provider/outcome, authenticated-reviewer, review-subject, raw-evidence, typed-rollback, and finalisation defects. No implementation, production migration, provider mutation, deployment, scheduler change, service change, or canary starts until this exact immutable commit passes all three reviews.
+> Supersedes failed v1 commit `10129ae81e3f1eac385292ced0cedc5c8390129d`, failed v2 commit `c435c49a3aafcd7de63a74988d68ea6d64b3006c`, failed v3 commit `640329f4fed5f3fb276d2fd4ca8941179f2e43f2`, failed v4 commit `f0ab5d538041b36b2b609bd71b2d1a6541a01130`, failed v5 commit `1ecb690bc272345cd03740e5f71178ebaf51bd06`, failed v6 commit `97352dcb9e3c79333fd17c8d01e38ff927a4fca3`, and failed v7 commit `09b799ca8371d280e1c848c75e3cd751fcbf106a`. V8 closes v7's reversed rollback lineage, unexercised promotion/rollback authority path, self-consistent phase-manifest forgery, caller-authored reviewer-authentication, verifier-binding, exact-review, exact-generation, and frozen-byte defects. No implementation, production migration, provider mutation, deployment, scheduler change, service change, or canary starts until this exact immutable commit passes all three reviews.
+
+### v8 adversarial hardening delta
+
+- The externally supplied phase-manifest index and deployment manifest are hash-pinned before verification. Every phase manifest is opened and hashed; RED/GREEN/REFACTOR executable, argv, cwd, and scope values must equal its commands.
+- The externally supplied DB review-attestation ledger is hash-pinned. Every phase/final execution attestation must equal its ledger row, so a caller-authored JSON object containing the attestor role string is not authentication.
+- Every evidence path is read once into the frozen byte map. Semantic JSON parsing and executable hashing use those bytes; post-verification re-read only detects mutation.
+- The SQL finalizer requires the exact three review execution IDs, exact canary generation/evaluation IDs, and report/evidence/deployment/index/ledger/verifier/frozen-manifest hashes recorded in the DB verifier binding. Unrelated legitimate reviews and stale same-kind verifier artifacts cannot finalise another report.
+- `rollback_runtime_variant` records prior champion as the promoted variant and candidate/restored variant as the rollback target, matching the typed receipt contract.
+- The rollback-only fixture executes successful `promote_runtime_variant` and `rollback_runtime_variant` paths over 30 exact control plus 30 exact treatment observations, then tests typed exact-report rollback and stale-replay rejection. It does not fabricate promotion or rollback events.
 
 ## 0. Goal, scope, and immutable target
 
@@ -26,22 +35,22 @@ Explicitly out of scope:
 
 Plan proof fixtures committed with this document:
 
-- `docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v7.sql`: executable PostgreSQL 16 contract fixture with durable specialist requirements, exact child-join manifests, post-synthesis evaluator causality, generation/evaluation-bound provider and outcome rows, DB-role-authenticated review executions, typed exact-report rollback receipts, successful finalisation, stale-replay rejection, and rollback-only cleanup.
-- `docs/plans/fixtures/autonomy-contract-spike-receipt-v7.json`: command/result/rollback receipt for the v7 SQL proof.
-- `docs/plans/fixtures/autonomy-contract-normalized-proof-v7.json`: deterministic normalised SQL proof binding the exact fixture, raw log, exit, PASS, rollback, and post-rollback absence predicates.
-- `docs/plans/fixtures/autonomy-contract-rollback-run-v7.log.gz`: deterministic-gzip archive of the complete raw psql stdout/stderr bytes; the proof records archive and decompressed lengths/SHA-256 and gzip mtime zero.
-- `docs/plans/fixtures/autonomy-authority-function-call-matrix-v7.json`: executable coverage map binding every authority function to its positive or fail-closed fixture path.
-- `docs/plans/fixtures/hermes-child-identity-spike-receipt-v7.json` plus process/usage/output v7 sidecars: one exact Hermes one-shot whose parent atomically SIGSTOP-captured PID/PPID/PGID/SID/start-ticks/executable/UID/cwd/environment child-execution ID, then SIGCONT-resumed it to a machine-written completed usage record and schema-valid output.
-- `docs/plans/fixtures/hermes-child-identity-spike-state-evidence-v7.json`: read-only Hermes state-row evidence for the same terminal session, model, profile, token counts, API-call count, cwd, and terminal reason.
+- `docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v8.sql`: executable PostgreSQL 16 contract fixture with durable specialist requirements, exact child-join manifests, post-synthesis evaluator causality, generation/evaluation-bound provider and outcome rows, DB-role-authenticated review executions, typed exact-report rollback receipts, successful finalisation, stale-replay rejection, and rollback-only cleanup.
+- `docs/plans/fixtures/autonomy-contract-spike-receipt-v8.json`: command/result/rollback receipt for the v8 SQL proof.
+- `docs/plans/fixtures/autonomy-contract-normalized-proof-v8.json`: deterministic normalised SQL proof binding the exact fixture, raw log, exit, PASS, rollback, and post-rollback absence predicates.
+- `docs/plans/fixtures/autonomy-contract-rollback-run-v8.log.gz`: deterministic-gzip archive of the complete raw psql stdout/stderr bytes; the proof records archive and decompressed lengths/SHA-256 and gzip mtime zero.
+- `docs/plans/fixtures/autonomy-authority-function-call-matrix-v8.json`: executable coverage map binding every authority function to its positive or fail-closed fixture path.
+- `docs/plans/fixtures/hermes-child-identity-spike-receipt-v8.json` plus process/usage/output v8 sidecars: one exact Hermes one-shot whose parent atomically SIGSTOP-captured PID/PPID/PGID/SID/start-ticks/executable/UID/cwd/environment child-execution ID, then SIGCONT-resumed it to a machine-written completed usage record and schema-valid output.
+- `docs/plans/fixtures/hermes-child-identity-spike-state-evidence-v8.json`: read-only Hermes state-row evidence for the same terminal session, model, profile, token counts, API-call count, cwd, and terminal reason.
 - `docs/plans/fixtures/canonical-learning-artifacts-v4.schema.json`: exact JSON Schemas for all four durable learning artifacts, including cross-field experiment-result coherence and the registry version that generated the candidate.
-- `docs/plans/fixtures/callscore-autonomy-implementation-report-v6.schema.json`: final report structure with stream/sequence identity, phase-local tuples, authenticated review executions, exact-generation canary identity, typed rollback/report relations, activation, and contradiction coherence.
-- `docs/plans/fixtures/autonomy-evidence-receipts-v2.schema.json`: dedicated Draft 2020-12 schemas for raw phase transcripts, exact review subjects, authenticated reviewer executions, activation, exact-generation provider execution/readback/rollback, exact-report runtime rollback, router/tool inheritance, canonical receipt validation, and final verifier receipts.
-- `docs/plans/fixtures/verify-autonomy-final-report-contract-v7.py`: create-only independent-verifier oracle that freezes all referenced evidence bytes before enforcing exact subjects, identities, raw output bytes, target tuples, generation/evaluation, rollback/report relations, and contradictions.
-- `docs/plans/fixtures/verify-autonomy-final-report-contract-v7-selftest.py`: executable positive fixture plus adversarial subject-hash, invented-reviewer, rawless-evidence, type, stale/unrelated rollback, and output-alias tests.
-- `docs/plans/fixtures/provider-mutation-surface-inventory-v7.json`: complete classified authority/mutation call-site inventory at base source commit `22993a5537c9b677e25f6454f9f72c52179fc493` and negative-test contract.
-- `docs/plans/fixtures/autonomy-runtime-baseline-inventory-v7.json`: exact enabled/schedule/workdir/prompt hash and byte count, resolved runner path/hash, wake chain, disposition, worker digest, and gateway identity for every mutation/claim-capable cron/runtime authority. Cutover re-hashes the protected scheduler source rather than storing prompt text.
+- `docs/plans/fixtures/callscore-autonomy-implementation-report-v7.schema.json`: final report structure with stream/sequence identity, phase-local tuples, authenticated review executions, exact-generation canary identity, typed rollback/report relations, activation, and contradiction coherence.
+- `docs/plans/fixtures/autonomy-evidence-receipts-v3.schema.json`: dedicated Draft 2020-12 schemas for raw phase transcripts, exact review subjects, authenticated reviewer executions, activation, exact-generation provider execution/readback/rollback, exact-report runtime rollback, router/tool inheritance, canonical receipt validation, and final verifier receipts.
+- `docs/plans/fixtures/verify-autonomy-final-report-contract-v8.py`: create-only independent-verifier oracle that freezes all referenced evidence bytes before enforcing exact subjects, identities, raw output bytes, target tuples, generation/evaluation, rollback/report relations, and contradictions.
+- `docs/plans/fixtures/verify-autonomy-final-report-contract-v8-selftest.py`: executable positive fixture plus adversarial subject-hash, invented-reviewer, rawless-evidence, type, stale/unrelated rollback, and output-alias tests.
+- `docs/plans/fixtures/provider-mutation-surface-inventory-v8.json`: complete classified authority/mutation call-site inventory at base source commit `22993a5537c9b677e25f6454f9f72c52179fc493` and negative-test contract.
+- `docs/plans/fixtures/autonomy-runtime-baseline-inventory-v8.json`: exact enabled/schedule/workdir/prompt hash and byte count, resolved runner path/hash, wake chain, disposition, worker digest, and gateway identity for every mutation/claim-capable cron/runtime authority. Cutover re-hashes the protected scheduler source rather than storing prompt text.
 - `docs/plans/fixtures/langgraph-postgres-dependency-compatibility.json`: npm metadata proof that Postgres checkpointer `1.0.4` is semver-compatible with the checked-in LangGraph/core/checkpoint/pg/Node ranges; Phase B still requires a lockfile/import/setup/resume execution spike.
-- `docs/plans/fixtures/v7-plan-artifact-manifest.json`: path, byte length, and SHA-256 binding for this plan and the non-circular plan/proof artifacts; the manifest's own SHA-256 is captured after commit and supplied to reviewers.
+- `docs/plans/fixtures/v8-plan-artifact-manifest.json`: path, byte length, and SHA-256 binding for this plan and the non-circular plan/proof artifacts; the manifest's own SHA-256 is captured after commit and supplied to reviewers.
 
 ## 1. Single-authority architecture
 
@@ -142,7 +151,7 @@ Exit zero, draft existence, report receipt, `independent_agent_execution=true`, 
 
 ### 3.1 Authoritative schema
 
-Migration `025-callscore-autonomous-supervisor.sql` must conform table-for-table, type-for-type, constraint-for-constraint, trigger-for-trigger, function-signature-for-function-signature, and ACL-for-ACL to `025-callscore-autonomous-supervisor-contract-v7.sql`, with only the fixture schema/role prefixes changed to production names. In particular, `source_channel_task_id` is UUID because migration 024 defines `channel_tasks.id UUID`; bigint is forbidden. It creates:
+Migration `025-callscore-autonomous-supervisor.sql` must conform table-for-table, type-for-type, constraint-for-constraint, trigger-for-trigger, function-signature-for-function-signature, and ACL-for-ACL to `025-callscore-autonomous-supervisor-contract-v8.sql`, with only the fixture schema/role prefixes changed to production names. In particular, `source_channel_task_id` is UUID because migration 024 defines `channel_tasks.id UUID`; bigint is forbidden. It creates:
 
 - lifecycle, execution-class, join, evaluation, provider, variant, and authority enums;
 - `autonomy_workflows` as the authoritative state projection;
@@ -242,7 +251,7 @@ Durable handles are authoritative in this order:
 
 Child-echoed IDs are ignored. Exit zero is ignored unless usage file says `completed=true`, `failed=false`, session ID is non-empty, stdout parses against the required schema, artifact hashes match parent reads, and the join accepts it.
 
-The committed v7 child spike proves one exact `context_engine` invocation end to end: the parent SIGSTOP-captured live `/proc` identity for child execution `6237576f-7d11-4892-b22b-7ab9048c1952`, resumed it, then bound the completed usage/output and persisted Hermes session `20260802_101228_db8b6a`. It is planning evidence only, so Phase C repeats the proof through the production runner and DB roles. Production child acceptance requires DB-authenticated gateway/process evidence plus report-verifier-role bindings for the exact usage and output artifacts before the join can become `ACCEPTED`; child JSON cannot self-attest process identity.
+The committed v8 child spike proves one exact `context_engine` invocation end to end: the parent SIGSTOP-captured live `/proc` identity for child execution `6237576f-7d11-4892-b22b-7ab9048c1952`, resumed it, then bound the completed usage/output and persisted Hermes session `20260802_101228_db8b6a`. It is planning evidence only, so Phase C repeats the proof through the production runner and DB roles. Production child acceptance requires DB-authenticated gateway/process evidence plus report-verifier-role bindings for the exact usage and output artifacts before the join can become `ACCEPTED`; child JSON cannot self-attest process identity.
 
 ### 4.2 Capability isolation
 
@@ -294,7 +303,7 @@ Failure produces controlled reason codes and a new revision artifact. Revision N
 
 ### 6.1 Remove caller-controlled approval
 
-Phase E must reproduce the search contract in `provider-mutation-surface-inventory-v7.json` and classify every match. The reviewed inventory requires changes to `callscore-operating-goal.ts`, `external-mutation-guard.ts`, `external-mutation-schemas.ts`, `graph-owned-provider-adapter.ts`, `external-mutation-node-utils.ts`, `mcp-youtube-publisher.ts`, `composio-client.ts`, `youtube-publisher.ts`, and `hermes-worker.ts`. A new matching path not present in the inventory fails RED until classified; an unclassified or direct executable provider path blocks the phase.
+Phase E must reproduce the search contract in `provider-mutation-surface-inventory-v8.json` and classify every match. The reviewed inventory requires changes to `callscore-operating-goal.ts`, `external-mutation-guard.ts`, `external-mutation-schemas.ts`, `graph-owned-provider-adapter.ts`, `external-mutation-node-utils.ts`, `mcp-youtube-publisher.ts`, `composio-client.ts`, `youtube-publisher.ts`, and `hermes-worker.ts`. A new matching path not present in the inventory fails RED until classified; an unclassified or direct executable provider path blocks the phase.
 
 Live execution schemas reject `approved`, `approved_publish`, `approved_by_operator`, `approval_receipt_id`, `live_owned_public`, and worker-minted receipt IDs. CLI may select dry-run/read-only mode only. No boolean or receipt string supplied by a caller confers authority.
 
@@ -423,7 +432,7 @@ Before phases A-J and before any migration, runtime, provider, service, cron, or
 
 Files:
 
-- create `migrations/025-callscore-autonomous-supervisor.sql` from the reviewed v7 SQL fixture, preserving UUID compatibility, DB-owned hashes, role/function ACLs, exact specialist requirements/joins, evaluator causality, generation/evaluation-bound provider and outcome rows, authenticated review execution, typed rollback receipts, retry snapshots, activation approval, and successful final-report PASS checks;
+- create `migrations/025-callscore-autonomous-supervisor.sql` from the reviewed v8 SQL fixture, preserving UUID compatibility, DB-owned hashes, role/function ACLs, exact specialist requirements/joins, evaluator causality, generation/evaluation-bound provider and outcome rows, authenticated review execution, typed rollback receipts, retry snapshots, activation approval, and successful final-report PASS checks;
 - create `src/lib/autonomy/supervisor/contracts.ts`, `repository.ts`, `transition-map.ts`, `completion-predicates.ts`;
 - modify control-plane and `channel-agent-tasks` compatibility code;
 - tests: contracts, migration, role/ACL, hash-chain, conservative backfill, legacy-writer denial.
@@ -463,7 +472,7 @@ Gate: forced semantic failure revises once, re-evaluates independently, and reac
 
 ### Phase E - exact authority, provider execution, and readback
 
-Implement section 6, remove all caller approval flags/worker-minted authority receipts, and make the source-inventory test exactly reproduce `provider-mutation-surface-inventory-v7.json`.
+Implement section 6, remove all caller approval flags/worker-minted authority receipts, and make the source-inventory test exactly reproduce `provider-mutation-surface-inventory-v8.json`.
 
 RED first: forged approved boolean, forged receipt ID, wrong account/action/payload/revision grant, reused grant, cross-workflow duplicate payload, ambiguous key encoding, duplicate process claim, crash-after-DISPATCHING resubmission, stale CLAIMED unsafe takeover, unknown outcome success, URL without readback, adapter direct invocation, unclassified provider surface.
 
@@ -583,7 +592,7 @@ Create:
 - committed schemas and fixtures for every proof;
 - JSON and Markdown report producers plus SHA-256 sidecars.
 
-The JSON must validate against `callscore-autonomy-implementation-report-v6.schema.json`; every referenced receipt payload must independently validate against `autonomy-evidence-receipts-v2.schema.json`. `phase_gates` is an exact object keyed A0-J. Each phase first freezes its immutable phase tuple and bundle manifest, then carries typed RED/GREEN/REFACTOR v2 receipts with absolute executable/hash, cwd/scope, identity-byte normalisation, raw stdout/stderr paths/lengths/hashes, plus one contract, implementation, and security review whose reviewed subject is exactly `[phase_manifest_sha256]`. Every review also carries a `callscore.review_execution_attestation.v1` written through the DB-authenticated identity-attestor role and bound to reviewer/session/delegation/task/target/review-output hash. Later commits do not rewrite those receipts. After Phase J, exactly three distinct final aggregate reviews bind the complete deployed tuple and review exactly `[deployment_manifest_sha256]`. Every receipt reference contains its expected schema, and both verifiers read and validate payload bytes rather than trusting path/hash/schema-name metadata. Activation approval and execution have distinct producers, bind exact report/tuple/approval hash/fence version, and obey approval <= activation < approval expiry plus activation < rollback deadline. Canary execution, independent readback, tested provider-object rollback/deletion, canonical receipt-validation wrappers, task-router/tool-inheritance, and runtime-variant rollback bind the exact report stream/sequence, deployment manifest, workflow, generation, accepted evaluation, provider operation, measurement, experiment, promotion, and rollback IDs. Final `PASS` is impossible with `BLOCKED_BY_GRAPH`, null provider IDs, non-HTTPS readback, wrong media/YouTube receipt class, arbitrary generic JSON, any non-PASS review, self/invented reviewer identity, wrong reviewed subject, rawless test evidence, unrelated/stale rollback, non-integer registry version, or untested public-object rollback. The verifier output is create-only, cannot alias any primary or recursively referenced evidence path, freezes all referenced bytes/executables before semantic validation, re-hashes them immediately before write, validates its own v2 receipt including the frozen-evidence manifest digest/count, and reads it back. Final-report DB insertion requires a successful exact finalisation fixture and independently authenticated report, review, canary, rollback, and active deployment-fence relations; generic artifact rows cannot satisfy it.
+The JSON must validate against `callscore-autonomy-implementation-report-v7.schema.json`; every referenced receipt payload must independently validate against `autonomy-evidence-receipts-v3.schema.json`. `phase_gates` is an exact object keyed A0-J. Each phase first freezes its immutable phase tuple and bundle manifest, then carries typed RED/GREEN/REFACTOR v2 receipts with absolute executable/hash, cwd/scope, identity-byte normalisation, raw stdout/stderr paths/lengths/hashes, plus one contract, implementation, and security review whose reviewed subject is exactly `[phase_manifest_sha256]`. Every review also carries a `callscore.review_execution_attestation.v1` written through the DB-authenticated identity-attestor role and bound to reviewer/session/delegation/task/target/review-output hash. Later commits do not rewrite those receipts. After Phase J, exactly three distinct final aggregate reviews bind the complete deployed tuple and review exactly `[deployment_manifest_sha256]`. Every receipt reference contains its expected schema, and both verifiers read and validate payload bytes rather than trusting path/hash/schema-name metadata. Activation approval and execution have distinct producers, bind exact report/tuple/approval hash/fence version, and obey approval <= activation < approval expiry plus activation < rollback deadline. Canary execution, independent readback, tested provider-object rollback/deletion, canonical receipt-validation wrappers, task-router/tool-inheritance, and runtime-variant rollback bind the exact report stream/sequence, deployment manifest, workflow, generation, accepted evaluation, provider operation, measurement, experiment, promotion, and rollback IDs. Final `PASS` is impossible with `BLOCKED_BY_GRAPH`, null provider IDs, non-HTTPS readback, wrong media/YouTube receipt class, arbitrary generic JSON, any non-PASS review, self/invented reviewer identity, wrong reviewed subject, rawless test evidence, unrelated/stale rollback, non-integer registry version, or untested public-object rollback. The verifier output is create-only, cannot alias any primary or recursively referenced evidence path, freezes all referenced bytes/executables before semantic validation, re-hashes them immediately before write, validates its own v2 receipt including the frozen-evidence manifest digest/count, and reads it back. Final-report DB insertion requires a successful exact finalisation fixture and independently authenticated report, review, canary, rollback, and active deployment-fence relations; generic artifact rows cannot satisfy it.
 
 ## 9. Cutover, rollback, and live-canary procedure
 
@@ -723,9 +732,14 @@ Final evidence verification uses both the production TypeScript verifier and the
 ```bash
 node --import tsx src/scripts/verify-callscore-autonomy-report.ts \
   --report .tmp/autonomy-implementation/$RUN_ID/callscore-autonomy-implementation-report.json \
-  --schema docs/plans/fixtures/callscore-autonomy-implementation-report-v6.schema.json \
-  --evidence-schema docs/plans/fixtures/autonomy-evidence-receipts-v2.schema.json \
+  --schema docs/plans/fixtures/callscore-autonomy-implementation-report-v7.schema.json \
+  --evidence-schema docs/plans/fixtures/autonomy-evidence-receipts-v3.schema.json \
   --deployment-manifest .tmp/autonomy-implementation/$RUN_ID/deployment-manifest.json \
+  --expected-deployment-manifest-sha256 "$DEPLOYMENT_MANIFEST_SHA256" \
+  --phase-manifest-index .tmp/autonomy-implementation/$RUN_ID/phase-manifest-index.json \
+  --expected-phase-manifest-index-sha256 "$PHASE_MANIFEST_INDEX_SHA256" \
+  --review-attestation-ledger .tmp/autonomy-implementation/$RUN_ID/db-review-attestation-ledger.json \
+  --expected-review-attestation-ledger-sha256 "$REVIEW_ATTESTATION_LEDGER_SHA256" \
   --expected-app-sha "$APP_SHA" --expected-workplane-sha "$WORKPLANE_SHA" \
   --expected-plan-sha "$PLAN_COMMIT_SHA" --expected-plan-content-sha256 "$PLAN_CONTENT_SHA256" \
   --expected-manifest-sha256 "$PLAN_MANIFEST_SHA256" \
@@ -733,11 +747,16 @@ node --import tsx src/scripts/verify-callscore-autonomy-report.ts \
   --expected-runtime-script-manifest-sha256 "$RUNTIME_SCRIPT_MANIFEST_SHA256" --expected-image-digest "$IMAGE_DIGEST" \
   --expected-prompt-manifest-sha256 "$PROMPT_MANIFEST_SHA256" \
   --require-live-canary --out .tmp/autonomy-implementation/$RUN_ID/report-verifier-ts.json
-python3 docs/plans/fixtures/verify-autonomy-final-report-contract-v7.py \
+python3 docs/plans/fixtures/verify-autonomy-final-report-contract-v8.py \
   --report .tmp/autonomy-implementation/$RUN_ID/callscore-autonomy-implementation-report.json \
-  --schema docs/plans/fixtures/callscore-autonomy-implementation-report-v6.schema.json \
-  --evidence-schema docs/plans/fixtures/autonomy-evidence-receipts-v2.schema.json \
+  --schema docs/plans/fixtures/callscore-autonomy-implementation-report-v7.schema.json \
+  --evidence-schema docs/plans/fixtures/autonomy-evidence-receipts-v3.schema.json \
   --deployment-manifest .tmp/autonomy-implementation/$RUN_ID/deployment-manifest.json \
+  --expected-deployment-manifest-sha256 "$DEPLOYMENT_MANIFEST_SHA256" \
+  --phase-manifest-index .tmp/autonomy-implementation/$RUN_ID/phase-manifest-index.json \
+  --expected-phase-manifest-index-sha256 "$PHASE_MANIFEST_INDEX_SHA256" \
+  --review-attestation-ledger .tmp/autonomy-implementation/$RUN_ID/db-review-attestation-ledger.json \
+  --expected-review-attestation-ledger-sha256 "$REVIEW_ATTESTATION_LEDGER_SHA256" \
   --expected-app-sha "$APP_SHA" --expected-workplane-sha "$WORKPLANE_SHA" \
   --expected-plan-sha "$PLAN_COMMIT_SHA" --expected-plan-content-sha256 "$PLAN_CONTENT_SHA256" \
   --expected-manifest-sha256 "$PLAN_MANIFEST_SHA256" \
@@ -746,7 +765,7 @@ python3 docs/plans/fixtures/verify-autonomy-final-report-contract-v7.py \
   --expected-prompt-manifest-sha256 "$PROMPT_MANIFEST_SHA256" \
   --verifier-agent-id "$REPORT_VERIFIER_AGENT_ID" --receipt-verifier-agent-id "$VERIFIER_RECEIPT_REVIEWER_AGENT_ID" \
   --out .tmp/autonomy-implementation/$RUN_ID/report-verifier-python.json
-python3 docs/plans/fixtures/verify-autonomy-final-report-contract-v7-selftest.py
+python3 docs/plans/fixtures/verify-autonomy-final-report-contract-v8-selftest.py
 ```
 
 Both production verifiers must exit zero and emit status `PASS`; their verifier-script hashes, report hash, report/evidence-schema hashes, frozen-evidence manifest hash/count, and create-only receipt readback hashes must be stored. The committed self-test must pass its valid fixture and reject bad artifact hashes, wrong phase/final review subjects, an invented reviewer without a DB-authenticated execution attestation, rawless phase evidence, ill-typed rollback versions, unrelated/stale report rollback identities, and output aliasing of both primary and raw evidence without modifying either. Implementation tests additionally mutate duplicate reviewer/session/delegation, self-verifier, omitted phase, wrong phase/final tuple, nonexistent or changed executable, changed raw output, reversed timestamps, bad exit status, stale canonical receipt subject, wrong generation/evaluation, wrong media class, blocked canary, null provider/readback/rollback, non-HTTPS URL, activation timestamp/hash, and non-empty blocker, and require both verifiers to reject.
@@ -774,7 +793,7 @@ The verified final copies are written to `/srv/agents/hermes/runtime/reviews/` o
 
 ## 11. Review, Kanban, and checkpoint policy
 
-1. Generate the v7 non-circular artifact manifest from the final plan, raw SQL log, and proof fixtures; validate every bound path/size/SHA-256, then commit the complete immutable package.
+1. Generate the v8 non-circular artifact manifest from the final plan, raw SQL log, and proof fixtures; validate every bound path/size/SHA-256, then commit the complete immutable package.
 2. Push and verify local commit equals `origin/feat/callscore-autonomous-langgraph-completion-20260802`.
 3. Send exact commit and manifest to three new independent reviewers: contract/spec, implementation/operability, security/trust.
 4. Any file edit invalidates all verdicts. New review batch, new commit, and new manifest are mandatory.

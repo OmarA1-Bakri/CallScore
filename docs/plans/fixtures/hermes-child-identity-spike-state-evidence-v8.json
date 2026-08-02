@@ -21,7 +21,7 @@
     "profile_name": "callscore"
   },
   "binding": {
-    "receipt_path": "docs/plans/fixtures/hermes-child-identity-spike-receipt-v7.json",
+    "receipt_path": "docs/plans/fixtures/hermes-child-identity-spike-receipt-v8.json",
     "receipt_sha256": "ddea44ea84d1a22c3a01987a1f794652d6192e77951cc8e360b58c83340a0cb5",
     "process_artifact_sha256": "22b622cac1d6e6e524e6a2e14e4162e61d19e169a11e5118743b5bceb5d0fe67",
     "usage_artifact_sha256": "a1fe5db0febd43cdc2c54138f49a9c25bee02a15c2da173b858d7994f0151e72",

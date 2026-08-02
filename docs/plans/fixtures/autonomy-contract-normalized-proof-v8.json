@@ -1,21 +1,21 @@
 {
-  "schema": "callscore.autonomy_contract_normalized_proof.v7",
-  "executed_at": "2026-08-02T10:19:55+01:00",
-  "command": "sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v7.sql",
+  "schema": "callscore.autonomy_contract_normalized_proof.v8",
+  "executed_at": "2026-08-02T11:19:47+01:00",
+  "command": "sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v8.sql",
   "database": "postgres",
   "postgres_version": "16.14 (Ubuntu 16.14-1.pgdg24.04+1)",
   "fixture": {
-    "path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v7.sql",
-    "byte_length": 309321,
-    "sha256": "9fefe55a0b82c6e6e818e22d9f374bd491c98751b3c21f29e365a07547db849b"
+    "path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v8.sql",
+    "byte_length": 322256,
+    "sha256": "d1ad86357f8e2f397813e085304e157fad99a80ba9cb15d58e84d163af795ea3"
   },
   "raw_output": {
-    "path": "docs/plans/fixtures/autonomy-contract-rollback-run-v7.log.gz",
+    "path": "docs/plans/fixtures/autonomy-contract-rollback-run-v8.log.gz",
     "content_encoding": "gzip",
-    "archive_byte_length": 3466,
-    "archive_sha256": "4ed6abbd780d1014cd7b23aa182065927c5ea6a5b7f889434fe8d3f907ba592d",
-    "uncompressed_byte_length": 23391,
-    "uncompressed_sha256": "61d681c40e99bf6d7b4a06ea2a2a1b920f37bdcc639ccff8ab7f8e7bc6fd73de",
+    "archive_byte_length": 4237,
+    "archive_sha256": "952e6a26450db3476616d1552b8a4857141a18efbc02905c3dc9d253dde094c1",
+    "uncompressed_byte_length": 29318,
+    "uncompressed_sha256": "39359b5295381739341792d08e2211d1d6074e96420d306a31810e21feb9a11f",
     "normalization": {
       "algorithm": "identity-bytes-before-deterministic-gzip",
       "version": "1",
@@ -25,11 +25,13 @@
   },
   "result": {
     "exit_code": 0,
-    "pass_marker": "autonomy_contract_v7_passed",
+    "pass_marker": "autonomy_contract_v8_passed",
     "pass_marker_count": 1,
     "rollback_marker_observed": true,
     "schema_absent_after_rollback": true,
     "temporary_roles_absent_after_rollback": true,
+    "successful_promotion_function_call_observed": true,
+    "successful_rollback_function_call_observed": true,
     "successful_final_report_insert_observed": true
   },
   "covered_negative_probes": [
@@ -52,9 +54,10 @@
     "invented_or_self_attested_reviewer_rejected",
     "wrong_review_subject_rejected",
     "generic_final_report_artifacts_rejected",
-    "typed_rollback_stale_replay_rejected",
+    "stale_provider_rollback_replay_rejected",
+    "stale_runtime_rollback_replay_rejected",
     "underpowered_or_self_reviewed_experiment_promotion_rejected",
-    "rollback_without_promotion_rejected"
+    "rollback_without_valid_regression_rejected"
   ],
-  "normalisation_note": "The complete psql transcript is committed as deterministic gzip. Decompression yields the exact captured stdout/stderr bytes, including psql table spacing; archive and uncompressed lengths/SHA-256 are both bound. Reruns compare exit, marker, rollback, cleanup, function matrix, and semantic probes."
+  "normalisation_note": "The complete psql transcript is committed as deterministic gzip. Decompression yields the exact captured stdout/stderr bytes, including psql table spacing; archive and uncompressed lengths/SHA-256 are both bound. Reruns compare exit, marker, rollback, cleanup, function matrix, positive promotion/rollback authority calls, and semantic probes."
 }

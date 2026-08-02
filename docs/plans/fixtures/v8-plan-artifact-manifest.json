@@ -1,0 +1,103 @@
+{
+  "schema": "callscore.plan_artifact_manifest.v8",
+  "artifact_count": 19,
+  "non_circular": true,
+  "manifest_path_excluded": "docs/plans/fixtures/v8-plan-artifact-manifest.json",
+  "artifacts": [
+    {
+      "path": "docs/plans/2026-08-02-callscore-autonomous-langgraph-completion-v8.md",
+      "byte_length": 89674,
+      "sha256": "afdb2d2740cca109d2ae2d53f82c02c3c8f827d140f9e485099d41a6726e5460"
+    },
+    {
+      "path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v8.sql",
+      "byte_length": 322256,
+      "sha256": "d1ad86357f8e2f397813e085304e157fad99a80ba9cb15d58e84d163af795ea3"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-contract-rollback-run-v8.log.gz",
+      "byte_length": 4237,
+      "sha256": "952e6a26450db3476616d1552b8a4857141a18efbc02905c3dc9d253dde094c1"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-contract-spike-receipt-v8.json",
+      "byte_length": 4063,
+      "sha256": "a7f5fe2765f09bef5308b0dc4bdc7f6de3941de63a1933c146f62520a3ab4c27"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-contract-normalized-proof-v8.json",
+      "byte_length": 3149,
+      "sha256": "84300ac9333d02759b4d457e726dc4eb30b0be39c8f39c2ae88538346f03ddf2"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-authority-function-call-matrix-v8.json",
+      "byte_length": 17258,
+      "sha256": "6b595b00ca5078834a4dd2992fcb2f42cda716035ed568671c906125d236fda3"
+    },
+    {
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-receipt-v8.json",
+      "byte_length": 2756,
+      "sha256": "5f956dd9eadebf8ad21ad18ac29b52be50c489311fdaed874d74107f81bc34bd"
+    },
+    {
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-process-v8.json",
+      "byte_length": 887,
+      "sha256": "22b622cac1d6e6e524e6a2e14e4162e61d19e169a11e5118743b5bceb5d0fe67"
+    },
+    {
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-usage-v8.json",
+      "byte_length": 415,
+      "sha256": "a1fe5db0febd43cdc2c54138f49a9c25bee02a15c2da173b858d7994f0151e72"
+    },
+    {
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-output-v8.json",
+      "byte_length": 72,
+      "sha256": "447b15d5864735e82ecedf0ed60b6d7b8869b58c92e0bad6f05ce581a260d8c4"
+    },
+    {
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-state-evidence-v8.json",
+      "byte_length": 1875,
+      "sha256": "04c2b3d1fedf83fb1bd77c59cc9ef1a05c47310425174868761268dceee6d1b5"
+    },
+    {
+      "path": "docs/plans/fixtures/canonical-learning-artifacts-v4.schema.json",
+      "byte_length": 8333,
+      "sha256": "106bc9b4f86d184cad28da3d60a3b256e38b28af5e8b8b38cb26f70ed5094e22"
+    },
+    {
+      "path": "docs/plans/fixtures/callscore-autonomy-implementation-report-v7.schema.json",
+      "byte_length": 16301,
+      "sha256": "95cf9be6477f05eaaec885c3dc07d9ebac99fcfabde9c6dc6850a07ba2920dc0"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-evidence-receipts-v3.schema.json",
+      "byte_length": 23664,
+      "sha256": "bc7fe464511d2c7b005e6cd76975b57f60b1090b788e547b9f7fd4cab1df0a2c"
+    },
+    {
+      "path": "docs/plans/fixtures/verify-autonomy-final-report-contract-v8.py",
+      "byte_length": 44559,
+      "sha256": "cabdc27248215463f6f615f9d627218a78d95f1be36f6b00dd5f941f0d18a01b"
+    },
+    {
+      "path": "docs/plans/fixtures/verify-autonomy-final-report-contract-v8-selftest.py",
+      "byte_length": 30014,
+      "sha256": "84468fec0397738f75a342b18c413beba17a4f50d1f1f833b4ba1fe55ed31e9a"
+    },
+    {
+      "path": "docs/plans/fixtures/provider-mutation-surface-inventory-v8.json",
+      "byte_length": 3747,
+      "sha256": "f5397b344197ef8124abbbcd5731e9be36d777a59d4013e9b17b415a816d859c"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-runtime-baseline-inventory-v8.json",
+      "byte_length": 5467,
+      "sha256": "087ebc9f9192bf16b19ae9d9ddec64d5443be1f3429242b0dde9fede8e7364fd"
+    },
+    {
+      "path": "docs/plans/fixtures/langgraph-postgres-dependency-compatibility.json",
+      "byte_length": 961,
+      "sha256": "4fa474d34a0801a5b95c41a4d54189572f7f5f402d57b622e6c29fe0013f970b"
+    }
+  ]
+}

@@ -1021,7 +1021,7 @@ CREATE TABLE autonomy_final_reports (
   report_id uuid PRIMARY KEY,
   report_stream_id text NOT NULL,
   sequence_no bigint NOT NULL CHECK (sequence_no > 0),
-  report_schema text NOT NULL CHECK (report_schema='callscore.autonomy_implementation_report.v6'),
+  report_schema text NOT NULL CHECK (report_schema='callscore.autonomy_implementation_report.v7'),
   app_commit_sha char(40) NOT NULL CHECK (app_commit_sha ~ '^[0-9a-f]{40}$'),
   workplane_commit_sha char(40) NOT NULL CHECK (workplane_commit_sha ~ '^[0-9a-f]{40}$'),
   plan_commit_sha char(40) NOT NULL CHECK (plan_commit_sha ~ '^[0-9a-f]{40}$'),
@@ -2438,6 +2438,12 @@ CREATE FUNCTION insert_verified_autonomy_report(
   p_image_digest text,
   p_prompt_manifest_sha256 char(64),
   p_deployment_manifest_sha256 char(64),
+  p_report_schema_sha256 char(64),
+  p_evidence_schema_sha256 char(64),
+  p_phase_manifest_index_sha256 char(64),
+  p_review_attestation_ledger_sha256 char(64),
+  p_verifier_script_sha256 char(64),
+  p_frozen_evidence_manifest_sha256 char(64),
   p_report_json_artifact_id uuid,
   p_report_json_sha256 char(64),
   p_producer_agent_id text,
@@ -2447,6 +2453,9 @@ CREATE FUNCTION insert_verified_autonomy_report(
   p_live_activation_approved boolean,
   p_blockers jsonb,
   p_canary_provider_operation_id uuid,
+  p_canary_generation_id uuid,
+  p_canary_accepted_evaluation_id uuid,
+  p_final_review_execution_ids uuid[],
   p_canary_readback_artifact_id uuid,
   p_canary_provider_rollback_artifact_id uuid,
   p_runtime_variant_rollback_artifact_id uuid,
@@ -2463,13 +2472,16 @@ BEGIN
   END IF;
   SELECT * INTO v_operation FROM callscore_plan_contract.provider_operations
    WHERE operation_id=p_canary_provider_operation_id AND provider_state='VERIFIED'
+     AND generation_id=p_canary_generation_id AND accepted_evaluation_id=p_canary_accepted_evaluation_id
      AND readback_receipt_artifact_id=p_canary_readback_artifact_id
      AND external_object_id IS NOT NULL;
   IF v_operation.operation_id IS NULL THEN
     RAISE EXCEPTION 'final PASS requires exact VERIFIED canary/readback relation' USING ERRCODE='23514';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_report_json_artifact_id AND content_sha256=p_report_json_sha256 AND artifact_kind='autonomy_implementation_report.v6')
-     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_verifier_artifact_id AND content_sha256=p_verifier_sha256 AND artifact_kind='autonomy_report_verification_receipt.v2')
+  IF cardinality(p_final_review_execution_ids)<>3
+     OR (SELECT count(DISTINCT x) FROM unnest(p_final_review_execution_ids) x)<>3
+     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_report_json_artifact_id AND content_sha256=p_report_json_sha256 AND artifact_kind='autonomy_implementation_report.v7')
+     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_verifier_artifact_id AND content_sha256=p_verifier_sha256 AND artifact_kind='autonomy_report_verification_receipt.v3')
      OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_canary_readback_artifact_id AND artifact_kind='provider_readback_receipt')
      OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_canary_provider_rollback_artifact_id AND artifact_kind='provider_object_rollback_receipt.v2')
      OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_runtime_variant_rollback_artifact_id AND artifact_kind='runtime_variant_rollback_receipt.v2')
@@ -2478,6 +2490,18 @@ BEGIN
        WHERE b.evidence_artifact_id=p_verifier_artifact_id AND b.subject_kind='autonomy_final_report'
          AND b.subject_id=p_report_id::text AND b.subject_sha256=p_report_json_sha256
          AND b.validation_schema='final-report-verification.v2' AND b.verifier_agent_id=p_verifier_agent_id
+         AND b.verifier_context @> jsonb_build_object(
+           'status','PASS','report_schema_sha256',p_report_schema_sha256,
+           'evidence_schema_sha256',p_evidence_schema_sha256,
+           'deployment_manifest_sha256',p_deployment_manifest_sha256,
+           'phase_manifest_index_sha256',p_phase_manifest_index_sha256,
+           'review_attestation_ledger_sha256',p_review_attestation_ledger_sha256,
+           'verifier_script_sha256',p_verifier_script_sha256,
+           'frozen_evidence_manifest_sha256',p_frozen_evidence_manifest_sha256,
+           'canary_generation_id',p_canary_generation_id,
+           'canary_accepted_evaluation_id',p_canary_accepted_evaluation_id,
+           'final_review_execution_ids',to_jsonb(p_final_review_execution_ids)
+         )
      )
      OR NOT EXISTS(
        SELECT 1 FROM callscore_plan_contract.verified_evidence_bindings b
@@ -2510,7 +2534,8 @@ BEGIN
      )
      OR (SELECT count(*) FROM callscore_plan_contract.autonomy_review_receipts r
          JOIN callscore_plan_contract.review_execution_attestations a USING(review_execution_id)
-         WHERE r.phase='FINAL' AND r.status='PASS' AND r.reviewed_subject_sha256=p_deployment_manifest_sha256
+         WHERE r.review_execution_id=ANY(p_final_review_execution_ids)
+           AND r.phase='FINAL' AND r.status='PASS' AND r.reviewed_subject_sha256=p_deployment_manifest_sha256
            AND a.target_app_commit_sha=p_app_commit_sha AND a.target_plan_commit_sha=p_plan_commit_sha
            AND a.target_deployment_manifest_sha256=p_deployment_manifest_sha256)<>3
      OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.provider_object_rollback_receipts r
@@ -2534,7 +2559,7 @@ BEGIN
     canary_readback_artifact_id,canary_provider_rollback_artifact_id,runtime_variant_rollback_artifact_id
     ,provider_rollback_receipt_id,runtime_rollback_receipt_id
   ) VALUES (
-    p_report_id,p_report_stream_id,p_sequence_no,'callscore.autonomy_implementation_report.v6',
+    p_report_id,p_report_stream_id,p_sequence_no,'callscore.autonomy_implementation_report.v7',
     p_app_commit_sha,p_workplane_commit_sha,p_plan_commit_sha,p_graph_source_sha256,p_migration_sha256,
     p_runtime_script_manifest_sha256,p_image_digest,p_prompt_manifest_sha256,p_deployment_manifest_sha256,p_report_json_artifact_id,
     p_report_json_sha256,p_producer_agent_id,p_verifier_agent_id,p_verifier_artifact_id,
@@ -3086,7 +3111,7 @@ BEGIN
     control_sample_size,treatment_sample_size,observation_days,quality_delta,outcome_relative_delta,
     bootstrap_ci95_lower,safety_violations,provider_verification_rate,controlled_reason_code,
     decision_payload,expected_registry_version
-  ) VALUES (v_event,p_experiment_id,v_seq,v_r.rollback_variant_id,v_r.active_variant_id,'ROLLBACK',
+  ) VALUES (v_event,p_experiment_id,v_seq,v_r.active_variant_id,v_r.rollback_variant_id,'ROLLBACK',
     v_stats.control_sample_size,v_stats.treatment_sample_size,v_stats.observation_days,v_stats.quality_delta,
     v_stats.outcome_relative_delta,v_stats.bootstrap_ci_lower,v_stats.safety_violations,v_stats.provider_verification_rate,
     'rollback_automatic_post_promotion_regression',jsonb_build_object('trigger_measurement_id',p_trigger_measurement_id,'statistics_function','compute_runtime_experiment_statistics.v1'),p_expected_registry_version);
@@ -3329,7 +3354,7 @@ ALTER FUNCTION record_review_execution_attestation(uuid,char,char,char,text,text
 ALTER FUNCTION record_autonomy_review_receipt(uuid,uuid,text,char,uuid,char,text) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_provider_object_rollback_receipt(uuid,text,bigint,char,uuid,uuid,uuid,timestamptz,timestamptz) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_runtime_variant_rollback_receipt(uuid,text,bigint,char,uuid,uuid,uuid,uuid,uuid,uuid,uuid,timestamptz,timestamptz) OWNER TO callscore_plan_function_owner;
-ALTER FUNCTION insert_verified_autonomy_report(uuid,text,bigint,char,char,char,char,char,char,text,char,char,uuid,char,text,text,uuid,char,boolean,jsonb,uuid,uuid,uuid,uuid,uuid,uuid) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION insert_verified_autonomy_report(uuid,text,bigint,char,char,char,char,char,char,text,char,char,char,char,char,char,char,char,uuid,char,text,text,uuid,char,boolean,jsonb,uuid,uuid,uuid,uuid[],uuid,uuid,uuid,uuid,uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_outcome_measurement(uuid,uuid,uuid,uuid,text,numeric,numeric,timestamptz,timestamptz,uuid,char,jsonb) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_canonical_learning_set(uuid,uuid,uuid,uuid[],jsonb[],uuid[]) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION reclaim_provider_claim(uuid,bigint,text,uuid) OWNER TO callscore_plan_function_owner;
@@ -3395,7 +3420,7 @@ GRANT EXECUTE ON FUNCTION record_provider_readback_evidence(uuid,uuid,text,times
   record_autonomy_review_receipt(uuid,uuid,text,char,uuid,char,text),
   record_provider_object_rollback_receipt(uuid,text,bigint,char,uuid,uuid,uuid,timestamptz,timestamptz),
   record_runtime_variant_rollback_receipt(uuid,text,bigint,char,uuid,uuid,uuid,uuid,uuid,uuid,uuid,timestamptz,timestamptz),
-  insert_verified_autonomy_report(uuid,text,bigint,char,char,char,char,char,char,text,char,char,uuid,char,text,text,uuid,char,boolean,jsonb,uuid,uuid,uuid,uuid,uuid,uuid)
+  insert_verified_autonomy_report(uuid,text,bigint,char,char,char,char,char,char,text,char,char,char,char,char,char,char,char,uuid,char,text,text,uuid,char,boolean,jsonb,uuid,uuid,uuid,uuid[],uuid,uuid,uuid,uuid,uuid)
 TO callscore_plan_report_verifier;
 
 -- Contract probes.
@@ -4390,8 +4415,8 @@ RESET ROLE;
 
 -- Exact typed finalisation evidence: authenticated reviewer lineage, review subjects, and rollback relations.
 SET LOCAL ROLE callscore_plan_runtime;
-SELECT record_autonomy_artifact('98000000-0000-0000-0000-000000000001','autonomy_implementation_report.v6','/srv/agents/hermes/profiles/callscore/runtime/children/final-report.json',repeat('1',64),100,'application/json','fixture-report-producer','fixture-report-verifier');
-SELECT record_autonomy_artifact('98000000-0000-0000-0000-000000000002','autonomy_report_verification_receipt.v2','/srv/agents/hermes/profiles/callscore/runtime/children/final-report-verification.json',repeat('2',64),100,'application/json','fixture-report-verification-producer','fixture-report-verifier');
+SELECT record_autonomy_artifact('98000000-0000-0000-0000-000000000001','autonomy_implementation_report.v7','/srv/agents/hermes/profiles/callscore/runtime/children/final-report.json',repeat('1',64),100,'application/json','fixture-report-producer','fixture-report-verifier');
+SELECT record_autonomy_artifact('98000000-0000-0000-0000-000000000002','autonomy_report_verification_receipt.v3','/srv/agents/hermes/profiles/callscore/runtime/children/final-report-verification.json',repeat('2',64),100,'application/json','fixture-report-verification-producer','fixture-report-verifier');
 SELECT record_autonomy_artifact('98000000-0000-0000-0000-000000000003','provider_object_rollback_receipt.v2','/srv/agents/hermes/profiles/callscore/runtime/children/provider-object-rollback.json',repeat('3',64),100,'application/json','fixture-rollback-author','fixture-report-verifier');
 SELECT record_autonomy_artifact('98000000-0000-0000-0000-000000000004','runtime_variant_rollback_receipt.v2','/srv/agents/hermes/profiles/callscore/runtime/children/runtime-variant-rollback.json',repeat('4',64),100,'application/json','fixture-rollback-author','fixture-report-verifier');
 SELECT record_autonomy_artifact(('98000000-0000-0000-0000-00000000000'||n)::uuid,'hermes_review_process_identity','/srv/agents/hermes/profiles/callscore/runtime/children/reviewer-'||n||'-identity.json',repeat(n::text,64),100,'application/json','callscore-hermes-gateway','callscore-review-identity-attestor') FROM generate_series(5,7) n;
@@ -4401,7 +4426,23 @@ SELECT record_autonomy_artifact('98000000-0000-0000-0000-00000000000a','autonomy
 RESET ROLE;
 
 SET LOCAL ROLE callscore_plan_report_verifier;
-SELECT record_verified_evidence_binding(gen_random_uuid(),'98000000-0000-0000-0000-000000000002',repeat('2',64),'autonomy_final_report','99000000-0000-0000-0000-000000000002',repeat('1',64),'final-report-verification.v2','fixture-report-verifier','{"source":"typed_final_verifier"}');
+SELECT record_verified_evidence_binding(
+  gen_random_uuid(),'98000000-0000-0000-0000-000000000002',repeat('2',64),
+  'autonomy_final_report','99000000-0000-0000-0000-000000000002',repeat('1',64),
+  'final-report-verification.v2','fixture-report-verifier',jsonb_build_object(
+    'status','PASS','report_schema_sha256',repeat('a',64),'evidence_schema_sha256',repeat('b',64),
+    'deployment_manifest_sha256',repeat('c',64),'phase_manifest_index_sha256',repeat('d',64),
+    'review_attestation_ledger_sha256',repeat('e',64),'verifier_script_sha256',repeat('f',64),
+    'frozen_evidence_manifest_sha256',repeat('0',64),
+    'canary_generation_id','70000000-0000-0000-0000-000000000001'::uuid,
+    'canary_accepted_evaluation_id','71000000-0000-0000-0000-000000000001'::uuid,
+    'final_review_execution_ids',to_jsonb(ARRAY[
+      '97000000-0000-0000-0000-000000000005'::uuid,
+      '97000000-0000-0000-0000-000000000006'::uuid,
+      '97000000-0000-0000-0000-000000000007'::uuid
+    ])
+  )
+);
 SELECT record_verified_evidence_binding(gen_random_uuid(),'98000000-0000-0000-0000-000000000003',repeat('3',64),'provider_object_rollback','84000000-0000-0000-0000-000000000001',repeat('c',64),'provider-object-rollback.v2','fixture-report-verifier','{"report_stream_id":"fixture-report-stream","report_sequence_no":1}');
 SELECT record_verified_evidence_binding(gen_random_uuid(),'98000000-0000-0000-0000-000000000004',repeat('4',64),'runtime_variant_rollback','fixture-report-stream:1',repeat('c',64),'runtime-variant-rollback.v2','fixture-report-verifier','{"exact_experiment_relation":true}');
 SELECT record_verified_evidence_binding(gen_random_uuid(),('98000000-0000-0000-0000-00000000000'||n)::uuid,repeat(n::text,64),'review_execution_identity','97000000-0000-0000-0000-00000000000'||n::text,repeat('c',64),'review-execution-identity.v1','callscore-review-identity-attestor','{"source":"gateway_session_ledger"}') FROM generate_series(5,7) n;
@@ -4434,36 +4475,199 @@ SELECT set_activation_fence(true,1,'fixture_refence_before_exact_activation','ca
 SELECT set_activation_fence(false,2,'fixture_exact_activation','callscore_plan_policy_writer','40900000-0000-0000-0000-000000000001',repeat('c',64));
 RESET ROLE;
 
-INSERT INTO runtime_promotion_events(
-  promotion_event_id,experiment_id,sequence_no,prior_champion_variant_id,candidate_variant_id,decision,
-  evaluator_generation_id,trust_generation_id,control_sample_size,treatment_sample_size,observation_days,
-  quality_delta,outcome_relative_delta,bootstrap_ci95_lower,safety_violations,provider_verification_rate,
-  controlled_reason_code,decision_payload,expected_registry_version
-) SELECT '95000000-0000-0000-0000-000000000001'::uuid,'60000000-0000-0000-0000-000000000001'::uuid,1,
-    CASE WHEN m.variant_id='61000000-0000-0000-0000-000000000001' THEN '61000000-0000-0000-0000-000000000002'::uuid ELSE '61000000-0000-0000-0000-000000000001'::uuid END,
-    m.variant_id,'PROMOTE','70000000-0000-0000-0000-000000000004'::uuid,'70000000-0000-0000-0000-000000000003'::uuid,30,30,14,0.05,0.10,0.01,0,1,'fixture_exact_promotion','{"source":"typed_fixture"}'::jsonb,1
-  FROM outcome_measurements m WHERE m.measurement_id='87000000-0000-0000-0000-000000000001'
-UNION ALL
-  SELECT '95000000-0000-0000-0000-000000000002'::uuid,'60000000-0000-0000-0000-000000000001'::uuid,2,
-    m.variant_id,
-    CASE WHEN m.variant_id='61000000-0000-0000-0000-000000000001' THEN '61000000-0000-0000-0000-000000000002'::uuid ELSE '61000000-0000-0000-0000-000000000001'::uuid END,
-    'ROLLBACK','70000000-0000-0000-0000-000000000004'::uuid,'70000000-0000-0000-0000-000000000003'::uuid,30,30,14,0.05,0.10,0.01,0,1,'rollback_fixture_exact','{"source":"typed_fixture"}'::jsonb,1
-  FROM outcome_measurements m WHERE m.measurement_id='87000000-0000-0000-0000-000000000001';
+-- Exercise the real promotion and rollback authorities with 30 exact eligible
+-- observations in each cohort. Rows are cloned only to keep this fixture
+-- compact; all runtime predicates recompute statistics from the relational
+-- workflow/assignment/generation/evaluation/outcome chain.
+CREATE TEMP TABLE fixture_runtime_event_ids(kind text PRIMARY KEY,event_id uuid NOT NULL) ON COMMIT DROP;
+GRANT SELECT,INSERT ON fixture_runtime_event_ids TO callscore_plan_runtime,callscore_plan_report_verifier;
+WITH template AS (
+  SELECT w FROM autonomy_workflows w WHERE workflow_id='00000000-0000-0000-0000-000000000001'
+)
+INSERT INTO autonomy_workflows
+SELECT (jsonb_populate_record(NULL::autonomy_workflows,
+  to_jsonb(t.w)||jsonb_build_object(
+    'workflow_id',md5('experiment-workflow-'||n)::uuid,
+    'workflow_run_id',md5('experiment-run-'||n)::uuid,
+    'source_channel_task_id',NULL,
+    'execution_class','INTERNAL_ARTIFACT','workflow_state','COMPLETE','achievement_class','DRAFTED',
+    'head_agent_id','fixture-experiment-head','channel','fixture','task_type','experiment_observation',
+    'input_payload',jsonb_build_object('sample',n),
+    'input_payload_sha256',encode(sha256(convert_to(jsonb_build_object('sample',n)::text,'UTF8')),'hex'),
+    'state_version',1,'lease_owner',NULL,'lease_token',NULL,'lease_expires_at',NULL,
+    'checkpoint_thread_id','callscore-task:'||md5('experiment-workflow-'||n)::uuid::text,
+    'terminal_reason_code','fixture_exact_experiment_sample',
+    'created_at',clock_timestamp()-CASE WHEN n<=30 THEN interval '14 days' ELSE interval '1 minute' END,
+    'updated_at',clock_timestamp()
+  ))).* FROM template t CROSS JOIN generate_series(1,60) n;
+
+WITH template AS (
+  SELECT a FROM runtime_variant_assignments a WHERE experiment_id='60000000-0000-0000-0000-000000000001' LIMIT 1
+)
+INSERT INTO runtime_variant_assignments
+SELECT (jsonb_populate_record(NULL::runtime_variant_assignments,
+  to_jsonb(t.a)||jsonb_build_object(
+    'assignment_id',md5('experiment-assignment-'||n)::uuid,
+    'workflow_id',md5('experiment-workflow-'||n)::uuid,
+    'producer_agent_id','fixture-experiment-producer-'||n,'delegated_role','candidate-producer',
+    'experiment_id','60000000-0000-0000-0000-000000000002',
+    'sequence_no',1,
+    'cohort_id',CASE WHEN n<=30 THEN '62000000-0000-0000-0000-000000000003' ELSE '62000000-0000-0000-0000-000000000004' END,
+    'cohort_name',CASE WHEN n<=30 THEN 'CONTROL' ELSE 'TREATMENT' END,
+    'variant_id',CASE WHEN n<=30 THEN '61000000-0000-0000-0000-000000000003' ELSE '61000000-0000-0000-0000-000000000004' END,
+    'assignment_bucket',CASE WHEN n<=30 THEN 0 ELSE 90 END,
+    'assignment_ratio_control',80,'monitoring_promotion_event_id',NULL,'registry_version',2,
+    'previous_record_hash',NULL,'record_hash',NULL
+  ))).* FROM template t CROSS JOIN generate_series(1,60) n;
+
+WITH template AS (
+  SELECT g FROM generation_provenance g WHERE generation_id='70000000-0000-0000-0000-000000000001'
+)
+INSERT INTO generation_provenance
+SELECT (jsonb_populate_record(NULL::generation_provenance,
+  to_jsonb(t.g)||jsonb_build_object(
+    'generation_id',md5('experiment-generation-'||n)::uuid,
+    'workflow_id',md5('experiment-workflow-'||n)::uuid,
+    'workflow_run_id',md5('experiment-run-'||n)::uuid,'sequence_no',1,
+    'delegation_id',NULL,'join_manifest_id',NULL,'evaluated_generation_id',NULL,
+    'producer_agent_id','fixture-experiment-producer-'||n,'delegated_role','candidate-producer',
+    'channel','fixture','task_type','experiment_observation','hermes_session_id','fixture-experiment-session-'||n,
+    'registry_version',2,'experiment_id','60000000-0000-0000-0000-000000000002',
+    'cohort_id',CASE WHEN n<=30 THEN '62000000-0000-0000-0000-000000000003' ELSE '62000000-0000-0000-0000-000000000004' END,
+    'variant_id',CASE WHEN n<=30 THEN '61000000-0000-0000-0000-000000000003' ELSE '61000000-0000-0000-0000-000000000004' END,
+    'started_at',clock_timestamp()-CASE WHEN n<=30 THEN interval '14 days' ELSE interval '1 minute' END,
+    'finished_at',clock_timestamp()-CASE WHEN n<=30 THEN interval '14 days' ELSE interval '1 minute' END,
+    'previous_record_hash',NULL,'record_hash',NULL
+  ))).* FROM template t CROSS JOIN generate_series(1,60) n;
+
+-- Independent evaluator and trust generations for the treatment candidate.
+WITH template AS (
+  SELECT g FROM generation_provenance g WHERE generation_id='70000000-0000-0000-0000-000000000004'
+), reviewers(generation_id,workflow_no,producer_agent_id,delegated_role,hermes_session_id) AS (
+  VALUES
+    (md5('experiment-evaluator-generation')::uuid,29,'fixture-independent-evaluator','evaluator','fixture-independent-evaluator-session'),
+    (md5('experiment-trust-generation')::uuid,30,'fixture-independent-trust','trust-reviewer','fixture-independent-trust-session')
+)
+INSERT INTO generation_provenance
+SELECT (jsonb_populate_record(NULL::generation_provenance,
+  to_jsonb(t.g)||jsonb_build_object(
+    'generation_id',r.generation_id,'workflow_id',md5('experiment-workflow-'||r.workflow_no)::uuid,
+    'workflow_run_id',md5('experiment-run-'||r.workflow_no)::uuid,'sequence_no',2,
+    'producer_agent_id',r.producer_agent_id,'delegated_role',r.delegated_role,
+    'hermes_session_id',r.hermes_session_id,'evaluated_generation_id',md5('experiment-generation-31')::uuid,
+    'experiment_id','60000000-0000-0000-0000-000000000002',
+    'cohort_id','62000000-0000-0000-0000-000000000004',
+    'variant_id','61000000-0000-0000-0000-000000000004',
+    'previous_record_hash',NULL,'record_hash',NULL,'created_at',clock_timestamp()
+  ))).* FROM template t CROSS JOIN reviewers r;
+
+WITH template AS (
+  SELECT q FROM quality_evaluations q WHERE evaluation_id='71000000-0000-0000-0000-000000000001'
+)
+INSERT INTO quality_evaluations
+SELECT (jsonb_populate_record(NULL::quality_evaluations,
+  to_jsonb(t.q)||jsonb_build_object(
+    'evaluation_id',md5('experiment-quality-'||n)::uuid,
+    'workflow_id',md5('experiment-workflow-'||n)::uuid,'sequence_no',1,
+    'generation_id',md5('experiment-generation-'||n)::uuid,
+    'evaluator_generation_id',md5('experiment-evaluator-generation')::uuid,
+    'weighted_score',CASE WHEN n<=30 THEN 0.80 ELSE 0.90 END,
+    'previous_record_hash',NULL,'record_hash',NULL,
+    'created_at',clock_timestamp()-CASE WHEN n<=30 THEN interval '14 days' ELSE interval '1 minute' END
+  ))).* FROM template t CROSS JOIN generate_series(1,60) n;
+
+-- A separate trust evaluation causally authorises the treatment candidate used by promotion.
+WITH template AS (
+  SELECT q FROM quality_evaluations q WHERE evaluation_id='71000000-0000-0000-0000-000000000001'
+)
+INSERT INTO quality_evaluations
+SELECT (jsonb_populate_record(NULL::quality_evaluations,
+  to_jsonb(t.q)||jsonb_build_object(
+    'evaluation_id',md5('experiment-trust-quality-31')::uuid,
+    'workflow_id',md5('experiment-workflow-31')::uuid,'sequence_no',2,
+    'generation_id',md5('experiment-generation-31')::uuid,
+    'evaluator_generation_id',md5('experiment-trust-generation')::uuid,
+    'weighted_score',0.90,'previous_record_hash',NULL,'record_hash',NULL,'created_at',clock_timestamp()
+  ))).* FROM template t;
+
+WITH template AS (
+  SELECT m FROM outcome_measurements m WHERE measurement_id='87000000-0000-0000-0000-000000000001'
+)
+INSERT INTO outcome_measurements
+SELECT (jsonb_populate_record(NULL::outcome_measurements,
+  to_jsonb(t.m)||jsonb_build_object(
+    'measurement_id',md5('experiment-measurement-'||n)::uuid,
+    'workflow_id',md5('experiment-workflow-'||n)::uuid,'sequence_no',1,
+    'generation_id',md5('experiment-generation-'||n)::uuid,
+    'operation_id',NULL,'publication_id',NULL,'experiment_id','60000000-0000-0000-0000-000000000002',
+    'cohort_id',CASE WHEN n<=30 THEN '62000000-0000-0000-0000-000000000003' ELSE '62000000-0000-0000-0000-000000000004' END,
+    'variant_id',CASE WHEN n<=30 THEN '61000000-0000-0000-0000-000000000003' ELSE '61000000-0000-0000-0000-000000000004' END,
+    'numerator',CASE WHEN n<=30 THEN 1.0 ELSE 1.2 END,'denominator',1.0,
+    'metric_value',CASE WHEN n<=30 THEN 1.0 ELSE 1.2 END,
+    'window_started_at',clock_timestamp()-CASE WHEN n<=30 THEN interval '16 days' ELSE interval '1 day' END,
+    'window_ended_at',clock_timestamp()-CASE WHEN n<=30 THEN interval '15 days' ELSE interval '1 minute' END,
+    'measured_at',clock_timestamp(),'previous_record_hash',NULL,'record_hash',NULL
+  ))).* FROM template t CROSS JOIN generate_series(1,60) n;
+
+SELECT jsonb_build_object(
+  'registry',(SELECT to_jsonb(r) FROM runtime_registry r JOIN runtime_experiments e USING(agent_id,channel,task_type,policy_version) WHERE e.experiment_id='60000000-0000-0000-0000-000000000002'),
+  'experiment',(SELECT to_jsonb(e) FROM runtime_experiments e WHERE experiment_id='60000000-0000-0000-0000-000000000002'),
+  'statistics',(SELECT to_jsonb(s) FROM compute_runtime_experiment_statistics('60000000-0000-0000-0000-000000000002') s),
+  'evaluator',(SELECT jsonb_build_object('role',delegated_role,'producer',producer_agent_id,'session',hermes_session_id) FROM generation_provenance WHERE generation_id=md5('experiment-evaluator-generation')::uuid),
+  'trust',(SELECT jsonb_build_object('role',delegated_role,'producer',producer_agent_id,'session',hermes_session_id) FROM generation_provenance WHERE generation_id=md5('experiment-trust-generation')::uuid),
+  'eval_accept',(SELECT count(*) FROM quality_evaluations WHERE evaluator_generation_id=md5('experiment-evaluator-generation')::uuid AND decision='ACCEPT'),
+  'trust_accept',(SELECT count(*) FROM quality_evaluations WHERE evaluator_generation_id=md5('experiment-trust-generation')::uuid AND decision='ACCEPT')
+) AS promotion_positive_path_preconditions;
+
+SET LOCAL ROLE callscore_plan_runtime;
+INSERT INTO fixture_runtime_event_ids
+SELECT 'PROMOTE',promote_runtime_variant(
+  '60000000-0000-0000-0000-000000000002',2,
+  md5('experiment-evaluator-generation')::uuid,md5('experiment-trust-generation')::uuid
+);
+RESET ROLE;
+
+-- New post-promotion evaluations make the treatment quality regress; the
+-- automatic rollback function must restore control and emit the typed event.
+WITH template AS (
+  SELECT q FROM quality_evaluations q WHERE evaluation_id='71000000-0000-0000-0000-000000000001'
+)
+INSERT INTO quality_evaluations
+SELECT (jsonb_populate_record(NULL::quality_evaluations,
+  to_jsonb(t.q)||jsonb_build_object(
+    'evaluation_id',md5('experiment-regression-quality-'||n)::uuid,
+    'workflow_id',md5('experiment-workflow-'||n)::uuid,'sequence_no',CASE WHEN n=31 THEN 3 ELSE 2 END,
+    'generation_id',md5('experiment-generation-'||n)::uuid,
+    'evaluator_generation_id','70000000-0000-0000-0000-000000000004',
+    'weighted_score',0.10,'previous_record_hash',NULL,'record_hash',NULL,'created_at',clock_timestamp()+interval '1 second'
+  ))).* FROM template t CROSS JOIN generate_series(31,60) n;
+
+SET LOCAL ROLE callscore_plan_runtime;
+INSERT INTO fixture_runtime_event_ids
+SELECT 'ROLLBACK',rollback_runtime_variant(
+  '60000000-0000-0000-0000-000000000002',3,md5('experiment-measurement-31')::uuid
+);
+RESET ROLE;
 
 SET LOCAL ROLE callscore_plan_report_verifier;
 SELECT record_provider_object_rollback_receipt('94000000-0000-0000-0000-000000000001','fixture-report-stream',1,repeat('c',64),'00000000-0000-0000-0000-000000000001','84000000-0000-0000-0000-000000000001','98000000-0000-0000-0000-000000000003',clock_timestamp(),clock_timestamp()+interval '1 hour');
 SELECT record_runtime_variant_rollback_receipt('94000000-0000-0000-0000-000000000002','fixture-report-stream',1,repeat('c',64),
-  '60000000-0000-0000-0000-000000000001','87000000-0000-0000-0000-000000000001',m.variant_id,
-  CASE WHEN m.variant_id='61000000-0000-0000-0000-000000000001' THEN '61000000-0000-0000-0000-000000000002'::uuid ELSE '61000000-0000-0000-0000-000000000001'::uuid END,
-  '95000000-0000-0000-0000-000000000001','95000000-0000-0000-0000-000000000002','98000000-0000-0000-0000-000000000004',clock_timestamp(),clock_timestamp()+interval '1 hour')
-FROM outcome_measurements m WHERE m.measurement_id='87000000-0000-0000-0000-000000000001';
+  '60000000-0000-0000-0000-000000000002',md5('experiment-measurement-31')::uuid,
+  '61000000-0000-0000-0000-000000000004','61000000-0000-0000-0000-000000000003',
+  (SELECT event_id FROM fixture_runtime_event_ids WHERE kind='PROMOTE'),
+  (SELECT event_id FROM fixture_runtime_event_ids WHERE kind='ROLLBACK'),
+  '98000000-0000-0000-0000-000000000004',clock_timestamp(),clock_timestamp()+interval '1 hour');
 SELECT insert_verified_autonomy_report(
   '99000000-0000-0000-0000-000000000002','fixture-report-stream',1,
   repeat('a',40),repeat('b',40),repeat('d',40),repeat('e',64),repeat('f',64),repeat('0',64),
   'sha256:'||repeat('1',64),repeat('2',64),repeat('c',64),
+  repeat('a',64),repeat('b',64),repeat('d',64),repeat('e',64),repeat('f',64),repeat('0',64),
   '98000000-0000-0000-0000-000000000001',repeat('1',64),'fixture-report-producer','fixture-report-verifier',
   '98000000-0000-0000-0000-000000000002',repeat('2',64),true,'[]',
-  '84000000-0000-0000-0000-000000000001','80000000-0000-0000-0000-000000000004',
+  '84000000-0000-0000-0000-000000000001',
+  '70000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001',
+  ARRAY['97000000-0000-0000-0000-000000000005'::uuid,'97000000-0000-0000-0000-000000000006'::uuid,'97000000-0000-0000-0000-000000000007'::uuid],
+  '80000000-0000-0000-0000-000000000004',
   '98000000-0000-0000-0000-000000000003','98000000-0000-0000-0000-000000000004',
   '94000000-0000-0000-0000-000000000001','94000000-0000-0000-0000-000000000002'
 );
@@ -4472,6 +4676,18 @@ BEGIN
   BEGIN
     PERFORM record_provider_object_rollback_receipt('94900000-0000-0000-0000-000000000001','fixture-report-stream',3,repeat('c',64),'00000000-0000-0000-0000-000000000001','84000000-0000-0000-0000-000000000001','98000000-0000-0000-0000-000000000003',clock_timestamp(),clock_timestamp()+interval '1 hour');
     RAISE EXCEPTION 'stale report sequence reused provider rollback evidence';
+  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+  END;
+  BEGIN
+    PERFORM record_runtime_variant_rollback_receipt(
+      '94900000-0000-0000-0000-000000000002','fixture-report-stream',3,repeat('c',64),
+      '60000000-0000-0000-0000-000000000002',md5('experiment-measurement-31')::uuid,
+      '61000000-0000-0000-0000-000000000004','61000000-0000-0000-0000-000000000003',
+      (SELECT event_id FROM fixture_runtime_event_ids WHERE kind='PROMOTE'),
+      (SELECT event_id FROM fixture_runtime_event_ids WHERE kind='ROLLBACK'),
+      '98000000-0000-0000-0000-000000000004',clock_timestamp(),clock_timestamp()+interval '1 hour'
+    );
+    RAISE EXCEPTION 'stale report sequence reused runtime rollback evidence';
   EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
   END;
 END;
@@ -4517,9 +4733,13 @@ BEGIN
       '99000000-0000-0000-0000-000000000001','fixture-report-stream',1,
       repeat('a',40),repeat('b',40),repeat('d',40),repeat('e',64),repeat('f',64),repeat('0',64),
       'sha256:'||repeat('1',64),repeat('2',64),repeat('c',64),
+      repeat('a',64),repeat('b',64),repeat('d',64),repeat('e',64),repeat('f',64),repeat('0',64),
       '88000000-0000-0000-0000-000000000001',repeat('1',64),'fixture-report-producer','fixture-report-verifier',
       '88000000-0000-0000-0000-000000000002',repeat('2',64),true,'[]',
-      '84000000-0000-0000-0000-000000000001','80000000-0000-0000-0000-000000000004',
+      '84000000-0000-0000-0000-000000000001',
+      '70000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001',
+      ARRAY['97000000-0000-0000-0000-000000000005'::uuid,'97000000-0000-0000-0000-000000000006'::uuid,'97000000-0000-0000-0000-000000000007'::uuid],
+      '80000000-0000-0000-0000-000000000004',
       '80000000-0000-0000-0000-000000000005','88000000-0000-0000-0000-000000000004',
       '94000000-0000-0000-0000-000000000001','94000000-0000-0000-0000-000000000002'
     );
@@ -4552,5 +4772,5 @@ BEGIN
 END;
 $$;
 
-SELECT 'autonomy_contract_v7_passed' AS result;
+SELECT 'autonomy_contract_v8_passed' AS result;
 ROLLBACK;
