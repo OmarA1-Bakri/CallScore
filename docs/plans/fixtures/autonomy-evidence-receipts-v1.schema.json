@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://call-score.com/schemas/autonomy-evidence-receipts.v1.json",
+  "title": "CallScore autonomy evidence receipts",
+  "oneOf": [
+    { "$ref": "#/$defs/phaseTest" },
+    { "$ref": "#/$defs/phaseReview" },
+    { "$ref": "#/$defs/finalReview" },
+    { "$ref": "#/$defs/activationApproval" },
+    { "$ref": "#/$defs/activation" },
+    { "$ref": "#/$defs/providerExecution" },
+    { "$ref": "#/$defs/providerReadback" },
+    { "$ref": "#/$defs/providerRollback" },
+    { "$ref": "#/$defs/runtimeRollback" },
+    { "$ref": "#/$defs/taskRouter" },
+    { "$ref": "#/$defs/toolInheritance" },
+    { "$ref": "#/$defs/canonicalReceiptValidation" },
+    { "$ref": "#/$defs/finalReportVerification" }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "httpsUri": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "identity": {
+      "type": "object",
+      "required": ["producer_agent_id", "verifier_agent_id"],
+      "properties": {
+        "producer_agent_id": { "type": "string", "minLength": 1 },
+        "verifier_agent_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "phaseTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase_id", "app_commit_sha", "workplane_commit_sha", "plan_commit_sha", "phase_commit_sha", "phase_manifest_sha256"],
+      "properties": {
+        "phase_id": { "enum": ["A0", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] },
+        "app_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "workplane_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "plan_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "phase_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "phase_manifest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "deploymentTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["app_commit_sha", "workplane_commit_sha", "plan_commit_sha", "graph_source_sha256", "migration_sha256", "runtime_script_manifest_sha256", "image_digest", "prompt_manifest_sha256"],
+      "properties": {
+        "app_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "workplane_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "plan_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "graph_source_sha256": { "$ref": "#/$defs/sha256" },
+        "migration_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_script_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "image_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "prompt_manifest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "phaseTest": {
+      "allOf": [
+        { "$ref": "#/$defs/identity" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "phase_id", "stage", "status", "target_tuple", "command", "exit_code", "started_at", "finished_at", "stdout_sha256", "stderr_sha256", "controlled_result_code", "producer_agent_id", "verifier_agent_id"],
+          "properties": {
+            "schema": { "const": "callscore.phase_test_receipt.v2" },
+            "phase_id": { "enum": ["A0", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] },
+            "stage": { "enum": ["RED", "GREEN", "REFACTOR"] },
+            "status": { "const": "PASS" },
+            "target_tuple": { "$ref": "#/$defs/phaseTarget" },
+            "command": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+            "exit_code": { "type": "integer" },
+            "started_at": { "$ref": "#/$defs/timestamp" },
+            "finished_at": { "$ref": "#/$defs/timestamp" },
+            "stdout_sha256": { "$ref": "#/$defs/sha256" },
+            "stderr_sha256": { "$ref": "#/$defs/sha256" },
+            "controlled_result_code": { "type": "string", "minLength": 1 },
+            "producer_agent_id": { "type": "string", "minLength": 1 },
+            "verifier_agent_id": { "type": "string", "minLength": 1 }
+          },
+          "allOf": [
+            { "if": { "properties": { "stage": { "const": "RED" } } }, "then": { "properties": { "exit_code": { "not": { "const": 0 } } } } },
+            { "if": { "properties": { "stage": { "enum": ["GREEN", "REFACTOR"] } } }, "then": { "properties": { "exit_code": { "const": 0 } } } }
+          ]
+        }
+      ]
+    },
+    "phaseReview": {
+      "allOf": [
+        { "$ref": "#/$defs/identity" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "phase_id", "review_type", "reviewer_agent_id", "verdict", "first_line", "target_tuple", "reviewed_artifact_sha256", "producer_agent_id", "verifier_agent_id"],
+          "properties": {
+            "schema": { "const": "callscore.phase_review_receipt.v2" },
+            "phase_id": { "enum": ["A0", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] },
+            "review_type": { "enum": ["contract", "implementation", "security"] },
+            "reviewer_agent_id": { "type": "string", "minLength": 1 },
+            "verdict": { "const": "PASS" },
+            "first_line": { "const": "VERDICT: PASS" },
+            "target_tuple": { "$ref": "#/$defs/phaseTarget" },
+            "reviewed_artifact_sha256": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sha256" } },
+            "producer_agent_id": { "type": "string", "minLength": 1 },
+            "verifier_agent_id": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "finalReview": {
+      "allOf": [
+        { "$ref": "#/$defs/identity" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "review_type", "reviewer_agent_id", "verdict", "first_line", "target_tuple", "reviewed_artifact_sha256", "producer_agent_id", "verifier_agent_id"],
+          "properties": {
+            "schema": { "const": "callscore.final_review_receipt.v1" },
+            "review_type": { "enum": ["contract", "implementation", "security"] },
+            "reviewer_agent_id": { "type": "string", "minLength": 1 },
+            "verdict": { "const": "PASS" },
+            "first_line": { "const": "VERDICT: PASS" },
+            "target_tuple": { "$ref": "#/$defs/deploymentTarget" },
+            "reviewed_artifact_sha256": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/sha256" } },
+            "producer_agent_id": { "type": "string", "minLength": 1 },
+            "verifier_agent_id": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "activationApproval": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "report_id", "target_tuple", "approved_at", "expires_at", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.autonomy_activation_approval_receipt.v2" }, "status": { "const": "PASS" },
+          "report_id": { "$ref": "#/$defs/uuid" }, "target_tuple": { "$ref": "#/$defs/deploymentTarget" },
+          "approved_at": { "$ref": "#/$defs/timestamp" }, "expires_at": { "$ref": "#/$defs/timestamp" },
+          "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "activation": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "report_id", "target_tuple", "approval_receipt_sha256", "activated_at", "fence_version", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.autonomy_activation_receipt.v2" }, "status": { "const": "PASS" },
+          "report_id": { "$ref": "#/$defs/uuid" }, "target_tuple": { "$ref": "#/$defs/deploymentTarget" },
+          "approval_receipt_sha256": { "$ref": "#/$defs/sha256" }, "activated_at": { "$ref": "#/$defs/timestamp" },
+          "fence_version": { "type": "integer", "minimum": 1 },
+          "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "providerIdentity": {
+      "type": "object",
+      "required": ["workflow_id", "operation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id"],
+      "properties": {
+        "workflow_id": { "$ref": "#/$defs/uuid" }, "operation_id": { "$ref": "#/$defs/uuid" },
+        "account_scope_hash": { "$ref": "#/$defs/sha256" }, "action_name": { "type": "string", "minLength": 1 },
+        "payload_sha256": { "$ref": "#/$defs/sha256" }, "external_object_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "providerExecution": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, { "$ref": "#/$defs/providerIdentity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "workflow_id", "operation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "publication_revision", "provider_state_version", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.provider_execution_receipt.v2" }, "status": { "const": "PASS" },
+          "workflow_id": { "$ref": "#/$defs/uuid" }, "operation_id": { "$ref": "#/$defs/uuid" }, "account_scope_hash": { "$ref": "#/$defs/sha256" },
+          "action_name": { "type": "string", "minLength": 1 }, "payload_sha256": { "$ref": "#/$defs/sha256" }, "external_object_id": { "type": "string", "minLength": 1 },
+          "publication_revision": { "type": "integer", "minimum": 0 }, "provider_state_version": { "type": "integer", "minimum": 1 },
+          "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "providerReadback": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, { "$ref": "#/$defs/providerIdentity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "workflow_id", "operation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "external_url", "visibility", "observed_at", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.provider_readback_receipt.v2" }, "status": { "const": "PASS" },
+          "workflow_id": { "$ref": "#/$defs/uuid" }, "operation_id": { "$ref": "#/$defs/uuid" }, "account_scope_hash": { "$ref": "#/$defs/sha256" },
+          "action_name": { "type": "string", "minLength": 1 }, "payload_sha256": { "$ref": "#/$defs/sha256" }, "external_object_id": { "type": "string", "minLength": 1 },
+          "external_url": { "$ref": "#/$defs/httpsUri" }, "visibility": { "const": "public" }, "observed_at": { "$ref": "#/$defs/timestamp" },
+          "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "providerRollback": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, { "$ref": "#/$defs/providerIdentity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "workflow_id", "operation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "external_url", "tested_disposition", "readback_after_rollback_sha256", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.provider_object_rollback_receipt.v2" }, "status": { "const": "PASS" },
+          "workflow_id": { "$ref": "#/$defs/uuid" }, "operation_id": { "$ref": "#/$defs/uuid" }, "account_scope_hash": { "$ref": "#/$defs/sha256" },
+          "action_name": { "type": "string", "minLength": 1 }, "payload_sha256": { "$ref": "#/$defs/sha256" }, "external_object_id": { "type": "string", "minLength": 1 },
+          "external_url": { "$ref": "#/$defs/httpsUri" }, "tested_disposition": { "enum": ["DELETED", "REVERTED"] },
+          "readback_after_rollback_sha256": { "$ref": "#/$defs/sha256" },
+          "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "runtimeRollback": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "workflow_id", "experiment_id", "trigger_measurement_id", "prior_variant_id", "restored_variant_id", "promotion_event_id", "prior_registry_version", "restored_registry_version", "rollback_event_id", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.runtime_variant_rollback_receipt.v2" }, "status": { "const": "PASS" },
+          "workflow_id": { "$ref": "#/$defs/uuid" }, "experiment_id": { "$ref": "#/$defs/uuid" }, "trigger_measurement_id": { "$ref": "#/$defs/uuid" },
+          "prior_variant_id": { "$ref": "#/$defs/uuid" }, "restored_variant_id": { "$ref": "#/$defs/uuid" }, "promotion_event_id": { "$ref": "#/$defs/uuid" },
+          "prior_registry_version": { "type": "integer", "minimum": 1 }, "restored_registry_version": { "type": "integer", "minimum": 2 },
+          "rollback_event_id": { "$ref": "#/$defs/uuid" },
+          "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "taskRouter": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "workflow_id", "router_decision_sha256", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.task_router_receipt.v2" }, "status": { "const": "PASS" }, "workflow_id": { "$ref": "#/$defs/uuid" },
+          "router_decision_sha256": { "$ref": "#/$defs/sha256" }, "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "toolInheritance": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "workflow_id", "delegation_id", "expected_capabilities_sha256", "observed_capabilities_sha256", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.tool_inheritance_receipt.v2" }, "status": { "const": "PASS" }, "workflow_id": { "$ref": "#/$defs/uuid" }, "delegation_id": { "$ref": "#/$defs/uuid" },
+          "expected_capabilities_sha256": { "$ref": "#/$defs/sha256" }, "observed_capabilities_sha256": { "$ref": "#/$defs/sha256" },
+          "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "canonicalReceiptValidation": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "workflow_id", "subject_sha256", "receipt_schema", "receipt_artifact_id", "receipt_payload_sha256", "receipt_schema_sha256", "validated_at", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.canonical_operational_receipt_validation.v1" }, "status": { "const": "PASS" },
+          "workflow_id": { "$ref": "#/$defs/uuid" }, "subject_sha256": { "$ref": "#/$defs/sha256" },
+          "receipt_schema": { "enum": ["editorial_angle_receipt.v1", "platform_fit_receipt.v1", "visual_brief_receipt.v1", "visual_qa_receipt.v1", "copy_visual_coherence_receipt.v1", "same_shit_memory_receipt.v1", "callscore.design_bundle_reference_receipt.v1", "callscore.website_design_alignment_receipt.v2", "callscore.branding_receipt.v2", "callscore.brand_lockup_occlusion_check.v1", "callscore.media_artifact_receipt.v2", "youtube_script_receipt.v1", "youtube_packaging_receipt.v1", "youtube_thumbnail_receipt.v1", "youtube_publish_package_receipt.v1", "youtube_analytics_receipt.v1"] },
+          "receipt_artifact_id": { "$ref": "#/$defs/uuid" }, "receipt_payload_sha256": { "$ref": "#/$defs/sha256" },
+          "receipt_schema_sha256": { "$ref": "#/$defs/sha256" }, "validated_at": { "$ref": "#/$defs/timestamp" },
+          "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    },
+    "finalReportVerification": {
+      "allOf": [{ "$ref": "#/$defs/identity" }, {
+        "type": "object", "additionalProperties": false,
+        "required": ["schema", "status", "report_id", "report_sha256", "report_schema_sha256", "evidence_schema_sha256", "deployment_manifest_sha256", "verifier_script_sha256", "verified_at", "errors", "producer_agent_id", "verifier_agent_id"],
+        "properties": {
+          "schema": { "const": "callscore.autonomy_report_verification_receipt.v2" }, "status": { "const": "PASS" }, "report_id": { "$ref": "#/$defs/uuid" },
+          "report_sha256": { "$ref": "#/$defs/sha256" }, "report_schema_sha256": { "$ref": "#/$defs/sha256" }, "evidence_schema_sha256": { "$ref": "#/$defs/sha256" },
+          "deployment_manifest_sha256": { "$ref": "#/$defs/sha256" }, "verifier_script_sha256": { "$ref": "#/$defs/sha256" }, "verified_at": { "$ref": "#/$defs/timestamp" },
+          "report": { "type": "string", "minLength": 1 }, "target_tuple": { "$ref": "#/$defs/deploymentTarget" },
+          "errors": { "type": "array", "maxItems": 0 }, "producer_agent_id": { "type": "string", "minLength": 1 }, "verifier_agent_id": { "type": "string", "minLength": 1 }
+        }
+      }]
+    }
+  }
+}

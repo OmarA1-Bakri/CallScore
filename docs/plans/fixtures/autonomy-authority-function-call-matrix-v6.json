@@ -1,0 +1,739 @@
+{
+  "contract": "Every SECURITY DEFINER authority function has fixed search_path, explicit ACL ownership/grants, and a direct fixture call or an installed-caller path. Exact positive and fail-closed predicates are in the referenced SQL lines.",
+  "coverage_issues": [],
+  "fixed_search_path_security_definer_count": 43,
+  "fixture_path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v6.sql",
+  "fixture_sha256": "09887aa05578f4f83f9ffc9948da2e2266fd039306e008a9c90fb87cd169d1a6",
+  "function_count": 44,
+  "functions": [
+    {
+      "definition_line": 162,
+      "fixed_search_path": true,
+      "fixture_call_lines": [],
+      "function": "set_ledger_hash",
+      "granted_roles": [],
+      "internal_call_lines": [
+        972
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 198,
+      "fixed_search_path": true,
+      "fixture_call_lines": [],
+      "function": "reject_append_only_mutation",
+      "granted_roles": [],
+      "internal_call_lines": [
+        976,
+        995
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 207,
+      "fixed_search_path": true,
+      "fixture_call_lines": [],
+      "function": "reject_projection_delete",
+      "granted_roles": [],
+      "internal_call_lines": [
+        987
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 997,
+      "fixed_search_path": true,
+      "fixture_call_lines": [],
+      "function": "transition_is_allowed",
+      "granted_roles": [],
+      "internal_call_lines": [
+        1568
+      ],
+      "security_definer": false
+    },
+    {
+      "definition_line": 1024,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        2982
+      ],
+      "function": "enqueue_autonomy_workflow",
+      "granted_roles": [
+        "callscore_plan_enqueue"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1063,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        2988
+      ],
+      "function": "backfill_legacy_channel_tasks",
+      "granted_roles": [],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1120,
+      "fixed_search_path": true,
+      "fixture_call_lines": [],
+      "function": "reject_legacy_channel_task_reactivation",
+      "granted_roles": [],
+      "internal_call_lines": [
+        1134
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1136,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3036
+      ],
+      "function": "set_activation_fence",
+      "granted_roles": [
+        "callscore_plan_policy_writer"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1167,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3184,
+        3202,
+        3228,
+        3722
+      ],
+      "function": "create_agent_delegation",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2947
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1204,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3209,
+        3210,
+        3215,
+        3227,
+        3235,
+        3236,
+        3243
+      ],
+      "function": "record_agent_delegation_event",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2948
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1263,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3086,
+        3198,
+        3199,
+        3200,
+        3201,
+        3248,
+        3249,
+        3250,
+        3251,
+        3252,
+        3254,
+        3255,
+        3294,
+        3295,
+        3296,
+        3297,
+        3298,
+        3323,
+        3324,
+        3325,
+        3326,
+        3327,
+        3328,
+        3329,
+        3330,
+        3331,
+        3332,
+        3333,
+        3334,
+        3335,
+        3336,
+        3337,
+        3575,
+        3581,
+        3606,
+        3612,
+        3648,
+        3653
+      ],
+      "function": "record_autonomy_artifact",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2949
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1284,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3029,
+        3110,
+        3223,
+        3224,
+        3239,
+        3240,
+        3301,
+        3341,
+        3375,
+        3392,
+        3447,
+        3470,
+        3485,
+        3590,
+        3619,
+        3676,
+        3682,
+        3789
+      ],
+      "function": "record_verified_evidence_binding",
+      "granted_roles": [
+        "callscore_plan_report_verifier"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1323,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3348
+      ],
+      "function": "record_canonical_policy_snapshot",
+      "granted_roles": [
+        "callscore_plan_policy_writer"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1353,
+      "fixed_search_path": true,
+      "fixture_call_lines": [],
+      "function": "assert_current_live_workflow_lease",
+      "granted_roles": [],
+      "internal_call_lines": [
+        1178,
+        1216,
+        1691,
+        1800,
+        1859,
+        1906,
+        1980,
+        2174,
+        2223,
+        2521
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1371,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3043,
+        3812
+      ],
+      "function": "claim_autonomy_workflow",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2941
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1407,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3164
+      ],
+      "function": "schedule_autonomy_retry",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2942
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1472,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3172
+      ],
+      "function": "resume_due_autonomy_retry",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2943
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1518,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3072,
+        3080
+      ],
+      "function": "resume_or_reclaim_autonomy_workflow",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2944
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1550,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3160,
+        3244,
+        3290,
+        3319,
+        3496,
+        3497,
+        3498,
+        3643,
+        3644,
+        3645,
+        3824
+      ],
+      "function": "transition_autonomy_workflow",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2946
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1653,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3044
+      ],
+      "function": "heartbeat_autonomy_workflow",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2945
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1680,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3368,
+        3412
+      ],
+      "function": "create_provider_operation_intent",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2954
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1712,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3403,
+        3419
+      ],
+      "function": "mint_ready_public_owned_grant",
+      "granted_roles": [
+        "callscore_plan_policy_writer"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1767,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3428
+      ],
+      "function": "revoke_external_action_grant",
+      "granted_roles": [
+        "callscore_plan_policy_writer"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1785,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3260,
+        3272,
+        3278,
+        3284
+      ],
+      "function": "record_generation_provenance",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2950
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1850,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3310,
+        3311,
+        3312,
+        3313,
+        3314
+      ],
+      "function": "record_quality_gate_evidence",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2951
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1888,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3315
+      ],
+      "function": "record_quality_evaluation",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2952
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 1971,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3894
+      ],
+      "function": "record_artifact_revision",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2953
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2002,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3406,
+        3422
+      ],
+      "function": "create_provider_operation",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2955
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2034,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3438,
+        3444,
+        3782,
+        3842
+      ],
+      "function": "mark_provider_dispatching",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2956
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2058,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3925
+      ],
+      "function": "insert_verified_autonomy_report",
+      "granted_roles": [
+        "callscore_plan_report_verifier"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2154,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3503,
+        3514
+      ],
+      "function": "record_outcome_measurement",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2962
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2208,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3598,
+        3632
+      ],
+      "function": "record_canonical_learning_set",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2963
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2292,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3781
+      ],
+      "function": "reclaim_provider_claim",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2957
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2327,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3944
+      ],
+      "function": "compute_runtime_experiment_statistics",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2613,
+        2659,
+        2964
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2407,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3122,
+        3123,
+        3126,
+        3694,
+        3705
+      ],
+      "function": "import_runtime_experiment_bundle",
+      "granted_roles": [
+        "callscore_plan_policy_writer"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2490,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3700
+      ],
+      "function": "conclude_runtime_experiment",
+      "granted_roles": [
+        "callscore_plan_policy_writer"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2513,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3159,
+        3208,
+        3234
+      ],
+      "function": "assign_runtime_variant",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2964
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2576,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3903
+      ],
+      "function": "promote_runtime_variant",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2965
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2642,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3911
+      ],
+      "function": "rollback_runtime_variant",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2965
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2689,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3457,
+        3480,
+        3799,
+        3857,
+        3866,
+        3876
+      ],
+      "function": "record_provider_readback_evidence",
+      "granted_roles": [
+        "callscore_plan_report_verifier"
+      ],
+      "internal_call_lines": [],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2746,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3464,
+        3492
+      ],
+      "function": "record_provider_result",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2958
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2807,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3786
+      ],
+      "function": "reconcile_ambiguous_provider_dispatch",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2959
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2830,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3806
+      ],
+      "function": "confirm_provider_not_performed",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2960
+      ],
+      "security_definer": true
+    },
+    {
+      "definition_line": 2859,
+      "fixed_search_path": true,
+      "fixture_call_lines": [
+        3807
+      ],
+      "function": "reclaim_confirmed_not_performed",
+      "granted_roles": [
+        "callscore_plan_runtime"
+      ],
+      "internal_call_lines": [
+        2961
+      ],
+      "security_definer": true
+    }
+  ],
+  "generated_at": "2026-08-02T08:44:29+01:00",
+  "schema": "callscore.autonomy_authority_function_call_matrix.v6",
+  "security_definer_function_count": 43
+}

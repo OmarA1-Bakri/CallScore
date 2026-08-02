@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://call-score.com/schemas/canonical-learning-artifacts.v3.json",
+  "$id": "https://call-score.com/schemas/canonical-learning-artifacts.v4.json",
   "title": "Canonical CallScore learning artifact bundle",
   "oneOf": [
     { "$ref": "#/$defs/learningEvent" },
