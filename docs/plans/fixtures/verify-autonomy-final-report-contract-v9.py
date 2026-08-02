@@ -575,11 +575,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--schema", required=True)
     parser.add_argument("--evidence-schema", required=True)
     parser.add_argument("--deployment-manifest", required=True)
-    parser.add_argument("--expected-deployment-manifest-sha256", required=True)
     parser.add_argument("--phase-manifest-index", required=True)
-    parser.add_argument("--expected-phase-manifest-index-sha256", required=True)
     parser.add_argument("--review-attestation-ledger", required=True)
-    parser.add_argument("--expected-review-attestation-ledger-sha256", required=True)
     parser.add_argument("--expected-app-sha", required=True)
     parser.add_argument("--expected-workplane-sha", required=True)
     parser.add_argument("--expected-plan-sha", required=True)
@@ -600,6 +597,7 @@ def main() -> int:
     global EVIDENCE_VALIDATOR, FROZEN_EVIDENCE, REVIEW_ATTESTATION_LEDGER
     args = parse_args()
     verifier_script_path = Path(__file__).resolve()
+    trust_exporter_path = verifier_script_path.with_name("export-autonomy-verifier-trust-v9.py")
     report_path = Path(args.report).resolve(strict=True)
     schema_path = Path(args.schema).resolve(strict=True)
     evidence_schema_path = Path(args.evidence_schema).resolve(strict=True)
@@ -615,17 +613,65 @@ def main() -> int:
     phase_index_bytes = phase_index_path.read_bytes()
     review_ledger_bytes = review_ledger_path.read_bytes()
     script_bytes = script_path.read_bytes()
+    trust_exporter_bytes = trust_exporter_path.read_bytes()
     report = json.loads(report_bytes)
-    if sha256_bytes(deployment_bytes) != args.expected_deployment_manifest_sha256:
+    trust_export = subprocess.run(
+        [sys.executable, str(trust_exporter_path),
+         "--report-stream-id", str(report.get("report_stream_id", "")),
+         "--sequence-no", str(report.get("sequence_no", ""))],
+        check=False, capture_output=True, text=True,
+    )
+    if trust_export.returncode != 0:
+        raise SystemExit("authenticated PostgreSQL verifier trust export failed")
+    try:
+        trust_bundle = json.loads(trust_export.stdout)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"authenticated PostgreSQL verifier trust export was invalid: {exc}") from exc
+    if trust_bundle.get("schema") != "callscore.db_autonomy_verifier_trust_bundle.v1":
+        raise SystemExit("authenticated PostgreSQL verifier trust export used wrong schema")
+    if trust_bundle.get("report_stream_id") != report.get("report_stream_id") \
+       or trust_bundle.get("report_sequence_no") != report.get("sequence_no"):
+        raise SystemExit("authenticated PostgreSQL verifier trust export subject mismatch")
+    if trust_bundle.get("app_commit_sha") != args.expected_app_sha \
+       or trust_bundle.get("plan_commit_sha") != args.expected_plan_sha:
+        raise SystemExit("CLI target differs from authenticated PostgreSQL trust anchor")
+    args.expected_deployment_manifest_sha256 = trust_bundle.get("deployment_manifest_sha256")
+    args.expected_phase_manifest_index_sha256 = trust_bundle.get("phase_manifest_index_sha256")
+    if sha256_bytes(script_bytes) != trust_bundle.get("verifier_script_sha256"):
+        raise SystemExit("verifier script differs from authenticated PostgreSQL trust anchor")
+    if sha256_bytes(trust_exporter_bytes) != trust_bundle.get("trust_exporter_script_sha256"):
+        raise SystemExit("trust exporter differs from authenticated PostgreSQL trust anchor")
+    if sha256_bytes(schema_bytes) != trust_bundle.get("report_schema_sha256"):
+        raise SystemExit("report schema differs from authenticated PostgreSQL trust anchor")
+    if sha256_bytes(evidence_schema_bytes) != trust_bundle.get("evidence_schema_sha256"):
+        raise SystemExit("evidence schema differs from authenticated PostgreSQL trust anchor")
+    if sha256_bytes(deployment_bytes) != trust_bundle.get("deployment_manifest_sha256"):
         raise SystemExit("deployment manifest pre-freeze hash mismatch")
-    if sha256_bytes(phase_index_bytes) != args.expected_phase_manifest_index_sha256:
+    if sha256_bytes(phase_index_bytes) != trust_bundle.get("phase_manifest_index_sha256"):
         raise SystemExit("phase manifest index pre-freeze hash mismatch")
-    if sha256_bytes(review_ledger_bytes) != args.expected_review_attestation_ledger_sha256:
+    if sha256_bytes(review_ledger_bytes) != trust_bundle.get("review_attestation_ledger_sha256"):
         raise SystemExit("review attestation ledger pre-freeze hash mismatch")
     phase_index = json.loads(phase_index_bytes)
     review_ledger = json.loads(review_ledger_bytes)
+    if phase_index.get("workplane_source_path") != trust_bundle.get("workplane_source_path"):
+        raise SystemExit("phase manifest index Workplane source is not PostgreSQL-authenticated")
+    phase_rows = phase_index.get("phases")
+    if not isinstance(phase_rows, dict):
+        raise SystemExit("phase manifest index phases missing")
+    projected_phase_contract = {
+        phase: {
+            "workplane_task_id": row.get("workplane_task_id"),
+            "execution_owner": row.get("execution_owner"),
+            "commands": row.get("commands"),
+        }
+        for phase, row in phase_rows.items() if isinstance(row, dict)
+    }
+    if projected_phase_contract != trust_bundle.get("phase_execution_contract"):
+        raise SystemExit("phase task/owner/command contract is not PostgreSQL-authenticated")
+    if review_ledger.get("attestations") != trust_bundle.get("attestations"):
+        raise SystemExit("review ledger differs from authenticated PostgreSQL review projection")
     REVIEW_ATTESTATION_LEDGER = {
-        str(row["review_execution_id"]): row for row in review_ledger.get("attestations", [])
+        str(row["review_execution_id"]): row for row in trust_bundle.get("attestations", [])
     }
     evidence_paths = artifact_paths(report)
     evidence_paths.update({deployment_path, phase_index_path, review_ledger_path})
@@ -658,7 +704,7 @@ def main() -> int:
             queue.append(Path(command[0]).resolve(strict=False))
     protected_paths = {
         report_path, schema_path, evidence_schema_path, deployment_path,
-        phase_index_path, review_ledger_path, verifier_script_path,
+        phase_index_path, review_ledger_path, verifier_script_path, trust_exporter_path,
     }
     if output in protected_paths or output in FROZEN_EVIDENCE:
         raise SystemExit("--out must not alias an input or referenced evidence artifact")
@@ -690,6 +736,8 @@ def main() -> int:
         "deployment_manifest_sha256": sha256_bytes(deployment_bytes),
         "phase_manifest_index_sha256": sha256_bytes(phase_index_bytes),
         "review_attestation_ledger_sha256": sha256_bytes(review_ledger_bytes),
+        "trust_exporter_script_sha256": sha256_bytes(trust_exporter_bytes),
+        "workplane_source_path": trust_bundle.get("workplane_source_path"),
         "final_review_execution_ids": final_review_execution_ids,
         "canary_generation_id": canary_execution_payload.get("generation_id"),
         "canary_accepted_evaluation_id": canary_execution_payload.get("accepted_evaluation_id"),
@@ -728,6 +776,7 @@ def main() -> int:
         phase_index_path: sha256_bytes(phase_index_bytes),
         review_ledger_path: sha256_bytes(review_ledger_bytes),
         script_path: sha256_bytes(script_bytes),
+        trust_exporter_path: sha256_bytes(trust_exporter_bytes),
         **{path: sha256_bytes(data) for path, data in FROZEN_EVIDENCE.items()},
     }
     for path, expected_sha256 in frozen_inputs.items():

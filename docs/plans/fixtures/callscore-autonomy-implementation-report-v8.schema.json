@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://call-score.com/schemas/autonomy-implementation-report.v7.json",
+  "$id": "https://call-score.com/schemas/autonomy-implementation-report.v8.json",
   "title": "CallScore autonomy implementation evidence report",
   "type": "object",
   "additionalProperties": false,
@@ -10,7 +10,7 @@
     "live_activation", "canary", "final_reviews", "receipts", "blockers"
   ],
   "properties": {
-    "schema": { "const": "callscore.autonomy_implementation_report.v7" },
+    "schema": { "const": "callscore.autonomy_implementation_report.v8" },
     "report_id": { "$ref": "#/$defs/uuid" },
     "report_stream_id": { "type": "string", "minLength": 1 },
     "sequence_no": { "type": "integer", "minimum": 1 },

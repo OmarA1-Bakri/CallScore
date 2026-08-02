@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://call-score.com/schemas/autonomy-evidence-receipts.v3.json",
+  "$id": "https://call-score.com/schemas/autonomy-evidence-receipts.v4.json",
   "title": "CallScore autonomy evidence receipts",
   "oneOf": [
     { "$ref": "#/$defs/phaseTest" },
@@ -323,11 +323,11 @@
     "finalReportVerification": {
       "allOf": [{ "$ref": "#/$defs/identity" }, {
         "type": "object", "additionalProperties": false,
-        "required": ["schema", "status", "report_id", "report_sha256", "report_schema_sha256", "evidence_schema_sha256", "deployment_manifest_sha256", "phase_manifest_index_sha256", "review_attestation_ledger_sha256", "final_review_execution_ids", "canary_generation_id", "canary_accepted_evaluation_id", "verifier_script_sha256", "frozen_evidence_manifest_sha256", "frozen_evidence_count", "verified_at", "errors", "producer_agent_id", "verifier_agent_id"],
+        "required": ["schema", "status", "report_id", "report_sha256", "report_schema_sha256", "evidence_schema_sha256", "deployment_manifest_sha256", "phase_manifest_index_sha256", "review_attestation_ledger_sha256", "trust_exporter_script_sha256", "workplane_source_path", "final_review_execution_ids", "canary_generation_id", "canary_accepted_evaluation_id", "verifier_script_sha256", "frozen_evidence_manifest_sha256", "frozen_evidence_count", "verified_at", "errors", "producer_agent_id", "verifier_agent_id"],
         "properties": {
           "schema": { "const": "callscore.autonomy_report_verification_receipt.v3" }, "status": { "const": "PASS" }, "report_id": { "$ref": "#/$defs/uuid" },
           "report_sha256": { "$ref": "#/$defs/sha256" }, "report_schema_sha256": { "$ref": "#/$defs/sha256" }, "evidence_schema_sha256": { "$ref": "#/$defs/sha256" },
-          "deployment_manifest_sha256": { "$ref": "#/$defs/sha256" }, "phase_manifest_index_sha256": { "$ref": "#/$defs/sha256" }, "review_attestation_ledger_sha256": { "$ref": "#/$defs/sha256" }, "verifier_script_sha256": { "$ref": "#/$defs/sha256" },
+          "deployment_manifest_sha256": { "$ref": "#/$defs/sha256" }, "phase_manifest_index_sha256": { "$ref": "#/$defs/sha256" }, "review_attestation_ledger_sha256": { "$ref": "#/$defs/sha256" }, "trust_exporter_script_sha256": { "$ref": "#/$defs/sha256" }, "workplane_source_path": { "type": "string", "pattern": "^/srv/agents/repos/callscore-workplane/" }, "verifier_script_sha256": { "$ref": "#/$defs/sha256" },
           "final_review_execution_ids": { "type": "array", "minItems": 3, "maxItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
           "canary_generation_id": { "$ref": "#/$defs/uuid" }, "canary_accepted_evaluation_id": { "$ref": "#/$defs/uuid" },
           "frozen_evidence_manifest_sha256": { "$ref": "#/$defs/sha256" }, "frozen_evidence_count": { "type": "integer", "minimum": 1 }, "verified_at": { "$ref": "#/$defs/timestamp" },

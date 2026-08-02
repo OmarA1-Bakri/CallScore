@@ -1,5 +1,5 @@
 {
-  "schema": "callscore.hermes_child_identity_spike_receipt.v7",
+  "schema": "callscore.hermes_child_identity_spike_receipt.v9",
   "observed_at": "2026-08-02T10:13:13+01:00",
   "command_contract": {
     "executable": "/home/omar/.local/bin/hermes",
@@ -30,7 +30,7 @@
     "cmdline_sha256": "6f03d37c30c8b984bab749cc3ae43126a38a2f9062344ff6764f5fac198bb8b3",
     "environ_sha256": "614a3f22cd4e8145b12ec336c2d332e2fb9b199cc10d74a852f0b580304263a6",
     "artifact": {
-      "path": "docs/plans/fixtures/hermes-child-identity-spike-process-v8.json",
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-process-v9.json",
       "byte_length": 887,
       "sha256": "22b622cac1d6e6e524e6a2e14e4162e61d19e169a11e5118743b5bceb5d0fe67"
     }
@@ -45,12 +45,12 @@
     "input_tokens": 8815,
     "output_tokens": 19,
     "usage_artifact": {
-      "path": "docs/plans/fixtures/hermes-child-identity-spike-usage-v8.json",
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-usage-v9.json",
       "byte_length": 415,
       "sha256": "a1fe5db0febd43cdc2c54138f49a9c25bee02a15c2da173b858d7994f0151e72"
     },
     "output_artifact": {
-      "path": "docs/plans/fixtures/hermes-child-identity-spike-output-v8.json",
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-output-v9.json",
       "byte_length": 72,
       "sha256": "447b15d5864735e82ecedf0ed60b6d7b8869b58c92e0bad6f05ce581a260d8c4"
     },

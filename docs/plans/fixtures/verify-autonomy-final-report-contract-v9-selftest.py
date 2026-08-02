@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Generate a valid v8 report, then prove adversarial variants fail closed."""
+"""Generate a valid v9 report, then prove adversarial variants fail closed."""
 from __future__ import annotations
 
 import copy
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -12,9 +13,9 @@ import uuid
 from pathlib import Path
 
 FIXTURES = Path(__file__).resolve().parent
-VERIFIER = FIXTURES / "verify-autonomy-final-report-contract-v8.py"
-REPORT_SCHEMA = FIXTURES / "callscore-autonomy-implementation-report-v7.schema.json"
-EVIDENCE_SCHEMA = FIXTURES / "autonomy-evidence-receipts-v3.schema.json"
+VERIFIER = FIXTURES / "verify-autonomy-final-report-contract-v9.py"
+REPORT_SCHEMA = FIXTURES / "callscore-autonomy-implementation-report-v8.schema.json"
+EVIDENCE_SCHEMA = FIXTURES / "autonomy-evidence-receipts-v4.schema.json"
 PHASES = ("A0", *tuple("ABCDEFGHIJ"))
 REVIEW_TYPES = ("contract", "implementation", "security")
 H = "a" * 64
@@ -63,7 +64,11 @@ def build(root: Path) -> tuple[dict, Path, dict, Path, Path]:
         "prompt_manifest_sha256": "5" * 64,
     }
     phase_gates: dict[str, dict] = {}
-    phase_index_payload = {"schema": "callscore.phase_execution_manifest_index.v1", "repo_root": str(root.resolve()), "phases": {}}
+    phase_index_payload = {
+        "schema": "callscore.phase_execution_manifest_index.v1", "repo_root": str(root.resolve()),
+        "workplane_source_path": "/srv/agents/repos/callscore-workplane/runtime/kanban/autonomy-v9-selftest.json",
+        "phases": {},
+    }
     review_ledger_rows: list[dict] = []
     for phase in PHASES:
         phase_commands = {
@@ -77,6 +82,7 @@ def build(root: Path) -> tuple[dict, Path, dict, Path, Path]:
         phase_index_payload["phases"][phase] = {
             "path": str(phase_manifest_path.resolve()), "sha256": phase_manifest_sha256,
             "commands": phase_commands,
+            "workplane_task_id": f"selftest-{phase}", "execution_owner": f"owner-{phase}",
         }
         phase_target = {
             "phase_id": phase, "app_commit_sha": APP, "workplane_commit_sha": WORKPLANE,
@@ -252,7 +258,7 @@ def build(root: Path) -> tuple[dict, Path, dict, Path, Path]:
         canonical.append(receipt(root, f"canonical-{index}.json", body, f"canonical-{index}-producer", "canonical-receipt-verifier"))
 
     report = {
-        "schema": "callscore.autonomy_implementation_report.v7", "report_id": report_id,
+        "schema": "callscore.autonomy_implementation_report.v8", "report_id": report_id,
         "report_stream_id": report_stream_id, "sequence_no": report_sequence_no,
         "generated_at": "2026-08-02T01:30:00Z", "final_status": "PASS",
         "producer_agent_id": "report-producer", "verifier_agent_id": "report-verifier",
@@ -281,11 +287,8 @@ def invoke(root: Path, label: str, report: dict, deployment_path: Path, target: 
     command = [
         sys.executable, str(VERIFIER), "--report", str(report_path), "--schema", str(REPORT_SCHEMA),
         "--evidence-schema", str(EVIDENCE_SCHEMA), "--deployment-manifest", str(deployment_path),
-        "--expected-deployment-manifest-sha256", hashlib.sha256(deployment_path.read_bytes()).hexdigest(),
         "--phase-manifest-index", str(phase_index_path),
-        "--expected-phase-manifest-index-sha256", hashlib.sha256(phase_index_path.read_bytes()).hexdigest(),
         "--review-attestation-ledger", str(review_ledger_path),
-        "--expected-review-attestation-ledger-sha256", hashlib.sha256(review_ledger_path.read_bytes()).hexdigest(),
         "--expected-app-sha", target["app_commit_sha"], "--expected-workplane-sha", target["workplane_commit_sha"],
         "--expected-plan-sha", target["plan_commit_sha"], "--expected-plan-content-sha256", "4" * 64,
         "--expected-manifest-sha256", "5" * 64, "--expected-graph-source-sha256", target["graph_source_sha256"],
@@ -300,9 +303,33 @@ def invoke(root: Path, label: str, report: dict, deployment_path: Path, target: 
 
 
 def main() -> int:
-    with tempfile.TemporaryDirectory(prefix="callscore-v8-verifier-selftest-") as directory:
+    global VERIFIER
+    with tempfile.TemporaryDirectory(prefix="callscore-v9-verifier-selftest-") as directory:
         root = Path(directory)
         report, deployment_path, target, phase_index_path, review_ledger_path = build(root)
+        VERIFIER = root / "verify-autonomy-final-report-contract-v9.py"
+        shutil.copy2(FIXTURES / "verify-autonomy-final-report-contract-v9.py", VERIFIER)
+        trust_config = {
+            "deployment_manifest": str(deployment_path), "phase_manifest_index": str(phase_index_path),
+            "review_attestation_ledger": str(review_ledger_path), "report_schema": str(REPORT_SCHEMA),
+            "evidence_schema": str(EVIDENCE_SCHEMA), "app_commit_sha": APP, "plan_commit_sha": PLAN,
+        }
+        dump(root / "selftest-trust-config.json", trust_config)
+        (root / "export-autonomy-verifier-trust-v9.py").write_text(
+            """#!/usr/bin/env python3
+import hashlib,json,sys
+from pathlib import Path
+here=Path(__file__).resolve().parent
+cfg=json.loads((here/'selftest-trust-config.json').read_text())
+def h(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+ledger=json.loads(Path(cfg['review_attestation_ledger']).read_text())
+phase_index=json.loads(Path(cfg['phase_manifest_index']).read_text())
+phase_contract={p:{'workplane_task_id':v['workplane_task_id'],'execution_owner':v['execution_owner'],'commands':v['commands']} for p,v in phase_index['phases'].items()}
+payload={'schema':'callscore.db_autonomy_verifier_trust_bundle.v1','report_stream_id':sys.argv[sys.argv.index('--report-stream-id')+1],'report_sequence_no':int(sys.argv[sys.argv.index('--sequence-no')+1]),'app_commit_sha':cfg['app_commit_sha'],'plan_commit_sha':cfg['plan_commit_sha'],'deployment_manifest_sha256':h(cfg['deployment_manifest']),'phase_manifest_index_sha256':h(cfg['phase_manifest_index']),'review_attestation_ledger_sha256':h(cfg['review_attestation_ledger']),'report_schema_sha256':h(cfg['report_schema']),'evidence_schema_sha256':h(cfg['evidence_schema']),'verifier_script_sha256':h(here/'verify-autonomy-final-report-contract-v9.py'),'trust_exporter_script_sha256':h(__file__),'workplane_source_path':phase_index['workplane_source_path'],'phase_execution_contract':phase_contract,'attestations':ledger['attestations']}
+print(json.dumps(payload,separators=(',',':'),sort_keys=True))
+""",
+            encoding="utf-8",
+        )
         cases: list[tuple[str, dict, int]] = [("valid", report, 0)]
         bad_phase = copy.deepcopy(report)
         bad_phase["phase_gates"]["A"]["green_receipt"]["sha256"] = "0" * 64
@@ -412,16 +439,23 @@ def main() -> int:
             completed = invoke(root, label, payload, deployment_path, target, phase_index_path, review_ledger_path)
             passed = (completed.returncode == expected_exit)
             results.append({"case": label, "exit_code": completed.returncode, "expected_exit_code": expected_exit, "passed": passed})
+        caller_phase_index = json.loads(phase_index_path.read_text())
+        caller_phase_index["caller_authored_extra_root"] = "forged"
+        caller_phase_index_path = dump(root / "caller-authored-phase-index.json", caller_phase_index)
+        completed = invoke(root, "caller-authored-phase-index", report, deployment_path, target, caller_phase_index_path, review_ledger_path)
+        results.append({"case": "caller-authored-phase-index", "exit_code": completed.returncode, "expected_exit_code": 1, "passed": completed.returncode == 1})
+        caller_ledger = json.loads(review_ledger_path.read_text())
+        caller_ledger["attestations"].append({**caller_ledger["attestations"][0], "review_execution_id": uid(), "reviewer_agent_id": "invented-reviewer", "delegation_id": uid(), "review_artifact_sha256": "f" * 64})
+        caller_ledger_path = dump(root / "caller-authored-review-ledger.json", caller_ledger)
+        completed = invoke(root, "caller-authored-review-ledger", report, deployment_path, target, phase_index_path, caller_ledger_path)
+        results.append({"case": "caller-authored-review-ledger", "exit_code": completed.returncode, "expected_exit_code": 1, "passed": completed.returncode == 1})
         alias_report = dump(root / "output-alias.json", report)
         alias_before = hashlib.sha256(alias_report.read_bytes()).hexdigest()
         alias_command = [
             sys.executable, str(VERIFIER), "--report", str(alias_report), "--schema", str(REPORT_SCHEMA),
             "--evidence-schema", str(EVIDENCE_SCHEMA), "--deployment-manifest", str(deployment_path),
-            "--expected-deployment-manifest-sha256", hashlib.sha256(deployment_path.read_bytes()).hexdigest(),
             "--phase-manifest-index", str(phase_index_path),
-            "--expected-phase-manifest-index-sha256", hashlib.sha256(phase_index_path.read_bytes()).hexdigest(),
             "--review-attestation-ledger", str(review_ledger_path),
-            "--expected-review-attestation-ledger-sha256", hashlib.sha256(review_ledger_path.read_bytes()).hexdigest(),
             "--expected-app-sha", target["app_commit_sha"], "--expected-workplane-sha", target["workplane_commit_sha"],
             "--expected-plan-sha", target["plan_commit_sha"], "--expected-plan-content-sha256", "4" * 64,
             "--expected-manifest-sha256", "5" * 64, "--expected-graph-source-sha256", target["graph_source_sha256"],
@@ -444,7 +478,7 @@ def main() -> int:
         raw_unchanged = hashlib.sha256(raw_output.read_bytes()).hexdigest() == raw_before
         results.append({"case": "raw-evidence-output-alias", "exit_code": raw_alias_completed.returncode, "expected_exit_code": 1,
                         "evidence_unchanged": raw_unchanged, "passed": raw_alias_completed.returncode == 1 and raw_unchanged})
-        print(json.dumps({"schema": "callscore.autonomy_verifier_selftest.v8", "results": results, "all_passed": all(row["passed"] for row in results)}, sort_keys=True))
+        print(json.dumps({"schema": "callscore.autonomy_verifier_selftest.v9", "results": results, "all_passed": all(row["passed"] for row in results)}, sort_keys=True))
         return 0 if all(row["passed"] for row in results) else 1
 
 
