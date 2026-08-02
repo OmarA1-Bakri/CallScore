@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://call-score.com/schemas/canonical-learning-artifacts.v1.json",
+  "$id": "https://call-score.com/schemas/canonical-learning-artifacts.v2.json",
   "title": "Canonical CallScore learning artifact bundle",
   "oneOf": [
     { "$ref": "#/$defs/learningEvent" },
@@ -20,7 +20,7 @@
         "agent_id", "channel", "prompt_name", "prompt_version", "prompt_sha256",
         "model", "provider", "parameters", "evaluator_weighted_score",
         "experiment_id", "cohort_id", "variant_id", "source_artifact_id",
-        "source_sha256", "recorded_at"
+        "source_sha256", "registry_version", "recorded_at"
       ],
       "properties": {
         "workflow_id": { "$ref": "#/$defs/uuid" },
@@ -41,6 +41,7 @@
         "variant_id": { "$ref": "#/$defs/nullableUuid" },
         "source_artifact_id": { "$ref": "#/$defs/uuid" },
         "source_sha256": { "$ref": "#/$defs/sha256" },
+        "registry_version": { "type": "integer", "minimum": 1 },
         "recorded_at": { "$ref": "#/$defs/timestamp" }
       }
     },

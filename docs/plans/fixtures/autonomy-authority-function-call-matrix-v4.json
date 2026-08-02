@@ -1,0 +1,408 @@
+{
+  "schema": "callscore.autonomy_authority_function_call_matrix.v4",
+  "fixture_path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v4.sql",
+  "contract": "Every SECURITY DEFINER authority function is executed through a positive path or a controlled fail-closed negative path; trigger/predicate helpers are exercised through their installed callers.",
+  "functions": [
+    {
+      "function": "set_ledger_hash",
+      "definition_line": 138,
+      "probe_mode": "trigger_positive_and_fork_negative",
+      "probe_lines": [],
+      "evidence": "ledger inserts plus non-monotonic sequence DO probe"
+    },
+    {
+      "function": "reject_append_only_mutation",
+      "definition_line": 174,
+      "probe_mode": "trigger_negative",
+      "probe_lines": [],
+      "evidence": "ledger UPDATE/DELETE DO probes"
+    },
+    {
+      "function": "reject_projection_delete",
+      "definition_line": 183,
+      "probe_mode": "trigger_negative",
+      "probe_lines": [],
+      "evidence": "projection DELETE denial DO probe"
+    },
+    {
+      "function": "transition_is_allowed",
+      "definition_line": 941,
+      "probe_mode": "internal_positive_and_negative",
+      "probe_lines": [],
+      "evidence": "transition_autonomy_workflow lifecycle probes"
+    },
+    {
+      "function": "enqueue_autonomy_workflow",
+      "definition_line": 968,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2526
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "backfill_legacy_channel_tasks",
+      "definition_line": 1007,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2532
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "reject_legacy_channel_task_reactivation",
+      "definition_line": 1064,
+      "probe_mode": "trigger_negative",
+      "probe_lines": [],
+      "evidence": "blocked compatibility row running UPDATE probe"
+    },
+    {
+      "function": "set_activation_fence",
+      "definition_line": 1080,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2564
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "create_agent_delegation",
+      "definition_line": 1100,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2655,
+        2664
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_agent_delegation_event",
+      "definition_line": 1136,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2661,
+        2662,
+        2663,
+        2670,
+        2671,
+        2672
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_autonomy_artifact",
+      "definition_line": 1180,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2609,
+        2653,
+        2654,
+        2677,
+        2678,
+        2679,
+        2680,
+        2681,
+        2682,
+        2699,
+        2700,
+        2701,
+        2702,
+        2703,
+        2717,
+        2718,
+        2719,
+        2720,
+        2721,
+        2722,
+        2723,
+        2724,
+        2725,
+        2726,
+        2727,
+        2728,
+        2729,
+        2789,
+        2790,
+        2791,
+        2792,
+        2793,
+        2794,
+        2795,
+        2796
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "claim_autonomy_workflow",
+      "definition_line": 1201,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2568
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "schedule_autonomy_retry",
+      "definition_line": 1237,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2640
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "resume_due_autonomy_retry",
+      "definition_line": 1270,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2648
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "resume_or_reclaim_autonomy_workflow",
+      "definition_line": 1298,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2597,
+        2605
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "transition_autonomy_workflow",
+      "definition_line": 1330,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2636,
+        2673,
+        2695,
+        2713,
+        2780,
+        2781,
+        2782,
+        2817,
+        2818,
+        2819
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "heartbeat_autonomy_workflow",
+      "definition_line": 1432,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2569
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "create_provider_operation_intent",
+      "definition_line": 1458,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2751
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "mint_ready_public_owned_grant",
+      "definition_line": 1489,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2756
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_generation_provenance",
+      "definition_line": 1526,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2683,
+        2689
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_quality_gate_evidence",
+      "definition_line": 1574,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2704,
+        2705,
+        2706,
+        2707,
+        2708
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_quality_evaluation",
+      "definition_line": 1600,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2709
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_artifact_revision",
+      "definition_line": 1682,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2888
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "create_provider_operation",
+      "definition_line": 1712,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2757
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "mark_provider_dispatching",
+      "definition_line": 1744,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2761,
+        2869
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "insert_verified_autonomy_report",
+      "definition_line": 1760,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2919
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_outcome_measurement",
+      "definition_line": 1827,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2783
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_canonical_learning_set",
+      "definition_line": 1874,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2797
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "reclaim_provider_claim",
+      "definition_line": 1940,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2868
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "compute_runtime_experiment_statistics",
+      "definition_line": 1969,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2938
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "import_runtime_experiment_bundle",
+      "definition_line": 2049,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2616
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "assign_runtime_variant",
+      "definition_line": 2096,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2635
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "promote_runtime_variant",
+      "definition_line": 2147,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2897
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "rollback_runtime_variant",
+      "definition_line": 2213,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2905
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_provider_readback_evidence",
+      "definition_line": 2260,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2762,
+        2771,
+        2874
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "record_provider_result",
+      "definition_line": 2298,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2767,
+        2776
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "reconcile_ambiguous_provider_dispatch",
+      "definition_line": 2358,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2873
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "confirm_provider_not_performed",
+      "definition_line": 2381,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2879
+      ],
+      "evidence": "direct SQL invocation"
+    },
+    {
+      "function": "reclaim_confirmed_not_performed",
+      "definition_line": 2410,
+      "probe_mode": "direct_runtime_probe",
+      "probe_lines": [
+        2880
+      ],
+      "evidence": "direct SQL invocation"
+    }
+  ],
+  "missing": []
+}

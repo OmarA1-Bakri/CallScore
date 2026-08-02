@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://call-score.com/schemas/autonomy-implementation-report.v2.json",
+  "$id": "https://call-score.com/schemas/autonomy-implementation-report.v3.json",
   "title": "CallScore autonomy implementation evidence report",
   "type": "object",
   "additionalProperties": false,
@@ -10,7 +10,7 @@
     "live_activation", "canary", "receipts", "blockers"
   ],
   "properties": {
-    "schema": { "const": "callscore.autonomy_implementation_report.v2" },
+    "schema": { "const": "callscore.autonomy_implementation_report.v3" },
     "report_id": { "$ref": "#/$defs/uuid" },
     "generated_at": { "$ref": "#/$defs/timestamp" },
     "final_status": { "enum": ["PASS", "BLOCKED", "FAIL"] },
@@ -31,14 +31,20 @@
     "deployment_tuple": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["deployment_manifest_sha256", "image_digest", "migration_version", "graph_version", "registry_sha256", "policy_sha256", "service_unit_sha256", "runtime_script_manifest_sha256"],
+      "required": ["deployment_manifest_sha256", "app_commit_sha", "workplane_commit_sha", "plan_commit_sha", "image_digest", "migration_version", "migration_sha256", "graph_version", "graph_source_sha256", "registry_sha256", "policy_sha256", "prompt_manifest_sha256", "service_unit_sha256", "runtime_script_manifest_sha256"],
       "properties": {
         "deployment_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "app_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "workplane_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "plan_commit_sha": { "$ref": "#/$defs/gitSha" },
         "image_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "migration_version": { "const": "025-callscore-autonomous-supervisor" },
+        "migration_sha256": { "$ref": "#/$defs/sha256" },
         "graph_version": { "type": "string", "minLength": 1 },
+        "graph_source_sha256": { "$ref": "#/$defs/sha256" },
         "registry_sha256": { "$ref": "#/$defs/sha256" },
         "policy_sha256": { "$ref": "#/$defs/sha256" },
+        "prompt_manifest_sha256": { "$ref": "#/$defs/sha256" },
         "service_unit_sha256": { "$ref": "#/$defs/sha256" },
         "runtime_script_manifest_sha256": { "$ref": "#/$defs/sha256" }
       }
@@ -46,8 +52,9 @@
     "phase_gates": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+      "required": ["A0", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
       "properties": {
+        "A0": { "$ref": "#/$defs/phaseGate" },
         "A": { "$ref": "#/$defs/phaseGate" },
         "B": { "$ref": "#/$defs/phaseGate" },
         "C": { "$ref": "#/$defs/phaseGate" },
@@ -77,7 +84,7 @@
       "additionalProperties": false,
       "required": [
         "status", "workflow_id", "provider_operation_id", "external_object_id", "external_url",
-        "execution_receipt", "provider_readback_receipt", "rollback_receipt",
+        "execution_receipt", "provider_readback_receipt", "provider_object_rollback_receipt", "runtime_variant_rollback_receipt",
         "task_router_receipt", "tool_inheritance_receipt"
       ],
       "properties": {
@@ -88,7 +95,8 @@
         "external_url": { "type": ["string", "null"], "minLength": 1 },
         "execution_receipt": { "$ref": "#/$defs/nullableArtifact" },
         "provider_readback_receipt": { "$ref": "#/$defs/nullableArtifact" },
-        "rollback_receipt": { "$ref": "#/$defs/nullableArtifact" },
+        "provider_object_rollback_receipt": { "$ref": "#/$defs/nullableArtifact" },
+        "runtime_variant_rollback_receipt": { "$ref": "#/$defs/nullableArtifact" },
         "task_router_receipt": { "$ref": "#/$defs/nullableArtifact" },
         "tool_inheritance_receipt": { "$ref": "#/$defs/nullableArtifact" }
       }
@@ -136,7 +144,8 @@
               "external_url": { "type": "string", "minLength": 1 },
               "execution_receipt": { "$ref": "#/$defs/artifact" },
               "provider_readback_receipt": { "$ref": "#/$defs/artifact" },
-              "rollback_receipt": { "$ref": "#/$defs/artifact" },
+              "provider_object_rollback_receipt": { "$ref": "#/$defs/artifact" },
+              "runtime_variant_rollback_receipt": { "$ref": "#/$defs/artifact" },
               "task_router_receipt": { "$ref": "#/$defs/artifact" },
               "tool_inheritance_receipt": { "$ref": "#/$defs/artifact" }
             }
@@ -147,6 +156,21 @@
     }
   ],
   "$defs": {
+    "targetTuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["app_commit_sha", "workplane_commit_sha", "plan_commit_sha", "graph_source_sha256", "migration_sha256", "runtime_script_manifest_sha256", "image_digest", "prompt_manifest_sha256"],
+      "properties": {
+        "app_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "workplane_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "plan_commit_sha": { "$ref": "#/$defs/gitSha" },
+        "graph_source_sha256": { "$ref": "#/$defs/sha256" },
+        "migration_sha256": { "$ref": "#/$defs/sha256" },
+        "runtime_script_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "image_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "prompt_manifest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
     "uuid": { "type": "string", "format": "uuid" },
     "nullableUuid": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
     "timestamp": { "type": "string", "format": "date-time" },
@@ -155,9 +179,10 @@
     "artifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["artifact_id", "path", "sha256", "byte_length", "producer_agent_id", "verifier_agent_id"],
+      "required": ["artifact_id", "schema", "path", "sha256", "byte_length", "producer_agent_id", "verifier_agent_id"],
       "properties": {
         "artifact_id": { "$ref": "#/$defs/uuid" },
+        "schema": { "type": "string", "minLength": 1 },
         "path": { "type": "string", "minLength": 1 },
         "sha256": { "$ref": "#/$defs/sha256" },
         "byte_length": { "type": "integer", "minimum": 1 },
@@ -169,18 +194,23 @@
     "review": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reviewer_agent_id", "verdict", "review_artifact"],
+      "required": ["phase_id", "review_type", "reviewer_agent_id", "verdict", "target_tuple", "review_artifact"],
       "properties": {
+        "phase_id": { "enum": ["A0", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] },
+        "review_type": { "enum": ["contract", "implementation", "security"] },
         "reviewer_agent_id": { "type": "string", "minLength": 1 },
         "verdict": { "enum": ["PASS", "FAIL"] },
+        "target_tuple": { "$ref": "#/$defs/targetTuple" },
         "review_artifact": { "$ref": "#/$defs/artifact" }
       }
     },
     "phaseGate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "red_receipt", "green_receipt", "refactor_receipt", "reviews"],
+      "required": ["phase_id", "target_tuple", "status", "red_receipt", "green_receipt", "refactor_receipt", "reviews"],
       "properties": {
+        "phase_id": { "enum": ["A0", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] },
+        "target_tuple": { "$ref": "#/$defs/targetTuple" },
         "status": { "enum": ["PASS", "BLOCKED", "FAIL"] },
         "red_receipt": { "$ref": "#/$defs/artifact" },
         "green_receipt": { "$ref": "#/$defs/artifact" },

@@ -1,6 +1,6 @@
 {
-  "schema": "callscore.provider_mutation_surface_inventory.v3",
-  "source_commit": "c435c49a3aafcd7de63a74988d68ea6d64b3006c",
+  "schema": "callscore.provider_mutation_surface_inventory.v4",
+  "source_commit": "22993a5537c9b677e25f6454f9f72c52179fc493",
   "search_contract": {
     "root": "src",
     "file_glob": "*.ts",
@@ -9,6 +9,7 @@
       "finalizeExternalMutationReceipt(",
       "executeGraphOwnedProviderMutation(",
       "__callscore_mode",
+      "ExternalMutationGuardRequestSchema",
       "approved: true",
       "--approved"
     ],

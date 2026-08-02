@@ -1,5 +1,5 @@
 {
-  "schema": "callscore.autonomy_runtime_baseline_inventory.v3",
+  "schema": "callscore.autonomy_runtime_baseline_inventory.v4",
   "observed_at": "2026-08-02T02:01:37+01:00",
   "source_path": "/srv/agents/hermes/profiles/callscore/cron/jobs.json",
   "scheduler_proof_rule": "Cutover re-reads this protected JSON, hashes each full prompt and resolved script, and requires equality before pause; no prompt body enters receipts.",
@@ -42,7 +42,7 @@
       "tracked_source_sha256": "56f0543efc232795bd9f82912ec41bde673939e044f4516281066cfcf69c6f38",
       "prompt_sha256": "86b40a91e134ec28f898e79b8faeeb184f2cd0e0720313f10c22969fb76962c7",
       "prompt_bytes": 393,
-      "wake_chain": ["hermes cron run 9c03a6eea969"],
+      "wake_chain": ["hermes -p callscore cron run 9c03a6eea969"],
       "cutover": "pause_then_replace_with_enqueue_wake_only"
     },
     {

@@ -210,18 +210,44 @@ CREATE TABLE autonomy_workflow_transitions (
   CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
 );
 
+-- Workflow lease ownership has a separate append-only chain because a same-state
+-- resume/reclaim must not be forged as a lifecycle transition.
+CREATE TABLE autonomy_workflow_lease_events (
+  lease_event_id uuid PRIMARY KEY,
+  workflow_id uuid NOT NULL REFERENCES autonomy_workflows(workflow_id) ON DELETE RESTRICT,
+  sequence_no bigint NOT NULL CHECK (sequence_no > 0),
+  state_version bigint NOT NULL CHECK (state_version >= 0),
+  lease_generation bigint NOT NULL CHECK (lease_generation > 0),
+  prior_lease_owner text,
+  lease_owner text NOT NULL,
+  lease_token uuid NOT NULL,
+  lease_expires_at timestamptz NOT NULL,
+  controlled_reason_code text NOT NULL,
+  previous_record_hash bytea,
+  record_hash bytea,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (workflow_id,sequence_no),
+  UNIQUE (workflow_id,lease_generation),
+  CHECK (previous_record_hash IS NULL OR octet_length(previous_record_hash)=32),
+  CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
+);
+
 CREATE TABLE canonical_policy_snapshots (
   policy_snapshot_id uuid PRIMARY KEY,
   sequence_no bigint NOT NULL CHECK (sequence_no > 0),
   policy_record_id text NOT NULL,
   policy_commit_sha char(40) NOT NULL CHECK (policy_commit_sha ~ '^[0-9a-f]{40}$'),
+  registry_sha256 char(64) NOT NULL CHECK (registry_sha256 ~ '^[0-9a-f]{64}$'),
+  registry_version text NOT NULL,
   channel text NOT NULL,
   account_scope_hash char(64) NOT NULL CHECK (account_scope_hash ~ '^[0-9a-f]{64}$'),
+  mutation_family text NOT NULL,
   provider_tool text NOT NULL,
   action_name text NOT NULL,
   readiness_status text NOT NULL CHECK (readiness_status='READY_PUBLIC_OWNED'),
   valid_from timestamptz NOT NULL,
   valid_until timestamptz NOT NULL CHECK (valid_until > valid_from),
+  rollback_contract jsonb NOT NULL CHECK (jsonb_typeof(rollback_contract)='object'),
   previous_record_hash bytea,
   record_hash bytea,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -322,6 +348,10 @@ CREATE TABLE agent_delegations (
   delegated_role text NOT NULL,
   ordinal smallint NOT NULL CHECK (ordinal >= 0),
   canonical_child_agent_id text NOT NULL,
+  child_execution_id uuid NOT NULL UNIQUE,
+  expected_executable text NOT NULL,
+  expected_uid integer NOT NULL CHECK (expected_uid >= 0),
+  expected_cwd text NOT NULL,
   launch_status callscore_join_status NOT NULL,
   hermes_pid integer CHECK (hermes_pid IS NULL OR hermes_pid > 1),
   hermes_pgid integer CHECK (hermes_pgid IS NULL OR hermes_pgid > 1),
@@ -348,6 +378,7 @@ CREATE TABLE agent_delegation_events (
   delegation_id uuid NOT NULL REFERENCES agent_delegations(delegation_id) ON DELETE RESTRICT,
   sequence_no bigint NOT NULL CHECK (sequence_no > 0),
   status callscore_join_status NOT NULL,
+  child_execution_id uuid NOT NULL,
   lease_generation bigint NOT NULL CHECK (lease_generation >= 0),
   hermes_pid integer,
   hermes_pgid integer,
@@ -390,7 +421,8 @@ CREATE TABLE runtime_experiments (
   ends_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   UNIQUE (agent_id,channel,task_type,policy_version,primary_metric,starts_at),
-  UNIQUE (experiment_id,agent_id,channel,task_type,policy_version)
+  UNIQUE (experiment_id,agent_id,channel,task_type,policy_version),
+  CHECK (eligibility_contract=jsonb_build_object('require_terminal_complete',true,'require_outcome',true,'require_accepted_quality',true))
 );
 
 CREATE TABLE runtime_variants (
@@ -454,6 +486,7 @@ CREATE TABLE runtime_variant_assignments (
   variant_id uuid NOT NULL REFERENCES runtime_variants(variant_id) ON DELETE RESTRICT,
   assignment_bucket smallint CHECK (assignment_bucket BETWEEN 0 AND 99),
   assignment_ratio_control smallint CHECK (assignment_ratio_control=80),
+  monitoring_promotion_event_id uuid,
   registry_version bigint NOT NULL CHECK (registry_version >= 0),
   previous_record_hash bytea,
   record_hash bytea,
@@ -491,7 +524,7 @@ CREATE TABLE generation_provenance (
   tools_manifest_sha256 char(64) NOT NULL CHECK (tools_manifest_sha256 ~ '^[0-9a-f]{64}$'),
   skills jsonb NOT NULL,
   skills_manifest_sha256 char(64) NOT NULL CHECK (skills_manifest_sha256 ~ '^[0-9a-f]{64}$'),
-  registry_version text NOT NULL,
+  registry_version bigint NOT NULL CHECK (registry_version >= 0),
   policy_version text NOT NULL,
   experiment_id uuid REFERENCES runtime_experiments(experiment_id) ON DELETE RESTRICT,
   cohort_id uuid REFERENCES runtime_cohorts(cohort_id) ON DELETE RESTRICT,
@@ -535,6 +568,24 @@ CREATE TABLE quality_evaluations (
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   UNIQUE (workflow_id,sequence_no),
   CHECK (generation_id <> evaluator_generation_id),
+  CHECK (previous_record_hash IS NULL OR octet_length(previous_record_hash)=32),
+  CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
+);
+
+CREATE TABLE quality_gate_evidence (
+  gate_evidence_id uuid PRIMARY KEY,
+  workflow_id uuid NOT NULL REFERENCES autonomy_workflows(workflow_id) ON DELETE RESTRICT,
+  generation_id uuid NOT NULL REFERENCES generation_provenance(generation_id) ON DELETE RESTRICT,
+  sequence_no bigint NOT NULL CHECK (sequence_no > 0),
+  gate_name text NOT NULL CHECK (gate_name IN ('claim_policy','canonical_receipts','secrets','originality','destination_fit')),
+  passed boolean NOT NULL,
+  evidence_artifact_id uuid NOT NULL REFERENCES autonomy_artifacts(artifact_id) ON DELETE RESTRICT,
+  verifier_agent_id text NOT NULL,
+  previous_record_hash bytea,
+  record_hash bytea,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (workflow_id,generation_id,gate_name),
+  UNIQUE (workflow_id,sequence_no),
   CHECK (previous_record_hash IS NULL OR octet_length(previous_record_hash)=32),
   CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
 );
@@ -630,6 +681,35 @@ CREATE TABLE provider_operation_lease_events (
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   UNIQUE (operation_id,sequence_no),
   UNIQUE (operation_id,lease_generation),
+  CHECK (previous_record_hash IS NULL OR octet_length(previous_record_hash)=32),
+  CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
+);
+
+CREATE TABLE provider_readback_evidence (
+  readback_evidence_id uuid PRIMARY KEY,
+  operation_id uuid NOT NULL REFERENCES provider_operations(operation_id) ON DELETE RESTRICT,
+  sequence_no bigint NOT NULL CHECK (sequence_no > 0),
+  evidence_type text NOT NULL CHECK (evidence_type IN ('EXECUTION','READBACK','ABSENCE')),
+  account_scope_hash char(64) NOT NULL CHECK (account_scope_hash ~ '^[0-9a-f]{64}$'),
+  provider_tool text NOT NULL,
+  action_name text NOT NULL,
+  payload_sha256 char(64) NOT NULL CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),
+  publication_revision integer NOT NULL CHECK (publication_revision BETWEEN 0 AND 3),
+  dispatch_window_started_at timestamptz NOT NULL,
+  dispatch_window_ended_at timestamptz NOT NULL CHECK (dispatch_window_ended_at >= dispatch_window_started_at),
+  external_object_id text,
+  external_url text,
+  visibility text,
+  performed boolean NOT NULL,
+  evidence_artifact_id uuid NOT NULL REFERENCES autonomy_artifacts(artifact_id) ON DELETE RESTRICT,
+  verifier_agent_id text NOT NULL,
+  previous_record_hash bytea,
+  record_hash bytea,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (operation_id,sequence_no),
+  UNIQUE (operation_id,evidence_type,evidence_artifact_id),
+  CHECK ((evidence_type='ABSENCE' AND NOT performed AND external_object_id IS NULL AND external_url IS NULL)
+      OR (evidence_type IN ('EXECUTION','READBACK') AND performed AND external_object_id IS NOT NULL)),
   CHECK (previous_record_hash IS NULL OR octet_length(previous_record_hash)=32),
   CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
 );
@@ -755,13 +835,23 @@ CREATE TABLE runtime_promotion_events (
   CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
 );
 
+ALTER TABLE runtime_variant_assignments
+  ADD CONSTRAINT runtime_assignment_monitoring_promotion_fk
+  FOREIGN KEY (monitoring_promotion_event_id) REFERENCES runtime_promotion_events(promotion_event_id) ON DELETE RESTRICT;
+
 CREATE TABLE autonomy_final_reports (
   report_id uuid PRIMARY KEY,
   report_stream_id text NOT NULL,
   sequence_no bigint NOT NULL CHECK (sequence_no > 0),
-  report_schema text NOT NULL CHECK (report_schema='callscore.autonomy_implementation_report.v2'),
+  report_schema text NOT NULL CHECK (report_schema='callscore.autonomy_implementation_report.v3'),
   app_commit_sha char(40) NOT NULL CHECK (app_commit_sha ~ '^[0-9a-f]{40}$'),
   workplane_commit_sha char(40) NOT NULL CHECK (workplane_commit_sha ~ '^[0-9a-f]{40}$'),
+  plan_commit_sha char(40) NOT NULL CHECK (plan_commit_sha ~ '^[0-9a-f]{40}$'),
+  graph_source_sha256 char(64) NOT NULL CHECK (graph_source_sha256 ~ '^[0-9a-f]{64}$'),
+  migration_sha256 char(64) NOT NULL CHECK (migration_sha256 ~ '^[0-9a-f]{64}$'),
+  runtime_script_manifest_sha256 char(64) NOT NULL CHECK (runtime_script_manifest_sha256 ~ '^[0-9a-f]{64}$'),
+  image_digest text NOT NULL CHECK (image_digest ~ '^sha256:[0-9a-f]{64}$'),
+  prompt_manifest_sha256 char(64) NOT NULL CHECK (prompt_manifest_sha256 ~ '^[0-9a-f]{64}$'),
   deployment_manifest_sha256 char(64) NOT NULL CHECK (deployment_manifest_sha256 ~ '^[0-9a-f]{64}$'),
   report_json_artifact_id uuid NOT NULL REFERENCES autonomy_artifacts(artifact_id) ON DELETE RESTRICT,
   report_json_sha256 char(64) NOT NULL CHECK (report_json_sha256 ~ '^[0-9a-f]{64}$'),
@@ -776,7 +866,8 @@ CREATE TABLE autonomy_final_reports (
   canary_status text NOT NULL CHECK (canary_status IN ('PASS','BLOCKED_BY_GRAPH','FAIL')),
   canary_provider_operation_id uuid REFERENCES provider_operations(operation_id) ON DELETE RESTRICT,
   canary_readback_artifact_id uuid REFERENCES autonomy_artifacts(artifact_id) ON DELETE RESTRICT,
-  canary_rollback_artifact_id uuid REFERENCES autonomy_artifacts(artifact_id) ON DELETE RESTRICT,
+  canary_provider_rollback_artifact_id uuid REFERENCES autonomy_artifacts(artifact_id) ON DELETE RESTRICT,
+  runtime_variant_rollback_artifact_id uuid REFERENCES autonomy_artifacts(artifact_id) ON DELETE RESTRICT,
   previous_record_hash bytea,
   record_hash bytea,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -787,7 +878,8 @@ CREATE TABLE autonomy_final_reports (
     final_status <> 'PASS' OR
     (verifier_status='PASS' AND live_activation_approved AND jsonb_array_length(blockers)=0
      AND canary_status='PASS' AND canary_provider_operation_id IS NOT NULL
-     AND canary_readback_artifact_id IS NOT NULL AND canary_rollback_artifact_id IS NOT NULL)
+     AND canary_readback_artifact_id IS NOT NULL AND canary_provider_rollback_artifact_id IS NOT NULL
+     AND runtime_variant_rollback_artifact_id IS NOT NULL)
   ),
   CHECK (previous_record_hash IS NULL OR octet_length(previous_record_hash)=32),
   CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
@@ -799,6 +891,7 @@ DECLARE spec text[];
 BEGIN
   FOREACH spec SLICE 1 IN ARRAY ARRAY[
     ARRAY['autonomy_workflow_transitions','workflow_id','sequence_no'],
+    ARRAY['autonomy_workflow_lease_events','workflow_id','sequence_no'],
     ARRAY['canonical_policy_snapshots','policy_record_id','sequence_no'],
     ARRAY['canonical_receipt_evidence','workflow_id','sequence_no'],
     ARRAY['provider_operation_intents','workflow_id','sequence_no'],
@@ -808,9 +901,11 @@ BEGIN
     ARRAY['runtime_variant_assignments','workflow_id','sequence_no'],
     ARRAY['generation_provenance','workflow_id','sequence_no'],
     ARRAY['quality_evaluations','workflow_id','sequence_no'],
+    ARRAY['quality_gate_evidence','workflow_id','sequence_no'],
     ARRAY['artifact_revisions','workflow_id','sequence_no'],
     ARRAY['provider_operation_events','operation_id','sequence_no'],
     ARRAY['provider_operation_lease_events','operation_id','sequence_no'],
+    ARRAY['provider_readback_evidence','operation_id','sequence_no'],
     ARRAY['outcome_measurements','workflow_id','sequence_no'],
     ARRAY['canonical_learning_artifacts','workflow_id','sequence_no'],
     ARRAY['runtime_variant_cooldowns','variant_id','sequence_no'],
@@ -889,8 +984,9 @@ AS $$
 BEGIN
   IF p_source_channel_task_id IS NULL THEN RAISE EXCEPTION 'canonical task-bound workflow requires channel task UUID' USING ERRCODE='23514'; END IF;
   INSERT INTO callscore_plan_contract.channel_tasks(
-    id,agent_id,channel_id,task_type,status,idempotency_key,payload_hash,payload
-  ) VALUES (p_source_channel_task_id,p_head_agent_id,p_channel,p_task_type,'pending',p_channel_task_idempotency_key,p_input_payload_sha256,p_input_payload)
+    id,agent_id,channel_id,task_type,status,idempotency_key,payload_hash,payload,blocker
+  ) VALUES (p_source_channel_task_id,p_head_agent_id,p_channel,p_task_type,'blocked',p_channel_task_idempotency_key,p_input_payload_sha256,p_input_payload,
+    'migrated_to_autonomy:'||p_workflow_id::text)
   ON CONFLICT (id) DO NOTHING;
   IF NOT EXISTS(
     SELECT 1 FROM callscore_plan_contract.channel_tasks
@@ -965,6 +1061,22 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION reject_legacy_channel_task_reactivation() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, callscore_plan_contract
+AS $$
+BEGIN
+  IF OLD.blocker LIKE 'migrated_to_autonomy:%' AND NEW.status IN ('pending','running') THEN
+    RAISE EXCEPTION 'legacy claimant permanently fenced after migration 025' USING ERRCODE='55000';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER channel_tasks_reject_legacy_reactivation
+BEFORE UPDATE ON channel_tasks
+FOR EACH ROW EXECUTE FUNCTION reject_legacy_channel_task_reactivation();
+
 CREATE FUNCTION set_activation_fence(
   p_fenced boolean,
   p_expected_version bigint,
@@ -987,7 +1099,8 @@ $$;
 
 CREATE FUNCTION create_agent_delegation(
   p_delegation_id uuid,p_workflow_id uuid,p_revision_number integer,p_delegated_role text,p_ordinal smallint,
-  p_child_agent_id text,p_usage_path text,p_stdout_path text,p_prompt_sha256 char(64),p_model text,p_provider text,
+  p_child_agent_id text,p_child_execution_id uuid,p_expected_executable text,p_expected_uid integer,p_expected_cwd text,
+  p_usage_path text,p_stdout_path text,p_prompt_sha256 char(64),p_model text,p_provider text,
   p_allowed_capabilities jsonb,p_required_output_schema text,p_deadline_at timestamptz
 ) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER
@@ -999,18 +1112,23 @@ BEGIN
   IF v_w.workflow_state NOT IN ('HEAD_PLANNING','CHILDREN_RUNNING') OR p_revision_number<>v_w.revision_count
      OR p_usage_path NOT LIKE '/srv/agents/hermes/profiles/callscore/runtime/children/%'
      OR p_stdout_path NOT LIKE '/srv/agents/hermes/profiles/callscore/runtime/children/%'
+     OR p_child_execution_id IS NULL OR p_expected_executable NOT LIKE '/%'
+     OR p_expected_uid<0 OR p_expected_cwd NOT LIKE '/%'
      OR p_deadline_at<=clock_timestamp() THEN
     RAISE EXCEPTION 'delegation intent predicate failed' USING ERRCODE='23514';
   END IF;
   INSERT INTO callscore_plan_contract.agent_delegations(
     delegation_id,workflow_id,workflow_run_id,revision_number,delegated_role,ordinal,canonical_child_agent_id,
+    child_execution_id,expected_executable,expected_uid,expected_cwd,
     launch_status,usage_file_path,stdout_file_path,prompt_sha256,model,provider,allowed_capabilities,
     required_output_schema,lease_generation,deadline_at
   ) VALUES (p_delegation_id,p_workflow_id,v_w.workflow_run_id,p_revision_number,p_delegated_role,p_ordinal,p_child_agent_id,
+    p_child_execution_id,p_expected_executable,p_expected_uid,p_expected_cwd,
     'DISPATCH_INTENT',p_usage_path,p_stdout_path,p_prompt_sha256,p_model,p_provider,p_allowed_capabilities,
     p_required_output_schema,1,p_deadline_at);
-  INSERT INTO callscore_plan_contract.agent_delegation_events(event_id,delegation_id,sequence_no,status,lease_generation,detail)
-  VALUES(gen_random_uuid(),p_delegation_id,1,'DISPATCH_INTENT',1,'{"reason":"dispatch_intent_committed"}');
+  INSERT INTO callscore_plan_contract.agent_delegation_events(event_id,delegation_id,sequence_no,status,child_execution_id,lease_generation,detail)
+  VALUES(gen_random_uuid(),p_delegation_id,1,'DISPATCH_INTENT',p_child_execution_id,1,
+    jsonb_build_object('reason','dispatch_intent_committed','expected_executable',p_expected_executable,'expected_uid',p_expected_uid,'expected_cwd',p_expected_cwd));
   RETURN p_delegation_id;
 END;
 $$;
@@ -1051,9 +1169,9 @@ BEGIN
   WHERE delegation_id=p_delegation_id RETURNING * INTO v_d;
   SELECT COALESCE(max(sequence_no),0)+1 INTO v_seq FROM callscore_plan_contract.agent_delegation_events WHERE delegation_id=p_delegation_id;
   INSERT INTO callscore_plan_contract.agent_delegation_events(
-    event_id,delegation_id,sequence_no,status,lease_generation,hermes_pid,hermes_pgid,hermes_start_ticks,
+    event_id,delegation_id,sequence_no,status,child_execution_id,lease_generation,hermes_pid,hermes_pgid,hermes_start_ticks,
     hermes_session_id,usage_artifact_id,usage_sha256,output_artifact_id,output_sha256,detail
-  ) VALUES (gen_random_uuid(),p_delegation_id,v_seq,p_to_status,v_d.lease_generation,p_hermes_pid,p_hermes_pgid,p_start_ticks,
+  ) VALUES (gen_random_uuid(),p_delegation_id,v_seq,p_to_status,v_d.child_execution_id,v_d.lease_generation,p_hermes_pid,p_hermes_pgid,p_start_ticks,
     p_session_id,p_usage_artifact_id,p_usage_sha256,p_output_artifact_id,p_output_sha256,p_detail);
   RETURN v_d;
 END;
@@ -1108,6 +1226,103 @@ BEGIN
     transition_id,workflow_id,sequence_no,from_state,to_state,from_state_version,to_state_version,
     lease_generation,controlled_reason_code
   ) VALUES (gen_random_uuid(),p_workflow_id,v_row.state_version,'QUEUED','HEAD_PLANNING',v_row.state_version-1,v_row.state_version,v_row.lease_generation,'claim_acquired');
+  INSERT INTO callscore_plan_contract.autonomy_workflow_lease_events(
+    lease_event_id,workflow_id,sequence_no,state_version,lease_generation,lease_owner,lease_token,lease_expires_at,controlled_reason_code
+  ) VALUES (gen_random_uuid(),p_workflow_id,v_row.lease_generation,v_row.state_version,v_row.lease_generation,
+    p_worker_id,p_lease_token,v_row.lease_expires_at,'initial_claim');
+  RETURN v_row;
+END;
+$$;
+
+CREATE FUNCTION schedule_autonomy_retry(
+  p_workflow_id uuid,p_from callscore_workflow_state,p_expected_version bigint,p_lease_token uuid,
+  p_retry_at timestamptz,p_reason text
+) RETURNS autonomy_workflows
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, callscore_plan_contract
+AS $$
+DECLARE v_current callscore_plan_contract.autonomy_workflows; v_row callscore_plan_contract.autonomy_workflows; v_to callscore_plan_contract.callscore_workflow_state;
+BEGIN
+  SELECT * INTO v_current FROM callscore_plan_contract.autonomy_workflows WHERE workflow_id=p_workflow_id FOR UPDATE;
+  IF v_current.workflow_state<>p_from OR v_current.state_version<>p_expected_version OR v_current.lease_token<>p_lease_token
+     OR p_from NOT IN ('CHILDREN_RUNNING','EXECUTING','PROVIDER_VERIFIED','OUTCOME_PENDING')
+     OR p_retry_at<=clock_timestamp() THEN
+    RAISE EXCEPTION 'retry schedule CAS/state/time predicate failed' USING ERRCODE='40001';
+  END IF;
+  v_to:=CASE WHEN v_current.retry_count>=v_current.max_retries THEN 'FAILED'::callscore_plan_contract.callscore_workflow_state ELSE 'RETRY'::callscore_plan_contract.callscore_workflow_state END;
+  UPDATE callscore_plan_contract.autonomy_workflows
+  SET workflow_state=v_to,state_version=state_version+1,
+      previous_executable_state=CASE WHEN v_to='RETRY' THEN p_from ELSE NULL END,
+      retry_at=CASE WHEN v_to='RETRY' THEN p_retry_at ELSE NULL END,
+      retry_count=retry_count+1,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,
+      terminal_reason_code=CASE WHEN v_to='FAILED' THEN 'retry_budget_exhausted:'||p_reason ELSE terminal_reason_code END,
+      updated_at=clock_timestamp()
+  WHERE workflow_id=p_workflow_id RETURNING * INTO v_row;
+  INSERT INTO callscore_plan_contract.autonomy_workflow_transitions(
+    transition_id,workflow_id,sequence_no,from_state,to_state,from_state_version,to_state_version,lease_generation,controlled_reason_code,detail
+  ) VALUES(gen_random_uuid(),p_workflow_id,v_row.state_version,p_from,v_to,p_expected_version,v_row.state_version,v_row.lease_generation,
+    CASE WHEN v_to='FAILED' THEN 'retry_budget_exhausted' ELSE p_reason END,
+    jsonb_build_object('retry_at',p_retry_at,'previous_executable_state',p_from,'retry_count',v_row.retry_count));
+  RETURN v_row;
+END;
+$$;
+
+CREATE FUNCTION resume_due_autonomy_retry(
+  p_workflow_id uuid,p_expected_version bigint,p_worker_id text,p_lease_token uuid,p_lease_seconds integer
+) RETURNS autonomy_workflows
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, callscore_plan_contract
+AS $$
+DECLARE v_prior callscore_plan_contract.autonomy_workflows; v_row callscore_plan_contract.autonomy_workflows;
+BEGIN
+  IF p_lease_seconds<10 OR p_lease_seconds>900 THEN RAISE EXCEPTION 'invalid lease duration' USING ERRCODE='23514'; END IF;
+  SELECT * INTO v_prior FROM callscore_plan_contract.autonomy_workflows
+   WHERE workflow_id=p_workflow_id AND workflow_state='RETRY' AND state_version=p_expected_version
+     AND lease_owner IS NULL AND retry_at<=clock_timestamp() FOR UPDATE;
+  IF v_prior.workflow_id IS NULL OR v_prior.previous_executable_state IS NULL THEN RAISE EXCEPTION 'retry not due/reclaimable' USING ERRCODE='40001'; END IF;
+  UPDATE callscore_plan_contract.autonomy_workflows
+  SET workflow_state=v_prior.previous_executable_state,state_version=state_version+1,
+      retry_at=NULL,previous_executable_state=NULL,lease_owner=p_worker_id,lease_token=p_lease_token,
+      lease_generation=lease_generation+1,lease_expires_at=clock_timestamp()+make_interval(secs=>p_lease_seconds),updated_at=clock_timestamp()
+  WHERE workflow_id=p_workflow_id RETURNING * INTO v_row;
+  INSERT INTO callscore_plan_contract.autonomy_workflow_transitions(
+    transition_id,workflow_id,sequence_no,from_state,to_state,from_state_version,to_state_version,lease_generation,controlled_reason_code
+  ) VALUES(gen_random_uuid(),p_workflow_id,v_row.state_version,'RETRY',v_row.workflow_state,p_expected_version,v_row.state_version,v_row.lease_generation,'retry_due_exact_resume');
+  INSERT INTO callscore_plan_contract.autonomy_workflow_lease_events(
+    lease_event_id,workflow_id,sequence_no,state_version,lease_generation,lease_owner,lease_token,lease_expires_at,controlled_reason_code
+  ) VALUES(gen_random_uuid(),p_workflow_id,v_row.lease_generation,v_row.state_version,v_row.lease_generation,p_worker_id,p_lease_token,v_row.lease_expires_at,'retry_resume_claim');
+  RETURN v_row;
+END;
+$$;
+
+CREATE FUNCTION resume_or_reclaim_autonomy_workflow(
+  p_workflow_id uuid,p_expected_version bigint,p_expected_lease_generation bigint,p_prior_lease_token uuid,
+  p_worker_id text,p_new_lease_token uuid,p_lease_seconds integer
+) RETURNS autonomy_workflows
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, callscore_plan_contract
+AS $$
+DECLARE v_prior callscore_plan_contract.autonomy_workflows; v_row callscore_plan_contract.autonomy_workflows; v_reason text;
+BEGIN
+  IF p_lease_seconds<10 OR p_lease_seconds>900 THEN RAISE EXCEPTION 'invalid lease duration' USING ERRCODE='23514'; END IF;
+  SELECT * INTO v_prior FROM callscore_plan_contract.autonomy_workflows
+   WHERE workflow_id=p_workflow_id AND state_version=p_expected_version AND lease_generation=p_expected_lease_generation
+     AND workflow_state NOT IN ('QUEUED','RETRY','COMPLETE','FAILED') FOR UPDATE;
+  IF v_prior.workflow_id IS NULL THEN RAISE EXCEPTION 'workflow recovery CAS failed' USING ERRCODE='40001'; END IF;
+  IF v_prior.lease_owner=p_worker_id AND v_prior.lease_token=p_prior_lease_token AND v_prior.lease_expires_at>=clock_timestamp() THEN
+    v_reason:='same_identity_resume';
+  ELSIF v_prior.lease_expires_at<clock_timestamp() THEN
+    v_reason:='expired_lease_reclaim';
+  ELSE
+    RAISE EXCEPTION 'active lease owned by competitor' USING ERRCODE='40001';
+  END IF;
+  UPDATE callscore_plan_contract.autonomy_workflows
+  SET lease_owner=p_worker_id,lease_token=p_new_lease_token,lease_generation=lease_generation+1,
+      lease_expires_at=clock_timestamp()+make_interval(secs=>p_lease_seconds),updated_at=clock_timestamp()
+  WHERE workflow_id=p_workflow_id RETURNING * INTO v_row;
+  INSERT INTO callscore_plan_contract.autonomy_workflow_lease_events(
+    lease_event_id,workflow_id,sequence_no,state_version,lease_generation,prior_lease_owner,lease_owner,lease_token,lease_expires_at,controlled_reason_code
+  ) VALUES(gen_random_uuid(),p_workflow_id,v_row.lease_generation,v_row.state_version,v_row.lease_generation,v_prior.lease_owner,p_worker_id,p_new_lease_token,v_row.lease_expires_at,v_reason);
   RETURN v_row;
 END;
 $$;
@@ -1132,8 +1347,18 @@ BEGIN
   IF NOT callscore_plan_contract.transition_is_allowed(v_current.execution_class,p_from,p_to) THEN
     RAISE EXCEPTION 'transition not allowed' USING ERRCODE='23514';
   END IF;
+  IF p_to='RETRY' OR p_from='RETRY' THEN
+    RAISE EXCEPTION 'RETRY is authority-owned by schedule/resume functions' USING ERRCODE='23514';
+  END IF;
   IF p_to='REVISION' AND v_current.revision_count>=3 THEN
-    RAISE EXCEPTION 'revision budget exhausted' USING ERRCODE='23514';
+    UPDATE callscore_plan_contract.autonomy_workflows
+    SET workflow_state='FAILED',state_version=state_version+1,lease_owner=NULL,lease_token=NULL,lease_expires_at=NULL,
+        terminal_reason_code='revision_budget_exhausted',updated_at=clock_timestamp()
+    WHERE workflow_id=p_workflow_id RETURNING * INTO v_updated;
+    INSERT INTO callscore_plan_contract.autonomy_workflow_transitions(
+      transition_id,workflow_id,sequence_no,from_state,to_state,from_state_version,to_state_version,lease_generation,controlled_reason_code
+    ) VALUES(gen_random_uuid(),p_workflow_id,v_updated.state_version,p_from,'FAILED',p_expected_version,v_updated.state_version,v_updated.lease_generation,'revision_budget_exhausted');
+    RETURN v_updated;
   END IF;
   IF p_from='QUALITY_EVALUATION' AND p_to='READY' AND NOT EXISTS(
     SELECT 1 FROM callscore_plan_contract.quality_evaluations q
@@ -1230,6 +1455,37 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION create_provider_operation_intent(
+  p_intent_id uuid,p_workflow_id uuid,p_account_scope_hash char(64),p_mutation_family text,
+  p_provider_tool text,p_action_name text,p_payload_artifact_id uuid,p_is_media boolean,p_is_youtube boolean,
+  p_rollback_artifact_id uuid,p_expires_at timestamptz
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, callscore_plan_contract
+AS $$
+DECLARE v_w callscore_plan_contract.autonomy_workflows; v_payload callscore_plan_contract.autonomy_artifacts;
+        v_rollback callscore_plan_contract.autonomy_artifacts; v_seq bigint;
+BEGIN
+  SELECT * INTO v_w FROM callscore_plan_contract.autonomy_workflows WHERE workflow_id=p_workflow_id FOR UPDATE;
+  SELECT * INTO v_payload FROM callscore_plan_contract.autonomy_artifacts
+   WHERE artifact_id=p_payload_artifact_id AND artifact_kind='provider_payload';
+  SELECT * INTO v_rollback FROM callscore_plan_contract.autonomy_artifacts
+   WHERE artifact_id=p_rollback_artifact_id AND artifact_kind='provider_object_rollback_contract';
+  IF v_w.workflow_state<>'READY' OR v_w.execution_class<>'OWNED_PUBLIC_MUTATION'
+     OR v_payload.artifact_id IS NULL OR v_rollback.artifact_id IS NULL OR p_expires_at<=clock_timestamp()
+     OR (p_is_youtube AND NOT p_is_media) THEN
+    RAISE EXCEPTION 'provider intent durable lineage/state predicate failed' USING ERRCODE='23514';
+  END IF;
+  SELECT COALESCE(max(sequence_no),0)+1 INTO v_seq FROM callscore_plan_contract.provider_operation_intents WHERE workflow_id=p_workflow_id;
+  INSERT INTO callscore_plan_contract.provider_operation_intents(
+    intent_id,workflow_id,sequence_no,publication_revision,account_scope_hash,mutation_family,provider_tool,
+    action_name,payload_artifact_id,payload_sha256,is_media,is_youtube,rollback_artifact_id,expires_at
+  ) VALUES(p_intent_id,p_workflow_id,v_seq,v_w.revision_count,p_account_scope_hash,p_mutation_family,p_provider_tool,
+    p_action_name,p_payload_artifact_id,v_payload.content_sha256,p_is_media,p_is_youtube,p_rollback_artifact_id,p_expires_at);
+  RETURN p_intent_id;
+END;
+$$;
+
 CREATE FUNCTION mint_ready_public_owned_grant(p_workflow_id uuid,p_intent_id uuid) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, callscore_plan_contract
@@ -1245,7 +1501,7 @@ BEGIN
   END IF;
   SELECT * INTO v_policy FROM callscore_plan_contract.canonical_policy_snapshots
    WHERE channel=v_w.channel AND account_scope_hash=v_i.account_scope_hash AND provider_tool=v_i.provider_tool
-     AND action_name=v_i.action_name AND readiness_status='READY_PUBLIC_OWNED'
+     AND mutation_family=v_i.mutation_family AND action_name=v_i.action_name AND readiness_status='READY_PUBLIC_OWNED'
      AND valid_from<=clock_timestamp() AND valid_until>clock_timestamp()
    ORDER BY sequence_no DESC LIMIT 1;
   IF v_policy.policy_snapshot_id IS NULL THEN RAISE EXCEPTION 'no exact active policy'; END IF;
@@ -1308,10 +1564,36 @@ BEGIN
   ) VALUES (
     p_generation_id,p_workflow_id,v_w.workflow_run_id,v_seq,p_delegation_id,p_producer_agent_id,p_delegated_role,v_w.channel,v_w.task_type,
     p_hermes_session_id,p_prompt_name,p_prompt_version,v_prompt.content_sha256,p_resolved_prompt_artifact_id,p_prompt_secret_scan_artifact_id,
-    p_model,p_provider,p_parameters,p_toolsets,p_tools_manifest_sha256,p_skills,p_skills_manifest_sha256,v_a.registry_version::text,v_w.policy_version,
+    p_model,p_provider,p_parameters,p_toolsets,p_tools_manifest_sha256,p_skills,p_skills_manifest_sha256,v_a.registry_version,v_w.policy_version,
     v_a.experiment_id,v_a.cohort_id,v_a.variant_id,p_input_evidence_sha256,p_output_artifact_id,v_output.content_sha256,p_token_usage,p_cost_usd,p_started_at,p_finished_at
   );
   RETURN p_generation_id;
+END;
+$$;
+
+CREATE FUNCTION record_quality_gate_evidence(
+  p_gate_evidence_id uuid,p_workflow_id uuid,p_generation_id uuid,p_gate_name text,
+  p_passed boolean,p_evidence_artifact_id uuid,p_verifier_agent_id text
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, callscore_plan_contract
+AS $$
+DECLARE v_generation callscore_plan_contract.generation_provenance; v_artifact callscore_plan_contract.autonomy_artifacts; v_seq bigint;
+BEGIN
+  SELECT * INTO v_generation FROM callscore_plan_contract.generation_provenance
+   WHERE generation_id=p_generation_id AND workflow_id=p_workflow_id;
+  SELECT * INTO v_artifact FROM callscore_plan_contract.autonomy_artifacts
+   WHERE artifact_id=p_evidence_artifact_id AND artifact_kind='quality_gate:'||p_gate_name;
+  IF v_generation.generation_id IS NULL OR v_artifact.artifact_id IS NULL
+     OR v_artifact.verified_by_agent_id<>p_verifier_agent_id
+     OR p_verifier_agent_id=v_generation.producer_agent_id THEN
+    RAISE EXCEPTION 'quality gate evidence identity/binding failed' USING ERRCODE='23514';
+  END IF;
+  SELECT COALESCE(max(sequence_no),0)+1 INTO v_seq FROM callscore_plan_contract.quality_gate_evidence WHERE workflow_id=p_workflow_id;
+  INSERT INTO callscore_plan_contract.quality_gate_evidence(
+    gate_evidence_id,workflow_id,generation_id,sequence_no,gate_name,passed,evidence_artifact_id,verifier_agent_id
+  ) VALUES(p_gate_evidence_id,p_workflow_id,p_generation_id,v_seq,p_gate_name,p_passed,p_evidence_artifact_id,p_verifier_agent_id);
+  RETURN p_gate_evidence_id;
 END;
 $$;
 
@@ -1320,7 +1602,6 @@ CREATE FUNCTION record_quality_evaluation(
   p_workflow_id uuid,
   p_generation_id uuid,
   p_evaluator_generation_id uuid,
-  p_deterministic_pass boolean,
   p_dimension_scores jsonb,
   p_similarity numeric,
   p_similarity_threshold numeric,
@@ -1330,12 +1611,13 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, callscore_plan_contract
 AS $$
 DECLARE v_candidate callscore_plan_contract.generation_provenance; v_evaluator callscore_plan_contract.generation_provenance;
-        v_weighted numeric; v_decision text; v_seq bigint; v_row callscore_plan_contract.quality_evaluations;
+        v_weighted numeric; v_decision text; v_seq bigint; v_row callscore_plan_contract.quality_evaluations; v_deterministic_pass boolean;
         v_keys text[]:=ARRAY['factual_accuracy','evidence_support','originality','platform_fit','clarity','callscore_voice','commercial_strength','actionability','handoff_readiness','hook','argument','native_structure','audience_relevance','cta','safety_compliance'];
         v_key text;
 BEGIN
   SELECT * INTO v_candidate FROM callscore_plan_contract.generation_provenance WHERE generation_id=p_generation_id AND workflow_id=p_workflow_id;
-  SELECT * INTO v_evaluator FROM callscore_plan_contract.generation_provenance WHERE generation_id=p_evaluator_generation_id AND delegated_role IN ('evaluator','trust-reviewer');
+  SELECT * INTO v_evaluator FROM callscore_plan_contract.generation_provenance
+   WHERE generation_id=p_evaluator_generation_id AND workflow_id=p_workflow_id AND delegated_role IN ('evaluator','trust-reviewer');
   IF v_candidate.generation_id IS NULL OR v_evaluator.generation_id IS NULL
      OR v_candidate.producer_agent_id=v_evaluator.producer_agent_id
      OR v_candidate.hermes_session_id IS NOT DISTINCT FROM v_evaluator.hermes_session_id
@@ -1365,7 +1647,11 @@ BEGIN
     + (p_dimension_scores->>'native_structure')::numeric*0.05
     + (p_dimension_scores->>'audience_relevance')::numeric*0.04
     + (p_dimension_scores->>'cta')::numeric*0.04;
-  v_decision:=CASE WHEN p_deterministic_pass
+  SELECT count(*)=5 AND bool_and(passed) INTO v_deterministic_pass
+  FROM callscore_plan_contract.quality_gate_evidence
+  WHERE workflow_id=p_workflow_id AND generation_id=p_generation_id
+    AND gate_name IN ('claim_policy','canonical_receipts','secrets','originality','destination_fit');
+  v_decision:=CASE WHEN v_deterministic_pass
     AND (p_dimension_scores->>'factual_accuracy')::numeric>=0.95
     AND (p_dimension_scores->>'evidence_support')::numeric>=0.95
     AND (p_dimension_scores->>'safety_compliance')::numeric=1
@@ -1374,15 +1660,18 @@ BEGIN
       WHERE (p_dimension_scores->>k)::numeric<0.80
     )
     AND v_weighted>=0.86 AND p_similarity<p_similarity_threshold THEN 'ACCEPT'
-    WHEN NOT p_deterministic_pass OR (p_dimension_scores->>'safety_compliance')::numeric<1 THEN 'REJECT'
+    WHEN NOT v_deterministic_pass OR (p_dimension_scores->>'safety_compliance')::numeric<1 THEN 'REJECT'
     ELSE 'REVISE' END;
   SELECT COALESCE(max(sequence_no),0)+1 INTO v_seq FROM callscore_plan_contract.quality_evaluations WHERE workflow_id=p_workflow_id;
   INSERT INTO callscore_plan_contract.quality_evaluations(
     evaluation_id,workflow_id,sequence_no,generation_id,evaluator_generation_id,evaluator_agent_id,decision,
     deterministic_gates,semantic_scores,similarity_score,similarity_threshold,weighted_score,
     acceptance_thresholds,controlled_reason_codes
-  ) VALUES (p_evaluation_id,p_workflow_id,v_seq,p_generation_id,p_evaluator_generation_id,v_evaluator.producer_agent_id,v_decision,
-    jsonb_build_object('pass',p_deterministic_pass),p_dimension_scores,p_similarity,p_similarity_threshold,v_weighted,
+  ) VALUES (p_evaluation_id,p_workflow_id,v_seq,p_generation_id,p_evaluator_generation_id,v_evaluator.producer_agent_id,
+    v_decision::callscore_plan_contract.callscore_evaluation_decision,
+    (SELECT jsonb_object_agg(gate_name,jsonb_build_object('passed',passed,'evidence_artifact_id',evidence_artifact_id,'verifier_agent_id',verifier_agent_id))
+     FROM callscore_plan_contract.quality_gate_evidence WHERE workflow_id=p_workflow_id AND generation_id=p_generation_id),
+    p_dimension_scores,p_similarity,p_similarity_threshold,v_weighted,
     jsonb_build_object('factual_accuracy',0.95,'evidence_support',0.95,'safety_compliance',1,'other_dimensions',0.80,'weighted_mean',0.86),
     jsonb_build_array(p_controlled_reason_code))
   RETURNING * INTO v_row;
@@ -1474,6 +1763,12 @@ CREATE FUNCTION insert_verified_autonomy_report(
   p_sequence_no bigint,
   p_app_commit_sha char(40),
   p_workplane_commit_sha char(40),
+  p_plan_commit_sha char(40),
+  p_graph_source_sha256 char(64),
+  p_migration_sha256 char(64),
+  p_runtime_script_manifest_sha256 char(64),
+  p_image_digest text,
+  p_prompt_manifest_sha256 char(64),
   p_deployment_manifest_sha256 char(64),
   p_report_json_artifact_id uuid,
   p_report_json_sha256 char(64),
@@ -1485,7 +1780,8 @@ CREATE FUNCTION insert_verified_autonomy_report(
   p_blockers jsonb,
   p_canary_provider_operation_id uuid,
   p_canary_readback_artifact_id uuid,
-  p_canary_rollback_artifact_id uuid
+  p_canary_provider_rollback_artifact_id uuid,
+  p_runtime_variant_rollback_artifact_id uuid
 ) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, callscore_plan_contract
@@ -1502,23 +1798,27 @@ BEGIN
   IF v_operation.operation_id IS NULL THEN
     RAISE EXCEPTION 'final PASS requires exact VERIFIED canary/readback relation' USING ERRCODE='23514';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_report_json_artifact_id AND content_sha256=p_report_json_sha256)
-     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_verifier_artifact_id AND content_sha256=p_verifier_sha256)
-     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_canary_rollback_artifact_id) THEN
+  IF NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_report_json_artifact_id AND content_sha256=p_report_json_sha256 AND artifact_kind='autonomy_implementation_report.v3')
+     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_verifier_artifact_id AND content_sha256=p_verifier_sha256 AND artifact_kind='autonomy_report_verification_receipt.v1')
+     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_canary_readback_artifact_id AND artifact_kind='provider_readback_receipt')
+     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_canary_provider_rollback_artifact_id AND artifact_kind='provider_object_rollback_receipt.v1')
+     OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_runtime_variant_rollback_artifact_id AND artifact_kind='runtime_variant_rollback_receipt.v1') THEN
     RAISE EXCEPTION 'final PASS artifact relation/hash failed' USING ERRCODE='23514';
   END IF;
   INSERT INTO callscore_plan_contract.autonomy_final_reports(
-    report_id,report_stream_id,sequence_no,report_schema,app_commit_sha,workplane_commit_sha,
+    report_id,report_stream_id,sequence_no,report_schema,app_commit_sha,workplane_commit_sha,plan_commit_sha,
+    graph_source_sha256,migration_sha256,runtime_script_manifest_sha256,image_digest,prompt_manifest_sha256,
     deployment_manifest_sha256,report_json_artifact_id,report_json_sha256,producer_agent_id,
     verifier_agent_id,verifier_artifact_id,verifier_sha256,verifier_status,final_status,
     live_activation_approved,blockers,canary_status,canary_provider_operation_id,
-    canary_readback_artifact_id,canary_rollback_artifact_id
+    canary_readback_artifact_id,canary_provider_rollback_artifact_id,runtime_variant_rollback_artifact_id
   ) VALUES (
-    p_report_id,p_report_stream_id,p_sequence_no,'callscore.autonomy_implementation_report.v2',
-    p_app_commit_sha,p_workplane_commit_sha,p_deployment_manifest_sha256,p_report_json_artifact_id,
+    p_report_id,p_report_stream_id,p_sequence_no,'callscore.autonomy_implementation_report.v3',
+    p_app_commit_sha,p_workplane_commit_sha,p_plan_commit_sha,p_graph_source_sha256,p_migration_sha256,
+    p_runtime_script_manifest_sha256,p_image_digest,p_prompt_manifest_sha256,p_deployment_manifest_sha256,p_report_json_artifact_id,
     p_report_json_sha256,p_producer_agent_id,p_verifier_agent_id,p_verifier_artifact_id,
     p_verifier_sha256,'PASS','PASS',true,p_blockers,'PASS',p_canary_provider_operation_id,
-    p_canary_readback_artifact_id,p_canary_rollback_artifact_id
+    p_canary_readback_artifact_id,p_canary_provider_rollback_artifact_id,p_runtime_variant_rollback_artifact_id
   );
   RETURN p_report_id;
 END;
@@ -1690,6 +1990,9 @@ WITH experiment AS (
   SELECT DISTINCT ON (m.workflow_id) m.*
   FROM callscore_plan_contract.outcome_measurements m
   JOIN experiment e ON e.experiment_id=m.experiment_id AND e.primary_metric=m.metric_name
+  JOIN callscore_plan_contract.runtime_variant_assignments a ON a.workflow_id=m.workflow_id AND a.experiment_id=m.experiment_id
+  JOIN callscore_plan_contract.autonomy_workflows w ON w.workflow_id=m.workflow_id AND w.workflow_state='COMPLETE'
+  WHERE e.eligibility_contract=jsonb_build_object('require_terminal_complete',true,'require_outcome',true,'require_accepted_quality',true)
   ORDER BY m.workflow_id,m.window_ended_at DESC,m.sequence_no DESC
 ), observations AS (
   SELECT m.workflow_id,c.cohort_name,m.metric_value,q.weighted_score,m.window_ended_at
@@ -1743,13 +2046,60 @@ FROM arrays a CROSS JOIN provider_rate p CROSS JOIN safety s LEFT JOIN bootstrap
 GROUP BY a.c_values,a.t_values,a.first_at,a.last_at,a.c_quality,a.t_quality,s.violations,p.rate;
 $$;
 
+CREATE FUNCTION import_runtime_experiment_bundle(
+  p_bundle jsonb,p_review_receipt_artifact_id uuid
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, callscore_plan_contract
+AS $$
+DECLARE v_experiment_id uuid:=(p_bundle->>'experiment_id')::uuid;
+        v_control uuid:=(p_bundle#>>'{control,variant_id}')::uuid;
+        v_treatment uuid:=(p_bundle#>>'{treatment,variant_id}')::uuid;
+        v_agent text:=p_bundle->>'agent_id'; v_channel text:=p_bundle->>'channel';
+        v_task text:=p_bundle->>'task_type'; v_policy text:=p_bundle->>'policy_version';
+        v_review callscore_plan_contract.autonomy_artifacts;
+BEGIN
+  SELECT * INTO v_review FROM callscore_plan_contract.autonomy_artifacts
+   WHERE artifact_id=p_review_receipt_artifact_id AND artifact_kind='runtime_experiment_bundle_review_receipt';
+  IF v_review.artifact_id IS NULL OR p_bundle->>'schema'<>'callscore.runtime_experiment_bundle.v1'
+     OR p_bundle->'eligibility_contract'<>jsonb_build_object('require_terminal_complete',true,'require_outcome',true,'require_accepted_quality',true)
+     OR (p_bundle->>'bootstrap_resamples')::integer<>10000 OR (p_bundle->>'minimum_control')::integer<>30
+     OR (p_bundle->>'minimum_treatment')::integer<>30 OR (p_bundle->>'minimum_observation_days')::integer<>14
+     OR (p_bundle->>'treatment_ratio')::integer<>20 THEN
+    RAISE EXCEPTION 'reviewed experiment bundle schema/constants invalid' USING ERRCODE='23514';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_agent||':'||v_channel||':'||v_task||':'||v_policy,0));
+  INSERT INTO callscore_plan_contract.runtime_experiments(
+    experiment_id,agent_id,channel,task_type,policy_version,primary_metric,eligibility_contract,bootstrap_contract,
+    bootstrap_resamples,bootstrap_seed,minimum_control,minimum_treatment,minimum_observation_days,
+    minimum_outcome_relative_delta,minimum_quality_delta,minimum_ci_lower_bound,minimum_provider_verification_rate,
+    maximum_safety_violations,treatment_ratio,starts_at
+  ) VALUES(v_experiment_id,v_agent,v_channel,v_task,v_policy,p_bundle->>'primary_metric',p_bundle->'eligibility_contract',
+    p_bundle->'bootstrap_contract',10000,(p_bundle->>'bootstrap_seed')::bigint,30,30,14,0.10,0.03,0,1,0,20,
+    (p_bundle->>'starts_at')::timestamptz);
+  INSERT INTO callscore_plan_contract.runtime_variants(
+    variant_id,experiment_id,agent_id,channel,task_type,policy_version,prompt_name,prompt_version,prompt_sha256,
+    model,provider,parameters,tools_manifest_sha256,skills_manifest_sha256,created_from_variant_id,definition_sha256
+  ) SELECT (x->>'variant_id')::uuid,v_experiment_id,v_agent,v_channel,v_task,v_policy,x->>'prompt_name',x->>'prompt_version',
+    x->>'prompt_sha256',x->>'model',x->>'provider',x->'parameters',x->>'tools_manifest_sha256',x->>'skills_manifest_sha256',
+    NULLIF(x->>'created_from_variant_id','')::uuid,encode(sha256(convert_to((x-'definition_sha256')::text,'UTF8')),'hex')
+    FROM (VALUES(p_bundle->'control'),(p_bundle->'treatment')) AS variants(x);
+  INSERT INTO callscore_plan_contract.runtime_cohorts(cohort_id,experiment_id,cohort_name,variant_id) VALUES
+    ((p_bundle#>>'{control,cohort_id}')::uuid,v_experiment_id,'CONTROL',v_control),
+    ((p_bundle#>>'{treatment,cohort_id}')::uuid,v_experiment_id,'TREATMENT',v_treatment);
+  INSERT INTO callscore_plan_contract.runtime_registry(agent_id,channel,task_type,policy_version,active_variant_id,registry_version)
+   VALUES(v_agent,v_channel,v_task,v_policy,v_control,1);
+  RETURN v_experiment_id;
+END;
+$$;
+
 CREATE FUNCTION assign_runtime_variant(p_workflow_id uuid) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, callscore_plan_contract
 AS $$
 DECLARE v_w callscore_plan_contract.autonomy_workflows; v_e callscore_plan_contract.runtime_experiments;
         v_r callscore_plan_contract.runtime_registry; v_cohort callscore_plan_contract.runtime_cohorts;
-        v_bucket integer; v_assignment uuid:=gen_random_uuid(); v_hash bytea;
+        v_bucket integer; v_assignment uuid:=gen_random_uuid(); v_hash bytea; v_monitor_experiment uuid; v_monitor_event uuid;
 BEGIN
   SELECT * INTO v_w FROM callscore_plan_contract.autonomy_workflows WHERE workflow_id=p_workflow_id FOR UPDATE;
   IF v_w.workflow_state<>'HEAD_PLANNING' THEN RAISE EXCEPTION 'variant assignment requires HEAD_PLANNING' USING ERRCODE='23514'; END IF;
@@ -1761,6 +2111,18 @@ BEGIN
    WHERE agent_id=v_w.head_agent_id AND channel=v_w.channel AND task_type=v_w.task_type AND policy_version=v_w.policy_version;
   IF v_r.active_variant_id IS NULL THEN RAISE EXCEPTION 'no exact active registry' USING ERRCODE='23514'; END IF;
   IF v_e.experiment_id IS NULL THEN
+    IF v_r.rollback_variant_id IS NOT NULL THEN
+      SELECT p.experiment_id,p.promotion_event_id INTO v_monitor_experiment,v_monitor_event FROM callscore_plan_contract.runtime_promotion_events p
+       WHERE p.candidate_variant_id=v_r.active_variant_id AND p.decision='PROMOTE' ORDER BY p.created_at DESC LIMIT 1;
+      SELECT * INTO v_cohort FROM callscore_plan_contract.runtime_cohorts
+       WHERE experiment_id=v_monitor_experiment AND cohort_name='TREATMENT' AND variant_id=v_r.active_variant_id;
+      IF v_cohort.cohort_id IS NULL THEN RAISE EXCEPTION 'post-promotion monitoring cohort missing' USING ERRCODE='23514'; END IF;
+      INSERT INTO callscore_plan_contract.runtime_variant_assignments(
+        assignment_id,workflow_id,experiment_id,sequence_no,cohort_id,cohort_name,variant_id,
+        assignment_bucket,assignment_ratio_control,monitoring_promotion_event_id,registry_version
+      ) VALUES(v_assignment,p_workflow_id,v_monitor_experiment,1,v_cohort.cohort_id,'TREATMENT',v_r.active_variant_id,99,80,v_monitor_event,v_r.registry_version);
+      RETURN v_assignment;
+    END IF;
     INSERT INTO callscore_plan_contract.runtime_variant_assignments(
       assignment_id,workflow_id,sequence_no,variant_id,registry_version
     ) VALUES (v_assignment,p_workflow_id,1,v_r.active_variant_id,v_r.registry_version);
@@ -1895,6 +2257,44 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION record_provider_readback_evidence(
+  p_readback_evidence_id uuid,p_operation_id uuid,p_evidence_type text,
+  p_dispatch_window_started_at timestamptz,p_dispatch_window_ended_at timestamptz,
+  p_external_object_id text,p_external_url text,p_visibility text,p_performed boolean,
+  p_evidence_artifact_id uuid,p_verifier_agent_id text
+) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = pg_catalog, callscore_plan_contract
+AS $$
+DECLARE v_o callscore_plan_contract.provider_operations; v_artifact callscore_plan_contract.autonomy_artifacts;
+        v_dispatch_at timestamptz; v_seq bigint; v_expected_kind text;
+BEGIN
+  SELECT * INTO v_o FROM callscore_plan_contract.provider_operations WHERE operation_id=p_operation_id FOR UPDATE;
+  SELECT min(dispatch_boundary_at) INTO v_dispatch_at FROM callscore_plan_contract.provider_operation_events
+   WHERE operation_id=p_operation_id AND to_state='DISPATCHING';
+  v_expected_kind:=CASE p_evidence_type WHEN 'EXECUTION' THEN 'provider_execution_receipt'
+    WHEN 'READBACK' THEN 'provider_readback_receipt' WHEN 'ABSENCE' THEN 'provider_absence_readback_receipt' ELSE NULL END;
+  SELECT * INTO v_artifact FROM callscore_plan_contract.autonomy_artifacts
+   WHERE artifact_id=p_evidence_artifact_id AND artifact_kind=v_expected_kind;
+  IF v_o.operation_id IS NULL OR v_artifact.artifact_id IS NULL OR v_dispatch_at IS NULL
+     OR p_dispatch_window_started_at>v_dispatch_at OR p_dispatch_window_ended_at< v_dispatch_at
+     OR p_verifier_agent_id=v_o.lease_owner
+     OR (p_evidence_type='ABSENCE' AND (p_performed OR p_external_object_id IS NOT NULL OR p_external_url IS NOT NULL))
+     OR (p_evidence_type IN ('EXECUTION','READBACK') AND (NOT p_performed OR p_external_object_id IS NULL)) THEN
+    RAISE EXCEPTION 'provider evidence exact identity/window/independence predicate failed' USING ERRCODE='23514';
+  END IF;
+  SELECT COALESCE(max(sequence_no),0)+1 INTO v_seq FROM callscore_plan_contract.provider_readback_evidence WHERE operation_id=p_operation_id;
+  INSERT INTO callscore_plan_contract.provider_readback_evidence(
+    readback_evidence_id,operation_id,sequence_no,evidence_type,account_scope_hash,provider_tool,action_name,
+    payload_sha256,publication_revision,dispatch_window_started_at,dispatch_window_ended_at,external_object_id,
+    external_url,visibility,performed,evidence_artifact_id,verifier_agent_id
+  ) VALUES(p_readback_evidence_id,p_operation_id,v_seq,p_evidence_type,v_o.account_scope_hash,v_o.provider_tool,v_o.action_name,
+    v_o.payload_sha256,v_o.publication_revision,p_dispatch_window_started_at,p_dispatch_window_ended_at,p_external_object_id,
+    p_external_url,p_visibility,p_performed,p_evidence_artifact_id,p_verifier_agent_id);
+  RETURN p_readback_evidence_id;
+END;
+$$;
+
 CREATE FUNCTION record_provider_result(
   p_operation_id uuid,
   p_expected_version bigint,
@@ -1910,6 +2310,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, callscore_plan_contract
 AS $$
 DECLARE v_prior callscore_plan_contract.callscore_provider_state; v_row callscore_plan_contract.provider_operations;
+        v_evidence callscore_plan_contract.provider_readback_evidence; v_artifact callscore_plan_contract.autonomy_artifacts; v_expected_type text;
 BEGIN
   SELECT provider_state INTO v_prior FROM callscore_plan_contract.provider_operations
    WHERE operation_id=p_operation_id AND state_version=p_expected_version AND lease_token=p_lease_token FOR UPDATE;
@@ -1920,6 +2321,21 @@ BEGIN
   END IF;
   IF p_to_state IN ('SUBMITTED','VERIFIED') AND (p_receipt_artifact_id IS NULL OR p_external_object_id IS NULL) THEN
     RAISE EXCEPTION 'provider success state requires durable receipt and external id' USING ERRCODE='23514';
+  END IF;
+  IF p_to_state IN ('SUBMITTED','VERIFIED') THEN
+    v_expected_type:=CASE WHEN p_to_state='SUBMITTED' THEN 'EXECUTION' ELSE 'READBACK' END;
+    SELECT e.* INTO v_evidence FROM callscore_plan_contract.provider_readback_evidence e
+     JOIN callscore_plan_contract.provider_operations o ON o.operation_id=e.operation_id
+     WHERE e.operation_id=p_operation_id AND e.evidence_type=v_expected_type
+       AND e.evidence_artifact_id=p_receipt_artifact_id AND e.performed
+       AND e.account_scope_hash=o.account_scope_hash AND e.provider_tool=o.provider_tool
+       AND e.action_name=o.action_name AND e.payload_sha256=o.payload_sha256
+       AND e.publication_revision=o.publication_revision AND e.external_object_id=p_external_object_id
+       AND e.external_url IS NOT DISTINCT FROM p_external_url;
+    SELECT * INTO v_artifact FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_receipt_artifact_id;
+    IF v_evidence.readback_evidence_id IS NULL OR v_artifact.content_sha256<>p_provider_response_sha256 THEN
+      RAISE EXCEPTION 'provider success evidence is not exact-bound' USING ERRCODE='23514';
+    END IF;
   END IF;
   UPDATE callscore_plan_contract.provider_operations
   SET provider_state=p_to_state,state_version=state_version+1,
@@ -1971,9 +2387,14 @@ AS $$
 DECLARE v_row callscore_plan_contract.provider_operations;
 BEGIN
   IF NOT EXISTS(
-    SELECT 1 FROM callscore_plan_contract.autonomy_artifacts
-    WHERE artifact_id=p_absence_receipt_artifact_id AND artifact_kind='provider_absence_readback_receipt'
-  ) THEN RAISE EXCEPTION 'independent provider absence receipt missing' USING ERRCODE='23514'; END IF;
+    SELECT 1 FROM callscore_plan_contract.provider_readback_evidence e
+    JOIN callscore_plan_contract.provider_operations o ON o.operation_id=e.operation_id
+    WHERE e.operation_id=p_operation_id AND e.evidence_type='ABSENCE' AND NOT e.performed
+      AND e.evidence_artifact_id=p_absence_receipt_artifact_id
+      AND e.account_scope_hash=o.account_scope_hash AND e.provider_tool=o.provider_tool
+      AND e.action_name=o.action_name AND e.payload_sha256=o.payload_sha256
+      AND e.publication_revision=o.publication_revision
+  ) THEN RAISE EXCEPTION 'independent exact-bound provider absence receipt missing' USING ERRCODE='23514'; END IF;
   UPDATE callscore_plan_contract.provider_operations
   SET provider_state='CONFIRMED_NOT_PERFORMED',state_version=state_version+1,updated_at=clock_timestamp()
   WHERE operation_id=p_operation_id AND state_version=p_expected_version AND provider_state='UNKNOWN'
@@ -2014,30 +2435,38 @@ $$;
 ALTER FUNCTION set_ledger_hash() OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION reject_append_only_mutation() OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION reject_projection_delete() OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION reject_legacy_channel_task_reactivation() OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION transition_is_allowed(callscore_execution_class,callscore_workflow_state,callscore_workflow_state) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION enqueue_autonomy_workflow(uuid,uuid,uuid,text,callscore_execution_class,text,text,text,text,jsonb,char) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION backfill_legacy_channel_tasks() OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION set_activation_fence(boolean,bigint,text,text) OWNER TO callscore_plan_function_owner;
-ALTER FUNCTION create_agent_delegation(uuid,uuid,integer,text,smallint,text,text,text,char,text,text,jsonb,text,timestamptz) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION create_agent_delegation(uuid,uuid,integer,text,smallint,text,uuid,text,integer,text,text,text,char,text,text,jsonb,text,timestamptz) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_agent_delegation_event(uuid,callscore_join_status,bigint,callscore_join_status,integer,integer,bigint,text,uuid,char,uuid,char,jsonb) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_autonomy_artifact(uuid,text,text,char,bigint,text,text,text) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION claim_autonomy_workflow(uuid,text,uuid,bigint,integer) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION schedule_autonomy_retry(uuid,callscore_workflow_state,bigint,uuid,timestamptz,text) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION resume_due_autonomy_retry(uuid,bigint,text,uuid,integer) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION resume_or_reclaim_autonomy_workflow(uuid,bigint,bigint,uuid,text,uuid,integer) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION heartbeat_autonomy_workflow(uuid,bigint,bigint,uuid,integer) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION transition_autonomy_workflow(uuid,callscore_workflow_state,callscore_workflow_state,bigint,uuid,text) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION mint_ready_public_owned_grant(uuid,uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_generation_provenance(uuid,uuid,uuid,text,text,text,text,text,uuid,uuid,text,text,jsonb,jsonb,char,jsonb,char,jsonb,uuid,jsonb,numeric,timestamptz,timestamptz) OWNER TO callscore_plan_function_owner;
-ALTER FUNCTION record_quality_evaluation(uuid,uuid,uuid,uuid,boolean,jsonb,numeric,numeric,text) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION record_quality_gate_evidence(uuid,uuid,uuid,text,boolean,uuid,text) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION record_quality_evaluation(uuid,uuid,uuid,uuid,jsonb,numeric,numeric,text) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_artifact_revision(uuid,uuid,uuid,uuid,uuid,jsonb) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION create_provider_operation_intent(uuid,uuid,char,text,text,text,uuid,boolean,boolean,uuid,timestamptz) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION create_provider_operation(uuid,uuid,uuid,uuid,text,uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION mark_provider_dispatching(uuid,bigint,uuid) OWNER TO callscore_plan_function_owner;
-ALTER FUNCTION insert_verified_autonomy_report(uuid,text,bigint,char,char,char,uuid,char,text,text,uuid,char,boolean,jsonb,uuid,uuid,uuid) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION insert_verified_autonomy_report(uuid,text,bigint,char,char,char,char,char,char,text,char,char,uuid,char,text,text,uuid,char,boolean,jsonb,uuid,uuid,uuid,uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_outcome_measurement(uuid,uuid,uuid,uuid,text,numeric,numeric,timestamptz,timestamptz,uuid,char,jsonb) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_canonical_learning_set(uuid,uuid,uuid,uuid[],jsonb[],uuid[]) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION reclaim_provider_claim(uuid,bigint,text,uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION compute_runtime_experiment_statistics(uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION assign_runtime_variant(uuid) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION import_runtime_experiment_bundle(jsonb,uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION promote_runtime_variant(uuid,bigint,uuid,uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION rollback_runtime_variant(uuid,bigint,uuid) OWNER TO callscore_plan_function_owner;
+ALTER FUNCTION record_provider_readback_evidence(uuid,uuid,text,timestamptz,timestamptz,text,text,text,boolean,uuid,text) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION record_provider_result(uuid,bigint,uuid,callscore_provider_state,text,char,text,text,uuid) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION reconcile_ambiguous_provider_dispatch(uuid,bigint,text) OWNER TO callscore_plan_function_owner;
 ALTER FUNCTION confirm_provider_not_performed(uuid,bigint,uuid,text) OWNER TO callscore_plan_function_owner;
@@ -2050,9 +2479,38 @@ GRANT INSERT ON canonical_policy_snapshots,canonical_receipt_evidence,autonomy_a
 REVOKE ALL ON ALL TABLES IN SCHEMA callscore_plan_contract FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA callscore_plan_contract FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION enqueue_autonomy_workflow(uuid,uuid,uuid,text,callscore_execution_class,text,text,text,text,jsonb,char) TO callscore_plan_enqueue;
-GRANT EXECUTE ON FUNCTION claim_autonomy_workflow(uuid,text,uuid,bigint,integer),heartbeat_autonomy_workflow(uuid,bigint,bigint,uuid,integer),transition_autonomy_workflow(uuid,callscore_workflow_state,callscore_workflow_state,bigint,uuid,text),create_agent_delegation(uuid,uuid,integer,text,smallint,text,text,text,char,text,text,jsonb,text,timestamptz),record_agent_delegation_event(uuid,callscore_join_status,bigint,callscore_join_status,integer,integer,bigint,text,uuid,char,uuid,char,jsonb),record_autonomy_artifact(uuid,text,text,char,bigint,text,text,text),record_generation_provenance(uuid,uuid,uuid,text,text,text,text,text,uuid,uuid,text,text,jsonb,jsonb,char,jsonb,char,jsonb,uuid,jsonb,numeric,timestamptz,timestamptz),record_quality_evaluation(uuid,uuid,uuid,uuid,boolean,jsonb,numeric,numeric,text),record_artifact_revision(uuid,uuid,uuid,uuid,uuid,jsonb),mint_ready_public_owned_grant(uuid,uuid),create_provider_operation(uuid,uuid,uuid,uuid,text,uuid),mark_provider_dispatching(uuid,bigint,uuid),reclaim_provider_claim(uuid,bigint,text,uuid),record_provider_result(uuid,bigint,uuid,callscore_provider_state,text,char,text,text,uuid),reconcile_ambiguous_provider_dispatch(uuid,bigint,text),confirm_provider_not_performed(uuid,bigint,uuid,text),reclaim_confirmed_not_performed(uuid,bigint,text,uuid),record_outcome_measurement(uuid,uuid,uuid,uuid,text,numeric,numeric,timestamptz,timestamptz,uuid,char,jsonb),record_canonical_learning_set(uuid,uuid,uuid,uuid[],jsonb[],uuid[]),compute_runtime_experiment_statistics(uuid),assign_runtime_variant(uuid),promote_runtime_variant(uuid,bigint,uuid,uuid),rollback_runtime_variant(uuid,bigint,uuid) TO callscore_plan_runtime;
+GRANT EXECUTE ON FUNCTION
+  claim_autonomy_workflow(uuid,text,uuid,bigint,integer),
+  schedule_autonomy_retry(uuid,callscore_workflow_state,bigint,uuid,timestamptz,text),
+  resume_due_autonomy_retry(uuid,bigint,text,uuid,integer),
+  resume_or_reclaim_autonomy_workflow(uuid,bigint,bigint,uuid,text,uuid,integer),
+  heartbeat_autonomy_workflow(uuid,bigint,bigint,uuid,integer),
+  transition_autonomy_workflow(uuid,callscore_workflow_state,callscore_workflow_state,bigint,uuid,text),
+  create_agent_delegation(uuid,uuid,integer,text,smallint,text,uuid,text,integer,text,text,text,char,text,text,jsonb,text,timestamptz),
+  record_agent_delegation_event(uuid,callscore_join_status,bigint,callscore_join_status,integer,integer,bigint,text,uuid,char,uuid,char,jsonb),
+  record_autonomy_artifact(uuid,text,text,char,bigint,text,text,text),
+  record_generation_provenance(uuid,uuid,uuid,text,text,text,text,text,uuid,uuid,text,text,jsonb,jsonb,char,jsonb,char,jsonb,uuid,jsonb,numeric,timestamptz,timestamptz),
+  record_quality_gate_evidence(uuid,uuid,uuid,text,boolean,uuid,text),
+  record_quality_evaluation(uuid,uuid,uuid,uuid,jsonb,numeric,numeric,text),
+  record_artifact_revision(uuid,uuid,uuid,uuid,uuid,jsonb),
+  create_provider_operation_intent(uuid,uuid,char,text,text,text,uuid,boolean,boolean,uuid,timestamptz),
+  mint_ready_public_owned_grant(uuid,uuid),
+  create_provider_operation(uuid,uuid,uuid,uuid,text,uuid),
+  mark_provider_dispatching(uuid,bigint,uuid),
+  reclaim_provider_claim(uuid,bigint,text,uuid),
+  record_provider_readback_evidence(uuid,uuid,text,timestamptz,timestamptz,text,text,text,boolean,uuid,text),
+  record_provider_result(uuid,bigint,uuid,callscore_provider_state,text,char,text,text,uuid),
+  reconcile_ambiguous_provider_dispatch(uuid,bigint,text),
+  confirm_provider_not_performed(uuid,bigint,uuid,text),
+  reclaim_confirmed_not_performed(uuid,bigint,text,uuid),
+  record_outcome_measurement(uuid,uuid,uuid,uuid,text,numeric,numeric,timestamptz,timestamptz,uuid,char,jsonb),
+  record_canonical_learning_set(uuid,uuid,uuid,uuid[],jsonb[],uuid[]),
+  compute_runtime_experiment_statistics(uuid),assign_runtime_variant(uuid),
+  promote_runtime_variant(uuid,bigint,uuid,uuid),rollback_runtime_variant(uuid,bigint,uuid)
+TO callscore_plan_runtime;
 GRANT EXECUTE ON FUNCTION set_activation_fence(boolean,bigint,text,text) TO callscore_plan_policy_writer;
-GRANT EXECUTE ON FUNCTION insert_verified_autonomy_report(uuid,text,bigint,char,char,char,uuid,char,text,text,uuid,char,boolean,jsonb,uuid,uuid,uuid) TO callscore_plan_report_verifier;
+GRANT EXECUTE ON FUNCTION import_runtime_experiment_bundle(jsonb,uuid) TO callscore_plan_policy_writer;
+GRANT EXECUTE ON FUNCTION insert_verified_autonomy_report(uuid,text,bigint,char,char,char,char,char,char,text,char,char,uuid,char,text,text,uuid,char,boolean,jsonb,uuid,uuid,uuid,uuid) TO callscore_plan_report_verifier;
 
 -- Contract probes.
 INSERT INTO agent_instances(agent_id) VALUES ('callscore-x-head');
@@ -2067,7 +2525,7 @@ VALUES
 SET LOCAL ROLE callscore_plan_enqueue;
 SELECT enqueue_autonomy_workflow(
   '00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000101',
-  '01000000-0000-0000-0000-000000000001','fixture-task-1','RESTRICTED_DRAFT','callscore-x-head','x','x_owned_post','policy-v1','{}',repeat('a',64)
+  '01000000-0000-0000-0000-000000000001','fixture-task-1','OWNED_PUBLIC_MUTATION','callscore-x-head','x','x_owned_post','policy-v1','{}',repeat('a',64)
 );
 RESET ROLE;
 
@@ -2108,6 +2566,7 @@ RESET ROLE;
 
 SET LOCAL ROLE callscore_plan_runtime;
 SELECT (claim_autonomy_workflow('00000000-0000-0000-0000-000000000001','fixture-worker','00000000-0000-0000-0000-000000000201',0,30)).workflow_state;
+SELECT (heartbeat_autonomy_workflow('00000000-0000-0000-0000-000000000001',1,0,'00000000-0000-0000-0000-000000000201',30)).lease_generation;
 RESET ROLE;
 
 DO $$
@@ -2132,13 +2591,346 @@ BEGIN
 END;
 $$;
 
--- Multiple null pre-completion session IDs are legal; duplicate non-null IDs are not.
-INSERT INTO agent_delegations(
-  delegation_id,workflow_id,workflow_run_id,revision_number,delegated_role,ordinal,canonical_child_agent_id,
-  launch_status,usage_file_path,stdout_file_path,prompt_sha256,model,provider,allowed_capabilities,required_output_schema,lease_generation,deadline_at
-) VALUES
-('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000101',0,'research',0,'callscore-x-research-child','DISPATCH_INTENT','/tmp/a.usage','/tmp/a.out',repeat('d',64),'m','p','{}','s',1,clock_timestamp()+interval '1 minute'),
-('20000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000101',0,'critic',1,'callscore-x-critic-child','DISPATCH_INTENT','/tmp/b.usage','/tmp/b.out',repeat('e',64),'m','p','{}','s',1,clock_timestamp()+interval '1 minute');
+
+-- Exercise workflow same-identity recovery, expired reclaim, exact RETRY scheduling, and due-time resume.
+SET LOCAL ROLE callscore_plan_runtime;
+SELECT (resume_or_reclaim_autonomy_workflow(
+  '00000000-0000-0000-0000-000000000001',1,1,'00000000-0000-0000-0000-000000000201',
+  'fixture-worker','00000000-0000-0000-0000-000000000202',30
+)).lease_generation;
+RESET ROLE;
+UPDATE autonomy_workflows SET lease_expires_at=clock_timestamp()-interval '1 second'
+ WHERE workflow_id='00000000-0000-0000-0000-000000000001';
+SET LOCAL ROLE callscore_plan_runtime;
+SELECT (resume_or_reclaim_autonomy_workflow(
+  '00000000-0000-0000-0000-000000000001',1,2,'00000000-0000-0000-0000-000000000202',
+  'fixture-reclaimer','00000000-0000-0000-0000-000000000203',30
+)).lease_generation;
+SELECT record_autonomy_artifact(
+  '40000000-0000-0000-0000-000000000010','runtime_experiment_bundle_review_receipt',
+  '/srv/agents/hermes/profiles/callscore/runtime/children/experiment-review.json',repeat('a',64),100,'application/json',
+  'callscore-experiment-reviewer','callscore-trust-reviewer'
+);
+RESET ROLE;
+SET LOCAL ROLE callscore_plan_policy_writer;
+SELECT import_runtime_experiment_bundle(
+  jsonb_build_object(
+    'schema','callscore.runtime_experiment_bundle.v1','experiment_id','60000000-0000-0000-0000-000000000001',
+    'agent_id','callscore-x-head','channel','x','task_type','x_owned_post','policy_version','policy-v1',
+    'primary_metric','engagement_rate',
+    'eligibility_contract',jsonb_build_object('require_terminal_complete',true,'require_outcome',true,'require_accepted_quality',true),
+    'bootstrap_contract',jsonb_build_object('method','percentile_bootstrap','statistic','relative_mean_delta','missing_data','exclude'),
+    'bootstrap_resamples',10000,'bootstrap_seed',42,'minimum_control',30,'minimum_treatment',30,
+    'minimum_observation_days',14,'treatment_ratio',20,'starts_at',(clock_timestamp()-interval '20 days')::text,
+    'control',jsonb_build_object('variant_id','61000000-0000-0000-0000-000000000001','cohort_id','62000000-0000-0000-0000-000000000001',
+      'prompt_name','x-head','prompt_version','v1','prompt_sha256',repeat('1',64),'model','m','provider','p','parameters','{}'::jsonb,
+      'tools_manifest_sha256',repeat('2',64),'skills_manifest_sha256',repeat('3',64),'created_from_variant_id',''),
+    'treatment',jsonb_build_object('variant_id','61000000-0000-0000-0000-000000000002','cohort_id','62000000-0000-0000-0000-000000000002',
+      'prompt_name','x-head','prompt_version','v2','prompt_sha256',repeat('4',64),'model','m','provider','p','parameters','{}'::jsonb,
+      'tools_manifest_sha256',repeat('5',64),'skills_manifest_sha256',repeat('6',64),'created_from_variant_id','61000000-0000-0000-0000-000000000001')
+  ),'40000000-0000-0000-0000-000000000010'
+);
+RESET ROLE;
+SET LOCAL ROLE callscore_plan_runtime;
+SELECT assign_runtime_variant('00000000-0000-0000-0000-000000000001');
+SELECT (transition_autonomy_workflow(
+  '00000000-0000-0000-0000-000000000001','HEAD_PLANNING','CHILDREN_RUNNING',1,
+  '00000000-0000-0000-0000-000000000203','fixture_children_start'
+)).state_version;
+SELECT (schedule_autonomy_retry(
+  '00000000-0000-0000-0000-000000000001','CHILDREN_RUNNING',2,
+  '00000000-0000-0000-0000-000000000203',clock_timestamp()+interval '1 second','fixture_retry'
+)).workflow_state;
+RESET ROLE;
+UPDATE autonomy_workflows SET retry_at=clock_timestamp()-interval '1 second'
+ WHERE workflow_id='00000000-0000-0000-0000-000000000001';
+SET LOCAL ROLE callscore_plan_runtime;
+SELECT (resume_due_autonomy_retry(
+  '00000000-0000-0000-0000-000000000001',3,'fixture-worker','00000000-0000-0000-0000-000000000204',30
+)).workflow_state;
+
+-- Exercise task-bound child intent plus parent-observed process identity and restart generation.
+SELECT record_autonomy_artifact('40000000-0000-0000-0000-000000000001','hermes_usage','/srv/agents/hermes/profiles/callscore/runtime/children/probe-a.usage',repeat('1',64),10,'application/json','callscore-evaluator-child','callscore-supervisor-verifier');
+SELECT record_autonomy_artifact('40000000-0000-0000-0000-000000000002','child_output','/srv/agents/hermes/profiles/callscore/runtime/children/probe-a.out',repeat('2',64),20,'application/json','callscore-evaluator-child','callscore-supervisor-verifier');
+SELECT create_agent_delegation(
+  '50000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',0,'evaluator',0::smallint,
+  'callscore-evaluator-child','51000000-0000-0000-0000-000000000001','/usr/bin/hermes',1000,'/opt/crypto-tuber-ranked',
+  '/srv/agents/hermes/profiles/callscore/runtime/children/probe-a.usage','/srv/agents/hermes/profiles/callscore/runtime/children/probe-a.out',
+  repeat('3',64),'m','p','{}','callscore.child_output.v1',clock_timestamp()+interval '2 minutes'
+);
+SELECT (record_agent_delegation_event('50000000-0000-0000-0000-000000000001','DISPATCH_INTENT',1,'SPAWNED',12345,12345,999,'session-probe-a',NULL,NULL,NULL,NULL,'{"source":"parent_procfs"}')).launch_status;
+SELECT (record_agent_delegation_event('50000000-0000-0000-0000-000000000001','SPAWNED',1,'SUCCEEDED',12345,12345,999,'session-probe-a','40000000-0000-0000-0000-000000000001',repeat('1',64),'40000000-0000-0000-0000-000000000002',repeat('2',64),'{"source":"parent_wait4"}')).launch_status;
+SELECT (record_agent_delegation_event('50000000-0000-0000-0000-000000000001','SUCCEEDED',1,'ACCEPTED',12345,12345,999,'session-probe-a','40000000-0000-0000-0000-000000000001',repeat('1',64),'40000000-0000-0000-0000-000000000002',repeat('2',64),'{"source":"parent_verifier"}')).launch_status;
+SELECT create_agent_delegation(
+  '50000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001',0,'critic',1::smallint,
+  'callscore-critic-child','51000000-0000-0000-0000-000000000002','/usr/bin/hermes',1000,'/opt/crypto-tuber-ranked',
+  '/srv/agents/hermes/profiles/callscore/runtime/children/probe-b.usage','/srv/agents/hermes/profiles/callscore/runtime/children/probe-b.out',
+  repeat('4',64),'m','p','{}','callscore.child_output.v1',clock_timestamp()+interval '2 minutes'
+);
+SELECT (record_agent_delegation_event('50000000-0000-0000-0000-000000000002','DISPATCH_INTENT',1,'SPAWNED',12346,12346,1000,'session-probe-b',NULL,NULL,NULL,NULL,'{"source":"parent_procfs"}')).launch_status;
+SELECT (record_agent_delegation_event('50000000-0000-0000-0000-000000000002','SPAWNED',1,'SUCCEEDED',12346,12346,1000,'session-probe-b','40000000-0000-0000-0000-000000000001',repeat('1',64),'40000000-0000-0000-0000-000000000002',repeat('2',64),'{"source":"parent_wait4"}')).launch_status;
+SELECT (record_agent_delegation_event('50000000-0000-0000-0000-000000000002','SUCCEEDED',1,'ACCEPTED',12346,12346,1000,'session-probe-b','40000000-0000-0000-0000-000000000001',repeat('1',64),'40000000-0000-0000-0000-000000000002',repeat('2',64),'{"source":"parent_verifier"}')).launch_status;
+SELECT (transition_autonomy_workflow(
+  '00000000-0000-0000-0000-000000000001','CHILDREN_RUNNING','HEAD_SYNTHESIS',4,
+  '00000000-0000-0000-0000-000000000204','fixture_children_joined'
+)).state_version;
+SELECT record_autonomy_artifact('40000000-0000-0000-0000-000000000020','resolved_prompt','/srv/agents/hermes/profiles/callscore/runtime/children/head.prompt',repeat('0',64),100,'text/plain','callscore-x-head','callscore-supervisor-verifier');
+SELECT record_autonomy_artifact('40000000-0000-0000-0000-000000000021','prompt_secret_scan_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/head.scan',repeat('1',64),50,'application/json','callscore-secret-scanner','callscore-supervisor-verifier');
+SELECT record_autonomy_artifact('40000000-0000-0000-0000-000000000022','generation_output','/srv/agents/hermes/profiles/callscore/runtime/children/head.output',repeat('2',64),200,'application/json','callscore-x-head','callscore-supervisor-verifier');
+SELECT record_autonomy_artifact('40000000-0000-0000-0000-000000000023','resolved_prompt','/srv/agents/hermes/profiles/callscore/runtime/children/evaluator.prompt',repeat('3',64),100,'text/plain','callscore-evaluator-child','callscore-supervisor-verifier');
+SELECT record_autonomy_artifact('40000000-0000-0000-0000-000000000024','prompt_secret_scan_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/evaluator.scan',repeat('4',64),50,'application/json','callscore-secret-scanner','callscore-supervisor-verifier');
+SELECT record_autonomy_artifact('40000000-0000-0000-0000-000000000025','generation_output','/srv/agents/hermes/profiles/callscore/runtime/children/evaluator.output',repeat('5',64),200,'application/json','callscore-evaluator-child','callscore-supervisor-verifier');
+SELECT record_generation_provenance(
+  '70000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',NULL,'callscore-x-head','head-synthesizer','parent-session','x-head','v2',
+  '40000000-0000-0000-0000-000000000020','40000000-0000-0000-0000-000000000021','m','p','{}','{}',repeat('6',64),'{}',repeat('7',64),'{}',
+  '40000000-0000-0000-0000-000000000022','{}',0,
+  clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second'
+);
+SELECT record_generation_provenance(
+  '70000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','50000000-0000-0000-0000-000000000001',
+  'callscore-evaluator-child','evaluator','session-probe-a','x-eval','v1','40000000-0000-0000-0000-000000000023','40000000-0000-0000-0000-000000000024',
+  'm','p','{}','{}',repeat('8',64),'{}',repeat('9',64),'{}','40000000-0000-0000-0000-000000000025','{}',0,
+  clock_timestamp()-interval '2 seconds',clock_timestamp()-interval '1 second'
+);
+SELECT (transition_autonomy_workflow(
+  '00000000-0000-0000-0000-000000000001','HEAD_SYNTHESIS','QUALITY_EVALUATION',5,
+  '00000000-0000-0000-0000-000000000204','fixture_synthesis_complete'
+)).state_version;
+SELECT record_autonomy_artifact(gen_random_uuid(),'quality_gate:claim_policy','/srv/agents/hermes/profiles/callscore/runtime/children/gate-claim.json',repeat('a',64),10,'application/json','callscore-policy-gate','callscore-quality-verifier');
+SELECT record_autonomy_artifact(gen_random_uuid(),'quality_gate:canonical_receipts','/srv/agents/hermes/profiles/callscore/runtime/children/gate-receipts.json',repeat('b',64),10,'application/json','callscore-receipt-gate','callscore-quality-verifier');
+SELECT record_autonomy_artifact(gen_random_uuid(),'quality_gate:secrets','/srv/agents/hermes/profiles/callscore/runtime/children/gate-secrets.json',repeat('c',64),10,'application/json','callscore-secrets-gate','callscore-quality-verifier');
+SELECT record_autonomy_artifact(gen_random_uuid(),'quality_gate:originality','/srv/agents/hermes/profiles/callscore/runtime/children/gate-originality.json',repeat('d',64),10,'application/json','callscore-originality-gate','callscore-quality-verifier');
+SELECT record_autonomy_artifact(gen_random_uuid(),'quality_gate:destination_fit','/srv/agents/hermes/profiles/callscore/runtime/children/gate-destination.json',repeat('e',64),10,'application/json','callscore-destination-gate','callscore-quality-verifier');
+SELECT record_quality_gate_evidence(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','claim_policy',true,(SELECT artifact_id FROM autonomy_artifacts WHERE artifact_kind='quality_gate:claim_policy'),'callscore-quality-verifier');
+SELECT record_quality_gate_evidence(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','canonical_receipts',true,(SELECT artifact_id FROM autonomy_artifacts WHERE artifact_kind='quality_gate:canonical_receipts'),'callscore-quality-verifier');
+SELECT record_quality_gate_evidence(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','secrets',true,(SELECT artifact_id FROM autonomy_artifacts WHERE artifact_kind='quality_gate:secrets'),'callscore-quality-verifier');
+SELECT record_quality_gate_evidence(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','originality',true,(SELECT artifact_id FROM autonomy_artifacts WHERE artifact_kind='quality_gate:originality'),'callscore-quality-verifier');
+SELECT record_quality_gate_evidence(gen_random_uuid(),'00000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','destination_fit',true,(SELECT artifact_id FROM autonomy_artifacts WHERE artifact_kind='quality_gate:destination_fit'),'callscore-quality-verifier');
+SELECT (record_quality_evaluation(
+  '71000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000002',
+  '{"factual_accuracy":1,"evidence_support":1,"originality":1,"platform_fit":1,"clarity":1,"callscore_voice":1,"commercial_strength":1,"actionability":1,"handoff_readiness":1,"hook":1,"argument":1,"native_structure":1,"audience_relevance":1,"cta":1,"safety_compliance":1}',0.1,0.2,'fixture_all_pass'
+)).decision;
+SELECT (transition_autonomy_workflow(
+  '00000000-0000-0000-0000-000000000001','QUALITY_EVALUATION','READY',6,
+  '00000000-0000-0000-0000-000000000204','fixture_quality_accepted'
+)).state_version;
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000001','provider_payload','/srv/agents/hermes/profiles/callscore/runtime/children/provider-payload.json',repeat('1',64),100,'application/json','callscore-x-head','callscore-provider-reviewer');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000002','provider_object_rollback_contract','/srv/agents/hermes/profiles/callscore/runtime/children/provider-rollback.json',repeat('2',64),100,'application/json','callscore-rollback-author','callscore-provider-reviewer');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000003','provider_execution_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/provider-execution.json',repeat('3',64),100,'application/json','callscore-provider-worker','callscore-provider-readback');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000004','provider_readback_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/provider-readback.json',repeat('4',64),100,'application/json','callscore-provider-readback','callscore-trust-reviewer');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000005','provider_absence_readback_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/provider-absence.json',repeat('5',64),100,'application/json','callscore-provider-readback','callscore-trust-reviewer');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000011','canonical_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/receipt-1.json',repeat('a',64),10,'application/json','callscore-receipt-producer','callscore-receipt-verifier');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000012','canonical_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/receipt-2.json',repeat('b',64),10,'application/json','callscore-receipt-producer','callscore-receipt-verifier');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000013','canonical_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/receipt-3.json',repeat('c',64),10,'application/json','callscore-receipt-producer','callscore-receipt-verifier');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000014','canonical_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/receipt-4.json',repeat('d',64),10,'application/json','callscore-receipt-producer','callscore-receipt-verifier');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000015','canonical_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/receipt-5.json',repeat('e',64),10,'application/json','callscore-receipt-producer','callscore-receipt-verifier');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000016','canonical_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/receipt-6.json',repeat('f',64),10,'application/json','callscore-receipt-producer','callscore-receipt-verifier');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000017','canonical_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/receipt-7.json',repeat('0',64),10,'application/json','callscore-receipt-producer','callscore-receipt-verifier');
+SELECT record_autonomy_artifact('80000000-0000-0000-0000-000000000018','canonical_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/receipt-8.json',repeat('9',64),10,'application/json','callscore-receipt-producer','callscore-receipt-verifier');
+RESET ROLE;
+
+INSERT INTO canonical_policy_snapshots(
+  policy_snapshot_id,sequence_no,policy_record_id,policy_commit_sha,registry_sha256,registry_version,channel,account_scope_hash,
+  mutation_family,provider_tool,action_name,readiness_status,valid_from,valid_until,rollback_contract
+) VALUES('82000000-0000-0000-0000-000000000001',1,'x-owned-post',repeat('a',40),repeat('b',64),'v1','x',repeat('c',64),
+  'social','X_CREATE_POST','create','READY_PUBLIC_OWNED',clock_timestamp()-interval '1 hour',clock_timestamp()+interval '1 hour','{"action":"delete_external_object"}');
+INSERT INTO canonical_receipt_evidence(receipt_evidence_id,workflow_id,sequence_no,receipt_schema,status,receipt_artifact_id,receipt_sha256,verifier_agent_id,verified_at,stale_at)
+SELECT gen_random_uuid(),'00000000-0000-0000-0000-000000000001',x.ord,x.schema_name,'PASS',x.artifact_id,a.content_sha256,'callscore-receipt-verifier',clock_timestamp(),clock_timestamp()+interval '1 hour'
+FROM (VALUES
+  (1,'editorial_angle_receipt.v1','80000000-0000-0000-0000-000000000011'::uuid),
+  (2,'platform_fit_receipt.v1','80000000-0000-0000-0000-000000000012'::uuid),
+  (3,'visual_brief_receipt.v1','80000000-0000-0000-0000-000000000013'::uuid),
+  (4,'visual_qa_receipt.v1','80000000-0000-0000-0000-000000000014'::uuid),
+  (5,'copy_visual_coherence_receipt.v1','80000000-0000-0000-0000-000000000015'::uuid),
+  (6,'same_shit_memory_receipt.v1','80000000-0000-0000-0000-000000000016'::uuid),
+  (7,'callscore.task_router_receipt.v1','80000000-0000-0000-0000-000000000017'::uuid),
+  (8,'callscore.tool_inheritance_receipt.v1','80000000-0000-0000-0000-000000000018'::uuid)
+) AS x(ord,schema_name,artifact_id) JOIN autonomy_artifacts a ON a.artifact_id=x.artifact_id;
+
+SET LOCAL ROLE callscore_plan_runtime;
+SELECT create_provider_operation_intent(
+  '83000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',repeat('c',64),'social',
+  'X_CREATE_POST','create','80000000-0000-0000-0000-000000000001',false,false,
+  '80000000-0000-0000-0000-000000000002',clock_timestamp()+interval '10 minutes'
+);
+SELECT mint_ready_public_owned_grant('00000000-0000-0000-0000-000000000001','83000000-0000-0000-0000-000000000001');
+SELECT (create_provider_operation(
+  '84000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','83000000-0000-0000-0000-000000000001',
+  (SELECT grant_id FROM external_action_grants WHERE intent_id='83000000-0000-0000-0000-000000000001'),'fixture-provider-worker','85000000-0000-0000-0000-000000000001'
+)).provider_state;
+SELECT (mark_provider_dispatching('84000000-0000-0000-0000-000000000001',0,'85000000-0000-0000-0000-000000000001')).provider_state;
+SELECT record_provider_readback_evidence(
+  '86000000-0000-0000-0000-000000000001','84000000-0000-0000-0000-000000000001','EXECUTION',
+  clock_timestamp()-interval '5 seconds',clock_timestamp()+interval '5 seconds','external-1','https://x.example/external-1','public',true,
+  '80000000-0000-0000-0000-000000000003','callscore-provider-readback'
+);
+SELECT (record_provider_result(
+  '84000000-0000-0000-0000-000000000001',1,'85000000-0000-0000-0000-000000000001','SUBMITTED','fixture_submitted',repeat('3',64),
+  'external-1','https://x.example/external-1','80000000-0000-0000-0000-000000000003'
+)).provider_state;
+SELECT record_provider_readback_evidence(
+  '86000000-0000-0000-0000-000000000002','84000000-0000-0000-0000-000000000001','READBACK',
+  clock_timestamp()-interval '5 seconds',clock_timestamp()+interval '5 seconds','external-1','https://x.example/external-1','public',true,
+  '80000000-0000-0000-0000-000000000004','callscore-provider-readback'
+);
+SELECT (record_provider_result(
+  '84000000-0000-0000-0000-000000000001',2,'85000000-0000-0000-0000-000000000001','VERIFIED','fixture_verified',repeat('4',64),
+  'external-1','https://x.example/external-1','80000000-0000-0000-0000-000000000004'
+)).provider_state;
+SELECT (transition_autonomy_workflow('00000000-0000-0000-0000-000000000001','READY','EXECUTING',7,'00000000-0000-0000-0000-000000000204','fixture_execute')).state_version;
+SELECT (transition_autonomy_workflow('00000000-0000-0000-0000-000000000001','EXECUTING','PROVIDER_VERIFIED',8,'00000000-0000-0000-0000-000000000204','fixture_provider_verified')).state_version;
+SELECT (transition_autonomy_workflow('00000000-0000-0000-0000-000000000001','PROVIDER_VERIFIED','OUTCOME_PENDING',9,'00000000-0000-0000-0000-000000000204','fixture_outcome_pending')).state_version;
+SELECT record_outcome_measurement(
+  '87000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001',
+  '84000000-0000-0000-0000-000000000001',
+  'engagement_rate',0.25,100,clock_timestamp()-interval '1 day',clock_timestamp(),
+  '80000000-0000-0000-0000-000000000004',repeat('4',64),'{"source":"fixture_readback"}'
+);
+SELECT record_autonomy_artifact('88000000-0000-0000-0000-000000000001','learning_event.v1','/srv/agents/hermes/profiles/callscore/runtime/children/learning-event.json',repeat('1',64),100,'application/json','callscore-learning-agent','callscore-learning-verifier');
+SELECT record_autonomy_artifact('88000000-0000-0000-0000-000000000002','agent_performance_ledger.v1','/srv/agents/hermes/profiles/callscore/runtime/children/performance-ledger.json',repeat('2',64),100,'application/json','callscore-learning-agent','callscore-learning-verifier');
+SELECT record_autonomy_artifact('88000000-0000-0000-0000-000000000003','learning_delta.v1','/srv/agents/hermes/profiles/callscore/runtime/children/learning-delta.json',repeat('3',64),100,'application/json','callscore-learning-agent','callscore-learning-verifier');
+SELECT record_autonomy_artifact('88000000-0000-0000-0000-000000000004','experiment_result.v1','/srv/agents/hermes/profiles/callscore/runtime/children/experiment-result.json',repeat('4',64),100,'application/json','callscore-learning-agent','callscore-learning-verifier');
+SELECT record_autonomy_artifact('89000000-0000-0000-0000-000000000001','json_schema_validation_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/learning-validation-1.json',repeat('5',64),100,'application/json','callscore-schema-validator','callscore-learning-verifier');
+SELECT record_autonomy_artifact('89000000-0000-0000-0000-000000000002','json_schema_validation_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/learning-validation-2.json',repeat('6',64),100,'application/json','callscore-schema-validator','callscore-learning-verifier');
+SELECT record_autonomy_artifact('89000000-0000-0000-0000-000000000003','json_schema_validation_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/learning-validation-3.json',repeat('7',64),100,'application/json','callscore-schema-validator','callscore-learning-verifier');
+SELECT record_autonomy_artifact('89000000-0000-0000-0000-000000000004','json_schema_validation_receipt','/srv/agents/hermes/profiles/callscore/runtime/children/learning-validation-4.json',repeat('8',64),100,'application/json','callscore-schema-validator','callscore-learning-verifier');
+SELECT record_canonical_learning_set(
+  '00000000-0000-0000-0000-000000000001','87000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001',
+  ARRAY['88000000-0000-0000-0000-000000000001','88000000-0000-0000-0000-000000000002','88000000-0000-0000-0000-000000000003','88000000-0000-0000-0000-000000000004']::uuid[],
+  ARRAY(
+    SELECT jsonb_build_object(
+      'schema',s,'workflow_id',g.workflow_id,'measurement_id',m.measurement_id,'generation_id',g.generation_id,
+      'agent_id',g.producer_agent_id,'channel',g.channel,'prompt_name',g.prompt_name,'prompt_version',g.prompt_version,
+      'prompt_sha256',g.prompt_sha256,'model',g.model,'provider',g.provider,'parameters',g.parameters,
+      'experiment_id',g.experiment_id,'cohort_id',g.cohort_id,'variant_id',g.variant_id,
+      'publication_id',m.publication_id,'source_artifact_id',m.source_artifact_id,'source_sha256',m.source_sha256,
+      'registry_version',g.registry_version,'evaluator_weighted_score',q.weighted_score
+    )
+    FROM unnest(ARRAY['learning_event.v1','agent_performance_ledger.v1','learning_delta.v1','experiment_result.v1']) s
+    CROSS JOIN generation_provenance g CROSS JOIN outcome_measurements m CROSS JOIN quality_evaluations q
+    WHERE g.generation_id='70000000-0000-0000-0000-000000000001'
+      AND m.measurement_id='87000000-0000-0000-0000-000000000001'
+      AND q.evaluation_id='71000000-0000-0000-0000-000000000001'
+  ),
+  ARRAY['89000000-0000-0000-0000-000000000001','89000000-0000-0000-0000-000000000002','89000000-0000-0000-0000-000000000003','89000000-0000-0000-0000-000000000004']::uuid[]
+);
+SELECT (transition_autonomy_workflow('00000000-0000-0000-0000-000000000001','OUTCOME_PENDING','OUTCOME_MEASURED',10,'00000000-0000-0000-0000-000000000204','fixture_outcome_measured')).state_version;
+SELECT (transition_autonomy_workflow('00000000-0000-0000-0000-000000000001','OUTCOME_MEASURED','LEARNING_RECORDED',11,'00000000-0000-0000-0000-000000000204','fixture_learning_recorded')).state_version;
+SELECT (transition_autonomy_workflow('00000000-0000-0000-0000-000000000001','LEARNING_RECORDED','COMPLETE',12,'00000000-0000-0000-0000-000000000204','fixture_complete')).state_version;
+RESET ROLE;
+
+DO $$
+BEGIN
+  BEGIN
+    UPDATE channel_tasks SET status='running' WHERE id='01000000-0000-0000-0000-000000000001';
+    RAISE EXCEPTION 'legacy reactivation unexpectedly succeeded';
+  EXCEPTION WHEN SQLSTATE '55000' THEN NULL;
+  END;
+  IF (SELECT workflow_state FROM autonomy_workflows WHERE workflow_id='00000000-0000-0000-0000-000000000001')<>'COMPLETE'
+     OR (SELECT count(*) FROM autonomy_workflow_lease_events WHERE workflow_id='00000000-0000-0000-0000-000000000001')<3
+     OR (SELECT provider_state FROM provider_operations WHERE operation_id='84000000-0000-0000-0000-000000000001')<>'VERIFIED'
+     OR (SELECT count(*) FROM canonical_learning_artifacts WHERE workflow_id='00000000-0000-0000-0000-000000000001')<>4 THEN
+    RAISE EXCEPTION 'full owned-public executable lifecycle probe failed';
+  END IF;
+END;
+$$;
+
+-- Exercise the ambiguous-dispatch fail-closed path and explicit absence-confirmed reclaim.
+INSERT INTO provider_operation_intents(
+  intent_id,workflow_id,sequence_no,publication_revision,account_scope_hash,mutation_family,provider_tool,action_name,
+  payload_artifact_id,payload_sha256,is_media,is_youtube,rollback_artifact_id,expires_at
+) SELECT '83000000-0000-0000-0000-000000000002',workflow_id,2,publication_revision,account_scope_hash,mutation_family,
+  provider_tool,'create_probe_unknown',payload_artifact_id,payload_sha256,is_media,is_youtube,rollback_artifact_id,clock_timestamp()+interval '10 minutes'
+  FROM provider_operation_intents WHERE intent_id='83000000-0000-0000-0000-000000000001';
+INSERT INTO external_action_grants(
+  grant_id,workflow_id,intent_id,sequence_no,authority_source,policy_snapshot_id,account_scope_hash,mutation_family,
+  provider_tool,action_name,publication_revision,payload_sha256,issued_by_role,issued_at,expires_at
+) SELECT '83000000-0000-0000-0000-000000000003',workflow_id,'83000000-0000-0000-0000-000000000002',2,authority_source,
+  policy_snapshot_id,account_scope_hash,mutation_family,provider_tool,'create_probe_unknown',publication_revision,payload_sha256,
+  issued_by_role,clock_timestamp(),clock_timestamp()+interval '10 minutes'
+  FROM external_action_grants WHERE intent_id='83000000-0000-0000-0000-000000000001';
+INSERT INTO provider_operations(
+  operation_id,workflow_id,intent_id,authority_grant_id,account_scope_hash,provider_tool,action_name,publication_revision,
+  payload_sha256,idempotency_key,provider_state,state_version,lease_owner,lease_token,lease_generation,lease_expires_at
+) SELECT '84000000-0000-0000-0000-000000000002',workflow_id,'83000000-0000-0000-0000-000000000002',
+  '83000000-0000-0000-0000-000000000003',account_scope_hash,provider_tool,'create_probe_unknown',publication_revision,
+  payload_sha256,repeat('8',64),'CLAIMED',0,'stale-worker','85000000-0000-0000-0000-000000000002',1,clock_timestamp()-interval '1 second'
+  FROM provider_operation_intents WHERE intent_id='83000000-0000-0000-0000-000000000002';
+INSERT INTO provider_operation_events(event_id,operation_id,sequence_no,from_state,to_state,controlled_reason_code)
+VALUES(gen_random_uuid(),'84000000-0000-0000-0000-000000000002',1,'INTENT','CLAIMED','fixture_initial_claim');
+INSERT INTO provider_operation_lease_events(
+  lease_event_id,operation_id,sequence_no,lease_generation,prior_lease_owner,lease_owner,lease_token,lease_expires_at,controlled_reason_code
+) VALUES (
+  gen_random_uuid(),'84000000-0000-0000-0000-000000000002',1,1,NULL,'stale-worker',
+  '85000000-0000-0000-0000-000000000002',clock_timestamp()-interval '1 second','fixture_initial_lease'
+);
+SET LOCAL ROLE callscore_plan_runtime;
+SELECT (reclaim_provider_claim('84000000-0000-0000-0000-000000000002',0,'fixture-provider-reclaimer','85000000-0000-0000-0000-000000000003')).lease_generation;
+SELECT (mark_provider_dispatching('84000000-0000-0000-0000-000000000002',0,'85000000-0000-0000-0000-000000000003')).provider_state;
+RESET ROLE;
+UPDATE provider_operations SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE operation_id='84000000-0000-0000-0000-000000000002';
+SET LOCAL ROLE callscore_plan_runtime;
+SELECT (reconcile_ambiguous_provider_dispatch('84000000-0000-0000-0000-000000000002',1,'fixture_crash_after_dispatch')).provider_state;
+SELECT record_provider_readback_evidence(
+  '86000000-0000-0000-0000-000000000003','84000000-0000-0000-0000-000000000002','ABSENCE',
+  clock_timestamp()-interval '5 seconds',clock_timestamp()+interval '5 seconds',NULL,NULL,NULL,false,
+  '80000000-0000-0000-0000-000000000005','callscore-provider-readback'
+);
+SELECT (confirm_provider_not_performed('84000000-0000-0000-0000-000000000002',2,'80000000-0000-0000-0000-000000000005','fixture_absence_verified')).provider_state;
+SELECT (reclaim_confirmed_not_performed('84000000-0000-0000-0000-000000000002',3,'fixture-provider-final','85000000-0000-0000-0000-000000000004')).provider_state;
+RESET ROLE;
+
+-- High-risk authority functions must be runtime-callable and fail closed on insufficient evidence.
+SET LOCAL ROLE callscore_plan_runtime;
+DO $$
+BEGIN
+  BEGIN
+    PERFORM record_artifact_revision(
+      '90000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001',
+      '70000000-0000-0000-0000-000000000001','71000000-0000-0000-0000-000000000001',
+      '70000000-0000-0000-0000-000000000002','["fixture_negative_revision"]'
+    );
+    RAISE EXCEPTION 'invalid revision unexpectedly accepted';
+  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+  END;
+  BEGIN
+    PERFORM promote_runtime_variant(
+      '60000000-0000-0000-0000-000000000001',1,
+      '70000000-0000-0000-0000-000000000002','70000000-0000-0000-0000-000000000002'
+    );
+    RAISE EXCEPTION 'underpowered/self-reviewed promotion unexpectedly accepted';
+  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+  END;
+  BEGIN
+    PERFORM rollback_runtime_variant(
+      '60000000-0000-0000-0000-000000000001',1,'87000000-0000-0000-0000-000000000001'
+    );
+    RAISE EXCEPTION 'rollback without prior promotion unexpectedly accepted';
+  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+  END;
+END;
+$$;
+RESET ROLE;
+
+SET LOCAL ROLE callscore_plan_report_verifier;
+DO $$
+BEGIN
+  BEGIN
+    PERFORM insert_verified_autonomy_report(
+      '99000000-0000-0000-0000-000000000001','fixture-report-stream',1,
+      repeat('a',40),repeat('b',40),repeat('d',40),repeat('e',64),repeat('f',64),repeat('0',64),
+      'sha256:'||repeat('1',64),repeat('2',64),repeat('c',64),
+      '88000000-0000-0000-0000-000000000001',repeat('1',64),'fixture-report-producer','fixture-report-verifier',
+      '88000000-0000-0000-0000-000000000002',repeat('2',64),true,'[]',
+      '84000000-0000-0000-0000-000000000001','80000000-0000-0000-0000-000000000004',
+      '80000000-0000-0000-0000-000000000005','88000000-0000-0000-0000-000000000004'
+    );
+    RAISE EXCEPTION 'generic artifacts unexpectedly satisfied final PASS';
+  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+  END;
+END;
+$$;
+RESET ROLE;
 
 -- Execute the statistics function even for an empty experiment ID so PostgreSQL validates its return contract.
 SET LOCAL ROLE callscore_plan_runtime;
@@ -2146,5 +2938,5 @@ SELECT count(*) AS empty_statistics_rows
 FROM compute_runtime_experiment_statistics('30000000-0000-0000-0000-000000000001');
 RESET ROLE;
 
-SELECT 'autonomy_contract_v3_passed' AS result;
+SELECT 'autonomy_contract_v4_passed' AS result;
 ROLLBACK;
