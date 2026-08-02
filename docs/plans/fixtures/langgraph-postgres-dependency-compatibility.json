@@ -1,0 +1,28 @@
+{
+  "schema": "callscore.langgraph_postgres_dependency_compatibility.v1",
+  "checked_at": "2026-08-02T01:20:00+01:00",
+  "project_versions": {
+    "@langchain/core": "^1.2.1",
+    "@langchain/langgraph": "^1.4.5",
+    "pg": "^8.21.0",
+    "zod": "^4.4.3",
+    "node_engine": "20.x"
+  },
+  "candidate": {
+    "package": "@langchain/langgraph-checkpoint-postgres",
+    "version": "1.0.4",
+    "peerDependencies": {
+      "@langchain/core": "^1.1.44",
+      "@langchain/langgraph-checkpoint": "^1.0.0"
+    },
+    "dependencies": {
+      "pg": "^8.12.0"
+    },
+    "engines": {
+      "node": ">=18"
+    }
+  },
+  "installed_langgraph_checkpoint_dependency": "@langchain/langgraph-checkpoint@^1.1.2",
+  "result": "SEMVER_COMPATIBLE_FOR_INSTALL_SPIKE",
+  "next_gate": "Phase B must run npm install in the isolated worktree, inspect the lockfile diff, import PostgresSaver, compile, and run a disposable PostgreSQL setup/resume test before accepting the dependency."
+}

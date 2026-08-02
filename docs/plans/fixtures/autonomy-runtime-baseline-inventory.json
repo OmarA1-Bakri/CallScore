@@ -1,0 +1,145 @@
+{
+  "schema": "callscore.autonomy_runtime_baseline_inventory.v1",
+  "observed_at": "2026-08-02T01:17:00+01:00",
+  "app": {
+    "base_sha": "22993a5537c9b677e25f6454f9f72c52179fc493",
+    "current_plan_sha": "10129ae81e3f1eac385292ced0cedc5c8390129d",
+    "branch": "feat/callscore-autonomous-langgraph-completion-20260802",
+    "worktree": "/home/omar/callscore-worktrees/autonomous-langgraph-completion-20260802"
+  },
+  "workplane": {
+    "base_sha": "99d1b9ce008557b82163ff4c799ff8087ccb97a9",
+    "origin_master_sha": "99d1b9ce008557b82163ff4c799ff8087ccb97a9",
+    "dirty_checkout_policy": "evidence-only; do not edit, clean, stash, or delete",
+    "dirty_paths": [
+      "infra/hermes-runtime-scripts/callscore-cmo-source-audit.py",
+      "infra/hermes-runtime-scripts/callscore-graph-owned-publish-invoker.sh",
+      "__pycache__/",
+      "hh_advance_wp4_to_wp5.py",
+      "hh_close_wp4_card.py",
+      "hh_evaluate_guarded_holdout.py",
+      "hh_qwen_recall_green.py.bak.20260713T050729Z",
+      "hh_qwen_v2_holdout_launch.py",
+      "hh_qwen_v2_holdout_run.py",
+      "hh_run_guarded_evaluator.py",
+      "hh_wp10_stage_review_commit.py.bak.20260713T033426Z",
+      "hh_wp10_stage_review_commit.py.bak.20260713T033445Z",
+      "hh_wp8_raw_smoke_probe.ts",
+      "hh_wp8_raw_smoke_probe.ts.bak.20260713T013220Z",
+      "hh_wp8_run_qwen_baseline.py.bak.20260713T011756Z",
+      "hh_wp8_sample_private_candidates.py.bak.20260713T010606Z",
+      "hh_wp8_stage_review_commit.py",
+      "receipts/call-admission-v2/",
+      "receipts/storage-cleanup/"
+    ],
+    "implementation_worktree": "/home/omar/callscore-worktrees/workplane-autonomous-langgraph-completion-20260802"
+  },
+  "services": [
+    {
+      "scope": "system",
+      "unit": "hermes-gateway.service",
+      "unit_file_state": "disabled",
+      "active_state": "inactive",
+      "sub_state": "dead"
+    },
+    {
+      "scope": "system",
+      "unit": "hermes-worker.service",
+      "unit_file_state": "enabled",
+      "active_state": "active",
+      "sub_state": "exited"
+    },
+    {
+      "scope": "system",
+      "unit": "callscore-enqueue.service",
+      "unit_file_state": "enabled",
+      "active_state": "active",
+      "sub_state": "running"
+    },
+    {
+      "scope": "user",
+      "unit": "hermes-callscore-gateway.service",
+      "unit_file_state": "enabled",
+      "active_state": "failed",
+      "sub_state": "failed"
+    },
+    {
+      "scope": "user",
+      "unit": "hermes-gateway.service",
+      "unit_file_state": "masked",
+      "active_state": "inactive",
+      "sub_state": "dead"
+    },
+    {
+      "scope": "user",
+      "unit": "hermes-gateway-callscore.service",
+      "unit_file_state": "masked",
+      "active_state": "inactive",
+      "sub_state": "dead"
+    }
+  ],
+  "unmanaged_processes": [
+    {
+      "pid_at_observation": 565296,
+      "ppid": 1,
+      "command": "/srv/agents/hermes/hermes-agent/venv/bin/python -m hermes_cli.main --profile callscore gateway run --replace",
+      "classification": "replacement for failed canonical user unit; must be identity-checked and quiesced during cutover"
+    }
+  ],
+  "workers": [
+    {
+      "compose_project": "crypto-tuber-ranked",
+      "service": "hermes-worker",
+      "worker_id": "data-pipeline-worker",
+      "authority": "pipeline jobs only"
+    },
+    {
+      "compose_project": "whop-auto",
+      "service": "channel-agent-worker",
+      "container": "whop-auto-channel-agent-worker-1",
+      "worker_id": "channel-agent-worker",
+      "authority": "legacy autonomy claimant; quiesce before activation",
+      "image_digest": "sha256:82800844c0e37e0fe97ea52a9941a853a344623a9bde82b60a3987c8d209dade"
+    }
+  ],
+  "mutation_or_claim_capable_cron_jobs": [
+    { "job_id": "8bd323116227", "name": "CallScore bounded channel-head tmux scheduler" },
+    { "job_id": "9c03a6eea969", "name": "CallScore twice-daily genuine social CMO loop" },
+    { "job_id": "144c3a9cc860", "name": "CallScore CMO cooldown catch-up watcher" },
+    { "job_id": "be1a78217918", "name": "CallScore engagement executor graph-owned" },
+    { "job_id": "4427e147e29c", "name": "callscore-zoho-inbox-monitor-graph-replies" },
+    { "job_id": "f39440513eb5", "name": "Video scheduler operating graph" },
+    { "job_id": "f2cfc2dd7a7c", "name": "CallScore engagement discovery scheduler" }
+  ],
+  "runtime_script_baseline": [
+    {
+      "path": "/srv/agents/hermes/scripts/callscore-channel-orchestrator.sh",
+      "sha256": "5436ef7dd6936322e23803cea9d326383acb152a8106d8bc85de19e83156b9f0",
+      "tracked_source_present": false
+    },
+    {
+      "path": "scripts/callscore-channel-head-scheduler.sh",
+      "sha256": "31004e57fdd30e3ac9299ebba2d6863c095942d3da7c439172af19176c24333f"
+    },
+    {
+      "path": "scripts/callscore-daily-orchestrator.sh",
+      "sha256": "f15658844b3b65bae412bb5cacd2a95309f531ceb25cb3097c20f373df664bcb"
+    },
+    {
+      "path": "scripts/cs-channel-wrapper.sh",
+      "sha256": "3f7212e5da81a7552f7175551da1a4f8def600c31af69e28e52b48e9409e3e68"
+    },
+    {
+      "path": "/srv/agents/repos/callscore-workplane/infra/hermes-runtime-scripts/callscore-engagement-executor.sh",
+      "sha256": "4f46f5a8dbf08fcaeecf1164b3b6ea789e31885c9d1949d5ffd47f3600e3a09d"
+    },
+    {
+      "path": "/srv/agents/repos/callscore-workplane/infra/hermes-runtime-scripts/callscore-genuine-social-packet.sh",
+      "sha256": "0594279497b492b6d5f72a28e1049245d348b6670a45e50ec6be492af7ed8972"
+    },
+    {
+      "path": "/srv/agents/repos/callscore-workplane/infra/hermes-runtime-scripts/callscore-cmo-finalizer.sh",
+      "sha256": "956dc1d0b671d07de36b927289166692794f8330b2daf53a62555e061fde2807"
+    }
+  ]
+}

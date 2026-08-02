@@ -1,0 +1,25 @@
+{
+  "schema": "callscore.autonomy_contract_spike_receipt.v1",
+  "tested_at": "2026-08-02T01:13:00+01:00",
+  "fixture_path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract.sql",
+  "fixture_sha256": "4dad57cc29822d8f1a4c0fd366e1c339b86701d2934094583461ca23583ee101",
+  "database": {
+    "engine": "PostgreSQL",
+    "major_version": 18,
+    "target": "local socket / disposable schema in one transaction",
+    "production_database_used": false
+  },
+  "command": "sudo -n -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f docs/plans/fixtures/025-callscore-autonomous-supervisor-contract.sql",
+  "exit_code": 0,
+  "asserted_result": "autonomy_contract_spike_passed",
+  "transaction_end": "ROLLBACK",
+  "durable_objects_left_by_spike": false,
+  "adversarial_probes": [
+    "append-only UPDATE denied",
+    "append-only DELETE denied",
+    "projection parent DELETE denied",
+    "lease coherence violation denied",
+    "duplicate transition version denied"
+  ],
+  "secret_values_recorded": false
+}

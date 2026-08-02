@@ -1,0 +1,40 @@
+{
+  "schema": "callscore.autonomy_plan_artifact_manifest.v2",
+  "artifacts": [
+    {
+      "path": "docs/plans/2026-08-02-callscore-autonomous-langgraph-completion-v2.md",
+      "bytes": 43488,
+      "sha256": "fddeda6b43d59205d45a6674a7dce6f8e0c2e6a4fc58b0c7d09fa28bef41f21f"
+    },
+    {
+      "path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract.sql",
+      "bytes": 25494,
+      "sha256": "4dad57cc29822d8f1a4c0fd366e1c339b86701d2934094583461ca23583ee101"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-contract-spike-receipt.json",
+      "bytes": 1014,
+      "sha256": "d61e1114d66024d0d8e3375e560102e69ccf4f4229dec7ad5f95c00a28cdc28b"
+    },
+    {
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-receipt.json",
+      "bytes": 1407,
+      "sha256": "74a9841cfd1a6877857c299dab2e135630985f8af77269c011d5e423cf5bc6e8"
+    },
+    {
+      "path": "docs/plans/fixtures/callscore-autonomy-implementation-report.schema.json",
+      "bytes": 7645,
+      "sha256": "f46d20131454ab65b98a05b110a9b3070659f26dcb6e249cc8ad1ef7d4ac073f"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-runtime-baseline-inventory.json",
+      "bytes": 5656,
+      "sha256": "b4dcf7d164ec8aa3ba007b3e24b894d23962d41ae31d30e18f8a73f2a93b311f"
+    },
+    {
+      "path": "docs/plans/fixtures/langgraph-postgres-dependency-compatibility.json",
+      "bytes": 961,
+      "sha256": "4fa474d34a0801a5b95c41a4d54189572f7f5f402d57b622e6c29fe0013f970b"
+    }
+  ]
+}

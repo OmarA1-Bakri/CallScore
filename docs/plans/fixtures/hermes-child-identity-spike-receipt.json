@@ -1,0 +1,48 @@
+{
+  "schema": "callscore.hermes_child_identity_spike.v1",
+  "tested_at": "2026-08-02T01:07:15+01:00",
+  "command_contract": {
+    "binary": "/home/omar/.local/bin/hermes",
+    "profile": "callscore",
+    "provider": "openrouter",
+    "model": "amazon/nova-micro-v1",
+    "toolsets": [
+      "context_engine"
+    ],
+    "resolved_tools": [],
+    "usage_file": "/tmp/callscore-hermes-child-usage.json",
+    "mode": "one-shot",
+    "environment_allowlist": [
+      "HOME",
+      "USER",
+      "PATH",
+      "HERMES_HOME",
+      "HERMES_PROFILE",
+      "OPENROUTER_API_KEY"
+    ],
+    "secret_values_recorded": false
+  },
+  "process_exit_code": 0,
+  "stdout_exact": "CHILD_HANDLE_OK",
+  "usage_file_fields": {
+    "session_id": "20260802_010715_716abd",
+    "model": "amazon/nova-micro-v1",
+    "provider": "openrouter",
+    "completed": true,
+    "failed": false,
+    "api_calls": 1
+  },
+  "assertions": {
+    "usage_file_exists": true,
+    "usage_file_completed": true,
+    "usage_file_failed_false": true,
+    "machine_recorded_session_id_nonempty": true,
+    "no_child_tools_exposed": true,
+    "exact_output_received": true,
+    "exit_code_alone_treated_as_success": false
+  },
+  "notes": [
+    "The production child runner must validate usage-file fields and the output schema independently.",
+    "The LLM credential is passed through an explicit environment allowlist; its value is not recorded."
+  ]
+}

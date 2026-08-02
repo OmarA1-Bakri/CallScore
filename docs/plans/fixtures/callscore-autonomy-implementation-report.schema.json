@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://call-score.com/schemas/callscore.autonomy_implementation_report.v1.json",
+  "title": "CallScore autonomy implementation report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "report_id",
+    "generated_at",
+    "implementation_tuple",
+    "phase_gates",
+    "live_activation",
+    "proofs",
+    "security",
+    "final_status",
+    "blockers"
+  ],
+  "properties": {
+    "schema": {
+      "const": "callscore.autonomy_implementation_report.v1"
+    },
+    "report_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "implementation_tuple": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app_base_sha",
+        "app_final_sha",
+        "app_origin_sha",
+        "workplane_base_sha",
+        "workplane_final_sha",
+        "workplane_origin_sha",
+        "runtime_script_manifest_sha256",
+        "worker_image_digest",
+        "graph_source_sha256",
+        "prompt_registry_version",
+        "migration_ids"
+      ],
+      "properties": {
+        "app_base_sha": { "$ref": "#/$defs/gitSha" },
+        "app_final_sha": { "$ref": "#/$defs/gitSha" },
+        "app_origin_sha": { "$ref": "#/$defs/gitSha" },
+        "workplane_base_sha": { "$ref": "#/$defs/gitSha" },
+        "workplane_final_sha": { "$ref": "#/$defs/gitSha" },
+        "workplane_origin_sha": { "$ref": "#/$defs/gitSha" },
+        "runtime_script_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "worker_image_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "graph_source_sha256": { "$ref": "#/$defs/sha256" },
+        "prompt_registry_version": { "type": "string", "minLength": 1 },
+        "migration_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "phase_gates": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase", "commit_sha", "origin_sha", "test_receipt_ids", "review_receipt_ids", "status"],
+        "properties": {
+          "phase": { "type": "string", "pattern": "^[A-J]$" },
+          "commit_sha": { "$ref": "#/$defs/gitSha" },
+          "origin_sha": { "$ref": "#/$defs/gitSha" },
+          "test_receipt_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "review_receipt_ids": { "type": "array", "minItems": 3, "items": { "type": "string" } },
+          "status": { "const": "PASS" }
+        }
+      }
+    },
+    "live_activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approved", "quiesce_receipt_id", "before_inventory_artifact_id", "after_inventory_artifact_id", "service_changes", "cron_changes", "rollback_target", "rollback_drill_receipt_id"],
+      "properties": {
+        "approved": { "type": "boolean" },
+        "quiesce_receipt_id": { "type": "string", "minLength": 1 },
+        "before_inventory_artifact_id": { "type": "string", "minLength": 1 },
+        "after_inventory_artifact_id": { "type": "string", "minLength": 1 },
+        "service_changes": { "type": "array", "items": { "$ref": "#/$defs/change" } },
+        "cron_changes": { "type": "array", "items": { "$ref": "#/$defs/change" } },
+        "rollback_target": { "type": "object" },
+        "rollback_drill_receipt_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "proofs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "migration",
+        "checkpoint_recovery",
+        "child_identity_join",
+        "quality_revision",
+        "provider_reconciliation",
+        "outcome_lineage",
+        "learning_artifacts",
+        "promotion_activation_rollback",
+        "single_authority",
+        "runtime_attestation",
+        "product_pipeline_scoring_api_website",
+        "owned_public_canary"
+      ],
+      "properties": {
+        "migration": { "$ref": "#/$defs/proof" },
+        "checkpoint_recovery": { "$ref": "#/$defs/proof" },
+        "child_identity_join": { "$ref": "#/$defs/proof" },
+        "quality_revision": { "$ref": "#/$defs/proof" },
+        "provider_reconciliation": { "$ref": "#/$defs/proof" },
+        "outcome_lineage": { "$ref": "#/$defs/proof" },
+        "learning_artifacts": { "$ref": "#/$defs/proof" },
+        "promotion_activation_rollback": { "$ref": "#/$defs/proof" },
+        "single_authority": { "$ref": "#/$defs/proof" },
+        "runtime_attestation": { "$ref": "#/$defs/proof" },
+        "product_pipeline_scoring_api_website": { "$ref": "#/$defs/proof" },
+        "owned_public_canary": { "$ref": "#/$defs/canaryProof" }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secret_scan", "append_only_acl_probe", "authority_forgery_probe", "restricted_lane_probe", "provider_duplicate_probe"],
+      "properties": {
+        "secret_scan": { "$ref": "#/$defs/proof" },
+        "append_only_acl_probe": { "$ref": "#/$defs/proof" },
+        "authority_forgery_probe": { "$ref": "#/$defs/proof" },
+        "restricted_lane_probe": { "$ref": "#/$defs/proof" },
+        "provider_duplicate_probe": { "$ref": "#/$defs/proof" }
+      }
+    },
+    "final_status": {
+      "enum": ["PASS", "BLOCKED", "FAIL"]
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "detail", "next_safe_action"],
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "detail": { "type": "string", "minLength": 1 },
+          "next_safe_action": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "before", "after", "receipt_id"],
+      "properties": {
+        "identity": { "type": "string" },
+        "before": { "type": "string" },
+        "after": { "type": "string" },
+        "receipt_id": { "type": "string" }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "producer", "verifier", "artifact_id", "artifact_sha256", "command"],
+      "properties": {
+        "status": { "const": "PASS" },
+        "producer": { "type": "string", "minLength": 1 },
+        "verifier": { "type": "string", "minLength": 1 },
+        "artifact_id": { "type": "string", "minLength": 1 },
+        "artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "command": { "type": "string", "minLength": 1 }
+      }
+    },
+    "canaryProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "graph_task_id", "provider_operation_id", "readback_artifact_id", "required_receipt_ids", "rollback_receipt_id"],
+      "properties": {
+        "status": { "enum": ["PASS", "BLOCKED_BY_GRAPH"] },
+        "graph_task_id": { "type": "string", "minLength": 1 },
+        "provider_operation_id": { "type": ["string", "null"] },
+        "readback_artifact_id": { "type": ["string", "null"] },
+        "required_receipt_ids": { "type": "array", "minItems": 6, "items": { "type": "string" } },
+        "rollback_receipt_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
