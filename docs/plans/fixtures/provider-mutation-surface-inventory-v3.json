@@ -1,0 +1,70 @@
+{
+  "schema": "callscore.provider_mutation_surface_inventory.v3",
+  "source_commit": "c435c49a3aafcd7de63a74988d68ea6d64b3006c",
+  "search_contract": {
+    "root": "src",
+    "file_glob": "*.ts",
+    "patterns": [
+      "evaluateExternalMutationRequest(",
+      "finalizeExternalMutationReceipt(",
+      "executeGraphOwnedProviderMutation(",
+      "__callscore_mode",
+      "approved: true",
+      "--approved"
+    ],
+    "acceptance": "A Phase E inventory test must reproduce this complete path set and fail on any unclassified added or omitted match."
+  },
+  "surfaces": [
+    {
+      "path": "src/lib/workplane/external-mutation-guard.ts",
+      "classification": "policy_guard_definition",
+      "required_disposition": "Keep validation-only logic, but remove caller-asserted authority. Every live mutation decision must resolve an unexpired, unrevoked, exact composite-bound database grant."
+    },
+    {
+      "path": "src/lib/workplane/external-mutation-schemas.ts",
+      "classification": "caller_authority_schema",
+      "required_disposition": "Remove approval booleans and caller receipt strings as authority-bearing inputs; add exact provider operation and grant identity schemas."
+    },
+    {
+      "path": "src/lib/workplane/node-wrappers/graph-owned-provider-adapter.ts",
+      "classification": "canonical_provider_adapter",
+      "required_disposition": "Become the sole provider mutation adapter. It must create/claim a provider operation, persist DISPATCHING immediately before network bytes may be sent, record response, and perform independent readback."
+    },
+    {
+      "path": "src/lib/workplane/node-wrappers/external-mutation-node-utils.ts",
+      "classification": "legacy_node_mutation_wrapper",
+      "required_disposition": "Route all live mutations through the canonical provider adapter; prohibit direct guard-finalize success."
+    },
+    {
+      "path": "src/video/composio/mcp-youtube-publisher.ts",
+      "classification": "youtube_mcp_mutation",
+      "required_disposition": "Remove approved:true authority and call only through an exact database-grant-bound provider operation."
+    },
+    {
+      "path": "src/video/composio/composio-client.ts",
+      "classification": "composio_transport_mutation",
+      "required_disposition": "Remove approved:true authority. Reject mutation calls without canonical adapter operation context and DISPATCHING boundary."
+    },
+    {
+      "path": "src/video/composio/youtube-publisher.ts",
+      "classification": "youtube_publisher_mutation",
+      "required_disposition": "Remove approved:true authority and route upload/readback through the canonical provider adapter."
+    },
+    {
+      "path": "src/scripts/hermes-worker.ts",
+      "classification": "imperative_worker_authority",
+      "required_disposition": "Delete caller-generated approval receipt IDs and imperative approved:true dispatch. Worker may enqueue/watchdog only and must call graph/database authority functions."
+    },
+    {
+      "path": "src/scripts/callscore-operating-goal.ts",
+      "classification": "caller_flag_authority",
+      "required_disposition": "Remove --approved as an authority source. A CLI mode may request execution but only an independently minted exact database grant can authorize it."
+    }
+  ],
+  "required_negative_tests": [
+    "No source path outside the canonical provider adapter may initiate a provider-mutating Composio action.",
+    "approved:true and --approved do not mint or imply authority.",
+    "Direct Composio client mutation without provider_operation_id and exact grant binding is rejected before network dispatch.",
+    "Any inventory search match absent from this classified list fails Phase E."
+  ]
+}

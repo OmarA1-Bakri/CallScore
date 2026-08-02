@@ -1,0 +1,115 @@
+{
+  "schema": "callscore.autonomy_runtime_baseline_inventory.v3",
+  "observed_at": "2026-08-02T02:01:37+01:00",
+  "source_path": "/srv/agents/hermes/profiles/callscore/cron/jobs.json",
+  "scheduler_proof_rule": "Cutover re-reads this protected JSON, hashes each full prompt and resolved script, and requires equality before pause; no prompt body enters receipts.",
+  "jobs": [
+    {
+      "job_id": "8bd323116227",
+      "name": "CallScore bounded channel-head tmux scheduler",
+      "enabled": true,
+      "schedule": "*/15 * * * *",
+      "workdir": "/opt/crypto-tuber-ranked",
+      "runner": "/srv/agents/hermes/scripts/callscore-channel-head-scheduler.sh",
+      "runner_sha256": "3370e12b8463c04e020684e4d1b59c4f77cdedf5e32002cd259db5e2cfb10ae6",
+      "prompt_sha256": "cb8f68b7014aa8598863d88a514747c54f397fb7cdcbe14d80e847793f5b8bb0",
+      "prompt_bytes": 392,
+      "wake_chain": ["/opt/crypto-tuber-ranked/scripts/callscore-channel-head-scheduler.sh"],
+      "cutover": "pause_then_replace_with_enqueue_wake_only"
+    },
+    {
+      "job_id": "9c03a6eea969",
+      "name": "CallScore twice-daily genuine social CMO loop",
+      "enabled": true,
+      "schedule": "0 9,17 * * *",
+      "workdir": "/opt/crypto-tuber-ranked",
+      "runner": "/srv/agents/hermes/scripts/callscore-genuine-social-packet.sh",
+      "runner_sha256": "57ba110643c18cb019edc683bc44f2a57725f56b4c941fd5a8b4fdf7561e6b28",
+      "tracked_source_sha256": "0594279497b492b6d5f72a28e1049245d348b6670a45e50ec6be492af7ed8972",
+      "prompt_sha256": "bf365e52429d09124ea3ffe87af3ba004502f5a26f2166557103f95bd21b6bf9",
+      "prompt_bytes": 3545,
+      "wake_chain": ["callscore-genuine-social-packet-impl.sh", "npm run operating:goal", "callscore-cmo-finalizer.sh"],
+      "cutover": "pause_then_replace_with_enqueue_wake_only"
+    },
+    {
+      "job_id": "144c3a9cc860",
+      "name": "CallScore CMO cooldown catch-up watcher",
+      "enabled": true,
+      "schedule": "every 5m",
+      "workdir": "/opt/crypto-tuber-ranked",
+      "runner": "/srv/agents/hermes/scripts/callscore-cmo-cooldown-catchup.sh",
+      "runner_sha256": "7873a746d48a7c3bb164f5f6307da802669f3f75f44df9236f265e57a34c3758",
+      "tracked_source_sha256": "56f0543efc232795bd9f82912ec41bde673939e044f4516281066cfcf69c6f38",
+      "prompt_sha256": "86b40a91e134ec28f898e79b8faeeb184f2cd0e0720313f10c22969fb76962c7",
+      "prompt_bytes": 393,
+      "wake_chain": ["hermes cron run 9c03a6eea969"],
+      "cutover": "pause_then_replace_with_enqueue_wake_only"
+    },
+    {
+      "job_id": "be1a78217918",
+      "name": "CallScore engagement executor graph-owned",
+      "enabled": true,
+      "schedule": "10 */2 * * *",
+      "workdir": "/opt/crypto-tuber-ranked",
+      "runner": "/srv/agents/hermes/scripts/callscore-engagement-executor.sh",
+      "runner_sha256": "4f46f5a8dbf08fcaeecf1164b3b6ea789e31885c9d1949d5ffd47f3600e3a09d",
+      "prompt_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "prompt_bytes": 0,
+      "wake_chain": ["callscore-engagement-executor-impl.py"],
+      "cutover": "pause_then_replace_with_enqueue_wake_only"
+    },
+    {
+      "job_id": "4427e147e29c",
+      "name": "callscore-zoho-inbox-monitor-graph-replies",
+      "enabled": true,
+      "schedule": "every 10m",
+      "workdir": "/opt/crypto-tuber-ranked",
+      "runner": "hermes_agent_prompt",
+      "model": "gpt-5.6-sol",
+      "provider": "openai-codex",
+      "prompt_sha256": "df42633436bb611944a266c50208facdc10caeb255a5b7d6c53ff5bb9e0e3147",
+      "prompt_bytes": 4721,
+      "wake_chain": ["agent prompt", "Composio email read/reply path"],
+      "cutover": "pause_then_replace_with_restricted_enqueue_only"
+    },
+    {
+      "job_id": "f39440513eb5",
+      "name": "Video scheduler operating graph",
+      "enabled": true,
+      "schedule": "0 8 * * *",
+      "workdir": null,
+      "runner": "/srv/agents/hermes/scripts/callscore-video-scheduler.sh",
+      "runner_sha256": "f498a821a4079932483c0cb374e452ec2d2834cfbab4381e20b7f86ae281c9ec",
+      "prompt_sha256": "f32716a07565f966519082c944710204303ca7a5d5e1f6ec301175d5ec6ae362",
+      "prompt_bytes": 529,
+      "wake_chain": ["npm run operating:goal -- --goal produce_video --mode live_owned_public"],
+      "cutover": "pause_then_replace_with_enqueue_wake_only"
+    },
+    {
+      "job_id": "f2cfc2dd7a7c",
+      "name": "CallScore engagement discovery scheduler",
+      "enabled": true,
+      "schedule": "0 */2 * * *",
+      "workdir": "/opt/crypto-tuber-ranked",
+      "runner": "/srv/agents/hermes/scripts/callscore-engagement-discovery.sh",
+      "runner_sha256": "370db57be46425d4703cf37676ce73a392c40f178df1248976b4b26c06182e8a",
+      "prompt_sha256": "f53dd3bccb5f5ec2b608f84049ba88339283ee44c38fca0277b0889b32aa5777",
+      "prompt_bytes": 539,
+      "wake_chain": ["callscore-engagement-discovery-impl.py"],
+      "cutover": "pause_then_replace_with_enqueue_wake_only"
+    }
+  ],
+  "latent_authorities": [
+    {
+      "type": "docker_compose_service",
+      "identity": "whop-auto/channel-agent-worker",
+      "image_digest": "sha256:82800844c0e37e0fe97ea52a9941a853a344623a9bde82b60a3987c8d209dade",
+      "cutover": "stop_remove_and_hide_behind_disabled_profile"
+    },
+    {
+      "type": "gateway",
+      "canonical": "user:hermes-callscore-gateway.service",
+      "forbidden": ["user:hermes-gateway.service", "user:hermes-gateway-callscore.service", "system:hermes-gateway.service"]
+    }
+  ]
+}

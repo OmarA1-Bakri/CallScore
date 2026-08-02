@@ -1,0 +1,64 @@
+{
+  "schema": "callscore.autonomy_plan_artifact_manifest.v3",
+  "generated_at": "2026-08-02T02:44:50+01:00",
+  "base_source_commit": "c435c49a3aafcd7de63a74988d68ea6d64b3006c",
+  "plan_path": "docs/plans/2026-08-02-callscore-autonomous-langgraph-completion-v3.md",
+  "artifact_count": 11,
+  "artifacts": [
+    {
+      "path": "docs/plans/2026-08-02-callscore-autonomous-langgraph-completion-v3.md",
+      "byte_length": 66650,
+      "sha256": "ac11f3e03097a9a8f986785ef8053f07f92649406ddf35c5430bf63009adb56b"
+    },
+    {
+      "path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v3.sql",
+      "byte_length": 131349,
+      "sha256": "7dc1c388de0c0ab1e77a284ac9f5b8c4f9cd607de151ed2db0646ccce0c60377"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-contract-spike-receipt-v3.json",
+      "byte_length": 2149,
+      "sha256": "b2c0f2a2c53314101a77b9942cd9dc785864f024300e85d975f705d40766357b"
+    },
+    {
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-receipt.json",
+      "byte_length": 1407,
+      "sha256": "74a9841cfd1a6877857c299dab2e135630985f8af77269c011d5e423cf5bc6e8"
+    },
+    {
+      "path": "docs/plans/fixtures/canonical-learning-artifacts.schema.json",
+      "byte_length": 7466,
+      "sha256": "c906de82ad5619180fa15fd1a5ca156f478c1b76c3f76be8348b36266297992b"
+    },
+    {
+      "path": "docs/plans/fixtures/callscore-autonomy-implementation-report-v2.schema.json",
+      "byte_length": 8476,
+      "sha256": "17423c1177b85ac41ed220dc914fd02254774cf3a32e03a5bd3f21db21b1f40a"
+    },
+    {
+      "path": "docs/plans/fixtures/verify-autonomy-final-report-contract.py",
+      "byte_length": 11657,
+      "sha256": "eef3147aa480bd8a3340adc95966c596c0eccf9d087b28ab34f0bc00188810de"
+    },
+    {
+      "path": "docs/plans/fixtures/provider-mutation-surface-inventory-v3.json",
+      "byte_length": 3703,
+      "sha256": "b3f9f2d156bc0d0512746e1edfe25f8b20adef4dee7d83e3191f35b11aa86d02"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-runtime-baseline-inventory.json",
+      "byte_length": 5656,
+      "sha256": "b4dcf7d164ec8aa3ba007b3e24b894d23962d41ae31d30e18f8a73f2a93b311f"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-runtime-baseline-inventory-v3.json",
+      "byte_length": 5454,
+      "sha256": "4e2d9f705d54ba36b69fd47510e40c3468be73e7ed5d1fcfa86444ef44447c71"
+    },
+    {
+      "path": "docs/plans/fixtures/langgraph-postgres-dependency-compatibility.json",
+      "byte_length": 961,
+      "sha256": "4fa474d34a0801a5b95c41a4d54189572f7f5f402d57b622e6c29fe0013f970b"
+    }
+  ]
+}
