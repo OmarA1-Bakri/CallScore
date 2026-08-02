@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://call-score.com/schemas/canonical-learning-artifacts.v2.json",
+  "$id": "https://call-score.com/schemas/canonical-learning-artifacts.v3.json",
   "title": "Canonical CallScore learning artifact bundle",
   "oneOf": [
     { "$ref": "#/$defs/learningEvent" },
@@ -67,19 +67,19 @@
         { "$ref": "#/$defs/provenance" },
         {
           "type": "object",
-          "required": ["schema", "period_started_at", "period_ended_at", "task_counts", "quality_metrics", "outcome_metrics", "safety_violations"],
+          "required": ["schema", "period_started_at", "period_duration_seconds", "task_counts", "quality_metrics", "outcome_metrics", "safety_violations"],
           "properties": {
             "schema": { "const": "agent_performance_ledger.v1" },
             "period_started_at": { "$ref": "#/$defs/timestamp" },
-            "period_ended_at": { "$ref": "#/$defs/timestamp" },
+            "period_duration_seconds": { "type": "integer", "minimum": 1 },
             "task_counts": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["eligible", "completed", "failed"],
+              "required": ["completed", "failed", "remaining"],
               "properties": {
-                "eligible": { "type": "integer", "minimum": 1 },
                 "completed": { "type": "integer", "minimum": 0 },
-                "failed": { "type": "integer", "minimum": 0 }
+                "failed": { "type": "integer", "minimum": 0 },
+                "remaining": { "type": "integer", "minimum": 0 }
               }
             },
             "quality_metrics": { "type": "object", "minProperties": 1 },
@@ -129,11 +129,17 @@
         { "$ref": "#/$defs/provenance" },
         {
           "type": "object",
-          "required": ["schema", "control_variant_id", "treatment_variant_id", "control_sample_size", "treatment_sample_size", "observation_days", "primary_metric", "absolute_delta", "relative_delta", "bootstrap_ci95", "safety_violations", "decision"],
+          "required": ["schema", "variant_ids", "control_sample_size", "treatment_sample_size", "observation_days", "primary_metric", "absolute_delta", "relative_delta", "bootstrap_ci95", "safety_violations", "decision"],
           "properties": {
             "schema": { "const": "experiment_result.v1" },
-            "control_variant_id": { "$ref": "#/$defs/uuid" },
-            "treatment_variant_id": { "$ref": "#/$defs/uuid" },
+            "variant_ids": {
+              "type": "array",
+              "prefixItems": [{ "$ref": "#/$defs/uuid" }, { "$ref": "#/$defs/uuid" }],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2,
+              "uniqueItems": true
+            },
             "control_sample_size": { "type": "integer", "minimum": 0 },
             "treatment_sample_size": { "type": "integer", "minimum": 0 },
             "observation_days": { "type": "integer", "minimum": 0 },
@@ -143,17 +149,30 @@
             "bootstrap_ci95": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["lower", "upper", "resamples", "seed"],
+              "required": ["lower", "width", "resamples", "seed"],
               "properties": {
                 "lower": { "type": "number" },
-                "upper": { "type": "number" },
+                "width": { "type": "number", "minimum": 0 },
                 "resamples": { "type": "integer", "minimum": 1000 },
                 "seed": { "type": "integer" }
               }
             },
             "safety_violations": { "type": "integer", "minimum": 0 },
             "decision": { "enum": ["PROMOTE", "REJECT", "ROLLBACK", "CONTINUE"] }
-          }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "decision": { "const": "PROMOTE" } }, "required": ["decision"] },
+              "then": { "properties": {
+                "control_sample_size": { "minimum": 30 },
+                "treatment_sample_size": { "minimum": 30 },
+                "observation_days": { "minimum": 14 },
+                "relative_delta": { "minimum": 0.1 },
+                "bootstrap_ci95": { "properties": { "lower": { "minimum": 0 }, "resamples": { "const": 10000 } } },
+                "safety_violations": { "const": 0 }
+              } }
+            }
+          ]
         }
       ],
       "unevaluatedProperties": false

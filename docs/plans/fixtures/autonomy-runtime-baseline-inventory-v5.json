@@ -1,5 +1,5 @@
 {
-  "schema": "callscore.autonomy_runtime_baseline_inventory.v4",
+  "schema": "callscore.autonomy_runtime_baseline_inventory.v5",
   "observed_at": "2026-08-02T02:01:37+01:00",
   "source_path": "/srv/agents/hermes/profiles/callscore/cron/jobs.json",
   "scheduler_proof_rule": "Cutover re-reads this protected JSON, hashes each full prompt and resolved script, and requires equality before pause; no prompt body enters receipts.",

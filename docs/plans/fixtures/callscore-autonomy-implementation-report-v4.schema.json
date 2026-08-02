@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://call-score.com/schemas/autonomy-implementation-report.v3.json",
+  "$id": "https://call-score.com/schemas/autonomy-implementation-report.v4.json",
   "title": "CallScore autonomy implementation evidence report",
   "type": "object",
   "additionalProperties": false,
@@ -10,7 +10,7 @@
     "live_activation", "canary", "receipts", "blockers"
   ],
   "properties": {
-    "schema": { "const": "callscore.autonomy_implementation_report.v3" },
+    "schema": { "const": "callscore.autonomy_implementation_report.v4" },
     "report_id": { "$ref": "#/$defs/uuid" },
     "generated_at": { "$ref": "#/$defs/timestamp" },
     "final_status": { "enum": ["PASS", "BLOCKED", "FAIL"] },
@@ -153,6 +153,52 @@
           "blockers": { "maxItems": 0 }
         }
       }
+    },
+    {
+      "if": { "properties": { "final_status": { "enum": ["BLOCKED", "FAIL"] } }, "required": ["final_status"] },
+      "then": { "properties": { "blockers": { "minItems": 1 } } }
+    },
+    {
+      "if": {
+        "properties": { "live_activation": { "properties": { "approved": { "const": true } }, "required": ["approved"] } },
+        "required": ["live_activation"]
+      },
+      "then": {
+        "properties": { "live_activation": { "properties": {
+          "approval_receipt": { "$ref": "#/$defs/artifact" },
+          "activated_at": { "$ref": "#/$defs/timestamp" },
+          "activation_receipt": { "$ref": "#/$defs/artifact" },
+          "rollback_deadline": { "$ref": "#/$defs/timestamp" }
+        } } }
+      },
+      "else": {
+        "properties": { "live_activation": { "properties": {
+          "approval_receipt": { "type": "null" },
+          "activated_at": { "type": "null" },
+          "activation_receipt": { "type": "null" },
+          "rollback_deadline": { "type": "null" }
+        } } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "canary": { "properties": { "status": { "const": "PASS" } }, "required": ["status"] } },
+        "required": ["canary"]
+      },
+      "then": {
+        "properties": { "canary": { "properties": {
+          "workflow_id": { "$ref": "#/$defs/uuid" },
+          "provider_operation_id": { "$ref": "#/$defs/uuid" },
+          "external_object_id": { "type": "string", "minLength": 1 },
+          "external_url": { "type": "string", "format": "uri", "minLength": 1 },
+          "execution_receipt": { "$ref": "#/$defs/artifact" },
+          "provider_readback_receipt": { "$ref": "#/$defs/artifact" },
+          "provider_object_rollback_receipt": { "$ref": "#/$defs/artifact" },
+          "runtime_variant_rollback_receipt": { "$ref": "#/$defs/artifact" },
+          "task_router_receipt": { "$ref": "#/$defs/artifact" },
+          "tool_inheritance_receipt": { "$ref": "#/$defs/artifact" }
+        } } }
+      }
     }
   ],
   "$defs": {
@@ -222,7 +268,13 @@
           "items": { "$ref": "#/$defs/review" },
           "uniqueItems": true
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "PASS" } }, "required": ["status"] },
+          "then": { "properties": { "reviews": { "items": { "properties": { "verdict": { "const": "PASS" } } } } } }
+        }
+      ]
     }
   }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evidence-only verifier contract for callscore.autonomy_implementation_report.v3.
+"""Evidence-only verifier contract for callscore.autonomy_implementation_report.v4.
 
 This is a plan fixture. Production Phase J copies the predicates into
 src/scripts/verify-callscore-autonomy-report.ts and keeps this fixture as the
@@ -211,6 +211,13 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
 
     activation = report["live_activation"]
     canary = report["canary"]
+    all_phase_gates_pass = all(
+        phases[phase]["status"] == "PASS"
+        and all(review["verdict"] == "PASS" for review in phases[phase]["reviews"])
+        for phase in PHASES
+    )
+    if report["final_status"] != "PASS" and activation["approved"] and canary["status"] == "PASS" and all_phase_gates_pass:
+        errors.append("non-PASS report contradicts fully approved all-green evidence")
     if report["final_status"] == "PASS":
         if not activation["approved"] or not activation["approval_receipt"] or not activation["activation_receipt"]:
             errors.append("PASS requires approved live activation with approval and activation receipts")
@@ -275,6 +282,13 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
             errors.append("canary readback external identity mismatch")
         if provider_rollback.get("external_url") != canary.get("external_url") or provider_rollback.get("tested_disposition") not in ("DELETED", "REVERTED"):
             errors.append("canary provider rollback was not tested against the exact object")
+        if str(readback.get("visibility", "")).lower() != "public" or not readback.get("external_url"):
+            errors.append("canary independent readback does not prove a public URL")
+
+    execution_ref = canary.get("execution_receipt")
+    readback_ref = canary.get("provider_readback_receipt")
+    if execution_ref and readback_ref and execution_ref.get("producer_agent_id") == readback_ref.get("producer_agent_id"):
+        errors.append("provider execution and provider readback producers must differ")
 
     runtime_rollback = canary_payloads.get("runtime_variant_rollback_receipt")
     if runtime_rollback and runtime_rollback.get("prior_variant_id") == runtime_rollback.get("restored_variant_id"):

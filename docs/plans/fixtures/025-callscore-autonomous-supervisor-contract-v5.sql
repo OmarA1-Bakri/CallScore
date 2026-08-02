@@ -417,6 +417,8 @@ CREATE TABLE runtime_experiments (
   minimum_provider_verification_rate numeric(8,5) NOT NULL CHECK (minimum_provider_verification_rate=1),
   maximum_safety_violations integer NOT NULL CHECK (maximum_safety_violations=0),
   treatment_ratio smallint NOT NULL CHECK (treatment_ratio=20),
+  bundle_sha256 char(64) NOT NULL UNIQUE CHECK (bundle_sha256 ~ '^[0-9a-f]{64}$'),
+  review_receipt_artifact_id uuid NOT NULL REFERENCES autonomy_artifacts(artifact_id) ON DELETE RESTRICT,
   starts_at timestamptz NOT NULL,
   ends_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -709,7 +711,10 @@ CREATE TABLE provider_readback_evidence (
   UNIQUE (operation_id,sequence_no),
   UNIQUE (operation_id,evidence_type,evidence_artifact_id),
   CHECK ((evidence_type='ABSENCE' AND NOT performed AND external_object_id IS NULL AND external_url IS NULL)
-      OR (evidence_type IN ('EXECUTION','READBACK') AND performed AND external_object_id IS NOT NULL)),
+      OR (evidence_type='EXECUTION' AND performed AND external_object_id IS NOT NULL)
+      OR (evidence_type='READBACK' AND performed AND external_object_id IS NOT NULL
+          AND external_url IS NOT NULL AND btrim(external_url)<>''
+          AND visibility IS NOT NULL AND lower(visibility)='public')),
   CHECK (previous_record_hash IS NULL OR octet_length(previous_record_hash)=32),
   CHECK (record_hash IS NULL OR octet_length(record_hash)=32)
 );
@@ -843,7 +848,7 @@ CREATE TABLE autonomy_final_reports (
   report_id uuid PRIMARY KEY,
   report_stream_id text NOT NULL,
   sequence_no bigint NOT NULL CHECK (sequence_no > 0),
-  report_schema text NOT NULL CHECK (report_schema='callscore.autonomy_implementation_report.v3'),
+  report_schema text NOT NULL CHECK (report_schema='callscore.autonomy_implementation_report.v4'),
   app_commit_sha char(40) NOT NULL CHECK (app_commit_sha ~ '^[0-9a-f]{40}$'),
   workplane_commit_sha char(40) NOT NULL CHECK (workplane_commit_sha ~ '^[0-9a-f]{40}$'),
   plan_commit_sha char(40) NOT NULL CHECK (plan_commit_sha ~ '^[0-9a-f]{40}$'),
@@ -1245,6 +1250,7 @@ DECLARE v_current callscore_plan_contract.autonomy_workflows; v_row callscore_pl
 BEGIN
   SELECT * INTO v_current FROM callscore_plan_contract.autonomy_workflows WHERE workflow_id=p_workflow_id FOR UPDATE;
   IF v_current.workflow_state<>p_from OR v_current.state_version<>p_expected_version OR v_current.lease_token<>p_lease_token
+     OR v_current.lease_expires_at IS NULL OR v_current.lease_expires_at<=clock_timestamp()
      OR p_from NOT IN ('CHILDREN_RUNNING','EXECUTING','PROVIDER_VERIFIED','OUTCOME_PENDING')
      OR p_retry_at<=clock_timestamp() THEN
     RAISE EXCEPTION 'retry schedule CAS/state/time predicate failed' USING ERRCODE='40001';
@@ -1341,7 +1347,8 @@ AS $$
 DECLARE v_current callscore_plan_contract.autonomy_workflows; v_updated callscore_plan_contract.autonomy_workflows; v_count integer;
 BEGIN
   SELECT * INTO v_current FROM callscore_plan_contract.autonomy_workflows WHERE workflow_id=p_workflow_id FOR UPDATE;
-  IF v_current.workflow_state<>p_from OR v_current.state_version<>p_expected_version OR v_current.lease_token<>p_lease_token THEN
+  IF v_current.workflow_state<>p_from OR v_current.state_version<>p_expected_version OR v_current.lease_token<>p_lease_token
+     OR v_current.lease_expires_at IS NULL OR v_current.lease_expires_at<=clock_timestamp() THEN
     RAISE EXCEPTION 'transition CAS/lease mismatch' USING ERRCODE='40001';
   END IF;
   IF NOT callscore_plan_contract.transition_is_allowed(v_current.execution_class,p_from,p_to) THEN
@@ -1448,6 +1455,7 @@ BEGIN
       updated_at=clock_timestamp()
   WHERE workflow_id=p_workflow_id AND state_version=p_expected_state_version
     AND lease_heartbeat_seq=p_expected_heartbeat_seq AND lease_token=p_lease_token
+    AND lease_expires_at>clock_timestamp()
     AND workflow_state NOT IN ('COMPLETE','FAILED')
   RETURNING * INTO v_row;
   IF v_row.workflow_id IS NULL THEN RAISE EXCEPTION 'heartbeat CAS/lease mismatch' USING ERRCODE='40001'; END IF;
@@ -1748,7 +1756,8 @@ AS $$
 DECLARE v_o callscore_plan_contract.provider_operations;
 BEGIN
   UPDATE callscore_plan_contract.provider_operations SET provider_state='DISPATCHING',state_version=state_version+1,updated_at=clock_timestamp()
-  WHERE operation_id=p_operation_id AND provider_state='CLAIMED' AND state_version=p_expected_version AND lease_token=p_lease_token
+  WHERE operation_id=p_operation_id AND provider_state='CLAIMED' AND state_version=p_expected_version
+    AND lease_token=p_lease_token AND lease_expires_at>clock_timestamp()
   RETURNING * INTO v_o;
   IF v_o.operation_id IS NULL THEN RAISE EXCEPTION 'dispatch boundary CAS failed' USING ERRCODE='40001'; END IF;
   INSERT INTO callscore_plan_contract.provider_operation_events(event_id,operation_id,sequence_no,from_state,to_state,controlled_reason_code,dispatch_boundary_at)
@@ -1798,7 +1807,7 @@ BEGIN
   IF v_operation.operation_id IS NULL THEN
     RAISE EXCEPTION 'final PASS requires exact VERIFIED canary/readback relation' USING ERRCODE='23514';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_report_json_artifact_id AND content_sha256=p_report_json_sha256 AND artifact_kind='autonomy_implementation_report.v3')
+  IF NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_report_json_artifact_id AND content_sha256=p_report_json_sha256 AND artifact_kind='autonomy_implementation_report.v4')
      OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_verifier_artifact_id AND content_sha256=p_verifier_sha256 AND artifact_kind='autonomy_report_verification_receipt.v1')
      OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_canary_readback_artifact_id AND artifact_kind='provider_readback_receipt')
      OR NOT EXISTS(SELECT 1 FROM callscore_plan_contract.autonomy_artifacts WHERE artifact_id=p_canary_provider_rollback_artifact_id AND artifact_kind='provider_object_rollback_receipt.v1')
@@ -1813,7 +1822,7 @@ BEGIN
     live_activation_approved,blockers,canary_status,canary_provider_operation_id,
     canary_readback_artifact_id,canary_provider_rollback_artifact_id,runtime_variant_rollback_artifact_id
   ) VALUES (
-    p_report_id,p_report_stream_id,p_sequence_no,'callscore.autonomy_implementation_report.v3',
+    p_report_id,p_report_stream_id,p_sequence_no,'callscore.autonomy_implementation_report.v4',
     p_app_commit_sha,p_workplane_commit_sha,p_plan_commit_sha,p_graph_source_sha256,p_migration_sha256,
     p_runtime_script_manifest_sha256,p_image_digest,p_prompt_manifest_sha256,p_deployment_manifest_sha256,p_report_json_artifact_id,
     p_report_json_sha256,p_producer_agent_id,p_verifier_agent_id,p_verifier_artifact_id,
@@ -2057,7 +2066,8 @@ DECLARE v_experiment_id uuid:=(p_bundle->>'experiment_id')::uuid;
         v_treatment uuid:=(p_bundle#>>'{treatment,variant_id}')::uuid;
         v_agent text:=p_bundle->>'agent_id'; v_channel text:=p_bundle->>'channel';
         v_task text:=p_bundle->>'task_type'; v_policy text:=p_bundle->>'policy_version';
-        v_review callscore_plan_contract.autonomy_artifacts;
+        v_review callscore_plan_contract.autonomy_artifacts; v_existing callscore_plan_contract.runtime_experiments;
+        v_bundle_sha256 char(64):=encode(sha256(convert_to(p_bundle::text,'UTF8')),'hex');
 BEGIN
   SELECT * INTO v_review FROM callscore_plan_contract.autonomy_artifacts
    WHERE artifact_id=p_review_receipt_artifact_id AND artifact_kind='runtime_experiment_bundle_review_receipt';
@@ -2065,18 +2075,32 @@ BEGIN
      OR p_bundle->'eligibility_contract'<>jsonb_build_object('require_terminal_complete',true,'require_outcome',true,'require_accepted_quality',true)
      OR (p_bundle->>'bootstrap_resamples')::integer<>10000 OR (p_bundle->>'minimum_control')::integer<>30
      OR (p_bundle->>'minimum_treatment')::integer<>30 OR (p_bundle->>'minimum_observation_days')::integer<>14
-     OR (p_bundle->>'treatment_ratio')::integer<>20 THEN
+     OR (p_bundle->>'treatment_ratio')::integer<>20
+     OR p_bundle->'bootstrap_contract'<>jsonb_build_object('method','percentile_bootstrap','statistic','relative_mean_delta','missing_data','exclude')
+     OR v_control=v_treatment
+     OR (p_bundle#>>'{control,cohort_id}')::uuid=(p_bundle#>>'{treatment,cohort_id}')::uuid
+     OR NULLIF(p_bundle#>>'{control,created_from_variant_id}','') IS NOT NULL
+     OR NULLIF(p_bundle#>>'{treatment,created_from_variant_id}','')::uuid IS DISTINCT FROM v_control THEN
     RAISE EXCEPTION 'reviewed experiment bundle schema/constants invalid' USING ERRCODE='23514';
   END IF;
   PERFORM pg_advisory_xact_lock(hashtextextended(v_agent||':'||v_channel||':'||v_task||':'||v_policy,0));
+  SELECT * INTO v_existing FROM callscore_plan_contract.runtime_experiments
+   WHERE experiment_id=v_experiment_id FOR UPDATE;
+  IF v_existing.experiment_id IS NOT NULL THEN
+    IF v_existing.bundle_sha256<>v_bundle_sha256
+       OR v_existing.review_receipt_artifact_id<>p_review_receipt_artifact_id THEN
+      RAISE EXCEPTION 'experiment id already binds different reviewed bundle' USING ERRCODE='23514';
+    END IF;
+    RETURN v_existing.experiment_id;
+  END IF;
   INSERT INTO callscore_plan_contract.runtime_experiments(
     experiment_id,agent_id,channel,task_type,policy_version,primary_metric,eligibility_contract,bootstrap_contract,
     bootstrap_resamples,bootstrap_seed,minimum_control,minimum_treatment,minimum_observation_days,
     minimum_outcome_relative_delta,minimum_quality_delta,minimum_ci_lower_bound,minimum_provider_verification_rate,
-    maximum_safety_violations,treatment_ratio,starts_at
+    maximum_safety_violations,treatment_ratio,bundle_sha256,review_receipt_artifact_id,starts_at
   ) VALUES(v_experiment_id,v_agent,v_channel,v_task,v_policy,p_bundle->>'primary_metric',p_bundle->'eligibility_contract',
     p_bundle->'bootstrap_contract',10000,(p_bundle->>'bootstrap_seed')::bigint,30,30,14,0.10,0.03,0,1,0,20,
-    (p_bundle->>'starts_at')::timestamptz);
+    v_bundle_sha256,p_review_receipt_artifact_id,(p_bundle->>'starts_at')::timestamptz);
   INSERT INTO callscore_plan_contract.runtime_variants(
     variant_id,experiment_id,agent_id,channel,task_type,policy_version,prompt_name,prompt_version,prompt_sha256,
     model,provider,parameters,tools_manifest_sha256,skills_manifest_sha256,created_from_variant_id,definition_sha256
@@ -2280,7 +2304,9 @@ BEGIN
      OR p_dispatch_window_started_at>v_dispatch_at OR p_dispatch_window_ended_at< v_dispatch_at
      OR p_verifier_agent_id=v_o.lease_owner
      OR (p_evidence_type='ABSENCE' AND (p_performed OR p_external_object_id IS NOT NULL OR p_external_url IS NOT NULL))
-     OR (p_evidence_type IN ('EXECUTION','READBACK') AND (NOT p_performed OR p_external_object_id IS NULL)) THEN
+     OR (p_evidence_type IN ('EXECUTION','READBACK') AND (NOT p_performed OR p_external_object_id IS NULL))
+     OR (p_evidence_type='READBACK' AND (p_external_url IS NULL OR btrim(p_external_url)=''
+         OR p_visibility IS NULL OR lower(p_visibility)<>'public')) THEN
     RAISE EXCEPTION 'provider evidence exact identity/window/independence predicate failed' USING ERRCODE='23514';
   END IF;
   SELECT COALESCE(max(sequence_no),0)+1 INTO v_seq FROM callscore_plan_contract.provider_readback_evidence WHERE operation_id=p_operation_id;
@@ -2313,7 +2339,8 @@ DECLARE v_prior callscore_plan_contract.callscore_provider_state; v_row callscor
         v_evidence callscore_plan_contract.provider_readback_evidence; v_artifact callscore_plan_contract.autonomy_artifacts; v_expected_type text;
 BEGIN
   SELECT provider_state INTO v_prior FROM callscore_plan_contract.provider_operations
-   WHERE operation_id=p_operation_id AND state_version=p_expected_version AND lease_token=p_lease_token FOR UPDATE;
+   WHERE operation_id=p_operation_id AND state_version=p_expected_version AND lease_token=p_lease_token
+     AND lease_expires_at>clock_timestamp() FOR UPDATE;
   IF v_prior IS NULL THEN RAISE EXCEPTION 'provider result CAS/lease mismatch' USING ERRCODE='40001'; END IF;
   IF NOT ((v_prior='DISPATCHING' AND p_to_state IN ('SUBMITTED','UNKNOWN','FAILED_TERMINAL'))
        OR (v_prior='SUBMITTED' AND p_to_state IN ('VERIFIED','UNKNOWN','FAILED_TERMINAL'))) THEN
@@ -2613,23 +2640,36 @@ SELECT record_autonomy_artifact(
 );
 RESET ROLE;
 SET LOCAL ROLE callscore_plan_policy_writer;
-SELECT import_runtime_experiment_bundle(
-  jsonb_build_object(
+DO $$
+DECLARE v_bundle jsonb:=jsonb_build_object(
     'schema','callscore.runtime_experiment_bundle.v1','experiment_id','60000000-0000-0000-0000-000000000001',
     'agent_id','callscore-x-head','channel','x','task_type','x_owned_post','policy_version','policy-v1',
     'primary_metric','engagement_rate',
     'eligibility_contract',jsonb_build_object('require_terminal_complete',true,'require_outcome',true,'require_accepted_quality',true),
     'bootstrap_contract',jsonb_build_object('method','percentile_bootstrap','statistic','relative_mean_delta','missing_data','exclude'),
     'bootstrap_resamples',10000,'bootstrap_seed',42,'minimum_control',30,'minimum_treatment',30,
-    'minimum_observation_days',14,'treatment_ratio',20,'starts_at',(clock_timestamp()-interval '20 days')::text,
+    'minimum_observation_days',14,'treatment_ratio',20,'starts_at','2026-07-01T00:00:00Z',
     'control',jsonb_build_object('variant_id','61000000-0000-0000-0000-000000000001','cohort_id','62000000-0000-0000-0000-000000000001',
       'prompt_name','x-head','prompt_version','v1','prompt_sha256',repeat('1',64),'model','m','provider','p','parameters','{}'::jsonb,
       'tools_manifest_sha256',repeat('2',64),'skills_manifest_sha256',repeat('3',64),'created_from_variant_id',''),
     'treatment',jsonb_build_object('variant_id','61000000-0000-0000-0000-000000000002','cohort_id','62000000-0000-0000-0000-000000000002',
       'prompt_name','x-head','prompt_version','v2','prompt_sha256',repeat('4',64),'model','m','provider','p','parameters','{}'::jsonb,
-      'tools_manifest_sha256',repeat('5',64),'skills_manifest_sha256',repeat('6',64),'created_from_variant_id','61000000-0000-0000-0000-000000000001')
-  ),'40000000-0000-0000-0000-000000000010'
-);
+      'tools_manifest_sha256',repeat('5',64),'skills_manifest_sha256',repeat('6',64),'created_from_variant_id','61000000-0000-0000-0000-000000000001'));
+DECLARE v_first uuid; v_second uuid;
+BEGIN
+  v_first:=import_runtime_experiment_bundle(v_bundle,'40000000-0000-0000-0000-000000000010');
+  v_second:=import_runtime_experiment_bundle(v_bundle,'40000000-0000-0000-0000-000000000010');
+  IF v_first<>v_second THEN RAISE EXCEPTION 'identical experiment bundle import was not idempotent'; END IF;
+  BEGIN
+    PERFORM import_runtime_experiment_bundle(
+      v_bundle||jsonb_build_object('bootstrap_seed','54322'),
+      '40000000-0000-0000-0000-000000000010'
+    );
+    RAISE EXCEPTION 'changed experiment bundle reused immutable experiment id';
+  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+  END;
+END;
+$$;
 RESET ROLE;
 SET LOCAL ROLE callscore_plan_runtime;
 SELECT assign_runtime_variant('00000000-0000-0000-0000-000000000001');
@@ -2880,6 +2920,68 @@ SELECT (confirm_provider_not_performed('84000000-0000-0000-0000-000000000002',2,
 SELECT (reclaim_confirmed_not_performed('84000000-0000-0000-0000-000000000002',3,'fixture-provider-final','85000000-0000-0000-0000-000000000004')).provider_state;
 RESET ROLE;
 
+-- Expired holders cannot mutate workflow or provider state, and public readback requires a URL and visibility.
+SET LOCAL ROLE callscore_plan_runtime;
+SELECT (claim_autonomy_workflow(
+  (SELECT workflow_id FROM autonomy_workflows WHERE source_channel_task_id='01000000-0000-0000-0000-000000000002'),
+  'fixture-expired-workflow-holder','00000000-0000-0000-0000-000000000299',0,30
+)).state_version;
+RESET ROLE;
+UPDATE autonomy_workflows SET lease_expires_at=clock_timestamp()-interval '1 second'
+ WHERE source_channel_task_id='01000000-0000-0000-0000-000000000002';
+SET LOCAL ROLE callscore_plan_runtime;
+DO $$
+DECLARE v_workflow_id uuid:=(SELECT workflow_id FROM autonomy_workflows WHERE source_channel_task_id='01000000-0000-0000-0000-000000000002');
+BEGIN
+  BEGIN
+    PERFORM transition_autonomy_workflow(
+      v_workflow_id,'HEAD_PLANNING','CHILDREN_RUNNING',1,
+      '00000000-0000-0000-0000-000000000299','expired_holder_must_fail'
+    );
+    RAISE EXCEPTION 'expired workflow lease transition unexpectedly accepted';
+  EXCEPTION WHEN SQLSTATE '40001' THEN NULL;
+  END;
+END;
+$$;
+RESET ROLE;
+
+UPDATE provider_operations SET lease_expires_at=clock_timestamp()-interval '1 second'
+ WHERE operation_id='84000000-0000-0000-0000-000000000002';
+SET LOCAL ROLE callscore_plan_runtime;
+DO $$
+DECLARE v_version bigint:=(SELECT state_version FROM provider_operations WHERE operation_id='84000000-0000-0000-0000-000000000002');
+BEGIN
+  BEGIN
+    PERFORM mark_provider_dispatching(
+      '84000000-0000-0000-0000-000000000002',v_version,
+      '85000000-0000-0000-0000-000000000004'
+    );
+    RAISE EXCEPTION 'expired provider lease dispatch unexpectedly accepted';
+  EXCEPTION WHEN SQLSTATE '40001' THEN NULL;
+  END;
+  BEGIN
+    PERFORM record_provider_readback_evidence(
+      '86000000-0000-0000-0000-000000000099','84000000-0000-0000-0000-000000000001','READBACK',
+      clock_timestamp()-interval '5 minutes',clock_timestamp()+interval '5 minutes',
+      'external-1',NULL,NULL,true,'80000000-0000-0000-0000-000000000005','callscore-independent-public-readback'
+    );
+    RAISE EXCEPTION 'public readback without URL and visibility unexpectedly accepted';
+  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+  END;
+  BEGIN
+    PERFORM record_provider_readback_evidence(
+      '86000000-0000-0000-0000-000000000098','84000000-0000-0000-0000-000000000001','READBACK',
+      clock_timestamp()-interval '5 minutes',clock_timestamp()+interval '5 minutes',
+      'external-1','https://x.example/external-1',NULL,true,
+      '80000000-0000-0000-0000-000000000005','callscore-independent-public-readback'
+    );
+    RAISE EXCEPTION 'public readback without visibility unexpectedly accepted';
+  EXCEPTION WHEN SQLSTATE '23514' THEN NULL;
+  END;
+END;
+$$;
+RESET ROLE;
+
 -- High-risk authority functions must be runtime-callable and fail closed on insufficient evidence.
 SET LOCAL ROLE callscore_plan_runtime;
 DO $$
@@ -2938,5 +3040,5 @@ SELECT count(*) AS empty_statistics_rows
 FROM compute_runtime_experiment_statistics('30000000-0000-0000-0000-000000000001');
 RESET ROLE;
 
-SELECT 'autonomy_contract_v4_passed' AS result;
+SELECT 'autonomy_contract_v5_passed' AS result;
 ROLLBACK;

@@ -1,0 +1,64 @@
+{
+  "schema": "callscore.autonomy_plan_artifact_manifest.v5",
+  "generated_at": "2026-08-02T06:48:04+01:00",
+  "base_source_commit": "22993a5537c9b677e25f6454f9f72c52179fc493",
+  "plan_path": "docs/plans/2026-08-02-callscore-autonomous-langgraph-completion-v5.md",
+  "artifact_count": 11,
+  "artifacts": [
+    {
+      "path": "docs/plans/2026-08-02-callscore-autonomous-langgraph-completion-v5.md",
+      "byte_length": 73564,
+      "sha256": "0f33932bf6df3457ac5ba0112dd4b5f13aa6baf69cdc6e3ec3efcddd074ec013"
+    },
+    {
+      "path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v5.sql",
+      "byte_length": 199669,
+      "sha256": "cd0ef85c60af0a6730af44aba97bb681dad0542539cb2fcb66b3dea7dead667e"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-contract-spike-receipt-v5.json",
+      "byte_length": 2906,
+      "sha256": "032a0888a623ae6c80a287a0718acc9d7f2339ef3539dfec60a25b201c3f5172"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-authority-function-call-matrix-v5.json",
+      "byte_length": 10079,
+      "sha256": "46380f23770c0791ed9cee24e4e461e028d59dca75141b1cb4dc66d563b87d68"
+    },
+    {
+      "path": "docs/plans/fixtures/hermes-child-identity-spike-receipt.json",
+      "byte_length": 1407,
+      "sha256": "74a9841cfd1a6877857c299dab2e135630985f8af77269c011d5e423cf5bc6e8"
+    },
+    {
+      "path": "docs/plans/fixtures/canonical-learning-artifacts-v3.schema.json",
+      "byte_length": 8333,
+      "sha256": "21711fd28b5012cf2cca74b281086146ad5de5e74af0e65a6092fbce65160c72"
+    },
+    {
+      "path": "docs/plans/fixtures/callscore-autonomy-implementation-report-v4.schema.json",
+      "byte_length": 12865,
+      "sha256": "73e8ed9b3b588328d7849c2d007b1a6d0a7a7db79a5bf80294fb975ab30b898f"
+    },
+    {
+      "path": "docs/plans/fixtures/verify-autonomy-final-report-contract-v5.py",
+      "byte_length": 17700,
+      "sha256": "dc0dc4f0f98f5fa748a19faa3d54bcdd76339a04611db7f689c019d778c3a4bd"
+    },
+    {
+      "path": "docs/plans/fixtures/provider-mutation-surface-inventory-v5.json",
+      "byte_length": 3747,
+      "sha256": "0642d17f0acae01fd26ef950c0557f36794a92ef1b0573c553572b373932dbac"
+    },
+    {
+      "path": "docs/plans/fixtures/autonomy-runtime-baseline-inventory-v5.json",
+      "byte_length": 5467,
+      "sha256": "e4f5f3dd441cca23513e05a3dfed0c06ad07c21cb3e31d53ab49de20a9688583"
+    },
+    {
+      "path": "docs/plans/fixtures/langgraph-postgres-dependency-compatibility.json",
+      "byte_length": 961,
+      "sha256": "4fa474d34a0801a5b95c41a4d54189572f7f5f402d57b622e6c29fe0013f970b"
+    }
+  ]
+}

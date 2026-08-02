@@ -1,6 +1,6 @@
-# CallScore Autonomous LangGraph Completion Plan v4
+# CallScore Autonomous LangGraph Completion Plan v5
 
-> Supersedes failed v1 commit `10129ae81e3f1eac385292ced0cedc5c8390129d`, failed v2 commit `c435c49a3aafcd7de63a74988d68ea6d64b3006c`, and failed v3 commit `640329f4fed5f3fb276d2fd4ca8941179f2e43f2`. V4 closes the v3 retry/reclaim, lifecycle, child-identity, runtime-callability, quality-evidence, provider-readback, experiment-bootstrap, post-promotion, eligibility, final-report, cutover-order, and rollback-evidence blockers. No implementation begins until three new reviewers return PASS against the exact v4 commit and manifest.
+> Supersedes failed v1 commit `10129ae81e3f1eac385292ced0cedc5c8390129d`, failed v2 commit `c435c49a3aafcd7de63a74988d68ea6d64b3006c`, failed v3 commit `640329f4fed5f3fb276d2fd4ca8941179f2e43f2`, and failed v4 commit `f0ab5d538041b36b2b609bd71b2d1a6541a01130`. V5 closes v4's recovered adversarial blockers: expired workflow/provider lease authority, non-idempotent experiment import, nullable public readback identity, contradictory final evidence, and underpowered or internally inconsistent experiment decisions. No implementation begins until three new reviewers return PASS against the exact v5 commit and manifest.
 
 ## 0. Goal, scope, and immutable target
 
@@ -26,17 +26,17 @@ Explicitly out of scope:
 
 Plan proof fixtures committed with this document:
 
-- `docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v4.sql`: executable PostgreSQL 16 contract fixture using migration 024's UUID `channel_tasks` key. It creates no-login function-owner/runtime/policy/enqueue/observer/report-verifier roles, fixed-search-path `SECURITY DEFINER` functions, direct-DML denials, DB-computed append-only hash chains, exact grant relations, provider dispatch boundary, experiment/learning/final-report contracts, and simultaneous null-session child rows. It returned `autonomy_contract_v4_passed` and rolled back on local PostgreSQL 16.14.
-- `docs/plans/fixtures/autonomy-contract-spike-receipt-v4.json`: command/result/rollback receipt for the v4 SQL proof.
-- `docs/plans/fixtures/autonomy-authority-function-call-matrix-v4.json`: executable coverage map binding every authority function to its positive or fail-closed fixture path.
+- `docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v5.sql`: executable PostgreSQL 16 contract fixture using migration 024's UUID `channel_tasks` key. It creates no-login function-owner/runtime/policy/enqueue/observer/report-verifier roles, fixed-search-path `SECURITY DEFINER` functions, direct-DML denials, DB-computed append-only hash chains, exact grant relations, provider dispatch boundary, experiment/learning/final-report contracts, and simultaneous null-session child rows. It explicitly rejects expired-lease mutators, incomplete public readback, and inconsistent experiment promotion inputs, while proving identical reviewed experiment imports are idempotent.
+- `docs/plans/fixtures/autonomy-contract-spike-receipt-v5.json`: command/result/rollback receipt for the v5 SQL proof.
+- `docs/plans/fixtures/autonomy-authority-function-call-matrix-v5.json`: executable coverage map binding every authority function to its positive or fail-closed fixture path.
 - `docs/plans/fixtures/hermes-child-identity-spike-receipt.json`: real Hermes one-shot proof with zero resolved tools, machine-written usage file, and non-empty session ID.
-- `docs/plans/fixtures/canonical-learning-artifacts-v2.schema.json`: exact JSON Schemas for all four durable learning artifacts, including the registry version that generated the candidate.
-- `docs/plans/fixtures/callscore-autonomy-implementation-report-v3.schema.json`: final report structure and PASS-conditional evidence contract.
-- `docs/plans/fixtures/verify-autonomy-final-report-contract-v4.py`: executable independent-verifier predicate oracle for cross-field identity, A-J review independence, typed receipt content, artifact hashes, the full deployed tuple, and live-canary requirements.
-- `docs/plans/fixtures/provider-mutation-surface-inventory-v4.json`: complete classified authority/mutation call-site inventory at base source commit `22993a5537c9b677e25f6454f9f72c52179fc493` and negative-test contract.
-- `docs/plans/fixtures/autonomy-runtime-baseline-inventory-v4.json`: exact enabled/schedule/workdir/prompt hash and byte count, resolved runner path/hash, wake chain, disposition, worker digest, and gateway identity for every mutation/claim-capable cron/runtime authority. Cutover re-hashes the protected scheduler source rather than storing prompt text.
+- `docs/plans/fixtures/canonical-learning-artifacts-v3.schema.json`: exact JSON Schemas for all four durable learning artifacts, including cross-field experiment-result coherence and the registry version that generated the candidate.
+- `docs/plans/fixtures/callscore-autonomy-implementation-report-v4.schema.json`: final report structure and PASS-conditional evidence contract, including cross-field activation, phase, review, and canary coherence.
+- `docs/plans/fixtures/verify-autonomy-final-report-contract-v5.py`: executable independent-verifier predicate oracle for cross-field identity, A-J review independence, typed receipt content, artifact hashes, the full deployed tuple, live-canary requirements, and contradiction rejection.
+- `docs/plans/fixtures/provider-mutation-surface-inventory-v5.json`: complete classified authority/mutation call-site inventory at base source commit `22993a5537c9b677e25f6454f9f72c52179fc493` and negative-test contract.
+- `docs/plans/fixtures/autonomy-runtime-baseline-inventory-v5.json`: exact enabled/schedule/workdir/prompt hash and byte count, resolved runner path/hash, wake chain, disposition, worker digest, and gateway identity for every mutation/claim-capable cron/runtime authority. Cutover re-hashes the protected scheduler source rather than storing prompt text.
 - `docs/plans/fixtures/langgraph-postgres-dependency-compatibility.json`: npm metadata proof that Postgres checkpointer `1.0.4` is semver-compatible with the checked-in LangGraph/core/checkpoint/pg/Node ranges; Phase B still requires a lockfile/import/setup/resume execution spike.
-- `docs/plans/fixtures/v4-plan-artifact-manifest.json`: path, byte length, and SHA-256 binding for this plan and the eleven non-circular proof artifacts; the manifest's own SHA-256 is captured after commit and supplied to reviewers.
+- `docs/plans/fixtures/v5-plan-artifact-manifest.json`: path, byte length, and SHA-256 binding for this plan and the eleven non-circular proof artifacts; the manifest's own SHA-256 is captured after commit and supplied to reviewers.
 
 ## 1. Single-authority architecture
 
@@ -137,7 +137,7 @@ Exit zero, draft existence, report receipt, `independent_agent_execution=true`, 
 
 ### 3.1 Authoritative schema
 
-Migration `025-callscore-autonomous-supervisor.sql` must conform table-for-table, type-for-type, constraint-for-constraint, trigger-for-trigger, function-signature-for-function-signature, and ACL-for-ACL to `025-callscore-autonomous-supervisor-contract-v4.sql`, with only the fixture schema/role prefixes changed to production names. In particular, `source_channel_task_id` is UUID because migration 024 defines `channel_tasks.id UUID`; bigint is forbidden. It creates:
+Migration `025-callscore-autonomous-supervisor.sql` must conform table-for-table, type-for-type, constraint-for-constraint, trigger-for-trigger, function-signature-for-function-signature, and ACL-for-ACL to `025-callscore-autonomous-supervisor-contract-v5.sql`, with only the fixture schema/role prefixes changed to production names. In particular, `source_channel_task_id` is UUID because migration 024 defines `channel_tasks.id UUID`; bigint is forbidden. It creates:
 
 - lifecycle, execution-class, join, evaluation, provider, variant, and authority enums;
 - `autonomy_workflows` as the authoritative state projection;
@@ -200,7 +200,7 @@ Enqueue allocates `workflow_id` before any claim. The worker read-only locator r
 - `workflow_run_id = <stable UUID allocated once at enqueue and never changed until terminal>`
 - `graph_attempt_id = <fresh UUID for each supervisor process invocation>`; this is checkpoint metadata only and is forbidden from child idempotency keys.
 
-The graph's first node calls `claim_autonomy_workflow(workflow_id, worker_id, lease_duration, expected_state_version)` using `FOR UPDATE` and CAS. No external action occurs in the claim node.
+The graph's first node calls `claim_autonomy_workflow(workflow_id, worker_id, lease_duration, expected_state_version)` using `FOR UPDATE` and CAS. No external action occurs in the claim node. Every lease-bound lifecycle mutator must match the current token/version/generation and must prove `lease_expires_at > clock_timestamp()` in the same statement; possession of an expired token grants no authority, including transition, retry scheduling, heartbeat, provider dispatch, and provider result mutation.
 
 Crash semantics:
 
@@ -284,7 +284,7 @@ Failure produces controlled reason codes and a new revision artifact. Revision N
 
 ### 6.1 Remove caller-controlled approval
 
-Phase E must reproduce the search contract in `provider-mutation-surface-inventory-v4.json` and classify every match. The reviewed inventory requires changes to `callscore-operating-goal.ts`, `external-mutation-guard.ts`, `external-mutation-schemas.ts`, `graph-owned-provider-adapter.ts`, `external-mutation-node-utils.ts`, `mcp-youtube-publisher.ts`, `composio-client.ts`, `youtube-publisher.ts`, and `hermes-worker.ts`. A new matching path not present in the inventory fails RED until classified; a path may not be silently omitted as an "applicable" call site.
+Phase E must reproduce the search contract in `provider-mutation-surface-inventory-v5.json` and classify every match. The reviewed inventory requires changes to `callscore-operating-goal.ts`, `external-mutation-guard.ts`, `external-mutation-schemas.ts`, `graph-owned-provider-adapter.ts`, `external-mutation-node-utils.ts`, `mcp-youtube-publisher.ts`, `composio-client.ts`, `youtube-publisher.ts`, and `hermes-worker.ts`. A new matching path not present in the inventory fails RED until classified; a path may not be silently omitted as an "applicable" call site.
 
 Live execution schemas reject `approved`, `approved_publish`, `approved_by_operator`, `approval_receipt_id`, `live_owned_public`, and worker-minted receipt IDs. CLI may select dry-run/read-only mode only. No boolean or receipt string supplied by a caller confers authority.
 
@@ -327,7 +327,7 @@ Crash after network submission but before external ID persistence becomes `UNKNO
 
 If readback finds one matching object, record its external ID/URL and verify it. If it finds multiple or cannot distinguish absence from uncertainty, remain `UNKNOWN` and fail closed. Never convert unknown to success or retry blindly.
 
-Execution and readback use separate graph nodes, separate typed evidence rows, separate receipts, and preferably separate provider read methods. `record_provider_readback_evidence(...)` binds evidence type, operation, account scope, tool, action, payload hash, dispatch-time window, external ID/URL/visibility or exact non-performance, artifact hash, and an independent verifier. `record_provider_result(...)` resolves these projections and rejects raw caller values that do not match them. `PROVIDER_VERIFIED` requires account, action, payload hash, external ID, and public/private visibility to match the claimed operation; `CONFIRMED_NOT_PERFORMED` requires typed ABSENCE evidence over the dispatch window.
+Execution and readback use separate graph nodes, separate typed evidence rows, separate receipts, and preferably separate provider read methods. `record_provider_readback_evidence(...)` binds evidence type, operation, account scope, tool, action, payload hash, dispatch-time window, external ID/URL/visibility or exact non-performance, artifact hash, and an independent verifier. Owned-public `READBACK` is invalid unless the independently observed external ID, non-empty external URL, and `public` visibility are all durable; execution evidence alone cannot supply or default those fields. `record_provider_result(...)` resolves these projections and rejects raw caller values that do not match them. `PROVIDER_VERIFIED` requires durable readback evidence; receipt JSON alone is insufficient.
 
 Initial mutating adapters are X, LinkedIn owned page, and private YouTube package/upload path. The single live canary is X only. Email, Whop, Reddit/community replies, DMs, outreach, payment, and customer actions remain non-mutating in this implementation.
 
@@ -352,14 +352,14 @@ A prompt containing a detected secret is rejected before model invocation and is
 
 Each accepted measurement must link workflow, run, generation, provider operation when applicable, provider object/publication, channel, cohort, variant, time window, metric numerator/denominator/value, and raw readback artifact.
 
-The same transaction validates against `canonical-learning-artifacts-v2.schema.json`, verifies every artifact payload hash, and writes exactly one typed relational row plus JSON payload for each:
+The same transaction validates against `canonical-learning-artifacts-v3.schema.json`, verifies every artifact payload hash, and writes exactly one typed relational row plus JSON payload for each:
 
 - `learning_event.v1`
 - `agent_performance_ledger.v1`
 - `learning_delta.v1`
 - `experiment_result.v1`
 
-Each schema requires workflow, measurement, generation, publication (nullable only for non-mutating classes), agent, channel, prompt name/version/hash, model/provider/parameters, evaluator score, experiment/cohort/variant (explicit nullable values when not enrolled), source artifact/hash, and timestamp. `learning_delta.v1` additionally binds prior/candidate variant and content-hashed changes; `experiment_result.v1` binds control/treatment samples, metric, effect, bootstrap CI/resamples/seed, safety count, and decision. UUID columns are real foreign keys to workflow, measurement, generation, experiment, cohort/assignment, variant, and content-addressed artifact metadata; JSON strings cannot substitute for relational provenance.
+Each schema requires workflow, measurement, generation, publication (nullable only for non-mutating classes), agent, channel, prompt name/version/hash, model/provider/parameters, evaluator score, experiment/cohort/variant (explicit nullable values when not enrolled), source artifact/hash, and timestamp. `learning_delta.v1` additionally binds prior/candidate variant and content-hashed changes. `agent_performance_ledger.v1` represents time as start plus positive duration and task counts as completed/failed/remaining, so reversed windows and impossible eligible totals are not representable. `experiment_result.v1` uses a two-item unique ordered variant pair, control/treatment samples, metric, effect, lower confidence bound plus non-negative interval width, bootstrap resamples/seed, safety count, and decision; `PROMOTE` schema constraints enforce the minimum sample/day/effect/confidence/resample and zero-safety thresholds before SQL revalidates the same facts. UUID columns are real foreign keys to workflow, measurement, generation, experiment, cohort/assignment, variant, and content-addressed artifact metadata; JSON strings cannot substitute for relational provenance.
 
 `LEARNING_RECORDED` requires all four distinct schema rows, exact schema validation, and DB hash-chain insertion. Langfuse trace/score writes are additional observability, not the authoritative ledger. Langfuse failure schedules retry and cannot erase DB evidence.
 
@@ -411,7 +411,7 @@ Before phases A-J and before any migration, runtime, provider, service, cron, or
 
 Files:
 
-- create `migrations/025-callscore-autonomous-supervisor.sql` from the reviewed v4 SQL fixture, preserving UUID compatibility, DB-owned hashes, role/function ACLs, composite grant FKs, child uniqueness, experiment/cohort FKs, and final-report PASS checks;
+- create `migrations/025-callscore-autonomous-supervisor.sql` from the reviewed v5 SQL fixture, preserving UUID compatibility, DB-owned hashes, role/function ACLs, composite grant FKs, child uniqueness, experiment/cohort FKs, and final-report PASS checks;
 - create `src/lib/autonomy/supervisor/contracts.ts`, `repository.ts`, `transition-map.ts`, `completion-predicates.ts`;
 - modify control-plane and `channel-agent-tasks` compatibility code;
 - tests: contracts, migration, role/ACL, hash-chain, conservative backfill, legacy-writer denial.
@@ -451,7 +451,7 @@ Gate: forced semantic failure revises once, re-evaluates independently, and reac
 
 ### Phase E - exact authority, provider execution, and readback
 
-Implement section 6, remove all caller approval flags/worker-minted receipts, and make the source-inventory test exactly reproduce `provider-mutation-surface-inventory-v4.json`.
+Implement section 6, remove all caller approval flags/worker-minted receipts, and make the source-inventory test exactly reproduce `provider-mutation-surface-inventory-v5.json`.
 
 RED first: forged approved boolean, forged receipt ID, wrong account/action/payload/revision grant, reused grant, cross-workflow duplicate payload, ambiguous key encoding, duplicate process claim, crash-after-DISPATCHING resubmission, stale CLAIMED unsafe takeover, unknown outcome success, URL without readback, adapter direct invocation, unclassified provider surface.
 
@@ -459,7 +459,7 @@ Gate: fake provider crash matrix proves exactly one logical operation and fail-c
 
 ### Phase F - outcomes and four learning artifacts
 
-Implement X/LinkedIn/YouTube/PostHog/Whop read-only collectors, measurement node, learning transaction validated against `canonical-learning-artifacts-v2.schema.json`, Langfuse score linkage, and delayed remeasurement.
+Implement X/LinkedIn/YouTube/PostHog/Whop read-only collectors, measurement node, learning transaction validated against `canonical-learning-artifacts-v3.schema.json`, Langfuse score linkage, and delayed remeasurement.
 
 RED first: missing attribution, zero denominator, malformed PostHog payload, quota failure overwrites prior measure, partial learning set advances state, delayed outcome resubmits provider.
 
@@ -571,7 +571,7 @@ Create:
 - committed schemas and fixtures for every proof;
 - JSON and Markdown report producers plus SHA-256 sidecars.
 
-The JSON must validate against `callscore-autonomy-implementation-report-v3.schema.json`. `phase_gates` is an exact object keyed A0-J, so omitted/duplicate phases are impossible; each phase carries typed RED/GREEN/REFACTOR receipts and exactly one contract, implementation, and security review. Every receipt reference contains its expected schema, and the verifier reads the JSON payload rather than trusting path/hash metadata alone. Phase and review payloads must bind the same externally supplied full tuple `{app_commit_sha,workplane_commit_sha,plan_commit_sha,graph_source_sha256,migration_sha256,runtime_script_manifest_sha256,image_digest,prompt_manifest_sha256}`. Activation receipts bind report ID and tuple. Canary execution, independent readback, and tested provider-object rollback/deletion receipts must bind the same workflow, provider operation, account, action, payload, external object, and URL; the runtime-variant rollback receipt remains a separate Phase G proof. Final `PASS` is impossible with `BLOCKED_BY_GRAPH`, null provider IDs, arbitrary generic JSON, any non-PASS phase/review, self-verification, or an untested public-object rollback. Final-report DB insertion requires schema PASS, independent verifier PASS, both hashes, and the SQL PASS constraints.
+The JSON must validate against `callscore-autonomy-implementation-report-v4.schema.json`. `phase_gates` is an exact object keyed A0-J, so omitted/duplicate phases are impossible; each phase carries typed RED/GREEN/REFACTOR receipts and exactly one contract, implementation, and security review. Every receipt reference contains its expected schema, and the verifier reads the JSON payload rather than trusting path/hash metadata alone. Phase and review payloads must bind the same externally supplied full tuple `{app_commit_sha,workplane_commit_sha,plan_commit_sha,graph_source_sha256,migration_sha256,runtime_script_manifest_sha256,image_digest,prompt_manifest_sha256}`. Activation receipts bind report ID and tuple. Canary execution, independent readback, and tested provider-object rollback/deletion receipts must bind the same workflow, provider operation, account, action, payload, external object, and URL; the runtime-variant rollback receipt remains a separate Phase G proof. Final `PASS` is impossible with `BLOCKED_BY_GRAPH`, null provider IDs, arbitrary generic JSON, any non-PASS phase/review, self-verification, or an untested public-object rollback. Final-report DB insertion requires schema PASS, independent verifier PASS, both hashes, and the SQL PASS constraints.
 
 ## 9. Cutover, rollback, and live-canary procedure
 
@@ -711,7 +711,7 @@ Final evidence verification uses both the production TypeScript verifier and the
 ```bash
 node --import tsx src/scripts/verify-callscore-autonomy-report.ts \
   --report .tmp/autonomy-implementation/$RUN_ID/callscore-autonomy-implementation-report.json \
-  --schema docs/plans/fixtures/callscore-autonomy-implementation-report-v3.schema.json \
+  --schema docs/plans/fixtures/callscore-autonomy-implementation-report-v4.schema.json \
   --deployment-manifest .tmp/autonomy-implementation/$RUN_ID/deployment-manifest.json \
   --expected-app-sha "$APP_SHA" --expected-workplane-sha "$WORKPLANE_SHA" \
   --expected-plan-sha "$PLAN_COMMIT_SHA" --expected-plan-content-sha256 "$PLAN_CONTENT_SHA256" \
@@ -720,9 +720,9 @@ node --import tsx src/scripts/verify-callscore-autonomy-report.ts \
   --expected-runtime-script-manifest-sha256 "$RUNTIME_SCRIPT_MANIFEST_SHA256" --expected-image-digest "$IMAGE_DIGEST" \
   --expected-prompt-manifest-sha256 "$PROMPT_MANIFEST_SHA256" \
   --require-live-canary --out .tmp/autonomy-implementation/$RUN_ID/report-verifier-ts.json
-python3 docs/plans/fixtures/verify-autonomy-final-report-contract-v4.py \
+python3 docs/plans/fixtures/verify-autonomy-final-report-contract-v5.py \
   --report .tmp/autonomy-implementation/$RUN_ID/callscore-autonomy-implementation-report.json \
-  --schema docs/plans/fixtures/callscore-autonomy-implementation-report-v3.schema.json \
+  --schema docs/plans/fixtures/callscore-autonomy-implementation-report-v4.schema.json \
   --deployment-manifest .tmp/autonomy-implementation/$RUN_ID/deployment-manifest.json \
   --expected-app-sha "$APP_SHA" --expected-workplane-sha "$WORKPLANE_SHA" \
   --expected-plan-sha "$PLAN_COMMIT_SHA" --expected-plan-content-sha256 "$PLAN_CONTENT_SHA256" \
@@ -758,7 +758,7 @@ The verified final copies are written to `/srv/agents/hermes/runtime/reviews/` o
 
 ## 11. Review, Kanban, and checkpoint policy
 
-1. Generate the v4 non-circular artifact manifest from the final plan and proof fixtures, validate every bound path/size/SHA-256, then commit the complete immutable package.
+1. Generate the v5 non-circular artifact manifest from the final plan and proof fixtures, validate every bound path/size/SHA-256, then commit the complete immutable package.
 2. Push and verify local commit equals `origin/feat/callscore-autonomous-langgraph-completion-20260802`.
 3. Send exact commit and manifest to three new independent reviewers: contract/spec, implementation/operability, security/trust.
 4. Any file edit invalidates all verdicts. New review batch, new commit, and new manifest are mandatory.

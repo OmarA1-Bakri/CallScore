@@ -1,5 +1,5 @@
 {
-  "schema": "callscore.provider_mutation_surface_inventory.v4",
+  "schema": "callscore.provider_mutation_surface_inventory.v5",
   "source_commit": "22993a5537c9b677e25f6454f9f72c52179fc493",
   "search_contract": {
     "root": "src",
