@@ -1,0 +1,60 @@
+{
+  "schema": "callscore.autonomy_contract_normalized_proof.v7",
+  "executed_at": "2026-08-02T10:19:55+01:00",
+  "command": "sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d postgres -f - < docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v7.sql",
+  "database": "postgres",
+  "postgres_version": "16.14 (Ubuntu 16.14-1.pgdg24.04+1)",
+  "fixture": {
+    "path": "docs/plans/fixtures/025-callscore-autonomous-supervisor-contract-v7.sql",
+    "byte_length": 309321,
+    "sha256": "9fefe55a0b82c6e6e818e22d9f374bd491c98751b3c21f29e365a07547db849b"
+  },
+  "raw_output": {
+    "path": "docs/plans/fixtures/autonomy-contract-rollback-run-v7.log.gz",
+    "content_encoding": "gzip",
+    "archive_byte_length": 3466,
+    "archive_sha256": "4ed6abbd780d1014cd7b23aa182065927c5ea6a5b7f889434fe8d3f907ba592d",
+    "uncompressed_byte_length": 23391,
+    "uncompressed_sha256": "61d681c40e99bf6d7b4a06ea2a2a1b920f37bdcc639ccff8ab7f8e7bc6fd73de",
+    "normalization": {
+      "algorithm": "identity-bytes-before-deterministic-gzip",
+      "version": "1",
+      "line_endings": "preserved",
+      "gzip_mtime": 0
+    }
+  },
+  "result": {
+    "exit_code": 0,
+    "pass_marker": "autonomy_contract_v7_passed",
+    "pass_marker_count": 1,
+    "rollback_marker_observed": true,
+    "schema_absent_after_rollback": true,
+    "temporary_roles_absent_after_rollback": true,
+    "successful_final_report_insert_observed": true
+  },
+  "covered_negative_probes": [
+    "stale_or_wrong_workflow_lease_rejected",
+    "post_terminal_child_delegation_rejected",
+    "caller_selected_delegation_identity_rejected",
+    "missing_or_extra_child_join_member_rejected",
+    "head_generation_without_exact_join_manifest_rejected",
+    "evaluator_before_candidate_rejected",
+    "provider_operation_before_executing_rejected",
+    "provider_generation_or_evaluation_mismatch_rejected",
+    "producer_generation_variant_mismatch_rejected",
+    "accepted_child_without_independent_process_and_output_bindings_rejected",
+    "revoked_provider_grant_rejected_at_dispatch_boundary",
+    "expired_provider_lease_rejected",
+    "non_https_public_readback_rejected",
+    "ambiguous_dispatch_requires_independent_absence_readback",
+    "unrelated_or_changed_learning_payload_validation_rejected",
+    "outcome_wrong_provider_generation_rejected",
+    "invented_or_self_attested_reviewer_rejected",
+    "wrong_review_subject_rejected",
+    "generic_final_report_artifacts_rejected",
+    "typed_rollback_stale_replay_rejected",
+    "underpowered_or_self_reviewed_experiment_promotion_rejected",
+    "rollback_without_promotion_rejected"
+  ],
+  "normalisation_note": "The complete psql transcript is committed as deterministic gzip. Decompression yields the exact captured stdout/stderr bytes, including psql table spacing; archive and uncompressed lengths/SHA-256 are both bound. Reruns compare exit, marker, rollback, cleanup, function matrix, and semantic probes."
+}

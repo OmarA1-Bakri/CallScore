@@ -1,0 +1,19 @@
+{
+  "schema": "callscore.hermes_child_live_process_evidence.v1",
+  "captured_at_epoch_ns": 1785661956073354074,
+  "capture_state": "SIGSTOPPED_BY_PARENT_FOR_ATOMIC_INSPECTION",
+  "pid": 1423596,
+  "ppid": 566902,
+  "pgid": 1423596,
+  "session_id": 1423596,
+  "start_ticks": 562445768,
+  "exe": "/srv/agents/hermes/hermes-agent/.hermes-runtime/python/generation-1785218503-2718341-55df0a21/cpython-3.11.15-linux-aarch64-gnu/bin/python3.11",
+  "cwd": "/home/omar/callscore-worktrees/autonomous-langgraph-completion-20260802",
+  "uid": 1000,
+  "state": "T",
+  "child_execution_id": "6237576f-7d11-4892-b22b-7ab9048c1952",
+  "hermes_home": "/srv/agents/hermes/profiles/callscore",
+  "hermes_profile": "callscore",
+  "cmdline_sha256": "6f03d37c30c8b984bab749cc3ae43126a38a2f9062344ff6764f5fac198bb8b3",
+  "environ_sha256": "614a3f22cd4e8145b12ec336c2d332e2fb9b199cc10d74a852f0b580304263a6"
+}

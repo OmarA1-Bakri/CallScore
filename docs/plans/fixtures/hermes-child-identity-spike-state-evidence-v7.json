@@ -1,0 +1,39 @@
+{
+  "schema": "callscore.hermes_child_identity_state_evidence.v2",
+  "observed_at": "2026-08-02T10:13:13+01:00",
+  "state_db_path": "/srv/agents/hermes/profiles/callscore/state.db",
+  "query": "SELECT id,source,model,started_at,ended_at,end_reason,message_count,tool_call_count,input_tokens,output_tokens,api_call_count,cwd,profile_name FROM sessions WHERE id=?",
+  "query_parameter": "20260802_101228_db8b6a",
+  "row_count": 1,
+  "session": {
+    "id": "20260802_101228_db8b6a",
+    "source": "cli",
+    "model": "gpt-5.6-sol",
+    "started_at": 1785661949.4804301,
+    "ended_at": 1785661956.4597392,
+    "end_reason": "agent_close",
+    "message_count": 2,
+    "tool_call_count": 0,
+    "input_tokens": 8815,
+    "output_tokens": 19,
+    "api_call_count": 1,
+    "cwd": "/home/omar/callscore-worktrees/autonomous-langgraph-completion-20260802",
+    "profile_name": "callscore"
+  },
+  "binding": {
+    "receipt_path": "docs/plans/fixtures/hermes-child-identity-spike-receipt-v7.json",
+    "receipt_sha256": "ddea44ea84d1a22c3a01987a1f794652d6192e77951cc8e360b58c83340a0cb5",
+    "process_artifact_sha256": "22b622cac1d6e6e524e6a2e14e4162e61d19e169a11e5118743b5bceb5d0fe67",
+    "usage_artifact_sha256": "a1fe5db0febd43cdc2c54138f49a9c25bee02a15c2da173b858d7994f0151e72",
+    "output_artifact_sha256": "447b15d5864735e82ecedf0ed60b6d7b8869b58c92e0bad6f05ce581a260d8c4",
+    "expected_session_id": "20260802_101228_db8b6a",
+    "expected_model": "gpt-5.6-sol",
+    "expected_profile": "callscore",
+    "expected_api_call_count": 1,
+    "expected_output_tokens": 19
+  },
+  "limitations": [
+    "The read-only state row plus usage/output artifacts prove terminal Hermes completion.",
+    "The live process sidecar was captured under SIGSTOP before SIGCONT and terminal completion, binding PID/PGID/start ticks/executable/UID/cwd/environment child ID to the same launch."
+  ]
+}

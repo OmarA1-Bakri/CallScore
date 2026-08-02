@@ -1,17 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://call-score.com/schemas/autonomy-implementation-report.v5.json",
+  "$id": "https://call-score.com/schemas/autonomy-implementation-report.v6.json",
   "title": "CallScore autonomy implementation evidence report",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema", "report_id", "generated_at", "final_status", "producer_agent_id",
+    "schema", "report_id", "report_stream_id", "sequence_no", "generated_at", "final_status", "producer_agent_id",
     "verifier_agent_id", "source_tuple", "deployment_tuple", "phase_gates",
     "live_activation", "canary", "final_reviews", "receipts", "blockers"
   ],
   "properties": {
-    "schema": { "const": "callscore.autonomy_implementation_report.v5" },
+    "schema": { "const": "callscore.autonomy_implementation_report.v6" },
     "report_id": { "$ref": "#/$defs/uuid" },
+    "report_stream_id": { "type": "string", "minLength": 1 },
+    "sequence_no": { "type": "integer", "minimum": 1 },
     "generated_at": { "$ref": "#/$defs/timestamp" },
     "final_status": { "enum": ["PASS", "BLOCKED", "FAIL"] },
     "producer_agent_id": { "type": "string", "minLength": 1 },
@@ -83,7 +85,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "status", "workflow_id", "provider_operation_id", "account_scope_hash", "action_name", "payload_sha256", "is_media", "is_youtube", "external_object_id", "external_url",
+        "status", "workflow_id", "provider_operation_id", "generation_id", "accepted_evaluation_id", "account_scope_hash", "action_name", "payload_sha256", "is_media", "is_youtube", "external_object_id", "external_url",
         "execution_receipt", "provider_readback_receipt", "provider_object_rollback_receipt", "runtime_variant_rollback_receipt",
         "task_router_receipt", "tool_inheritance_receipt"
       ],
@@ -91,6 +93,8 @@
         "status": { "enum": ["PASS", "BLOCKED_BY_GRAPH", "FAIL"] },
         "workflow_id": { "$ref": "#/$defs/nullableUuid" },
         "provider_operation_id": { "$ref": "#/$defs/nullableUuid" },
+        "generation_id": { "$ref": "#/$defs/nullableUuid" },
+        "accepted_evaluation_id": { "$ref": "#/$defs/nullableUuid" },
         "account_scope_hash": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
         "action_name": { "type": ["string", "null"], "minLength": 1 },
         "payload_sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
@@ -283,7 +287,7 @@
     "review": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["phase_id", "review_type", "reviewer_agent_id", "verdict", "first_line", "target_tuple", "review_artifact"],
+      "required": ["phase_id", "review_type", "reviewer_agent_id", "verdict", "first_line", "target_tuple", "review_artifact", "review_execution_attestation"],
       "properties": {
         "phase_id": { "enum": ["A0", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] },
         "review_type": { "enum": ["contract", "implementation", "security"] },
@@ -291,7 +295,8 @@
         "verdict": { "enum": ["PASS", "FAIL"] },
         "first_line": { "enum": ["VERDICT: PASS", "VERDICT: FAIL"] },
         "target_tuple": { "$ref": "#/$defs/phaseTargetTuple" },
-        "review_artifact": { "$ref": "#/$defs/artifact" }
+        "review_artifact": { "$ref": "#/$defs/artifact" },
+        "review_execution_attestation": { "$ref": "#/$defs/artifact" }
       }
     },
     "phaseGate": {
@@ -323,14 +328,15 @@
     "finalReview": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["review_type", "reviewer_agent_id", "verdict", "first_line", "target_tuple", "review_artifact"],
+      "required": ["review_type", "reviewer_agent_id", "verdict", "first_line", "target_tuple", "review_artifact", "review_execution_attestation"],
       "properties": {
         "review_type": { "enum": ["contract", "implementation", "security"] },
         "reviewer_agent_id": { "type": "string", "minLength": 1 },
         "verdict": { "enum": ["PASS", "FAIL"] },
         "first_line": { "enum": ["VERDICT: PASS", "VERDICT: FAIL"] },
         "target_tuple": { "$ref": "#/$defs/targetTuple" },
-        "review_artifact": { "$ref": "#/$defs/artifact" }
+        "review_artifact": { "$ref": "#/$defs/artifact" },
+        "review_execution_attestation": { "$ref": "#/$defs/artifact" }
       }
     }
   }

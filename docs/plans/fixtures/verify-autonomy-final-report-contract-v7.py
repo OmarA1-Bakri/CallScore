@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evidence-only verifier contract for callscore.autonomy_implementation_report.v5.
+"""Evidence-only verifier contract for callscore.autonomy_implementation_report.v6.
 
 This is a plan fixture. Production Phase J copies the predicates into
 src/scripts/verify-callscore-autonomy-report.ts and keeps this fixture as the
@@ -22,6 +22,7 @@ from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 PHASES = ("A0", *tuple("ABCDEFGHIJ"))
 REVIEW_TYPES = ("contract", "implementation", "security")
 EVIDENCE_VALIDATOR: Draft202012Validator | None = None
+FROZEN_EVIDENCE: dict[Path, bytes] = {}
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -52,14 +53,17 @@ def artifact_paths(report: dict[str, Any]) -> set[Path]:
 
 
 def verify_artifact(ref: dict[str, Any], errors: list[str], label: str) -> None:
-    path = Path(ref.get("path", ""))
+    path = Path(ref.get("path", "")).resolve(strict=False)
     if not path.is_absolute():
         errors.append(f"{label}: path must be absolute")
         return
     if not path.is_file():
         errors.append(f"{label}: artifact missing: {path}")
         return
-    data = path.read_bytes()
+    data = FROZEN_EVIDENCE.get(path)
+    if data is None:
+        errors.append(f"{label}: artifact was not frozen before verification: {path}")
+        return
     if len(data) != ref.get("byte_length"):
         errors.append(f"{label}: byte_length mismatch")
     if sha256_bytes(data) != ref.get("sha256"):
@@ -72,6 +76,21 @@ def verify_artifact(ref: dict[str, Any], errors: list[str], label: str) -> None:
             errors.append(f"{label}: reference schema does not match artifact payload")
     except Exception as exc:  # noqa: BLE001
         errors.append(f"{label}: evidence must be JSON: {exc}")
+
+
+def verify_raw_artifact(ref: dict[str, Any], errors: list[str], label: str) -> None:
+    path = Path(ref.get("path", "")).resolve(strict=False)
+    if not path.is_absolute() or not path.is_file():
+        errors.append(f"{label}: raw artifact path must be absolute and present")
+        return
+    data = FROZEN_EVIDENCE.get(path)
+    if data is None:
+        errors.append(f"{label}: raw artifact was not frozen before verification")
+        return
+    if len(data) != ref.get("byte_length"):
+        errors.append(f"{label}: raw byte_length mismatch")
+    if sha256_bytes(data) != ref.get("sha256"):
+        errors.append(f"{label}: raw sha256 mismatch")
 
 
 def verify_json_receipt(
@@ -108,7 +127,8 @@ def verify_json_receipt(
 
 def verify_review_artifact(
     ref: dict[str, Any], expected_reviewer: str, expected_phase: str,
-    expected_review_type: str, expected_target: dict[str, Any], errors: list[str], label: str,
+    expected_review_type: str, expected_target: dict[str, Any], expected_subject_sha256: str,
+    errors: list[str], label: str,
 ) -> None:
     review = verify_json_receipt(
         ref, "callscore.phase_review_receipt.v2", errors, label,
@@ -129,6 +149,34 @@ def verify_review_artifact(
         errors.append(f"{label}: phase/review type mismatch")
     if review.get("target_tuple") != expected_target:
         errors.append(f"{label}: immutable target tuple mismatch")
+    if review.get("reviewed_artifact_sha256") != [expected_subject_sha256]:
+        errors.append(f"{label}: reviewed subject must be the exact phase bundle manifest")
+
+
+def verify_review_execution_attestation(
+    ref: dict[str, Any], expected_scope: str, expected_reviewer: str,
+    expected_target: dict[str, Any], expected_subject_sha256: str,
+    expected_review_output_sha256: str, errors: list[str], label: str,
+) -> None:
+    payload = verify_json_receipt(
+        ref, "callscore.review_execution_attestation.v1", errors, label,
+        ("status", "scope", "review_execution_id", "reviewer_agent_id", "hermes_session_id",
+         "delegation_batch_id", "target_tuple", "reviewed_artifact_sha256",
+         "review_output_sha256", "process_identity_sha256", "attested_by_role"),
+    )
+    if payload is None:
+        return
+    expected = {
+        "status": "PASS", "scope": expected_scope, "reviewer_agent_id": expected_reviewer,
+        "target_tuple": expected_target, "reviewed_artifact_sha256": expected_subject_sha256,
+        "review_output_sha256": expected_review_output_sha256,
+        "attested_by_role": "callscore-review-identity-attestor",
+    }
+    for key, value in expected.items():
+        if payload.get(key) != value:
+            errors.append(f"{label}: authenticated execution binding mismatch: {key}")
+    if ref.get("producer_agent_id") != "callscore-review-identity-attestor":
+        errors.append(f"{label}: attestation was not produced by the DB-authenticated identity role")
 
 
 def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse.Namespace) -> list[str]:
@@ -229,6 +277,24 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
                 command = payload.get("command", [])
                 if not command or not Path(command[0]).is_absolute() or not Path(command[0]).is_file() or not os.access(command[0], os.X_OK):
                     errors.append(f"phase {phase}.{field}: command executable must be absolute, present, and executable")
+                elif sha256_bytes(FROZEN_EVIDENCE.get(Path(command[0]).resolve(strict=False), b"")) != payload.get("command_executable_sha256"):
+                    errors.append(f"phase {phase}.{field}: command executable hash mismatch")
+                if not Path(str(payload.get("cwd", ""))).is_absolute() or not Path(str(payload.get("cwd", ""))).is_dir():
+                    errors.append(f"phase {phase}.{field}: cwd must be an absolute existing directory")
+                if payload.get("scope", {}).get("phase_manifest_sha256") != phase_target.get("phase_manifest_sha256"):
+                    errors.append(f"phase {phase}.{field}: command scope is not bound to phase manifest")
+                for stream in ("stdout", "stderr"):
+                    raw_ref = payload.get(f"{stream}_artifact", {})
+                    verify_raw_artifact(raw_ref, errors, f"phase.{phase}.{field}.{stream}_artifact")
+                    if raw_ref.get("sha256") != payload.get(f"{stream}_sha256"):
+                        errors.append(f"phase {phase}.{field}: {stream} digest/raw artifact mismatch")
+                try:
+                    started = datetime.fromisoformat(str(payload["started_at"]).replace("Z", "+00:00"))
+                    finished = datetime.fromisoformat(str(payload["finished_at"]).replace("Z", "+00:00"))
+                    if finished < started:
+                        errors.append(f"phase {phase}.{field}: execution timestamps are reversed")
+                except (KeyError, TypeError, ValueError):
+                    errors.append(f"phase {phase}.{field}: execution timestamps are invalid")
                 if stage == "RED" and payload.get("exit_code") == 0:
                     errors.append(f"phase {phase}.{field}: RED must preserve a nonzero expected failure")
                 if stage in ("GREEN", "REFACTOR") and payload.get("exit_code") != 0:
@@ -246,7 +312,13 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
                 errors.append(f"phase {phase}: review {index} is not PASS")
             verify_review_artifact(
                 review["review_artifact"], review["reviewer_agent_id"], phase,
-                review["review_type"], phase_target, errors, f"phase.{phase}.review.{index}",
+                review["review_type"], phase_target, phase_target["phase_manifest_sha256"],
+                errors, f"phase.{phase}.review.{index}",
+            )
+            verify_review_execution_attestation(
+                review["review_execution_attestation"], "PHASE", review["reviewer_agent_id"],
+                phase_target, phase_target["phase_manifest_sha256"], review["review_artifact"]["sha256"],
+                errors, f"phase.{phase}.review.{index}.execution",
             )
             if review["phase_id"] != phase or review["target_tuple"] != phase_target:
                 errors.append(f"phase {phase}: review {index} tuple mismatch")
@@ -269,6 +341,13 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
             errors.append(f"final review {index}: artifact producer is not claimed reviewer")
         if payload and any(payload.get(key) != review.get(key) for key in ("review_type", "reviewer_agent_id", "verdict", "first_line", "target_tuple")):
             errors.append(f"final review {index}: payload/report binding mismatch")
+        if payload and payload.get("reviewed_artifact_sha256") != [deployment["deployment_manifest_sha256"]]:
+            errors.append(f"final review {index}: reviewed subject must be the exact deployment manifest")
+        verify_review_execution_attestation(
+            review["review_execution_attestation"], "FINAL", review["reviewer_agent_id"],
+            expected_target, deployment["deployment_manifest_sha256"], review["review_artifact"]["sha256"],
+            errors, f"final_review.{index}.execution",
+        )
 
     canonical_receipt_schemas: set[str] = set()
     for index, ref in enumerate(report["receipts"]):
@@ -319,6 +398,7 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
             errors.append("PASS requires a live provider-verified canary; BLOCKED_BY_GRAPH is not completion")
         for field in (
             "provider_operation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "external_url", "execution_receipt",
+            "generation_id", "accepted_evaluation_id",
             "provider_readback_receipt", "provider_object_rollback_receipt", "runtime_variant_rollback_receipt",
             "task_router_receipt", "tool_inheritance_receipt",
         ):
@@ -364,10 +444,10 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
             errors.append("activation approval and activation execution producers must differ")
 
     canary_specs = {
-        "execution_receipt": ("callscore.provider_execution_receipt.v2", ("status", "workflow_id", "operation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "publication_revision", "provider_state_version")),
-        "provider_readback_receipt": ("callscore.provider_readback_receipt.v2", ("status", "workflow_id", "operation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "external_url", "visibility", "observed_at")),
-        "provider_object_rollback_receipt": ("callscore.provider_object_rollback_receipt.v2", ("status", "workflow_id", "operation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "external_url", "tested_disposition", "readback_after_rollback_sha256")),
-        "runtime_variant_rollback_receipt": ("callscore.runtime_variant_rollback_receipt.v2", ("status", "workflow_id", "experiment_id", "trigger_measurement_id", "prior_variant_id", "restored_variant_id", "promotion_event_id", "prior_registry_version", "restored_registry_version", "rollback_event_id")),
+        "execution_receipt": ("callscore.provider_execution_receipt.v2", ("status", "workflow_id", "operation_id", "generation_id", "accepted_evaluation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "publication_revision", "provider_state_version")),
+        "provider_readback_receipt": ("callscore.provider_readback_receipt.v2", ("status", "workflow_id", "operation_id", "generation_id", "accepted_evaluation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "external_url", "visibility", "observed_at")),
+        "provider_object_rollback_receipt": ("callscore.provider_object_rollback_receipt.v2", ("status", "report_id", "report_stream_id", "report_sequence_no", "deployment_manifest_sha256", "workflow_id", "operation_id", "generation_id", "accepted_evaluation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id", "external_url", "tested_disposition", "readback_after_rollback_sha256", "verified_at", "expires_at")),
+        "runtime_variant_rollback_receipt": ("callscore.runtime_variant_rollback_receipt.v2", ("status", "report_id", "report_stream_id", "report_sequence_no", "deployment_manifest_sha256", "workflow_id", "experiment_id", "trigger_measurement_id", "trigger_generation_id", "prior_variant_id", "restored_variant_id", "promotion_event_id", "prior_registry_version", "restored_registry_version", "rollback_event_id", "verified_at", "expires_at")),
         "task_router_receipt": ("callscore.task_router_receipt.v2", ("status", "workflow_id", "router_decision_sha256")),
         "tool_inheritance_receipt": ("callscore.tool_inheritance_receipt.v2", ("status", "workflow_id", "delegation_id", "expected_capabilities_sha256", "observed_capabilities_sha256")),
     }
@@ -389,10 +469,10 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
     for label, payload in (("execution", execution), ("readback", readback), ("provider rollback", provider_rollback)):
         if payload and (payload.get("operation_id") != operation_id or payload.get("workflow_id") != workflow_id):
             errors.append(f"canary {label}: workflow/operation mismatch")
-        if payload and any(payload.get(key) != canary.get(key) for key in ("account_scope_hash", "action_name", "payload_sha256", "external_object_id")):
+        if payload and any(payload.get(key) != canary.get(key) for key in ("generation_id", "accepted_evaluation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id")):
             errors.append(f"canary {label}: report identity tuple mismatch")
     if execution and readback and provider_rollback:
-        identity_fields = ("account_scope_hash", "action_name", "payload_sha256", "external_object_id")
+        identity_fields = ("generation_id", "accepted_evaluation_id", "account_scope_hash", "action_name", "payload_sha256", "external_object_id")
         if any(execution.get(key) != readback.get(key) or execution.get(key) != provider_rollback.get(key) for key in identity_fields):
             errors.append("canary execution/readback/provider rollback identity mismatch")
         if readback.get("external_url") != canary.get("external_url") or readback.get("external_object_id") != canary.get("external_object_id"):
@@ -408,12 +488,33 @@ def verify_report(report: dict[str, Any], schema: dict[str, Any], args: argparse
         errors.append("provider execution and provider readback producers must differ")
 
     runtime_rollback = canary_payloads.get("runtime_variant_rollback_receipt")
+    rollback_report_binding = {
+        "report_id": report["report_id"],
+        "report_stream_id": report["report_stream_id"],
+        "report_sequence_no": report["sequence_no"],
+        "deployment_manifest_sha256": deployment["deployment_manifest_sha256"],
+    }
+    for label, payload in (("provider", provider_rollback), ("runtime", runtime_rollback)):
+        if payload and any(payload.get(key) != value for key, value in rollback_report_binding.items()):
+            errors.append(f"{label} rollback is not bound to the exact report/deployment tuple")
+        if payload:
+            try:
+                verified = datetime.fromisoformat(str(payload["verified_at"]).replace("Z", "+00:00"))
+                expires = datetime.fromisoformat(str(payload["expires_at"]).replace("Z", "+00:00"))
+                if verified >= expires:
+                    errors.append(f"{label} rollback receipt is expired or temporally invalid")
+            except (KeyError, TypeError, ValueError):
+                errors.append(f"{label} rollback timestamps are invalid")
     if runtime_rollback and runtime_rollback.get("prior_variant_id") == runtime_rollback.get("restored_variant_id"):
         errors.append("runtime variant rollback does not change variant")
     if runtime_rollback and runtime_rollback.get("workflow_id") != workflow_id:
         errors.append("runtime rollback is unrelated to the canary workflow")
     if runtime_rollback and runtime_rollback.get("restored_registry_version", 0) <= runtime_rollback.get("prior_registry_version", 0):
         errors.append("runtime rollback registry versions are not monotonic")
+    if runtime_rollback and runtime_rollback.get("trigger_generation_id") != canary.get("generation_id"):
+        errors.append("runtime rollback trigger measurement is not bound to the canary generation")
+    if runtime_rollback and runtime_rollback.get("promotion_event_id") == runtime_rollback.get("rollback_event_id"):
+        errors.append("runtime rollback promotion and rollback events must be distinct")
 
     return errors
 
@@ -441,7 +542,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    global EVIDENCE_VALIDATOR
+    global EVIDENCE_VALIDATOR, FROZEN_EVIDENCE
     args = parse_args()
     verifier_script_path = Path(__file__).resolve()
     report_path = Path(args.report).resolve(strict=True)
@@ -450,23 +551,46 @@ def main() -> int:
     deployment_path = Path(args.deployment_manifest).resolve(strict=True)
     script_path = verifier_script_path
     output = Path(args.out).resolve(strict=False)
-    protected_paths = {report_path, schema_path, evidence_schema_path, deployment_path, verifier_script_path}
-    if output in protected_paths or output in artifact_paths(load_json(report_path)):
-        raise SystemExit("--out must not alias an input or referenced evidence artifact")
-    if output.exists():
-        raise SystemExit("--out is create-only and must not already exist")
     report_bytes = report_path.read_bytes()
     schema_bytes = schema_path.read_bytes()
     evidence_schema_bytes = evidence_schema_path.read_bytes()
     deployment_bytes = deployment_path.read_bytes()
     script_bytes = script_path.read_bytes()
     report = json.loads(report_bytes)
+    evidence_paths = artifact_paths(report)
+    for gate in report.get("phase_gates", {}).values():
+        for field in ("red_receipt", "green_receipt", "refactor_receipt"):
+            receipt_ref = gate.get(field, {})
+            receipt_path = Path(str(receipt_ref.get("path", ""))).resolve(strict=False)
+            if receipt_path.is_file():
+                try:
+                    receipt_payload = json.loads(receipt_path.read_bytes())
+                    evidence_paths.update(artifact_paths(receipt_payload))
+                    command = receipt_payload.get("command", [])
+                    if command and Path(command[0]).is_absolute():
+                        evidence_paths.add(Path(command[0]).resolve(strict=False))
+                except Exception:  # verifier reports malformed receipts later
+                    pass
+    protected_paths = {report_path, schema_path, evidence_schema_path, deployment_path, verifier_script_path}
+    if output in protected_paths or output in evidence_paths:
+        raise SystemExit("--out must not alias an input or referenced evidence artifact")
+    if output.exists():
+        raise SystemExit("--out is create-only and must not already exist")
+    for path in evidence_paths:
+        if not path.is_file():
+            raise SystemExit(f"referenced evidence missing before verification: {path}")
+    FROZEN_EVIDENCE = {path: path.read_bytes() for path in evidence_paths}
     schema = json.loads(schema_bytes)
     evidence_schema = json.loads(evidence_schema_bytes)
     EVIDENCE_VALIDATOR = Draft202012Validator(evidence_schema, format_checker=FormatChecker())
     errors = verify_report(report, schema, args)
     if args.verifier_agent_id == args.receipt_verifier_agent_id:
         errors.append("verification receipt producer and verifier must differ")
+    frozen_evidence_manifest = json.dumps(
+        [{"path": str(path), "sha256": sha256_bytes(data), "byte_length": len(data)}
+         for path, data in sorted(FROZEN_EVIDENCE.items(), key=lambda item: str(item[0]))],
+        separators=(",", ":"), sort_keys=True,
+    ).encode("utf-8")
     receipt = {
         "schema": "callscore.autonomy_report_verification_receipt.v2",
         "status": "FAIL" if errors else "PASS",
@@ -476,6 +600,8 @@ def main() -> int:
         "evidence_schema_sha256": sha256_bytes(evidence_schema_bytes),
         "deployment_manifest_sha256": sha256_bytes(deployment_bytes),
         "verifier_script_sha256": sha256_bytes(script_bytes),
+        "frozen_evidence_manifest_sha256": sha256_bytes(frozen_evidence_manifest),
+        "frozen_evidence_count": len(FROZEN_EVIDENCE),
         "report": str(report_path),
         "target_tuple": {
             "app_commit_sha": args.expected_app_sha,
@@ -506,6 +632,7 @@ def main() -> int:
         evidence_schema_path: sha256_bytes(evidence_schema_bytes),
         deployment_path: sha256_bytes(deployment_bytes),
         script_path: sha256_bytes(script_bytes),
+        **{path: sha256_bytes(data) for path, data in FROZEN_EVIDENCE.items()},
     }
     for path, expected_sha256 in frozen_inputs.items():
         if sha256_bytes(path.read_bytes()) != expected_sha256:

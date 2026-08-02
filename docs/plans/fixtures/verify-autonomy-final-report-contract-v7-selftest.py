@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a valid v5 report, then prove adversarial variants fail closed."""
+"""Generate a valid v6 report, then prove adversarial variants fail closed."""
 from __future__ import annotations
 
 import copy
@@ -12,9 +12,9 @@ import uuid
 from pathlib import Path
 
 FIXTURES = Path(__file__).resolve().parent
-VERIFIER = FIXTURES / "verify-autonomy-final-report-contract-v6.py"
-REPORT_SCHEMA = FIXTURES / "callscore-autonomy-implementation-report-v5.schema.json"
-EVIDENCE_SCHEMA = FIXTURES / "autonomy-evidence-receipts-v1.schema.json"
+VERIFIER = FIXTURES / "verify-autonomy-final-report-contract-v7.py"
+REPORT_SCHEMA = FIXTURES / "callscore-autonomy-implementation-report-v6.schema.json"
+EVIDENCE_SCHEMA = FIXTURES / "autonomy-evidence-receipts-v2.schema.json"
 PHASES = ("A0", *tuple("ABCDEFGHIJ"))
 REVIEW_TYPES = ("contract", "implementation", "security")
 H = "a" * 64
@@ -38,6 +38,14 @@ def ref(path: Path, schema: str, producer: str, verifier: str) -> dict:
         "artifact_id": uid(), "schema": schema, "path": str(path.resolve()),
         "sha256": hashlib.sha256(data).hexdigest(), "byte_length": len(data),
         "producer_agent_id": producer, "verifier_agent_id": verifier,
+    }
+
+
+def raw_ref(path: Path) -> dict:
+    data = path.read_bytes()
+    return {
+        "path": str(path.resolve()), "sha256": hashlib.sha256(data).hexdigest(),
+        "byte_length": len(data), "media_type": "text/plain",
     }
 
 
@@ -69,13 +77,24 @@ def build(root: Path) -> tuple[dict, Path, dict]:
         stages: dict[str, dict] = {}
         for stage in ("RED", "GREEN", "REFACTOR"):
             producer = f"phase-{phase}-{stage.lower()}-runner"
+            executable = Path("/usr/bin/false" if stage == "RED" else "/usr/bin/true")
+            stdout_path = root / f"{phase}-{stage}.stdout"
+            stderr_path = root / f"{phase}-{stage}.stderr"
+            stdout_path.write_bytes(f"{phase}:{stage}:stdout\n".encode())
+            stderr_path.write_bytes(f"{phase}:{stage}:stderr\n".encode())
             body = {
                 "schema": "callscore.phase_test_receipt.v2", "phase_id": phase, "stage": stage,
                 "status": "PASS", "target_tuple": phase_target,
-                "command": ["/usr/bin/false" if stage == "RED" else "/usr/bin/true"],
+                "command": [str(executable)],
+                "command_executable_sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
+                "cwd": str(root.resolve()),
+                "scope": {"repo_root": str(root.resolve()), "test_selector": f"phase:{phase}:{stage}",
+                          "phase_manifest_sha256": phase_target["phase_manifest_sha256"]},
+                "normalization": {"algorithm": "identity-bytes", "version": "1", "line_endings": "preserved"},
                 "exit_code": 1 if stage == "RED" else 0,
                 "started_at": "2026-08-02T00:00:00Z", "finished_at": "2026-08-02T00:00:01Z",
-                "stdout_sha256": H, "stderr_sha256": "b" * 64,
+                "stdout_sha256": raw_ref(stdout_path)["sha256"], "stderr_sha256": raw_ref(stderr_path)["sha256"],
+                "stdout_artifact": raw_ref(stdout_path), "stderr_artifact": raw_ref(stderr_path),
                 "controlled_result_code": "expected_red" if stage == "RED" else "passed",
             }
             stages[f"{stage.lower()}_receipt"] = receipt(root, f"{phase}-{stage}.json", body, producer, "phase-receipt-verifier")
@@ -86,13 +105,22 @@ def build(root: Path) -> tuple[dict, Path, dict]:
                 "schema": "callscore.phase_review_receipt.v2", "phase_id": phase,
                 "review_type": review_type, "reviewer_agent_id": reviewer, "verdict": "PASS",
                 "first_line": "VERDICT: PASS", "target_tuple": phase_target,
-                "reviewed_artifact_sha256": [H],
+                "reviewed_artifact_sha256": [phase_target["phase_manifest_sha256"]],
             }
             artifact = receipt(root, f"{phase}-{review_type}-review.json", body, reviewer, "phase-review-verifier")
+            attestation = receipt(root, f"{phase}-{review_type}-attestation.json", {
+                "schema": "callscore.review_execution_attestation.v1", "status": "PASS", "scope": "PHASE",
+                "review_execution_id": uid(), "reviewer_agent_id": reviewer,
+                "hermes_session_id": f"session-{phase}-{review_type}", "delegation_batch_id": f"batch-{phase}",
+                "delegation_task_ordinal": REVIEW_TYPES.index(review_type), "target_tuple": phase_target,
+                "reviewed_artifact_sha256": phase_target["phase_manifest_sha256"],
+                "review_output_sha256": artifact["sha256"], "process_identity_sha256": "d" * 64,
+                "attested_by_role": "callscore-review-identity-attestor",
+            }, "callscore-review-identity-attestor", "review-identity-trust-verifier")
             reviews.append({
                 "phase_id": phase, "review_type": review_type, "reviewer_agent_id": reviewer,
                 "verdict": "PASS", "first_line": "VERDICT: PASS", "target_tuple": phase_target,
-                "review_artifact": artifact,
+                "review_artifact": artifact, "review_execution_attestation": attestation,
             })
         phase_gates[phase] = {"phase_id": phase, "target_tuple": phase_target, "status": "PASS", **stages, "reviews": reviews}
 
@@ -105,12 +133,24 @@ def build(root: Path) -> tuple[dict, Path, dict]:
             "target_tuple": target, "reviewed_artifact_sha256": [deployment["deployment_manifest_sha256"]],
         }
         artifact = receipt(root, f"final-{review_type}.json", body, reviewer, "final-review-verifier")
+        attestation = receipt(root, f"final-{review_type}-attestation.json", {
+            "schema": "callscore.review_execution_attestation.v1", "status": "PASS", "scope": "FINAL",
+            "review_execution_id": uid(), "reviewer_agent_id": reviewer,
+            "hermes_session_id": f"session-final-{review_type}", "delegation_batch_id": "batch-final",
+            "delegation_task_ordinal": REVIEW_TYPES.index(review_type), "target_tuple": target,
+            "reviewed_artifact_sha256": deployment["deployment_manifest_sha256"],
+            "review_output_sha256": artifact["sha256"], "process_identity_sha256": "e" * 64,
+            "attested_by_role": "callscore-review-identity-attestor",
+        }, "callscore-review-identity-attestor", "review-identity-trust-verifier")
         final_reviews.append({
             "review_type": review_type, "reviewer_agent_id": reviewer, "verdict": "PASS",
             "first_line": "VERDICT: PASS", "target_tuple": target, "review_artifact": artifact,
+            "review_execution_attestation": attestation,
         })
 
     report_id, workflow_id, operation_id = uid(), uid(), uid()
+    report_stream_id, report_sequence_no = "autonomy-final", 1
+    generation_id, accepted_evaluation_id = uid(), uid()
     approval = receipt(root, "activation-approval.json", {
         "schema": "callscore.autonomy_activation_approval_receipt.v2", "status": "PASS",
         "report_id": report_id, "target_tuple": target, "approved_at": "2026-08-02T01:00:00Z",
@@ -123,6 +163,7 @@ def build(root: Path) -> tuple[dict, Path, dict]:
     }, "deployment-operator", "activation-verifier")
     provider_identity = {
         "status": "PASS", "workflow_id": workflow_id, "operation_id": operation_id,
+        "generation_id": generation_id, "accepted_evaluation_id": accepted_evaluation_id,
         "account_scope_hash": "d" * 64, "action_name": "create", "payload_sha256": "e" * 64,
         "external_object_id": "external-1",
     }
@@ -136,14 +177,23 @@ def build(root: Path) -> tuple[dict, Path, dict]:
     }, "provider-readback", "trust-reviewer")
     provider_rollback = receipt(root, "provider-rollback.json", {
         "schema": "callscore.provider_object_rollback_receipt.v2", **provider_identity,
+        "report_id": report_id, "report_stream_id": report_stream_id,
+        "report_sequence_no": report_sequence_no,
+        "deployment_manifest_sha256": deployment["deployment_manifest_sha256"],
         "external_url": "https://example.com/public/1", "tested_disposition": "DELETED",
         "readback_after_rollback_sha256": "f" * 64,
+        "verified_at": "2026-08-02T01:21:00Z", "expires_at": "2026-08-02T03:00:00Z",
     }, "provider-rollback-worker", "trust-reviewer")
     runtime_rollback = receipt(root, "runtime-rollback.json", {
         "schema": "callscore.runtime_variant_rollback_receipt.v2", "status": "PASS",
+        "report_id": report_id, "report_stream_id": report_stream_id,
+        "report_sequence_no": report_sequence_no,
+        "deployment_manifest_sha256": deployment["deployment_manifest_sha256"],
         "workflow_id": workflow_id, "experiment_id": uid(), "trigger_measurement_id": uid(),
+        "trigger_generation_id": generation_id,
         "prior_variant_id": uid(), "restored_variant_id": uid(), "promotion_event_id": uid(),
         "prior_registry_version": 1, "restored_registry_version": 2, "rollback_event_id": uid(),
+        "verified_at": "2026-08-02T01:22:00Z", "expires_at": "2026-08-02T03:00:00Z",
     }, "runtime-rollback-worker", "trust-reviewer")
     router = receipt(root, "router.json", {
         "schema": "callscore.task_router_receipt.v2", "status": "PASS", "workflow_id": workflow_id,
@@ -167,7 +217,8 @@ def build(root: Path) -> tuple[dict, Path, dict]:
         canonical.append(receipt(root, f"canonical-{index}.json", body, f"canonical-{index}-producer", "canonical-receipt-verifier"))
 
     report = {
-        "schema": "callscore.autonomy_implementation_report.v5", "report_id": report_id,
+        "schema": "callscore.autonomy_implementation_report.v6", "report_id": report_id,
+        "report_stream_id": report_stream_id, "sequence_no": report_sequence_no,
         "generated_at": "2026-08-02T01:30:00Z", "final_status": "PASS",
         "producer_agent_id": "report-producer", "verifier_agent_id": "report-verifier",
         "source_tuple": {"app_commit_sha": APP, "workplane_commit_sha": WORKPLANE, "plan_commit_sha": PLAN, "plan_sha256": "4" * 64, "manifest_sha256": "5" * 64},
@@ -175,6 +226,7 @@ def build(root: Path) -> tuple[dict, Path, dict]:
         "live_activation": {"approved": True, "approval_receipt": approval, "activated_at": "2026-08-02T01:10:00Z", "activation_receipt": activation, "rollback_deadline": "2026-08-02T03:00:00Z"},
         "canary": {
             "status": "PASS", "workflow_id": workflow_id, "provider_operation_id": operation_id,
+            "generation_id": generation_id, "accepted_evaluation_id": accepted_evaluation_id,
             "account_scope_hash": "d" * 64, "action_name": "create", "payload_sha256": "e" * 64,
             "is_media": False, "is_youtube": False, "external_object_id": "external-1",
             "external_url": "https://example.com/public/1", "execution_receipt": execution,
@@ -207,13 +259,43 @@ def invoke(root: Path, label: str, report: dict, deployment_path: Path, target: 
 
 
 def main() -> int:
-    with tempfile.TemporaryDirectory(prefix="callscore-v6-verifier-selftest-") as directory:
+    with tempfile.TemporaryDirectory(prefix="callscore-v7-verifier-selftest-") as directory:
         root = Path(directory)
         report, deployment_path, target = build(root)
         cases: list[tuple[str, dict, int]] = [("valid", report, 0)]
         bad_phase = copy.deepcopy(report)
         bad_phase["phase_gates"]["A"]["green_receipt"]["sha256"] = "0" * 64
         cases.append(("bad-phase-hash", bad_phase, 1))
+        bad_phase_subject = copy.deepcopy(report)
+        phase_review = bad_phase_subject["phase_gates"]["A"]["reviews"][0]
+        phase_payload = json.loads(Path(phase_review["review_artifact"]["path"]).read_text())
+        phase_payload["reviewed_artifact_sha256"] = ["0" * 64]
+        phase_file = dump(root / "bad-phase-subject.json", phase_payload)
+        phase_review["review_artifact"] = ref(phase_file, phase_payload["schema"], phase_payload["producer_agent_id"], phase_payload["verifier_agent_id"])
+        cases.append(("wrong-phase-review-subject", bad_phase_subject, 1))
+        bad_final_subject = copy.deepcopy(report)
+        final_review = bad_final_subject["final_reviews"][0]
+        final_payload = json.loads(Path(final_review["review_artifact"]["path"]).read_text())
+        final_payload["reviewed_artifact_sha256"] = ["0" * 64]
+        final_file = dump(root / "bad-final-subject.json", final_payload)
+        final_review["review_artifact"] = ref(final_file, final_payload["schema"], final_payload["producer_agent_id"], final_payload["verifier_agent_id"])
+        cases.append(("wrong-final-review-subject", bad_final_subject, 1))
+        invented = copy.deepcopy(report)
+        invented_review = invented["final_reviews"][0]
+        invented_payload = json.loads(Path(invented_review["review_artifact"]["path"]).read_text())
+        invented_payload["reviewer_agent_id"] = "invented-independent-reviewer"
+        invented_payload["producer_agent_id"] = "invented-independent-reviewer"
+        invented_file = dump(root / "invented-reviewer.json", invented_payload)
+        invented_review["reviewer_agent_id"] = "invented-independent-reviewer"
+        invented_review["review_artifact"] = ref(invented_file, invented_payload["schema"], "invented-independent-reviewer", invented_payload["verifier_agent_id"])
+        cases.append(("invented-reviewer-without-attestation", invented, 1))
+        rawless = copy.deepcopy(report)
+        raw_ref_receipt = rawless["phase_gates"]["A"]["red_receipt"]
+        rawless_payload = json.loads(Path(raw_ref_receipt["path"]).read_text())
+        rawless_payload.pop("stdout_artifact")
+        rawless_file = dump(root / "rawless-phase-evidence.json", rawless_payload)
+        rawless["phase_gates"]["A"]["red_receipt"] = ref(rawless_file, rawless_payload["schema"], rawless_payload["producer_agent_id"], rawless_payload["verifier_agent_id"])
+        cases.append(("rawless-phase-evidence", rawless, 1))
         bad_runtime = copy.deepcopy(report)
         runtime_path = Path(bad_runtime["canary"]["runtime_variant_rollback_receipt"]["path"])
         runtime_payload = json.loads(runtime_path.read_text())
@@ -228,6 +310,13 @@ def main() -> int:
         unrelated_file = dump(root / "runtime-rollback-unrelated.json", unrelated_payload)
         unrelated["canary"]["runtime_variant_rollback_receipt"] = ref(unrelated_file, unrelated_payload["schema"], unrelated_payload["producer_agent_id"], unrelated_payload["verifier_agent_id"])
         cases.append(("unrelated-runtime-rollback", unrelated, 1))
+        stale_runtime = copy.deepcopy(report)
+        stale_path = Path(stale_runtime["canary"]["runtime_variant_rollback_receipt"]["path"])
+        stale_payload = json.loads(stale_path.read_text())
+        stale_payload["report_sequence_no"] = 2
+        stale_file = dump(root / "runtime-rollback-stale-report.json", stale_payload)
+        stale_runtime["canary"]["runtime_variant_rollback_receipt"] = ref(stale_file, stale_payload["schema"], stale_payload["producer_agent_id"], stale_payload["verifier_agent_id"])
+        cases.append(("runtime-rollback-stale-report", stale_runtime, 1))
         results = []
         for label, payload, expected_exit in cases:
             completed = invoke(root, label, payload, deployment_path, target)
@@ -250,7 +339,17 @@ def main() -> int:
         alias_completed = subprocess.run(alias_command, text=True, capture_output=True)
         alias_unchanged = hashlib.sha256(alias_report.read_bytes()).hexdigest() == alias_before
         results.append({"case": "output-alias", "exit_code": alias_completed.returncode, "expected_exit_code": 1, "report_unchanged": alias_unchanged, "passed": alias_completed.returncode == 1 and alias_unchanged})
-        print(json.dumps({"schema": "callscore.autonomy_verifier_selftest.v6", "results": results, "all_passed": all(row["passed"] for row in results)}, sort_keys=True))
+        raw_alias = Path(report["phase_gates"]["A"]["red_receipt"]["path"])
+        raw_payload = json.loads(raw_alias.read_text())
+        raw_output = Path(raw_payload["stdout_artifact"]["path"])
+        raw_before = hashlib.sha256(raw_output.read_bytes()).hexdigest()
+        raw_alias_command = alias_command.copy()
+        raw_alias_command[-1] = str(raw_output)
+        raw_alias_completed = subprocess.run(raw_alias_command, text=True, capture_output=True)
+        raw_unchanged = hashlib.sha256(raw_output.read_bytes()).hexdigest() == raw_before
+        results.append({"case": "raw-evidence-output-alias", "exit_code": raw_alias_completed.returncode, "expected_exit_code": 1,
+                        "evidence_unchanged": raw_unchanged, "passed": raw_alias_completed.returncode == 1 and raw_unchanged})
+        print(json.dumps({"schema": "callscore.autonomy_verifier_selftest.v7", "results": results, "all_passed": all(row["passed"] for row in results)}, sort_keys=True))
         return 0 if all(row["passed"] for row in results) else 1
 
 
