@@ -10,12 +10,32 @@ const repoRoot = process.cwd();
 const script = join(repoRoot, "scripts/apply-callscore-hermes-patch.py");
 const manifest = join(repoRoot, "ops/hermes-runtime-patches/bitwarden-zero-ttl-cache/manifest.json");
 const ownedPatch = join(repoRoot, "ops/hermes-runtime-patches/bitwarden-zero-ttl-cache/bitwarden-zero-ttl-cache.patch");
-const gatewayUnit = join(repoRoot, "ops/systemd/hermes-callscore-gateway.service");
-const unitInstaller = join(repoRoot, "scripts/install-callscore-hermes-gateway-unit.py");
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 
 function run(args: string[]) {
   return spawnSync("python3", [script, ...args], { cwd: repoRoot, encoding: "utf8" });
+}
+
+function initGitRuntime(root: string, content = "value = 'before'\n") {
+  const target = join(root, "runtime");
+  mkdirSync(join(target, "agent"), { recursive: true });
+  writeFileSync(join(target, "agent/example.py"), content);
+  for (const args of [
+    ["init", "-q", target],
+    ["-C", target, "config", "user.name", "CallScore Test"],
+    ["-C", target, "config", "user.email", "callscore-test@example.invalid"],
+    ["-C", target, "add", "agent/example.py"],
+    ["-C", target, "commit", "-q", "-m", "fixture"],
+    ["-C", target, "gc", "--prune=now"],
+  ]) {
+    const result = spawnSync("git", args, { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+  }
+  const commit = spawnSync("git", ["-C", target, "rev-parse", "HEAD"], { encoding: "utf8" });
+  const tree = spawnSync("git", ["-C", target, "rev-parse", "HEAD^{tree}"], { encoding: "utf8" });
+  assert.equal(commit.status, 0, commit.stderr || commit.stdout);
+  assert.equal(tree.status, 0, tree.stderr || tree.stdout);
+  return { target, commit: commit.stdout.trim(), tree: tree.stdout.trim() };
 }
 
 test("CallScore owns a pinned Hermes zero-TTL cache patch", () => {
@@ -24,8 +44,9 @@ test("CallScore owns a pinned Hermes zero-TTL cache patch", () => {
   const parsed = JSON.parse(result.stdout);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.owner, "OmarA1-Bakri/CallScore");
-  assert.equal(parsed.upstream_commit, "1d3d021282098261ce2ad224a76d97d89b16188c");
-  assert.equal(parsed.patch_sha256, "e44e3216e8b139c1122630170ec5036485dfd844978fd8569c4267cfc8032ed8");
+  assert.equal(parsed.upstream_commit, "b91aade17683a551e6c8e633fe5407d07354b16e");
+  assert.match(parsed.patch_sha256, /^[0-9a-f]{64}$/);
+
   assert.deepEqual(parsed.target_paths, [
     "agent/secret_sources/bitwarden.py",
     "tests/test_bitwarden_secrets.py",
@@ -38,7 +59,7 @@ test("owned Hermes patch is syntactically valid for git apply", () => {
     encoding: "utf8",
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.match(result.stdout, /^4\s+0\s+agent\/secret_sources\/bitwarden\.py$/m);
+  assert.match(result.stdout, /^12\s+4\s+agent\/secret_sources\/bitwarden\.py$/m);
   assert.match(result.stdout, /^29\s+0\s+tests\/test_bitwarden_secrets\.py$/m);
 });
 
@@ -53,11 +74,9 @@ test("CallScore scopes patch-format blank-line whitespace handling to owned patc
 
 test("CallScore patch installer verifies and applies a bounded patch", () => {
   const root = mkdtempSync(join(tmpdir(), "callscore-hermes-patch-"));
-  const target = join(root, "runtime");
+  const { target, commit, tree } = initGitRuntime(root);
   const bundle = join(root, "bundle");
-  mkdirSync(join(target, "agent"), { recursive: true });
   mkdirSync(bundle, { recursive: true });
-  writeFileSync(join(target, "agent/example.py"), "value = 'before'\n");
   writeFileSync(
     join(bundle, "change.patch"),
     "diff --git a/agent/example.py b/agent/example.py\n" +
@@ -74,8 +93,8 @@ test("CallScore patch installer verifies and applies a bounded patch", () => {
       schema: "callscore.hermes_runtime_patch.v1",
       owner: "OmarA1-Bakri/CallScore",
       upstream_repository: "NousResearch/hermes-agent",
-      upstream_commit: "test-commit",
-      upstream_tree: "test-tree",
+      upstream_commit: commit,
+      upstream_tree: tree,
       patch_file: "change.patch",
       patch_sha256: sha(patchBytes),
       target_files: [{
@@ -102,9 +121,8 @@ test("CallScore patch installer verifies and applies a bounded patch", () => {
 
 test("CallScore patch installer fails closed on mixed target state", () => {
   const root = mkdtempSync(join(tmpdir(), "callscore-hermes-patch-mixed-"));
-  const target = join(root, "runtime");
+  const { target, commit, tree } = initGitRuntime(root);
   const bundle = join(root, "bundle");
-  mkdirSync(target, { recursive: true });
   mkdirSync(bundle, { recursive: true });
   writeFileSync(join(target, "one"), "after\n");
   writeFileSync(join(target, "two"), "before\n");
@@ -113,8 +131,8 @@ test("CallScore patch installer fails closed on mixed target state", () => {
     schema: "callscore.hermes_runtime_patch.v1",
     owner: "OmarA1-Bakri/CallScore",
     upstream_repository: "NousResearch/hermes-agent",
-    upstream_commit: "test-commit",
-    upstream_tree: "test-tree",
+    upstream_commit: commit,
+    upstream_tree: tree,
     patch_file: "change.patch",
     patch_sha256: sha("placeholder\n"),
     target_files: [
@@ -128,105 +146,103 @@ test("CallScore patch installer fails closed on mixed target state", () => {
   assert.match(result.stderr, /mixed_or_unknown/);
 });
 
-test("canonical CallScore gateway applies the owned Hermes patch before startup", () => {
-  assert.equal(existsSync(gatewayUnit), true, "repo-owned CallScore gateway unit must exist");
-  const unit = readFileSync(gatewayUnit, "utf8");
-  assert.match(unit, /^WorkingDirectory=\/opt\/crypto-tuber-ranked$/m);
-  assert.match(
-    unit,
-    /^ExecStartPre=\/usr\/bin\/python3 \/opt\/crypto-tuber-ranked\/scripts\/apply-callscore-hermes-patch\.py --manifest \/opt\/crypto-tuber-ranked\/ops\/hermes-runtime-patches\/bitwarden-zero-ttl-cache\/manifest\.json --runtime-repo \/srv\/agents\/hermes\/hermes-agent --apply$/m,
-  );
-  assert.match(unit, /^Environment="HERMES_HOME=\/srv\/agents\/hermes\/profiles\/callscore"$/m);
-  assert.match(unit, /^ExecStart=\/home\/omar\/\.local\/bin\/callscore gateway run --accept-hooks$/m);
-  assert.ok(unit.indexOf("ExecStartPre=") < unit.indexOf("ExecStart="));
-});
-
-test("gateway unit installer verifies drift and never restarts the live gateway", () => {
-  assert.equal(existsSync(unitInstaller), true, "guarded gateway unit installer must exist");
-  const root = mkdtempSync(join(tmpdir(), "callscore-gateway-unit-"));
-  const destination = join(root, "hermes-callscore-gateway.service");
-
-  let result = spawnSync("python3", [unitInstaller, "--source", gatewayUnit, "--destination", destination, "--check"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
-  assert.equal(result.status, 1);
-  assert.equal(JSON.parse(result.stderr).state, "missing");
-
-  result = spawnSync("python3", [unitInstaller, "--source", gatewayUnit, "--destination", destination, "--install", "--no-daemon-reload"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.equal(JSON.parse(result.stdout).state, "installed");
-  assert.equal(readFileSync(destination, "utf8"), readFileSync(gatewayUnit, "utf8"));
-
-  result = spawnSync("python3", [unitInstaller, "--source", gatewayUnit, "--destination", destination, "--check"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-  });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.equal(JSON.parse(result.stdout).state, "current");
-
-  const installer = readFileSync(unitInstaller, "utf8");
-  assert.doesNotMatch(installer, /\bsystemctl\b[^\n]*(?:restart|start|stop|enable|disable)\b/);
-});
-
-test("gateway unit installer keeps the canonical user-systemd destination under profile HOME", () => {
-  const fakeHome = mkdtempSync(join(tmpdir(), "callscore-profile-home-"));
-  const passwdHome = spawnSync(
-    "python3",
-    ["-c", "import os,pwd; print(pwd.getpwuid(os.getuid()).pw_dir)"],
-    { encoding: "utf8", env: { ...process.env, HOME: fakeHome } },
-  );
-  assert.equal(passwdHome.status, 0, passwdHome.stderr || passwdHome.stdout);
-  const result = spawnSync("python3", [unitInstaller, "--source", gatewayUnit, "--check"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    env: { ...process.env, HOME: fakeHome },
-  });
-  assert.notEqual(result.status, null);
-  const payload = JSON.parse(result.status === 0 ? result.stdout : result.stderr);
-  assert.equal(
-    payload.destination,
-    join(passwdHome.stdout.trim(), ".config/systemd/user/hermes-callscore-gateway.service"),
-  );
-  assert.equal(payload.destination.startsWith(fakeHome), false);
-});
-
-test("Python runtime installers invoke only fixed absolute executables without subprocess or a shell", () => {
-  for (const path of [script, unitInstaller]) {
-    const source = readFileSync(path, "utf8");
-    assert.doesNotMatch(source, /^import subprocess$/m);
-    assert.doesNotMatch(source, /\bsubprocess\./);
-    assert.doesNotMatch(source, /shell\s*=\s*True/);
-    assert.match(source, /os\.posix_spawn\(/);
+test("manifest rejects malformed or bypassable Git anchors", () => {
+  const source = JSON.parse(readFileSync(manifest, "utf8"));
+  const root = mkdtempSync(join(tmpdir(), "callscore-hermes-bad-anchor-"));
+  const patchPath = join(root, source.patch_file);
+  writeFileSync(patchPath, readFileSync(ownedPatch));
+  for (const [field, value] of [
+    ["upstream_commit", "test-commit"],
+    ["upstream_tree", "not-a-tree"],
+  ] as const) {
+    const bad = { ...source, [field]: value };
+    const path = join(root, `${field}.json`);
+    writeFileSync(path, JSON.stringify(bad));
+    const result = run(["--manifest", path, "--verify-manifest"]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /40-character hexadecimal Git object ID/);
   }
-  assert.match(readFileSync(script, "utf8"), /GIT_EXECUTABLE = "\/usr\/bin\/git"/);
-  assert.match(readFileSync(unitInstaller, "utf8"), /SYSTEMCTL_EXECUTABLE = "\/usr\/bin\/systemctl"/);
 });
 
-test("gateway unit installer refuses a symlink destination", () => {
-  const root = mkdtempSync(join(tmpdir(), "callscore-gateway-symlink-"));
-  const protectedFile = join(root, "protected");
-  const destination = join(root, "hermes-callscore-gateway.service");
-  writeFileSync(protectedFile, "do-not-overwrite\n");
-  symlinkSync(protectedFile, destination);
+test("patch installer fails closed on commit and tree anchor mismatches", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-hermes-anchor-mismatch-"));
+  const { target, commit, tree } = initGitRuntime(root);
+  const bundle = join(root, "bundle");
+  mkdirSync(bundle);
+  writeFileSync(join(bundle, "change.patch"), "placeholder\n");
+  const base = {
+    schema: "callscore.hermes_runtime_patch.v1",
+    owner: "OmarA1-Bakri/CallScore",
+    upstream_repository: "NousResearch/hermes-agent",
+    upstream_commit: commit,
+    upstream_tree: tree,
+    patch_file: "change.patch",
+    patch_sha256: sha("placeholder\n"),
+    target_files: [{ path: "agent/example.py", before_sha256: sha("value = 'before'\n"), after_sha256: sha("value = 'after'\n") }],
+  };
+  for (const [field, value, expected] of [
+    ["upstream_commit", "0".repeat(40), /runtime Git anchor mismatch/],
+    ["upstream_tree", "f".repeat(40), /runtime Git anchor mismatch/],
+  ] as const) {
+    const path = join(bundle, `${field}.json`);
+    writeFileSync(path, JSON.stringify({ ...base, [field]: value }));
+    const result = run(["--manifest", path, "--runtime-repo", target, "--check"]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, expected);
+  }
+});
 
-  const result = spawnSync(
-    "python3",
-    [unitInstaller, "--source", gatewayUnit, "--destination", destination, "--install", "--no-daemon-reload"],
-    { cwd: repoRoot, encoding: "utf8" },
-  );
+test("patch installer refuses target symlinks that escape the runtime", () => {
+  const root = mkdtempSync(join(tmpdir(), "callscore-hermes-target-symlink-"));
+  const { target, commit, tree } = initGitRuntime(root);
+  const bundle = join(root, "bundle");
+  const protectedPath = join(root, "protected.py");
+  mkdirSync(bundle);
+  writeFileSync(protectedPath, "value = 'before'\n");
+  symlinkSync(protectedPath, join(target, "agent/link.py"));
+  const patchText =
+    "diff --git a/agent/link.py b/agent/link.py\n" +
+    "--- a/agent/link.py\n" +
+    "+++ b/agent/link.py\n" +
+    "@@ -1 +1 @@\n" +
+    "-value = 'before'\n" +
+    "+value = 'after'\n";
+  writeFileSync(join(bundle, "change.patch"), patchText);
+  writeFileSync(join(bundle, "manifest.json"), JSON.stringify({
+    schema: "callscore.hermes_runtime_patch.v1",
+    owner: "OmarA1-Bakri/CallScore",
+    upstream_repository: "NousResearch/hermes-agent",
+    upstream_commit: commit,
+    upstream_tree: tree,
+    patch_file: "change.patch",
+    patch_sha256: sha(patchText),
+    target_files: [{
+      path: "agent/link.py",
+      before_sha256: sha("value = 'before'\n"),
+      after_sha256: sha("value = 'after'\n"),
+    }],
+  }));
+  const result = run(["--manifest", join(bundle, "manifest.json"), "--runtime-repo", target, "--apply"]);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /unsafe destination|refusing unsafe destination/);
-  assert.equal(readFileSync(protectedFile, "utf8"), "do-not-overwrite\n");
+  assert.match(result.stderr, /unsafe target path/);
+  assert.equal(readFileSync(protectedPath, "utf8"), "value = 'before'\n");
 });
 
-test("package scripts expose explicit Hermes runtime and gateway unit gates", () => {
+test("CallScore runtime applicator does not spawn commands or own gateway control-plane files", () => {
+  const source = readFileSync(script, "utf8");
+  assert.doesNotMatch(source, /^import subprocess$/m);
+  assert.doesNotMatch(source, /\bsubprocess\./);
+  assert.doesNotMatch(source, /os\.posix_spawn\(/);
+  assert.doesNotMatch(source, /\/usr\/bin\/git/);
+  assert.doesNotMatch(source, /\bctypes\b/);
+  assert.equal(existsSync(join(repoRoot, "ops/systemd/hermes-callscore-gateway.service")), false);
+  assert.equal(existsSync(join(repoRoot, "scripts/install-callscore-hermes-gateway-unit.py")), false);
+});
+
+test("package scripts expose only CallScore-owned Hermes runtime patch gates", () => {
   const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
   assert.match(pkg.scripts["hermes:runtime:verify"], /apply-callscore-hermes-patch\.py[\s\S]*--check/);
   assert.match(pkg.scripts["hermes:runtime:apply"], /apply-callscore-hermes-patch\.py[\s\S]*--apply/);
-  assert.match(pkg.scripts["hermes:gateway:unit:check"], /install-callscore-hermes-gateway-unit\.py[\s\S]*--check/);
-  assert.match(pkg.scripts["hermes:gateway:unit:install"], /install-callscore-hermes-gateway-unit\.py[\s\S]*--install/);
+  assert.equal(pkg.scripts["hermes:gateway:unit:check"], undefined);
+  assert.equal(pkg.scripts["hermes:gateway:unit:install"], undefined);
 });

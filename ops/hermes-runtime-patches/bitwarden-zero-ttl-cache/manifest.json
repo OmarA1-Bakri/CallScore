@@ -2,20 +2,20 @@
   "schema": "callscore.hermes_runtime_patch.v1",
   "owner": "OmarA1-Bakri/CallScore",
   "upstream_repository": "NousResearch/hermes-agent",
-  "upstream_commit": "1d3d021282098261ce2ad224a76d97d89b16188c",
-  "upstream_tree": "490dbf5687bd00bd6309b0d0cd69fe5384a4301d",
+  "upstream_commit": "b91aade17683a551e6c8e633fe5407d07354b16e",
+  "upstream_tree": "bb41123fec0f088f6e211c744a0cfd1fce668d24",
   "patch_file": "bitwarden-zero-ttl-cache.patch",
-  "patch_sha256": "e44e3216e8b139c1122630170ec5036485dfd844978fd8569c4267cfc8032ed8",
+  "patch_sha256": "ab7e689ec1e51955801455015db86fde23e14117b9e716f0a8ca92d61466d264",
   "target_files": [
     {
       "path": "agent/secret_sources/bitwarden.py",
-      "before_sha256": "64654db0ca3ff8f6e69479786a7d1e202291f657414cc06608f3e0e5e234c6d5",
-      "after_sha256": "8e851a5bc35a64b2ff4e35475064295465773abdbace3aa63c54299892a98b35"
+      "before_sha256": "8b986aff7def3c623b84cf3fed5bbe9edd5664c3dc5f8a59521cf7b597ed80cb",
+      "after_sha256": "0b2a9dc2c8027f6f70c6e74151cf491c6eba7cb5a4c80eb184e7d5335b8b3537"
     },
     {
       "path": "tests/test_bitwarden_secrets.py",
-      "before_sha256": "11576e262f8455d39cb7120111d9d5987f114df035b3c1ba4de3d52692386b57",
-      "after_sha256": "436cd4b269f80b0f7bb2fd7d3043f0ed5fd3ea5d9022badc9bd65c15788bcb54"
+      "before_sha256": "dd0eecf97fba011f2e93bcd835343cbf5aa07f3b16ca7c355a7f54a814e79b8e",
+      "after_sha256": "11344aaefdbcf178c4e5d285637528550cd5f86ee651365079865784fe8ac244"
     }
   ]
 }
