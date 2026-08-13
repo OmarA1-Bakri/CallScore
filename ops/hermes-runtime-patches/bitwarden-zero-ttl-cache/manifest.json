@@ -5,7 +5,7 @@
   "upstream_commit": "1d3d021282098261ce2ad224a76d97d89b16188c",
   "upstream_tree": "490dbf5687bd00bd6309b0d0cd69fe5384a4301d",
   "patch_file": "bitwarden-zero-ttl-cache.patch",
-  "patch_sha256": "6a140ef6664fdfe30b643760e358bffca8c7cba0de4d616430a5b2decaf978d6",
+  "patch_sha256": "e44e3216e8b139c1122630170ec5036485dfd844978fd8569c4267cfc8032ed8",
   "target_files": [
     {
       "path": "agent/secret_sources/bitwarden.py",

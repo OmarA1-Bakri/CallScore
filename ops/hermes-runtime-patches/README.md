@@ -18,3 +18,17 @@ Use `--apply` only through an approved CallScore runtime maintenance path. The
 installer fails closed on upstream-anchor drift, patch drift, or mixed target
 state. No secret values, environment files, caches, or credentials belong in a
 patch bundle.
+
+The canonical CallScore gateway unit lives at
+`ops/systemd/hermes-callscore-gateway.service`. Its `ExecStartPre` applies this
+pinned bundle before Hermes starts, so an unpatched or drifted runtime fails
+closed. Install or verify the unit with:
+
+```bash
+npm run hermes:gateway:unit:check
+npm run hermes:gateway:unit:install
+```
+
+The installer may copy the unit and run `systemctl --user daemon-reload`; it
+never starts, stops, restarts, enables, or disables the gateway. Runtime
+activation is a separate operator-reviewed action.

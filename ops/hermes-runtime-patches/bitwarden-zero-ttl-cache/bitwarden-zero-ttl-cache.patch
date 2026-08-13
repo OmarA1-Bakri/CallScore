@@ -2,16 +2,25 @@ diff --git a/agent/secret_sources/bitwarden.py b/agent/secret_sources/bitwarden.
 index 357f69cc6..f6ba6d5aa 100644
 --- a/agent/secret_sources/bitwarden.py
 +++ b/agent/secret_sources/bitwarden.py
-@@ -536,0 +537,4 @@ def fetch_bitwarden_secrets(
+@@ -534,6 +534,10 @@ def fetch_bitwarden_secrets(
+         raise RuntimeError("Bitwarden project_id is empty")
+ 
+     cache_key = (_token_fingerprint(access_token), project_id, server_url or "")
 +    if cache_ttl_seconds <= 0 and not encrypted_cache_enabled:
 +        # A zero TTL opts out of plaintext persistence. Remove a stale cache
 +        # left by an earlier non-zero policy before doing the live fetch.
 +        _DISK_CACHE.clear(home_path)
+     if use_cache and cache_ttl_seconds > 0:
+         cached = _CACHE.get(cache_key)
+         if cached and cached.is_fresh(cache_ttl_seconds):
 diff --git a/tests/test_bitwarden_secrets.py b/tests/test_bitwarden_secrets.py
 index 420605416..50255fcfa 100644
 --- a/tests/test_bitwarden_secrets.py
 +++ b/tests/test_bitwarden_secrets.py
-@@ -336,0 +337,29 @@ def test_disk_cache_key_mismatch_triggers_refetch(monkeypatch, tmp_path):
+@@ -334,6 +334,35 @@ def test_disk_cache_key_mismatch_triggers_refetch(monkeypatch, tmp_path):
+ 
+ 
+ 
 +def test_zero_ttl_removes_stale_plaintext_disk_cache(monkeypatch, tmp_path):
 +    """TTL zero removes legacy plaintext cache and writes no replacement."""
 +    home = tmp_path / ".hermes"
@@ -40,3 +49,7 @@ index 420605416..50255fcfa 100644
 +    assert secrets == {"CANARY": "secret-value"}
 +    assert not cache_path.exists()
 +
++
+ def test_encrypted_cache_writes_without_plaintext(monkeypatch, tmp_path):
+     """Encrypted cache stores last-good secrets without raw values on disk."""
+     home = tmp_path / ".hermes"
