@@ -1,0 +1,21 @@
+{
+  "schema": "callscore.hermes_runtime_patch.v1",
+  "owner": "OmarA1-Bakri/CallScore",
+  "upstream_repository": "NousResearch/hermes-agent",
+  "upstream_commit": "1d3d021282098261ce2ad224a76d97d89b16188c",
+  "upstream_tree": "490dbf5687bd00bd6309b0d0cd69fe5384a4301d",
+  "patch_file": "bitwarden-zero-ttl-cache.patch",
+  "patch_sha256": "6a140ef6664fdfe30b643760e358bffca8c7cba0de4d616430a5b2decaf978d6",
+  "target_files": [
+    {
+      "path": "agent/secret_sources/bitwarden.py",
+      "before_sha256": "64654db0ca3ff8f6e69479786a7d1e202291f657414cc06608f3e0e5e234c6d5",
+      "after_sha256": "8e851a5bc35a64b2ff4e35475064295465773abdbace3aa63c54299892a98b35"
+    },
+    {
+      "path": "tests/test_bitwarden_secrets.py",
+      "before_sha256": "11576e262f8455d39cb7120111d9d5987f114df035b3c1ba4de3d52692386b57",
+      "after_sha256": "436cd4b269f80b0f7bb2fd7d3043f0ed5fd3ea5d9022badc9bd65c15788bcb54"
+    }
+  ]
+}

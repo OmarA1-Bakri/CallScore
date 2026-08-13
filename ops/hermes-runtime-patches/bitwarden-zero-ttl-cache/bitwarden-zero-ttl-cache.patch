@@ -1,0 +1,42 @@
+diff --git a/agent/secret_sources/bitwarden.py b/agent/secret_sources/bitwarden.py
+index 357f69cc6..f6ba6d5aa 100644
+--- a/agent/secret_sources/bitwarden.py
++++ b/agent/secret_sources/bitwarden.py
+@@ -536,0 +537,4 @@ def fetch_bitwarden_secrets(
++    if cache_ttl_seconds <= 0 and not encrypted_cache_enabled:
++        # A zero TTL opts out of plaintext persistence. Remove a stale cache
++        # left by an earlier non-zero policy before doing the live fetch.
++        _DISK_CACHE.clear(home_path)
+diff --git a/tests/test_bitwarden_secrets.py b/tests/test_bitwarden_secrets.py
+index 420605416..50255fcfa 100644
+--- a/tests/test_bitwarden_secrets.py
++++ b/tests/test_bitwarden_secrets.py
+@@ -336,0 +337,29 @@ def test_disk_cache_key_mismatch_triggers_refetch(monkeypatch, tmp_path):
++def test_zero_ttl_removes_stale_plaintext_disk_cache(monkeypatch, tmp_path):
++    """TTL zero removes legacy plaintext cache and writes no replacement."""
++    home = tmp_path / ".hermes"
++    home.mkdir()
++    fake_binary = tmp_path / "bws"
++    fake_binary.write_text("")
++    payload = _fake_bws_payload([{"key": "CANARY", "value": "secret-value"}])
++    monkeypatch.setattr(
++        bw.subprocess,
++        "run",
++        lambda *a, **kw: mock.Mock(returncode=0, stdout=payload, stderr=""),
++    )
++    bw._reset_cache_for_tests(home)
++    cache_path = bw._disk_cache_path(home)
++    cache_path.parent.mkdir(parents=True, exist_ok=True)
++    cache_path.write_text('{"stale":"plaintext"}')
++
++    secrets, _ = bw.fetch_bitwarden_secrets(
++        access_token="0.t",
++        project_id="proj-1",
++        binary=fake_binary,
++        cache_ttl_seconds=0,
++        home_path=home,
++    )
++
++    assert secrets == {"CANARY": "secret-value"}
++    assert not cache_path.exists()
++
