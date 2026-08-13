@@ -6,13 +6,39 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import subprocess
+import os
 import sys
 from pathlib import Path
 from typing import Any
 
 SCHEMA = "callscore.hermes_runtime_patch.v1"
 OWNER = "OmarA1-Bakri/CallScore"
+GIT_EXECUTABLE = "/usr/bin/git"
+
+
+def run_git(runtime_repo: Path, arguments: list[str]) -> tuple[int, str]:
+    """Run the fixed system Git binary without a shell or PATH lookup."""
+    read_fd, write_fd = os.pipe()
+    try:
+        argv = [GIT_EXECUTABLE, "-C", str(runtime_repo), *arguments]
+        file_actions = [
+            (os.POSIX_SPAWN_DUP2, write_fd, 1),
+            (os.POSIX_SPAWN_DUP2, write_fd, 2),
+            (os.POSIX_SPAWN_CLOSE, read_fd),
+            (os.POSIX_SPAWN_CLOSE, write_fd),
+        ]
+        process_id = os.posix_spawn(
+            GIT_EXECUTABLE,
+            argv,
+            os.environ.copy(),
+            file_actions=file_actions,
+        )
+    finally:
+        os.close(write_fd)
+    with os.fdopen(read_fd, "rb") as output:
+        captured = output.read().decode("utf-8", errors="replace")
+    _, status = os.waitpid(process_id, 0)
+    return os.waitstatus_to_exitcode(status), captured
 
 
 def sha256(path: Path) -> str:
@@ -93,16 +119,10 @@ def target_state(runtime_repo: Path, manifest: dict[str, Any]) -> tuple[str, lis
 def verify_git_anchor(runtime_repo: Path, manifest: dict[str, Any]) -> None:
     if len(str(manifest["upstream_commit"])) != 40:
         return
-    probe = subprocess.run(
-        ["git", "rev-parse", "HEAD", "HEAD^{tree}"],
-        cwd=runtime_repo,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if probe.returncode != 0:
+    returncode, output = run_git(runtime_repo, ["rev-parse", "HEAD", "HEAD^{tree}"])
+    if returncode != 0:
         raise ValueError("runtime repo is not a readable Git worktree")
-    anchors = probe.stdout.splitlines()
+    anchors = output.splitlines()
     if len(anchors) != 2:
         raise ValueError("runtime repo returned an incomplete Git anchor")
     actual_commit, actual_tree = anchors
@@ -117,19 +137,13 @@ def verify_git_anchor(runtime_repo: Path, manifest: dict[str, Any]) -> None:
 
 
 def git_apply(runtime_repo: Path, patch_path: Path, *, check: bool) -> None:
-    command = ["git", "apply"]
+    command = ["apply"]
     if check:
         command.append("--check")
     command.extend(["--whitespace=error", str(patch_path)])
-    result = subprocess.run(
-        command,
-        cwd=runtime_repo,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip()
+    returncode, output = run_git(runtime_repo, command)
+    if returncode != 0:
+        detail = output.strip()
         raise ValueError(f"git apply {'check ' if check else ''}failed: {detail}")
 
 

@@ -174,6 +174,12 @@ test("gateway unit installer verifies drift and never restarts the live gateway"
 
 test("gateway unit installer keeps the canonical user-systemd destination under profile HOME", () => {
   const fakeHome = mkdtempSync(join(tmpdir(), "callscore-profile-home-"));
+  const passwdHome = spawnSync(
+    "python3",
+    ["-c", "import os,pwd; print(pwd.getpwuid(os.getuid()).pw_dir)"],
+    { encoding: "utf8", env: { ...process.env, HOME: fakeHome } },
+  );
+  assert.equal(passwdHome.status, 0, passwdHome.stderr || passwdHome.stdout);
   const result = spawnSync("python3", [unitInstaller, "--source", gatewayUnit, "--check"], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -181,7 +187,23 @@ test("gateway unit installer keeps the canonical user-systemd destination under 
   });
   assert.notEqual(result.status, null);
   const payload = JSON.parse(result.status === 0 ? result.stdout : result.stderr);
-  assert.equal(payload.destination, "/home/omar/.config/systemd/user/hermes-callscore-gateway.service");
+  assert.equal(
+    payload.destination,
+    join(passwdHome.stdout.trim(), ".config/systemd/user/hermes-callscore-gateway.service"),
+  );
+  assert.equal(payload.destination.startsWith(fakeHome), false);
+});
+
+test("Python runtime installers invoke only fixed absolute executables without subprocess or a shell", () => {
+  for (const path of [script, unitInstaller]) {
+    const source = readFileSync(path, "utf8");
+    assert.doesNotMatch(source, /^import subprocess$/m);
+    assert.doesNotMatch(source, /\bsubprocess\./);
+    assert.doesNotMatch(source, /shell\s*=\s*True/);
+    assert.match(source, /os\.posix_spawn\(/);
+  }
+  assert.match(readFileSync(script, "utf8"), /GIT_EXECUTABLE = "\/usr\/bin\/git"/);
+  assert.match(readFileSync(unitInstaller, "utf8"), /SYSTEMCTL_EXECUTABLE = "\/usr\/bin\/systemctl"/);
 });
 
 test("gateway unit installer refuses a symlink destination", () => {

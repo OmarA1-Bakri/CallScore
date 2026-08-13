@@ -12,12 +12,12 @@ import hashlib
 import json
 import os
 import pwd
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 DEFAULT_SOURCE = Path("ops/systemd/hermes-callscore-gateway.service")
+SYSTEMCTL_EXECUTABLE = "/usr/bin/systemctl"
 
 
 def login_home() -> Path:
@@ -91,14 +91,28 @@ def install_atomic(destination: Path, source_data: bytes) -> None:
 
 
 def daemon_reload() -> None:
-    result = subprocess.run(
-        ["systemctl", "--user", "daemon-reload"],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip()
+    read_fd, write_fd = os.pipe()
+    try:
+        argv = [SYSTEMCTL_EXECUTABLE, "--user", "daemon-reload"]
+        file_actions = [
+            (os.POSIX_SPAWN_DUP2, write_fd, 1),
+            (os.POSIX_SPAWN_DUP2, write_fd, 2),
+            (os.POSIX_SPAWN_CLOSE, read_fd),
+            (os.POSIX_SPAWN_CLOSE, write_fd),
+        ]
+        process_id = os.posix_spawn(
+            SYSTEMCTL_EXECUTABLE,
+            argv,
+            os.environ.copy(),
+            file_actions=file_actions,
+        )
+    finally:
+        os.close(write_fd)
+    with os.fdopen(read_fd, "rb") as output:
+        captured = output.read().decode("utf-8", errors="replace")
+    _, status = os.waitpid(process_id, 0)
+    if os.waitstatus_to_exitcode(status) != 0:
+        detail = captured.strip()
         raise ValueError(f"systemd user daemon-reload failed: {detail}")
 
 
