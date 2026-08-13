@@ -26,6 +26,8 @@
     "validate:candles": "node --import tsx src/scripts/validate-candle-open-time-constraint.ts",
     "pipeline:data": "node --import tsx src/scripts/run-data-pipeline.ts",
     "hygiene:secrets": "node --import tsx src/scripts/check-secret-hygiene.ts",
+    "hermes:runtime:verify": "python3 scripts/apply-callscore-hermes-patch.py --manifest ops/hermes-runtime-patches/bitwarden-zero-ttl-cache/manifest.json --runtime-repo /home/omar/.hermes/hermes-agent --check",
+    "hermes:runtime:apply": "python3 scripts/apply-callscore-hermes-patch.py --manifest ops/hermes-runtime-patches/bitwarden-zero-ttl-cache/manifest.json --runtime-repo /home/omar/.hermes/hermes-agent --apply",
     "audit:pipeline": "node --import tsx src/scripts/audit-pipeline-readiness.ts",
     "verify:public": "node --import tsx src/scripts/verify-public-surface.ts",
     "backfill:publication-dates": "node --import tsx src/scripts/backfill-publication-dates.ts",

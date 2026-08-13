@@ -1,0 +1,74 @@
+diff --git a/agent/secret_sources/bitwarden.py b/agent/secret_sources/bitwarden.py
+index b19451fda..a7d1e98f6 100644
+--- a/agent/secret_sources/bitwarden.py
++++ b/agent/secret_sources/bitwarden.py
+@@ -443,7 +443,15 @@ def fetch_bitwarden_secrets(
+         raise RuntimeError("Bitwarden project_id is empty")
+ 
+     cache_key = (_token_fingerprint(access_token), project_id, server_url or "")
+-    if use_cache:
++    if cache_ttl_seconds <= 0:
++        # TTL zero is an explicit no-cache policy. Remove any plaintext disk
++        # cache left by an earlier non-zero configuration before the live fetch.
++        _CACHE.pop(cache_key, None)
++        try:
++            _disk_cache_path(home_path).unlink()
++        except (FileNotFoundError, OSError):
++            pass
++    if use_cache and cache_ttl_seconds > 0:
+         cached = _CACHE.get(cache_key)
+         if cached and cached.is_fresh(cache_ttl_seconds):
+             return cached.secrets, []
+@@ -465,9 +473,9 @@ def fetch_bitwarden_secrets(
+         )
+ 
+     secrets, warnings = _run_bws_list(bws, access_token, project_id, server_url)
+-    entry = _CachedFetch(secrets=secrets, fetched_at=time.time())
+-    _CACHE[cache_key] = entry
+-    if use_cache:
++    if use_cache and cache_ttl_seconds > 0:
++        entry = _CachedFetch(secrets=secrets, fetched_at=time.time())
++        _CACHE[cache_key] = entry
+         _write_disk_cache(cache_key, entry, home_path)
+     return secrets, warnings
+ 
+diff --git a/tests/test_bitwarden_secrets.py b/tests/test_bitwarden_secrets.py
+index dbedd0cb7..cdabb9b9e 100644
+--- a/tests/test_bitwarden_secrets.py
++++ b/tests/test_bitwarden_secrets.py
+@@ -685,6 +685,35 @@ def test_disk_cache_expires_with_ttl(monkeypatch, tmp_path):
+     assert call_count["n"] == 2
+ 
+ 
++def test_zero_ttl_removes_stale_plaintext_disk_cache(monkeypatch, tmp_path):
++    """TTL zero removes a stale plaintext cache and writes no replacement."""
++    home = tmp_path / ".hermes"
++    home.mkdir()
++    fake_binary = tmp_path / "bws"
++    fake_binary.write_text("")
++    payload = _fake_bws_payload([{"key": "CANARY", "value": "secret-value"}])
++    monkeypatch.setattr(
++        bw.subprocess,
++        "run",
++        lambda *a, **kw: mock.Mock(returncode=0, stdout=payload, stderr=""),
++    )
++    bw._reset_cache_for_tests(home)
++    cache_path = bw._disk_cache_path(home)
++    cache_path.parent.mkdir(parents=True, exist_ok=True)
++    cache_path.write_text('{"stale":"plaintext"}')
++
++    secrets, _ = bw.fetch_bitwarden_secrets(
++        access_token="0.t",
++        project_id="proj-1",
++        binary=fake_binary,
++        cache_ttl_seconds=0,
++        home_path=home,
++    )
++
++    assert secrets == {"CANARY": "secret-value"}
++    assert not cache_path.exists()
++
++
+ def test_disk_cache_key_mismatch_triggers_refetch(monkeypatch, tmp_path):
+     """Disk cache entry written by a different token/project is ignored."""
+     home = tmp_path / ".hermes"
