@@ -4,7 +4,10 @@ import {
 } from "../operating-graph-schemas";
 import { evaluateExternalMutationRequest, finalizeExternalMutationReceipt } from "../external-mutation-guard";
 import { OperatingGraphMutationContextSchema } from "../external-mutation-schemas";
-import { evaluateCanonicalOperationalPackage } from "../../autonomy/canonical-operational-runtime";
+import {
+  buildYoutubeProductionPackage,
+  evaluateCanonicalOperationalPackage,
+} from "../../autonomy/canonical-operational-runtime";
 import type {
   ExternalMutationFamilySchema,
   ExternalMutationModeSchema,
@@ -83,8 +86,14 @@ function providerPayloadHasRequiredMedia(toolSlug: string, payload: unknown): bo
   return true;
 }
 
-function canonicalReceiptBlocker(input: Record<string, unknown>, platform: ExternalMutationPlatform): string | null {
-  if (!hasOwn(input, "canonical_receipts") && !hasOwn(input, "canonical_operational_package") && !mediaGateRequiresMedia(input)) return null;
+function canonicalReceiptBlocker(
+  input: Record<string, unknown>,
+  platform: ExternalMutationPlatform,
+  required: boolean,
+): string | null {
+  if (!hasOwn(input, "canonical_receipts") && !hasOwn(input, "canonical_operational_package") && !mediaGateRequiresMedia(input)) {
+    return required ? "canonical_operational_package_missing" : null;
+  }
   const rawPackage = input.canonical_operational_package;
   const packageRecord = isRecord(rawPackage) ? rawPackage : null;
   const receipts = hasOwn(input, "canonical_receipts") ? input.canonical_receipts : packageRecord?.receipts;
@@ -98,7 +107,21 @@ function canonicalReceiptBlocker(input: Record<string, unknown>, platform: Exter
       receipts,
       media_artifact: isRecord(mediaArtifact) ? mediaArtifact : null,
     });
-    return decision.status === "approved" ? null : (decision.blockers[0] ?? "canonical_operational_package_blocked");
+    if (decision.status !== "approved") {
+      return decision.blockers[0] ?? "canonical_operational_package_blocked";
+    }
+    if (platform === "youtube") {
+      const youtubeDecision = buildYoutubeProductionPackage({
+        package_id: decision.package.package_id,
+        created_at: decision.package.created_at,
+        receipts: decision.package.receipts,
+        media_artifact: isRecord(mediaArtifact) ? mediaArtifact : null,
+      });
+      return youtubeDecision.status === "approved"
+        ? null
+        : (youtubeDecision.blockers[0] ?? "youtube_production_package_blocked");
+    }
+    return null;
   } catch {
     return "canonical_operational_package_invalid";
   }
@@ -214,7 +237,11 @@ export function runGraphOwnedMutationNode(options: GraphOwnedMutationNodeOptions
     return blocked(options.nodeId, "required_media_missing");
   }
 
-  const canonicalBlocker = canonicalReceiptBlocker(options.input, options.platform);
+  const canonicalBlocker = canonicalReceiptBlocker(
+    options.input,
+    options.platform,
+    options.requestedAction === "publish_owned_public",
+  );
   if (canonicalBlocker) {
     return blocked(options.nodeId, canonicalBlocker);
   }

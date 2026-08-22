@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { describe, test } from "node:test";
 
 import { buildInitialOperatingState, createCallscoreOperatingGraph } from "../src/lib/workplane/callscore-operating-graph";
+import { validCanonicalOperationalPackage } from "./helpers/canonical-operational-package-fixture";
 
 function stableJson(value: unknown): string {
   return JSON.stringify(value, (_key, val) => {
@@ -62,6 +63,7 @@ describe("revenue_now live_owned_public graph-owned publish routing", () => {
             provider_response: { ok: true, id: "2070000000000000000", url: "https://x.com/0marbakri/status/2070000000000000000" },
             provider_execution_receipt_id: "x_owned_publish_node-provider-exec-test",
             child_receipt_ids: ["x_owned_publish_node-provider-exec-test"],
+            canonical_operational_package: validCanonicalOperationalPackage("x"),
           },
           linkedin_owned_publish_node: {
             graph_context: graphContext("linkedin_owned_publish_node", linkedinPayload),
@@ -70,6 +72,7 @@ describe("revenue_now live_owned_public graph-owned publish routing", () => {
             provider_response: { ok: true, id: "urn:li:share:test", x_restli_id: "urn:li:share:test" },
             provider_execution_receipt_id: "linkedin_owned_publish_node-provider-exec-test",
             child_receipt_ids: ["linkedin_owned_publish_node-provider-exec-test"],
+            canonical_operational_package: validCanonicalOperationalPackage("linkedin"),
           },
         },
       },

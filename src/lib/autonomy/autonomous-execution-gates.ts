@@ -182,9 +182,9 @@ export function classifyOwnedPublicEvidence(input: OwnedPublicEvidenceInput): Ga
     if (!graph.preview_available && !graph.node_path && !graph.node_invoked && !graph.mutation_inputs_path) blockers.push("graph_owned_preview_missing");
   }
 
-  const ceremonial = input.ceremonial_receipts ?? [];
+  const canonicalReceiptAliases = input.ceremonial_receipts ?? [];
   for (const name of ["editorial_angle_receipt.v1", "platform_fit_receipt.v1", "visual_brief_receipt.v1", "visual_qa_receipt.v1", "copy_visual_coherence_receipt.v1", "same_shit_memory_receipt.v1"]) {
-    if (!ceremonial.includes(name)) warnings.push(`missing_ceremonial_receipt_alias_accepted:${name}`);
+    if (!canonicalReceiptAliases.includes(name)) blockers.push(`missing_required_canonical_receipt:${name}`);
   }
 
   if (blockers.length > 0) {

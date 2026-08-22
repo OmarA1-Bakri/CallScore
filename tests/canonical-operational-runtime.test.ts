@@ -45,12 +45,31 @@ test("canonical runtime package requires every operational receipt before handof
     package_id: "pkg-complete",
     channel: "linkedin",
     created_at: "2026-06-30T00:00:00.000Z",
+    evaluated_at: "2026-06-30T12:00:00.000Z",
     receipts: REQUIRED_CANONICAL_RECEIPT_TYPES.map((type) => receipt(type)),
     media_artifact: validCanonicalMediaArtifact("linkedin"),
   });
   assert.equal(complete.status, "approved");
   assert.deepEqual(complete.blockers, []);
   assert.doesNotThrow(() => CanonicalOperationalPackageSchema.parse(complete.package));
+});
+
+test("canonical runtime blocks stale packages and stale required receipts", () => {
+  const stalePackage = evaluateCanonicalOperationalPackage({
+    package_id: "pkg-stale",
+    channel: "x",
+    created_at: "2026-07-09T00:00:00.000Z",
+    evaluated_at: "2026-07-11T00:00:00.000Z",
+    receipts: REQUIRED_CANONICAL_RECEIPT_TYPES.map((type) => ({
+      ...receipt(type),
+      created_at: "2026-07-09T00:00:00.000Z",
+    })),
+    media_artifact: validCanonicalMediaArtifact("x"),
+  });
+
+  assert.equal(stalePackage.status, "blocked");
+  assert.ok(stalePackage.blockers.includes("canonical_package_stale"));
+  assert.ok(stalePackage.blockers.includes("stale_editorial_angle_receipt.v1"));
 });
 
 test("canonical runtime calls the media validator and blocks a forged receipt-only package", () => {

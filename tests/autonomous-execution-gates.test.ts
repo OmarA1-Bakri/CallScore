@@ -7,6 +7,15 @@ import {
   type OwnedPublicEvidenceInput,
 } from "../src/lib/autonomy/autonomous-execution-gates";
 
+const requiredDraftReceipts = [
+  "editorial_angle_receipt.v1",
+  "platform_fit_receipt.v1",
+  "visual_brief_receipt.v1",
+  "visual_qa_receipt.v1",
+  "copy_visual_coherence_receipt.v1",
+  "same_shit_memory_receipt.v1",
+] as const;
+
 const baseDraft: OwnedPublicEvidenceInput = {
   execution_mode: "draft_ready",
   data_packet: {
@@ -27,13 +36,20 @@ const baseDraft: OwnedPublicEvidenceInput = {
   quality_gate: { ok: true, failures: [] },
   visual_asset: { required: true, png_sha256: `sha256:${"a".repeat(64)}`, kind: "product_screenshot", alt_text: "CallScore leaderboard" },
   graph_owned_path: { preview_available: true },
+  ceremonial_receipts: requiredDraftReceipts,
 };
 
-test("draft-ready evidence passes without ceremonial receipt files", () => {
-  const result = classifyOwnedPublicEvidence(baseDraft);
+test("draft-ready evidence blocks when required canonical receipt aliases are missing", () => {
+  const result = classifyOwnedPublicEvidence({ ...baseDraft, ceremonial_receipts: [] });
+  assert.equal(result.normalized_status, "blocked");
+  assert.ok(result.blockers.includes("missing_required_canonical_receipt:editorial_angle_receipt.v1"));
+  assert.equal(result.warnings.some((warning) => warning.includes("missing_ceremonial_receipt_alias_accepted")), false);
+});
+
+test("draft-ready evidence passes when required canonical receipt aliases are present", () => {
+  const result = classifyOwnedPublicEvidence({ ...baseDraft, ceremonial_receipts: requiredDraftReceipts });
   assert.equal(result.normalized_status, "draft_ready");
   assert.deepEqual(result.blockers, []);
-  assert.ok(result.warnings.some((w) => w.includes("missing_ceremonial_receipt_alias_accepted")));
 });
 
 test("quality gate failure blocks publish with status reason", () => {

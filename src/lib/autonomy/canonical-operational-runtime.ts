@@ -57,8 +57,12 @@ export interface CanonicalPackageEvaluation {
   readonly package: CanonicalOperationalPackage;
 }
 
+export const CANONICAL_EVIDENCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+export const CANONICAL_EVIDENCE_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
 export interface CanonicalOperationalPackageInput extends Omit<CanonicalOperationalPackage, "status" | "blockers"> {
   readonly media_artifact?: Partial<MediaArtifactReceipt> | null;
+  readonly evaluated_at?: string;
 }
 
 function hasApprovedReceipt(receipts: readonly CanonicalReceipt[], schema: string): boolean {
@@ -75,8 +79,46 @@ function missingReceiptBlockers(receipts: readonly CanonicalReceipt[], required:
   return required.filter((schema) => !hasApprovedReceipt(receipts, schema)).map((schema) => `missing_${schema}`);
 }
 
+function timestampMs(value: string): number | null {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function freshnessBlockers(
+  packageCreatedAt: string,
+  receipts: readonly CanonicalReceipt[],
+  evaluatedAt: string,
+): string[] {
+  const evaluatedMs = timestampMs(evaluatedAt);
+  const packageMs = timestampMs(packageCreatedAt);
+  if (evaluatedMs === null) return ["canonical_evaluation_timestamp_invalid"];
+  const blockers: string[] = [];
+  if (packageMs === null) {
+    blockers.push("canonical_package_timestamp_invalid");
+  } else if (packageMs > evaluatedMs + CANONICAL_EVIDENCE_FUTURE_SKEW_MS) {
+    blockers.push("canonical_package_timestamp_in_future");
+  } else if (evaluatedMs - packageMs > CANONICAL_EVIDENCE_MAX_AGE_MS) {
+    blockers.push("canonical_package_stale");
+  }
+  for (const receipt of receipts) {
+    const receiptMs = timestampMs(receipt.created_at);
+    if (receiptMs === null) {
+      blockers.push(`invalid_created_at_${receipt.schema}`);
+    } else if (receiptMs > evaluatedMs + CANONICAL_EVIDENCE_FUTURE_SKEW_MS) {
+      blockers.push(`future_created_at_${receipt.schema}`);
+    } else if (evaluatedMs - receiptMs > CANONICAL_EVIDENCE_MAX_AGE_MS) {
+      blockers.push(`stale_${receipt.schema}`);
+    }
+  }
+  return blockers;
+}
+
 export function evaluateCanonicalOperationalPackage(input: CanonicalOperationalPackageInput): CanonicalPackageEvaluation {
-  const { media_artifact: mediaArtifact, ...packageInput } = input;
+  const {
+    media_artifact: mediaArtifact,
+    evaluated_at: evaluatedAt = new Date().toISOString(),
+    ...packageInput
+  } = input;
   const parsed = CanonicalOperationalPackageSchema.omit({ status: true, blockers: true }).parse(packageInput);
   const mediaBlockers: string[] = [];
   if (!mediaArtifact) {
@@ -92,6 +134,7 @@ export function evaluateCanonicalOperationalPackage(input: CanonicalOperationalP
   const blockers = [
     ...missingReceiptBlockers(parsed.receipts, REQUIRED_CANONICAL_RECEIPT_TYPES),
     ...receiptBlockers(parsed.receipts),
+    ...freshnessBlockers(parsed.created_at, parsed.receipts, evaluatedAt),
     ...mediaBlockers,
   ];
   const status = blockers.length === 0 ? "approved" : "blocked";
